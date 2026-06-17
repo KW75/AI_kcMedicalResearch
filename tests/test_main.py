@@ -1,9 +1,11 @@
 ﻿from __future__ import annotations
 
+import json
+from io import BytesIO
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 
-from src.main import read_text_file, save_report, build_project_context
+from src.main import read_text_file, save_report, build_project_context, call_ollama
 
 
 def test_read_text_file_returns_content(tmp_path: Path) -> None:
@@ -82,3 +84,54 @@ def test_build_project_context_combines_multiple_files(tmp_path: Path) -> None:
         result = build_project_context()
     assert "PRD content." in result
     assert "Architecture content." in result
+
+
+def test_call_ollama_returns_response_text() -> None:
+    fake_response = json.dumps({"response": "Hello from Ollama."}).encode("utf-8")
+    mock_response = MagicMock()
+    mock_response.read.return_value = fake_response
+    mock_response.__enter__ = lambda s: s
+    mock_response.__exit__ = MagicMock(return_value=False)
+    with patch("src.main.urlopen", return_value=mock_response):
+        result = call_ollama(
+            model="qwen2.5-coder:3b",
+            prompt="Say hello.",
+            host="http://localhost:11434",
+        )
+    assert result == "Hello from Ollama."
+
+
+def test_call_ollama_raises_on_empty_response() -> None:
+    fake_response = json.dumps({"response": ""}).encode("utf-8")
+    mock_response = MagicMock()
+    mock_response.read.return_value = fake_response
+    mock_response.__enter__ = lambda s: s
+    mock_response.__exit__ = MagicMock(return_value=False)
+    with patch("src.main.urlopen", return_value=mock_response):
+        try:
+            call_ollama(
+                model="qwen2.5-coder:3b",
+                prompt="Say hello.",
+                host="http://localhost:11434",
+            )
+            assert False, "Expected RuntimeError was not raised."
+        except RuntimeError as error:
+            assert "no response" in str(error).lower()
+
+
+def test_call_ollama_raises_on_ollama_error() -> None:
+    fake_response = json.dumps({"error": "model not found"}).encode("utf-8")
+    mock_response = MagicMock()
+    mock_response.read.return_value = fake_response
+    mock_response.__enter__ = lambda s: s
+    mock_response.__exit__ = MagicMock(return_value=False)
+    with patch("src.main.urlopen", return_value=mock_response):
+        try:
+            call_ollama(
+                model="qwen2.5-coder:3b",
+                prompt="Say hello.",
+                host="http://localhost:11434",
+            )
+            assert False, "Expected RuntimeError was not raised."
+        except RuntimeError as error:
+            assert "model not found" in str(error).lower()
