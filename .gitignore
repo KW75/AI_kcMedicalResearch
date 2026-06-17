@@ -15,3 +15,9 @@ build/
 *.egg-info/
 
 .vscode/
+
+# Local-only handoff/reference files
+HANDOFF*.md
+HANDOFF*.html
+GITHUB_SETUP_REFERENCE*.md
+GITHUB_SETUP_REFERENCE*.html
