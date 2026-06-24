@@ -225,7 +225,7 @@ def test_main_runs_full_workflow(tmp_path: Path) -> None:
     mock_response.__enter__ = lambda s: s
     mock_response.__exit__ = MagicMock(return_value=False)
 
-    with patch("builtins.input", side_effect=["1", "Write a hello world function."]), \
+    with patch("builtins.input", side_effect=["1", "Write a hello world function.", "no"]), \
          patch("src.main.urlopen", return_value=mock_response), \
          patch("src.main.REPORTS_DIR", tmp_path), \
          patch("src.main.load_dotenv"), \

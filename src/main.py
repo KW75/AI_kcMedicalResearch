@@ -139,24 +139,34 @@ def main() -> None:
     model = os.getenv("OLLAMA_MODEL", DEFAULT_OLLAMA_MODEL)
     host = os.getenv("OLLAMA_HOST", DEFAULT_OLLAMA_HOST)
 
-    role_name, prompt_path, report_path = choose_role()
+    print("\nAI Automation Tool")
+    print("==================")
+    print("Type 'quit' or 'exit' at any prompt to stop.\n")
 
-    role_prompt = read_text_file(prompt_path)
-    project_context = build_project_context()
+    while True:
+        role_name, prompt_path, report_path = choose_role()
 
-    task = input("\nEnter your task for the AI: ").strip()
+        role_prompt = read_text_file(prompt_path)
+        project_context = build_project_context()
 
-    if not task:
-        raise ValueError("Task cannot be empty.")
+        task = input("\nEnter your task for the AI: ").strip()
 
-    safety_rules = """
+        if task.lower() in ("quit", "exit"):
+            print("\nGoodbye.")
+            break
+
+        if not task:
+            print("Task cannot be empty. Please try again.")
+            continue
+
+        safety_rules = """
 Safety rules:
 - Do not include secrets, passwords, or API keys.
 - Do not create malware, spyware, keyloggers, credential theft tools, exploit payloads, reverse shells, or unauthorized scanning tools.
 - If a task is unsafe, refuse and suggest a safe defensive alternative.
 """
 
-    full_prompt = f"""
+        full_prompt = f"""
 {role_prompt}
 
 {safety_rules}
@@ -172,18 +182,28 @@ User task:
 Respond as the {role_name} AI.
 """
 
-    print(f"\nSending task to local {role_name} AI using Ollama model {model}...\n")
+        print(f"\nSending task to local {role_name} AI using Ollama model {model}...\n")
 
-    response_text = call_ollama(model=model, prompt=full_prompt, host=host)
+        try:
+            response_text = call_ollama(model=model, prompt=full_prompt, host=host)
+        except RuntimeError as error:
+            print(f"\nError: {error}")
+            print("Please check Ollama is running and try again.\n")
+            continue
 
-    print("\nAI RESPONSE")
-    print("=" * 60)
-    print(response_text)
-    print("=" * 60)
+        print("\nAI RESPONSE")
+        print("=" * 60)
+        print(response_text)
+        print("=" * 60)
 
-    save_report(report_path, role_name, model, task, response_text)
+        save_report(report_path, role_name, model, task, response_text)
 
-    print(f"\nSaved response to: {report_path}")
+        print(f"\nSaved response to: {report_path}")
+
+        again = input("\nSend another task? (yes to continue, anything else to quit): ").strip().lower()
+        if again != "yes":
+            print("\nGoodbye.")
+            break
 
 
 if __name__ == "__main__":
