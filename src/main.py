@@ -50,19 +50,19 @@ def build_project_context() -> str:
 
     return "\n\n".join(sections)
 
-
 def choose_role() -> tuple[str, Path, Path]:
-    print("\nChoose AI role:")
-    print("1. Builder AI")
-    print("2. Reviewer AI")
-    print("3. Tester AI")
+    while True:
+        print("\nChoose AI role:")
+        print("1. Builder AI")
+        print("2. Reviewer AI")
+        print("3. Tester AI")
 
-    choice = input("\nEnter 1, 2, or 3: ").strip()
+        choice = input("\nEnter 1, 2, or 3: ").strip()
 
-    if choice not in ROLE_FILES:
-        raise ValueError("Invalid choice. Please run again and choose 1, 2, or 3.")
+        if choice in ROLE_FILES:
+            return ROLE_FILES[choice]
 
-    return ROLE_FILES[choice]
+        print("Invalid choice. Please enter 1, 2, or 3.")
 
 
 def call_ollama(model: str, prompt: str, host: str) -> str:

@@ -4,8 +4,8 @@ import json
 from io import BytesIO
 from pathlib import Path
 from unittest.mock import patch, MagicMock
+from src.main import read_text_file, save_report, build_project_context, call_ollama, choose_role
 
-from src.main import read_text_file, save_report, build_project_context, call_ollama
 
 
 def test_read_text_file_returns_content(tmp_path: Path) -> None:
@@ -287,14 +287,11 @@ def test_choose_role_returns_tester(tmp_path: Path) -> None:
     assert role_name == "Tester"
 
 
-def test_choose_role_raises_on_invalid_choice() -> None:
-    from src.main import choose_role
-    with patch("builtins.input", return_value="9"):
-        try:
-            choose_role()
-            assert False, "Expected ValueError was not raised."
-        except ValueError as error:
-            assert "invalid choice" in str(error).lower()
+def test_choose_role_shows_warning_on_invalid_then_accepts_valid() -> None:
+    with patch("builtins.input", side_effect=["9", "1"]), \
+         patch("builtins.print"):
+        role_name, prompt_path, report_path = choose_role()
+    assert role_name == "Builder"
 
 
 def test_main_runs_full_workflow(tmp_path: Path) -> None:
