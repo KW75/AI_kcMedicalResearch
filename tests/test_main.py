@@ -33,6 +33,86 @@ def test_save_report_creates_file(tmp_path: Path) -> None:
     save_report(report_path, "Tester", "qwen2.5-coder:3b", "Run tests", "All tests passed.")
     assert report_path.exists()
 
+def test_start_session_transcript_creates_file(tmp_path: Path) -> None:
+    from src.main import start_session_transcript
+    transcript_path = start_session_transcript(tmp_path)
+    assert transcript_path.exists()
+
+
+def test_start_session_transcript_contains_header(tmp_path: Path) -> None:
+    from src.main import start_session_transcript
+    transcript_path = start_session_transcript(tmp_path)
+    content = transcript_path.read_text(encoding="utf-8")
+    assert "Session Transcript" in content
+    assert "Started:" in content
+
+
+def test_start_session_transcript_filename_contains_session(tmp_path: Path) -> None:
+    from src.main import start_session_transcript
+    transcript_path = start_session_transcript(tmp_path)
+    assert "session_" in transcript_path.name
+
+
+def test_append_to_transcript_adds_entry(tmp_path: Path) -> None:
+    from src.main import start_session_transcript, append_to_transcript
+    transcript_path = start_session_transcript(tmp_path)
+    append_to_transcript(transcript_path, 1, "Builder", "Write a function", "Here is the code.")
+    content = transcript_path.read_text(encoding="utf-8")
+    assert "Builder" in content
+    assert "Write a function" in content
+    assert "Here is the code." in content
+
+
+def test_append_to_transcript_includes_step_number(tmp_path: Path) -> None:
+    from src.main import start_session_transcript, append_to_transcript
+    transcript_path = start_session_transcript(tmp_path)
+    append_to_transcript(transcript_path, 3, "Reviewer", "Review the code", "Looks good.")
+    content = transcript_path.read_text(encoding="utf-8")
+    assert "Step 3" in content
+
+
+def test_append_to_transcript_appends_multiple_entries(tmp_path: Path) -> None:
+    from src.main import start_session_transcript, append_to_transcript
+    transcript_path = start_session_transcript(tmp_path)
+    append_to_transcript(transcript_path, 1, "Builder", "First task", "First response.")
+    append_to_transcript(transcript_path, 2, "Reviewer", "Second task", "Second response.")
+    content = transcript_path.read_text(encoding="utf-8")
+    assert "First response." in content
+    assert "Second response." in content
+
+
+def test_main_handles_empty_task(tmp_path: Path) -> None:
+    from src.main import main
+    fake_response = json.dumps({"response": "Builder AI response."}).encode("utf-8")
+    mock_response = MagicMock()
+    mock_response.read.return_value = fake_response
+    mock_response.__enter__ = lambda s: s
+    mock_response.__exit__ = MagicMock(return_value=False)
+
+    with patch("builtins.input", side_effect=["1", "", "1", "Write a function", "no"]), \
+         patch("src.main.urlopen", return_value=mock_response), \
+         patch("src.main.REPORTS_DIR", tmp_path), \
+         patch("src.main.load_dotenv"), \
+         patch("builtins.print"):
+        main()
+
+
+def test_main_handles_ollama_error_and_retries(tmp_path: Path) -> None:
+    from src.main import main
+    fake_response = json.dumps({"response": "Builder AI response."}).encode("utf-8")
+    mock_response = MagicMock()
+    mock_response.read.return_value = fake_response
+    mock_response.__enter__ = lambda s: s
+    mock_response.__exit__ = MagicMock(return_value=False)
+
+    with patch("builtins.input", side_effect=["1", "Write a function", "1", "Write a function", "no"]), \
+         patch("src.main.urlopen", side_effect=[RuntimeError("Ollama failed"), mock_response]), \
+         patch("src.main.REPORTS_DIR", tmp_path), \
+         patch("src.main.load_dotenv"), \
+         patch("builtins.print"):
+        main()
+
+
 
 def test_save_report_contains_expected_content(tmp_path: Path) -> None:
     report_path = tmp_path / "reports" / "review-log.md"

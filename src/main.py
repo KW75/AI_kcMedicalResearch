@@ -133,6 +133,21 @@ Model: {model}
         file.write(entry)
 
 
+def start_session_transcript(reports_dir: Path) -> Path:
+    reports_dir.mkdir(parents=True, exist_ok=True)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    transcript_path = reports_dir / f"session_{timestamp}.md"
+    header = f"# Session Transcript\n\nStarted: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n---\n"
+    transcript_path.write_text(header, encoding="utf-8")
+    return transcript_path
+
+
+def append_to_transcript(transcript_path: Path, step: int, role_name: str, task: str, response_text: str) -> None:
+    entry = f"## Step {step} — {role_name} AI\n\n**Task:** {task}\n\n**Response:**\n\n{response_text}\n\n---\n"
+    with transcript_path.open("a", encoding="utf-8") as file:
+        file.write(entry)
+
+
 def main() -> None:
     load_dotenv(PROJECT_ROOT / ".env")
 
@@ -142,6 +157,11 @@ def main() -> None:
     print("\nAI Automation Tool")
     print("==================")
     print("Type 'quit' or 'exit' at any prompt to stop.\n")
+
+    transcript_path = start_session_transcript(REPORTS_DIR)
+    print(f"Session transcript: {transcript_path}\n")
+
+    step = 0
 
     while True:
         role_name, prompt_path, report_path = choose_role()
@@ -191,14 +211,18 @@ Respond as the {role_name} AI.
             print("Please check Ollama is running and try again.\n")
             continue
 
+        step += 1
+
         print("\nAI RESPONSE")
         print("=" * 60)
         print(response_text)
         print("=" * 60)
 
         save_report(report_path, role_name, model, task, response_text)
+        append_to_transcript(transcript_path, step, role_name, task, response_text)
 
         print(f"\nSaved response to: {report_path}")
+        print(f"Session transcript updated: {transcript_path}")
 
         again = input("\nSend another task? (yes to continue, anything else to quit): ").strip().lower()
         if again != "yes":
