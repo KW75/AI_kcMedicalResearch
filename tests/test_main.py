@@ -135,3 +135,101 @@ def test_call_ollama_raises_on_ollama_error() -> None:
             assert False, "Expected RuntimeError was not raised."
         except RuntimeError as error:
             assert "model not found" in str(error).lower()
+
+
+def test_call_ollama_raises_on_http_error() -> None:
+    from urllib.error import HTTPError
+    fake_error = HTTPError(
+        url="http://localhost:11434/api/generate",
+        code=500,
+        msg="Internal Server Error",
+        hdrs=None,
+        fp=BytesIO(b"something went wrong"),
+    )
+    with patch("src.main.urlopen", side_effect=fake_error):
+        try:
+            call_ollama(
+                model="qwen2.5-coder:3b",
+                prompt="Say hello.",
+                host="http://localhost:11434",
+            )
+            assert False, "Expected RuntimeError was not raised."
+        except RuntimeError as error:
+            assert "500" in str(error)
+
+
+def test_call_ollama_raises_on_url_error() -> None:
+    from urllib.error import URLError
+    fake_error = URLError(reason="Connection refused")
+    with patch("src.main.urlopen", side_effect=fake_error):
+        try:
+            call_ollama(
+                model="qwen2.5-coder:3b",
+                prompt="Say hello.",
+                host="http://localhost:11434",
+            )
+            assert False, "Expected RuntimeError was not raised."
+        except RuntimeError as error:
+            assert "ollama" in str(error).lower()
+
+
+def test_call_ollama_raises_on_timeout() -> None:
+    with patch("src.main.urlopen", side_effect=TimeoutError()):
+        try:
+            call_ollama(
+                model="qwen2.5-coder:3b",
+                prompt="Say hello.",
+                host="http://localhost:11434",
+            )
+            assert False, "Expected RuntimeError was not raised."
+        except RuntimeError as error:
+            assert "too long" in str(error).lower()
+
+
+def test_choose_role_returns_builder(tmp_path: Path) -> None:
+    from src.main import choose_role
+    with patch("builtins.input", return_value="1"):
+        role_name, prompt_path, report_path = choose_role()
+    assert role_name == "Builder"
+
+
+def test_choose_role_returns_reviewer(tmp_path: Path) -> None:
+    from src.main import choose_role
+    with patch("builtins.input", return_value="2"):
+        role_name, prompt_path, report_path = choose_role()
+    assert role_name == "Reviewer"
+
+
+def test_choose_role_returns_tester(tmp_path: Path) -> None:
+    from src.main import choose_role
+    with patch("builtins.input", return_value="3"):
+        role_name, prompt_path, report_path = choose_role()
+    assert role_name == "Tester"
+
+
+def test_choose_role_raises_on_invalid_choice() -> None:
+    from src.main import choose_role
+    with patch("builtins.input", return_value="9"):
+        try:
+            choose_role()
+            assert False, "Expected ValueError was not raised."
+        except ValueError as error:
+            assert "invalid choice" in str(error).lower()
+
+
+def test_main_runs_full_workflow(tmp_path: Path) -> None:
+    from src.main import main
+    fake_response = json.dumps({"response": "Builder AI response."}).encode("utf-8")
+    mock_response = MagicMock()
+    mock_response.read.return_value = fake_response
+    mock_response.__enter__ = lambda s: s
+    mock_response.__exit__ = MagicMock(return_value=False)
+
+    with patch("builtins.input", side_effect=["1", "Write a hello world function."]), \
+         patch("src.main.urlopen", return_value=mock_response), \
+         patch("src.main.REPORTS_DIR", tmp_path), \
+         patch("src.main.load_dotenv"), \
+         patch("builtins.print"):
+        main()
+
+
