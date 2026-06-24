@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import json
 from io import BytesIO
@@ -309,4 +309,40 @@ def test_main_runs_full_workflow(tmp_path: Path) -> None:
          patch("builtins.print"):
         main()
 
+
+def test_print_session_summary_shows_step_count(tmp_path: Path) -> None:
+    from src.main import print_session_summary, start_session_transcript
+    transcript_path = start_session_transcript(tmp_path)
+    with patch("builtins.print") as mock_print:
+        print_session_summary(3, ["Builder", "Reviewer", "Builder"], transcript_path)
+    printed = " ".join(str(call) for call in mock_print.call_args_list)
+    assert "3" in printed
+
+
+def test_print_session_summary_shows_role_counts(tmp_path: Path) -> None:
+    from src.main import print_session_summary, start_session_transcript
+    transcript_path = start_session_transcript(tmp_path)
+    with patch("builtins.print") as mock_print:
+        print_session_summary(3, ["Builder", "Reviewer", "Builder"], transcript_path)
+    printed = " ".join(str(call) for call in mock_print.call_args_list)
+    assert "Builder" in printed
+    assert "Reviewer" in printed
+
+
+def test_print_session_summary_shows_none_when_no_steps(tmp_path: Path) -> None:
+    from src.main import print_session_summary, start_session_transcript
+    transcript_path = start_session_transcript(tmp_path)
+    with patch("builtins.print") as mock_print:
+        print_session_summary(0, [], transcript_path)
+    printed = " ".join(str(call) for call in mock_print.call_args_list)
+    assert "none" in printed
+
+    
+def test_print_session_summary_shows_transcript_path(tmp_path: Path) -> None:
+    from src.main import print_session_summary, start_session_transcript
+    transcript_path = start_session_transcript(tmp_path)
+    with patch("builtins.print") as mock_print:
+        print_session_summary(1, ["Tester"], transcript_path)
+    printed = " ".join(str(call) for call in mock_print.call_args_list)
+    assert transcript_path.name in printed
 

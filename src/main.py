@@ -148,6 +148,19 @@ def append_to_transcript(transcript_path: Path, step: int, role_name: str, task:
         file.write(entry)
 
 
+def print_session_summary(step: int, roles_used: list[str], transcript_path: Path) -> None:
+    from collections import Counter
+    role_counts = Counter(roles_used)
+    roles_str = ", ".join(f"{role} ({count})" for role, count in role_counts.items())
+    print("\n" + "=" * 42)
+    print("Session Summary")
+    print("=" * 42)
+    print(f"Steps completed : {step}")
+    print(f"Roles used      : {roles_str if roles_str else 'none'}")
+    print(f"Transcript saved: {transcript_path}")
+    print("=" * 42 + "\n")
+
+
 def main() -> None:
     load_dotenv(PROJECT_ROOT / ".env")
 
@@ -162,6 +175,8 @@ def main() -> None:
     print(f"Session transcript: {transcript_path}\n")
 
     step = 0
+    roles_used = []
+
 
     while True:
         role_name, prompt_path, report_path = choose_role()
@@ -212,6 +227,8 @@ Respond as the {role_name} AI.
             continue
 
         step += 1
+        roles_used.append(role_name)
+
 
         print("\nAI RESPONSE")
         print("=" * 60)
@@ -226,8 +243,11 @@ Respond as the {role_name} AI.
 
         again = input("\nSend another task? (yes to continue, anything else to quit): ").strip().lower()
         if again != "yes":
-            print("\nGoodbye.")
+            print_session_summary(step, roles_used, transcript_path)
+            print("Goodbye.")
             break
+
+
 
 
 if __name__ == "__main__":
