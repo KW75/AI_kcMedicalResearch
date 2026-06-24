@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import json
 import os
@@ -143,7 +143,7 @@ def start_session_transcript(reports_dir: Path) -> Path:
 
 
 def append_to_transcript(transcript_path: Path, step: int, role_name: str, task: str, response_text: str) -> None:
-    entry = f"## Step {step} — {role_name} AI\n\n**Task:** {task}\n\n**Response:**\n\n{response_text}\n\n---\n"
+    entry = f"## Step {step} - {role_name} AI\n\n**Task:** {task}\n\n**Response:**\n\n{response_text}\n\n---\n"
     with transcript_path.open("a", encoding="utf-8") as file:
         file.write(entry)
 
