@@ -176,6 +176,7 @@ def main() -> None:
 
     step = 0
     roles_used = []
+    last_response = ""
 
 
     while True:
@@ -210,6 +211,10 @@ Project context:
 
 {project_context}
 
+Previous AI output:
+
+{last_response}
+
 User task:
 
 {task}
@@ -228,6 +233,7 @@ Respond as the {role_name} AI.
 
         step += 1
         roles_used.append(role_name)
+        last_response = response_text
 
 
         print("\nAI RESPONSE")
