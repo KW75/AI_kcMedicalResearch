@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import argparse
 from datetime import datetime
 from pathlib import Path
 from urllib.error import HTTPError, URLError
@@ -166,10 +167,23 @@ def print_session_summary(step: int, roles_used: list[str], transcript_path: Pat
     print("=" * 42 + "\n")
 
 
-def main() -> None:
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="AI Automation Tool")
+    parser.add_argument(
+        "--model",
+        type=str,
+        default=None,
+        help="Ollama model to use (overrides OLLAMA_MODEL in .env)",
+    )
+    return parser.parse_args()
+
+
+def main(model_override: str | None = None) -> None:
+
     load_dotenv(PROJECT_ROOT / ".env")
 
-    model = os.getenv("OLLAMA_MODEL", DEFAULT_OLLAMA_MODEL)
+    model = model_override or os.getenv("OLLAMA_MODEL", DEFAULT_OLLAMA_MODEL)
+
     host = os.getenv("OLLAMA_HOST", DEFAULT_OLLAMA_HOST)
 
     print("\nAI Automation Tool")
@@ -261,7 +275,7 @@ Respond as the {role_name} AI.
             break
 
 
-
-
 if __name__ == "__main__":
-    main()
+    args = parse_args()
+    main(model_override=args.model)
+

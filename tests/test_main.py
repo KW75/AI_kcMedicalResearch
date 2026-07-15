@@ -374,3 +374,57 @@ def test_truncate_context_custom_limit() -> None:
     result = truncate_context(text, max_chars=10)
     assert result.startswith("hello worl")
     assert "truncated" in result.lower()
+
+
+def test_main_uses_model_override(tmp_path: Path) -> None:
+    from src.main import main
+    fake_response = json.dumps({"response": "Builder AI response."}).encode("utf-8")
+    mock_response = MagicMock()
+    mock_response.read.return_value = fake_response
+    mock_response.__enter__ = lambda s: s
+    mock_response.__exit__ = MagicMock(return_value=False)
+
+    with patch("builtins.input", side_effect=["1", "Write a function.", "no"]), \
+         patch("src.main.urlopen", return_value=mock_response) as mock_urlopen, \
+         patch("src.main.REPORTS_DIR", tmp_path), \
+         patch("src.main.load_dotenv"), \
+         patch("builtins.print"):
+        main(model_override="llama3.2:3b")
+
+    called_payload = json.loads(mock_urlopen.call_args[0][0].data.decode("utf-8"))
+    assert called_payload["model"] == "llama3.2:3b"
+
+
+def test_main_uses_env_model_when_no_override(tmp_path: Path) -> None:
+    from src.main import main
+    fake_response = json.dumps({"response": "Builder AI response."}).encode("utf-8")
+    mock_response = MagicMock()
+    mock_response.read.return_value = fake_response
+    mock_response.__enter__ = lambda s: s
+    mock_response.__exit__ = MagicMock(return_value=False)
+
+    with patch("builtins.input", side_effect=["1", "Write a function.", "no"]), \
+         patch("src.main.urlopen", return_value=mock_response) as mock_urlopen, \
+         patch("src.main.REPORTS_DIR", tmp_path), \
+         patch("src.main.load_dotenv"), \
+         patch("builtins.print"), \
+         patch.dict("os.environ", {"OLLAMA_MODEL": "mistral:7b"}):
+        main(model_override=None)
+
+    called_payload = json.loads(mock_urlopen.call_args[0][0].data.decode("utf-8"))
+    assert called_payload["model"] == "mistral:7b"
+
+
+def test_parse_args_default_model_is_none() -> None:
+    from src.main import parse_args
+    with patch("sys.argv", ["main.py"]):
+        args = parse_args()
+    assert args.model is None
+
+
+def test_parse_args_model_flag() -> None:
+    from src.main import parse_args
+    with patch("sys.argv", ["main.py", "--model", "llama3.2:3b"]):
+        args = parse_args()
+    assert args.model == "llama3.2:3b"
+
