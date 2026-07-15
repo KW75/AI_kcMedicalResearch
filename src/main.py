@@ -147,6 +147,11 @@ def append_to_transcript(transcript_path: Path, step: int, role_name: str, task:
     with transcript_path.open("a", encoding="utf-8") as file:
         file.write(entry)
 
+def truncate_context(text: str, max_chars: int = 2000) -> str:
+    if len(text) <= max_chars:
+        return text
+    return text[:max_chars] + f"\n\n[Response truncated at {max_chars} characters to keep prompt size manageable.]"
+
 
 def print_session_summary(step: int, roles_used: list[str], transcript_path: Path) -> None:
     from collections import Counter
@@ -202,6 +207,12 @@ Safety rules:
 - If a task is unsafe, refuse and suggest a safe defensive alternative.
 """
 
+        previous_context = (
+            f"\nPrevious AI output:\n\n{truncate_context(last_response)}\n"
+            if last_response
+            else ""
+        )
+
         full_prompt = f"""
 {role_prompt}
 
@@ -211,11 +222,7 @@ Project context:
 
 {project_context}
 
-Previous AI output:
-
-{last_response}
-
-User task:
+{previous_context}User task:
 
 {task}
 

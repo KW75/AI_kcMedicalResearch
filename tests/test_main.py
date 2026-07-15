@@ -346,3 +346,31 @@ def test_print_session_summary_shows_transcript_path(tmp_path: Path) -> None:
     printed = " ".join(str(call) for call in mock_print.call_args_list)
     assert transcript_path.name in printed
 
+def test_truncate_context_returns_short_text_unchanged() -> None:
+    from src.main import truncate_context
+    text = "Short response."
+    result = truncate_context(text)
+    assert result == "Short response."
+
+
+def test_truncate_context_truncates_long_text() -> None:
+    from src.main import truncate_context
+    text = "x" * 3000
+    result = truncate_context(text, max_chars=2000)
+    assert len(result) > 2000
+    assert "truncated" in result.lower()
+
+
+def test_truncate_context_keeps_exactly_max_chars() -> None:
+    from src.main import truncate_context
+    text = "x" * 2000
+    result = truncate_context(text, max_chars=2000)
+    assert result == text
+
+
+def test_truncate_context_custom_limit() -> None:
+    from src.main import truncate_context
+    text = "hello world this is a long text"
+    result = truncate_context(text, max_chars=10)
+    assert result.startswith("hello worl")
+    assert "truncated" in result.lower()
