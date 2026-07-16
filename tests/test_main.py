@@ -669,6 +669,49 @@ def test_parse_args_export_session_flag():
     args = parse_args()
     assert args.export_session == "session_20250101_120000.md"
 
+# show_stats tests
+
+def test_show_stats_no_reports_folder(capsys):
+    from src.main import show_stats
+    show_stats(reports_dir="nonexistent_reports_dir_xyz")
+    captured = capsys.readouterr()
+    assert "No reports folder found" in captured.out
+
+
+def test_show_stats_empty_folder(tmp_path, capsys):
+    from src.main import show_stats
+    show_stats(reports_dir=str(tmp_path))
+    captured = capsys.readouterr()
+    assert "No session transcripts found" in captured.out
+
+
+def test_show_stats_counts_sessions(tmp_path, capsys):
+    from src.main import show_stats
+    (tmp_path / "session_20250101_120000.md").write_text("## Step 1 - Builder AI\n", encoding="utf-8")
+    (tmp_path / "session_20250102_120000.md").write_text("## Step 1 - Reviewer AI\n", encoding="utf-8")
+    show_stats(reports_dir=str(tmp_path))
+    captured = capsys.readouterr()
+    assert "Total sessions    : 2" in captured.out
+
+
+def test_show_stats_counts_roles(tmp_path, capsys):
+    from src.main import show_stats
+    content = "## Step 1 - Builder AI\n## Step 2 - Builder AI\n## Step 3 - Reviewer AI\n"
+    (tmp_path / "session_20250101_120000.md").write_text(content, encoding="utf-8")
+    show_stats(reports_dir=str(tmp_path))
+    captured = capsys.readouterr()
+    assert "Builder" in captured.out
+    assert "Reviewer" in captured.out
+
+
+def test_parse_args_stats_flag():
+    from src.main import parse_args
+    import sys
+    sys.argv = ["main.py", "--stats"]
+    args = parse_args()
+    assert args.stats is True
+
+
 
 
 

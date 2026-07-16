@@ -294,6 +294,48 @@ def export_session(filename: str, reports_dir: str = "reports") -> None:
     print(f"{Fore.GREEN}Exported: {export_path}")
 
 
+def show_stats(reports_dir: str = "reports") -> None:
+    """Scan all session transcripts and print summary statistics."""
+    reports_path = Path(reports_dir)
+
+    if not reports_path.exists():
+        print("No reports folder found. No sessions have been run yet.")
+        return
+
+    session_files = sorted(
+        reports_path.glob("session_*.md"),
+        reverse=True,
+    )
+
+    if not session_files:
+        print("No session transcripts found in reports/.")
+        return
+
+    total_sessions = len(session_files)
+    most_recent = session_files[0].name
+    role_counts: dict[str, int] = {}
+
+    for session_file in session_files:
+        content = session_file.read_text(encoding="utf-8")
+        for line in content.splitlines():
+            for role in ("Builder", "Reviewer", "Tester"):
+                if f"## Step" in line and f"{role} AI" in line:
+                    role_counts[role] = role_counts.get(role, 0) + 1
+
+    print(f"\n{Fore.MAGENTA}{'=' * 42}")
+    print(f"{Fore.MAGENTA}  Session Statistics")
+    print(f"{Fore.MAGENTA}{'=' * 42}")
+    print(f"  Total sessions    : {total_sessions}")
+    print(f"  Most recent       : {most_recent}")
+    print(f"  Role usage across all sessions:")
+    for role, count in role_counts.items():
+        color = role_color(role)
+        print(f"    {color}{role:<10}: {count} step(s)")
+    if not role_counts:
+        print(f"  No steps recorded.")
+    print(f"{Fore.MAGENTA}{'=' * 42}\n")
+
+
 def parse_args() -> argparse.Namespace:
     """Parse and return command line arguments."""
     parser = argparse.ArgumentParser(
@@ -342,6 +384,15 @@ def parse_args() -> argparse.Namespace:
         metavar="FILENAME",
         help="Export a session transcript as a plain text file",
     )
+
+    parser.add_argument(
+        "--stats",
+        action="store_true",
+        default=False,
+        help="Show statistics across all past session transcripts and exit",
+    )
+
+
 
 
     parser.add_argument(
@@ -480,7 +531,6 @@ Respond as the {role_name} AI.
             print("Goodbye.")
             break
 
-
 if __name__ == "__main__":
     args = parse_args()
     if args.list_sessions:
@@ -491,9 +541,7 @@ if __name__ == "__main__":
         delete_session(filename=args.delete_session, reports_dir=str(REPORTS_DIR))
     elif args.export_session:
         export_session(filename=args.export_session, reports_dir=str(REPORTS_DIR))
+    elif args.stats:
+        show_stats(reports_dir=str(REPORTS_DIR))
     else:
         main(model_override=args.model, dry_run=args.dry_run)
-
-
-
-
