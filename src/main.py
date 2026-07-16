@@ -311,11 +311,11 @@ def main(model_override: str | None = None, dry_run: bool = False) -> None:
     print(f"{Fore.MAGENTA}{'=' * 42}")
     print(f"  Model : {Fore.CYAN}{model}")
     print(f"{Fore.WHITE}  Host  : {host}")
+    if dry_run:
+        print(f"{Fore.YELLOW}  Mode  : DRY RUN - Ollama will not be called.")
     print(f"{Fore.MAGENTA}{'=' * 42}")
     print(f"{Fore.WHITE}  Type 'quit' or 'exit' at any prompt to stop.")
     print(f"{Fore.MAGENTA}{'=' * 42}\n")
-    if dry_run:
-       print(f"{Fore.YELLOW}  DRY RUN MODE - Ollama will not be called.\n")
 
 
     transcript_path = start_session_transcript(REPORTS_DIR)
