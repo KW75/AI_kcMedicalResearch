@@ -8,8 +8,7 @@ from datetime import datetime
 from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
-
-from colorama import Fore, Style, init as colorama_init
+from colorama import Fore, init as colorama_init
 from dotenv import load_dotenv
 
 colorama_init(autoreset=True)
@@ -52,12 +51,16 @@ def role_color(role_name: str) -> str:
 
 
 def read_text_file(path: Path) -> str:
+    """Read a file and return its content stripped of whitespace. Returns empty string if missing."""
+
     if not path.exists():
         return ""
     return path.read_text(encoding="utf-8").strip()
 
 
 def build_project_context() -> str:
+    """Combine all project doc files into a single context string for the AI prompt."""
+
     sections = []
     for path in DOC_FILES:
         content = read_text_file(path)
@@ -67,6 +70,8 @@ def build_project_context() -> str:
 
 
 def choose_role() -> tuple[str, Path, Path]:
+    """Prompt the user to choose an AI role. Loops until a valid choice is made."""
+
     while True:
         print(f"\n{Fore.WHITE}Choose AI role:")
         print(f"{Fore.CYAN}1. Builder AI")
@@ -80,8 +85,9 @@ def choose_role() -> tuple[str, Path, Path]:
 
         print(f"{Fore.RED}Invalid choice. Please enter 1, 2, or 3.")
 
-
 def call_ollama(model: str, prompt: str, host: str) -> str:
+    """Send a prompt to the Ollama API and return the response text."""
+
     url = host.rstrip("/") + "/api/generate"
 
     payload = {
@@ -124,10 +130,11 @@ def call_ollama(model: str, prompt: str, host: str) -> str:
 
     return response_text
 
-
 def save_report(
     report_path: Path, role_name: str, model: str, task: str, response_text: str
 ) -> None:
+    """Append a formatted AI response entry to the role report file."""
+
     report_path.parent.mkdir(parents=True, exist_ok=True)
 
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -152,8 +159,8 @@ Model: {model}
     with report_path.open("a", encoding="utf-8") as file:
         file.write(entry)
 
-
 def start_session_transcript(reports_dir: Path) -> Path:
+    """Create a timestamped session transcript file and return its path."""
     reports_dir.mkdir(parents=True, exist_ok=True)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     transcript_path = reports_dir / f"session_{timestamp}.md"
@@ -164,10 +171,10 @@ def start_session_transcript(reports_dir: Path) -> Path:
     transcript_path.write_text(header, encoding="utf-8")
     return transcript_path
 
-
 def append_to_transcript(
     transcript_path: Path, step: int, role_name: str, task: str, response_text: str
 ) -> None:
+    """Append a step entry to the session transcript file."""
     entry = (
         f"## Step {step} - {role_name} AI\n\n"
         f"**Task:** {task}\n\n"
@@ -176,8 +183,8 @@ def append_to_transcript(
     with transcript_path.open("a", encoding="utf-8") as file:
         file.write(entry)
 
-
 def truncate_context(text: str, max_chars: int = 2000) -> str:
+    """Truncate text to max_chars. Appends a notice if truncation occurred."""
     if len(text) <= max_chars:
         return text
     return (
@@ -185,10 +192,10 @@ def truncate_context(text: str, max_chars: int = 2000) -> str:
         + f"\n\n[Response truncated at {max_chars} characters to keep prompt size manageable.]"
     )
 
-
 def print_session_summary(
     step: int, roles_used: list[str], transcript_path: Path
 ) -> None:
+    """Print a formatted session summary showing steps completed, roles used, and transcript path."""
     role_counts = Counter(roles_used)
     roles_str = ", ".join(
         f"{role} ({count})" for role, count in role_counts.items()
@@ -225,6 +232,7 @@ def list_sessions(reports_dir: str = "reports") -> None:
     print()
 
 def parse_args() -> argparse.Namespace:
+    """Parse and return command line arguments."""
     parser = argparse.ArgumentParser(
         description="AI Automation Tool - local AI assistant using Ollama",
         epilog=(
@@ -258,6 +266,7 @@ def parse_args() -> argparse.Namespace:
 
 
 def main(model_override: str | None = None) -> None:
+    """Run the main interactive AI automation session loop."""
 
     load_dotenv(PROJECT_ROOT / ".env")
 
