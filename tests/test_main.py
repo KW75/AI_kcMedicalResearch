@@ -515,5 +515,41 @@ def test_parse_args_help_contains_examples(capsys):
     assert "--model" in captured.out
     assert "--list-sessions" in captured.out
 
+# read_session tests
+
+def test_read_session_prints_content(tmp_path, capsys):
+    from src.main import read_session
+    f = tmp_path / "session_20250101_120000.md"
+    f.write_text("Session content here", encoding="utf-8")
+    read_session(filename="session_20250101_120000.md", reports_dir=str(tmp_path))
+    captured = capsys.readouterr()
+    assert "Session content here" in captured.out
+
+
+def test_read_session_prints_filename_in_header(tmp_path, capsys):
+    from src.main import read_session
+    f = tmp_path / "session_20250101_120000.md"
+    f.write_text("Some content", encoding="utf-8")
+    read_session(filename="session_20250101_120000.md", reports_dir=str(tmp_path))
+    captured = capsys.readouterr()
+    assert "session_20250101_120000.md" in captured.out
+
+
+def test_read_session_file_not_found(tmp_path, capsys):
+    from src.main import read_session
+    read_session(filename="session_missing.md", reports_dir=str(tmp_path))
+    captured = capsys.readouterr()
+    assert "not found" in captured.out
+    assert "--list-sessions" in captured.out
+
+
+def test_parse_args_read_session_flag():
+    from src.main import parse_args
+    import sys
+    sys.argv = ["main.py", "--read-session", "session_20250101_120000.md"]
+    args = parse_args()
+    assert args.read_session == "session_20250101_120000.md"
+
+
 
 

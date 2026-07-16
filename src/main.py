@@ -231,6 +231,24 @@ def list_sessions(reports_dir: str = "reports") -> None:
         print(f"  {i:>3}.  {f.name}")
     print()
 
+def read_session(filename: str, reports_dir: str = "reports") -> None:
+    """Print the contents of a named session transcript to the terminal."""
+    reports_path = Path(reports_dir)
+    session_path = reports_path / filename
+
+    if not session_path.exists():
+        print(f"{Fore.RED}Session file not found: {session_path}")
+        print(f"{Fore.YELLOW}Use --list-sessions to see available transcripts.")
+        return
+
+    content = session_path.read_text(encoding="utf-8")
+    print(f"\n{Fore.MAGENTA}{'=' * 42}")
+    print(f"{Fore.MAGENTA}  Session: {filename}")
+    print(f"{Fore.MAGENTA}{'=' * 42}\n")
+    print(content)
+    print(f"{Fore.MAGENTA}{'=' * 42}\n")
+
+
 def parse_args() -> argparse.Namespace:
     """Parse and return command line arguments."""
     parser = argparse.ArgumentParser(
@@ -238,7 +256,7 @@ def parse_args() -> argparse.Namespace:
         epilog=(
             "Examples:\n"
             "  python src/main.py                        # start a session\n"
-            "  python src/main.py --model llama3.2:3b   # use a different model\n"
+            "  python src/main.py --model llama3.2:3b    # use a different model\n"
             "  python src/main.py --list-sessions        # list past transcripts\n"
             "  python src/main.py --version              # show version\n"
         ),
@@ -256,6 +274,14 @@ def parse_args() -> argparse.Namespace:
         default=False,
         help="List all past session transcripts in reports/ and exit",
     )
+    parser.add_argument(
+        "--read-session",
+        type=str,
+        default=None,
+        metavar="FILENAME",
+        help="Print a past session transcript to the terminal by filename",
+    )
+
     parser.add_argument(
         "--version",
         action="version",
@@ -375,10 +401,13 @@ Respond as the {role_name} AI.
             print("Goodbye.")
             break
 
-
 if __name__ == "__main__":
     args = parse_args()
     if args.list_sessions:
         list_sessions(reports_dir=str(REPORTS_DIR))
+    elif args.read_session:
+        read_session(filename=args.read_session, reports_dir=str(REPORTS_DIR))
     else:
         main(model_override=args.model)
+
+
