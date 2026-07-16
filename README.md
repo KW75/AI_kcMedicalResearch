@@ -1,161 +1,108 @@
 # AI Automation Tool
 
-A local Python CLI tool that uses Ollama to run AI-assisted development workflows.
-Three AI roles work together in a connected session — Builder writes code,
-Reviewer checks it, and Tester validates it — with each role automatically
-receiving the previous role's output as context.
+A local Python AI automation tool powered by [Ollama](https://ollama.com).
+Run Builder, Reviewer, and Tester AI roles from your terminal —
+no cloud APIs, no data leaving your machine.
 
-## What it does
+---
 
-- Runs a multi-role AI session entirely on your local machine using Ollama
-- Lets you switch between Builder, Reviewer, and Tester roles in one session
-- Passes the previous AI response forward as context to the next step automatically
-- Saves each response to a role-specific report file in `reports/`
-- Saves a full timestamped session transcript capturing the entire workflow
-- Prints a session summary at the end showing steps completed and roles used
+## Features
 
-## AI roles
+- Three AI roles — Builder, Reviewer, and Tester
+- Multi-task sessions — stay in a session and send multiple tasks without restarting
+- Forward context passing — each step automatically receives the previous AI response
+- Session transcripts — timestamped markdown file saved per session in `reports/`
+- Session summary — printed at exit showing steps completed, roles used, and transcript path
+- Coloured terminal output — each role has its own colour, errors in red, summary in magenta
+- `--model` flag — override the Ollama model from the command line
+- `--list-sessions` flag — list all past session transcripts sorted newest first
+- `--read-session` flag — print a past session transcript to the terminal
+- `--dry-run` flag — run a full session without calling Ollama, for testing
+- `--version` flag — show tool version and exit
+- `--help` flag — show usage and examples
 
-- **Builder AI** — creates or modifies code based on your task and project context
-- **Reviewer AI** — reviews code and gives structured feedback with a final decision
-- **Tester AI** — suggests tests and checks readiness before deployment
-
-## Target workflow
-
-```
-Builder AI writes code
-      ↓
-Reviewer AI reviews and gives feedback
-      ↓
-Builder AI fixes issues
-      ↓
-Tester AI suggests tests and checks readiness
-      ↓
-Human approves before deploy
-```
+---
 
 ## Requirements
 
 - Python 3.11+
-- Ollama installed and running locally
-- Ollama model pulled (default: `qwen2.5-coder:3b`)
+- [Ollama](https://ollama.com) installed and running locally
+- A pulled Ollama model (default: `qwen2.5-coder:3b`)
+
+---
 
 ## Setup
 
-1. Clone the repository:
+**1. Clone the repository:**
 
-```powershell
+```bash
 git clone https://github.com/KW75/ai-automation-tool.git
 cd ai-automation-tool
-```
 
-2. Create and activate the virtual environment:
 
-```powershell
+2. Create and activate a virtual environment:
+
 python -m venv .venv
+# Windows
 .venv\Scripts\Activate.ps1
-```
+# macOS/Linux
+source .venv/bin/activate
 
 3. Install dependencies:
 
-```powershell
 pip install -r requirements.txt
-```
 
-4. Copy `.env.example` to `.env`:
+4. Create your .env file:
 
-```powershell
-Copy-Item .env.example .env
-```
+cp .env.example .env
 
-5. Make sure Ollama is running and the model is available:
+Edit .env if you want to change the default model or host:
 
-```powershell
-ollama list
-```
+OLLAMA_HOST=http://localhost:11434
+OLLAMA_MODEL=qwen2.5-coder:3b
 
-If `qwen2.5-coder:3b` is not listed, pull it:
+5. Pull a model in Ollama:
 
-```powershell
 ollama pull qwen2.5-coder:3b
-```
 
-## Run
 
-```powershell
-python src\main.py
-```
+Usage
 
-You will see:
+Start a session:
+python src/main.py
 
-```
-AI Automation Tool
-==================
-Type 'quit' or 'exit' at any prompt to stop.
+Use a different model:
+python src/main.py --model llama3.2:3b
 
-Session transcript: D:\ai-automation-tool\reports\session_20260624_111934.md
+List past session transcripts:
+ python src/main.py --list-sessions
 
-Choose AI role:
-1. Builder AI
-2. Reviewer AI
-3. Tester AI
+Read a past session transcript:
+python src/main.py --read-session session_20260716_154643.md
 
-Enter 1, 2, or 3:
-```
+Run without Ollama (dry run):
+ python src/main.py --dry-run
 
-- Choose a role, enter your task, and wait for the AI response
-- After each response, type `yes` to send another task or anything else to quit
-- Type `exit` or `quit` at any task prompt to stop immediately
-- A session summary is printed at the end of every session
+Show version:
+python src/main.py --version
 
-## Session transcript example
+Workflow
 
-Each session creates a timestamped file in `reports/` capturing the full workflow:
+Builder AI  →  writes or suggests code
+Reviewer AI →  reviews and gives feedback
+Builder AI  →  fixes issues
+Tester AI   →  creates or checks tests
+Human       →  approves before deploy
 
-```
-# Session Transcript
+Each step automatically passes the previous AI response as context to the next step.
 
-Started: 2026-06-24 11:19:34
+Running Tests
 
----
-## Step 1 - Builder AI
-
-**Task:** write a Python function that adds two numbers
-
-**Response:** ...
-
----
-## Step 2 - Reviewer AI
-
-**Task:** review the code from the previous step
-
-**Response:** ...
-
----
-## Step 3 - Tester AI
-
-**Task:** suggest tests for the add function
-
-**Response:** ...
-```
-
-## Run tests
-
-```powershell
 python -m pytest -v
-```
-
-With coverage:
-
-```powershell
 python -m pytest -v --cov=src --cov-report=term-missing
-```
 
-Current status: **37 tests passing, 98% coverage**
+Project Structure
 
-## Project structure
-
-```
 ai-automation-tool/
 ├── src/
 │   ├── __init__.py
@@ -173,23 +120,28 @@ ai-automation-tool/
 │   ├── coding-standards.md
 │   ├── test-strategy.md
 │   └── decision-log.md
-├── reports/              (ignored, not committed)
-├── .env                  (ignored, not committed)
+├── reports/              # ignored by git
+├── .venv/                # ignored by git
+├── .env                  # ignored by git
 ├── .env.example
 ├── .gitignore
 ├── conftest.py
 ├── pytest.ini
 ├── requirements.txt
 └── README.md
-```
 
-## Configuration
 
-All settings are controlled via `.env`:
+AI Roles
 
-```
-OLLAMA_HOST=http://localhost:11434
-OLLAMA_MODEL=qwen2.5-coder:3b
-```
+Builder AI — creates and modifies code based on your task description.
+Reviewer AI — reviews code and gives structured feedback on quality, correctness, and improvement areas.
+Tester AI — suggests tests, checks test coverage, and assesses readiness before deployment.
 
-Change `OLLAMA_MODEL` to use a different locally available model.
+License
+
+MIT
+
+
+
+
+
