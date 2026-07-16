@@ -248,6 +248,27 @@ def read_session(filename: str, reports_dir: str = "reports") -> None:
     print(content)
     print(f"{Fore.MAGENTA}{'=' * 42}\n")
 
+def delete_session(filename: str, reports_dir: str = "reports") -> None:
+    """Delete a named session transcript after confirmation."""
+    reports_path = Path(reports_dir)
+    session_path = reports_path / filename
+
+    if not session_path.exists():
+        print(f"{Fore.RED}Session file not found: {session_path}")
+        print(f"{Fore.YELLOW}Use --list-sessions to see available transcripts.")
+        return
+
+    confirm = input(
+        f"{Fore.YELLOW}Delete {filename}? This cannot be undone. Type 'yes' to confirm: "
+    ).strip().lower()
+
+    if confirm != "yes":
+        print(f"{Fore.WHITE}Delete cancelled.")
+        return
+
+    session_path.unlink()
+    print(f"{Fore.GREEN}Deleted: {filename}")
+
 
 def parse_args() -> argparse.Namespace:
     """Parse and return command line arguments."""
@@ -280,6 +301,14 @@ def parse_args() -> argparse.Namespace:
         default=None,
         metavar="FILENAME",
         help="Print a past session transcript to the terminal by filename",
+    )
+
+    parser.add_argument(
+        "--delete-session",
+        type=str,
+        default=None,
+        metavar="FILENAME",
+        help="Delete a past session transcript by filename",
     )
 
     parser.add_argument(
@@ -418,14 +447,18 @@ Respond as the {role_name} AI.
             print("Goodbye.")
             break
 
+
 if __name__ == "__main__":
     args = parse_args()
     if args.list_sessions:
         list_sessions(reports_dir=str(REPORTS_DIR))
     elif args.read_session:
         read_session(filename=args.read_session, reports_dir=str(REPORTS_DIR))
+    elif args.delete_session:
+        delete_session(filename=args.delete_session, reports_dir=str(REPORTS_DIR))
     else:
         main(model_override=args.model, dry_run=args.dry_run)
+
 
 
 

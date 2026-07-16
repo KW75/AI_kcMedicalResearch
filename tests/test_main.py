@@ -576,6 +576,54 @@ def test_main_dry_run_does_not_call_ollama(tmp_path, monkeypatch):
     monkeypatch.setattr("src.main.REPORTS_DIR", tmp_path)
     main(dry_run=True)
 
+# delete_session tests
+
+def test_delete_session_removes_file(tmp_path, monkeypatch):
+    from src.main import delete_session
+    f = tmp_path / "session_20250101_120000.md"
+    f.write_text("content", encoding="utf-8")
+    monkeypatch.setattr("builtins.input", lambda _: "yes")
+    delete_session(filename="session_20250101_120000.md", reports_dir=str(tmp_path))
+    assert not f.exists()
+
+
+def test_delete_session_cancelled(tmp_path, monkeypatch, capsys):
+    from src.main import delete_session
+    f = tmp_path / "session_20250101_120000.md"
+    f.write_text("content", encoding="utf-8")
+    monkeypatch.setattr("builtins.input", lambda _: "no")
+    delete_session(filename="session_20250101_120000.md", reports_dir=str(tmp_path))
+    assert f.exists()
+    captured = capsys.readouterr()
+    assert "cancelled" in captured.out
+
+
+def test_delete_session_file_not_found(tmp_path, capsys):
+    from src.main import delete_session
+    delete_session(filename="session_missing.md", reports_dir=str(tmp_path))
+    captured = capsys.readouterr()
+    assert "not found" in captured.out
+    assert "--list-sessions" in captured.out
+
+
+def test_delete_session_prints_confirmation(tmp_path, monkeypatch, capsys):
+    from src.main import delete_session
+    f = tmp_path / "session_20250101_120000.md"
+    f.write_text("content", encoding="utf-8")
+    monkeypatch.setattr("builtins.input", lambda _: "yes")
+    delete_session(filename="session_20250101_120000.md", reports_dir=str(tmp_path))
+    captured = capsys.readouterr()
+    assert "Deleted" in captured.out
+
+
+def test_parse_args_delete_session_flag():
+    from src.main import parse_args
+    import sys
+    sys.argv = ["main.py", "--delete-session", "session_20250101_120000.md"]
+    args = parse_args()
+    assert args.delete_session == "session_20250101_120000.md"
+
+
 
 
 
