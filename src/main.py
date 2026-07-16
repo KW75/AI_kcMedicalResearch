@@ -9,7 +9,10 @@ from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
+from colorama import Fore, Style, init as colorama_init
 from dotenv import load_dotenv
+
+colorama_init(autoreset=True)
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -36,6 +39,16 @@ DOC_FILES = [
 ]
 
 
+def role_color(role_name: str) -> str:
+    """Return a colorama Fore colour code for the given role name."""
+    colors = {
+        "Builder": Fore.CYAN,
+        "Reviewer": Fore.YELLOW,
+        "Tester": Fore.GREEN,
+    }
+    return colors.get(role_name, Fore.WHITE)
+
+
 def read_text_file(path: Path) -> str:
     if not path.exists():
         return ""
@@ -53,17 +66,17 @@ def build_project_context() -> str:
 
 def choose_role() -> tuple[str, Path, Path]:
     while True:
-        print("\nChoose AI role:")
-        print("1. Builder AI")
-        print("2. Reviewer AI")
-        print("3. Tester AI")
+        print(f"\n{Fore.WHITE}Choose AI role:")
+        print(f"{Fore.CYAN}1. Builder AI")
+        print(f"{Fore.YELLOW}2. Reviewer AI")
+        print(f"{Fore.GREEN}3. Tester AI")
 
         choice = input("\nEnter 1, 2, or 3: ").strip()
 
         if choice in ROLE_FILES:
             return ROLE_FILES[choice]
 
-        print("Invalid choice. Please enter 1, 2, or 3.")
+        print(f"{Fore.RED}Invalid choice. Please enter 1, 2, or 3.")
 
 
 def call_ollama(model: str, prompt: str, host: str) -> str:
@@ -178,13 +191,13 @@ def print_session_summary(
     roles_str = ", ".join(
         f"{role} ({count})" for role, count in role_counts.items()
     )
-    print("\n" + "=" * 42)
-    print("Session Summary")
-    print("=" * 42)
+    print("\n" + f"{Fore.MAGENTA}" + "=" * 42)
+    print(f"{Fore.MAGENTA}Session Summary")
+    print(f"{Fore.MAGENTA}" + "=" * 42)
     print(f"Steps completed : {step}")
     print(f"Roles used      : {roles_str if roles_str else 'none'}")
     print(f"Transcript saved: {transcript_path}")
-    print("=" * 42 + "\n")
+    print(f"{Fore.MAGENTA}" + "=" * 42 + "\n")
 
 
 def list_sessions(reports_dir: str = "reports") -> None:
@@ -290,25 +303,28 @@ Project context:
 Respond as the {role_name} AI.
 """
 
+        color = role_color(role_name)
+
         print(
-            f"\nSending task to local {role_name} AI using Ollama model {model}...\n"
+            f"\n{color}Sending task to local {role_name} AI "
+            f"using Ollama model {model}...\n"
         )
 
         try:
             response_text = call_ollama(model=model, prompt=full_prompt, host=host)
         except RuntimeError as error:
-            print(f"\nError: {error}")
-            print("Please check Ollama is running and try again.\n")
+            print(f"\n{Fore.RED}Error: {error}")
+            print(f"{Fore.RED}Please check Ollama is running and try again.\n")
             continue
 
         step += 1
         roles_used.append(role_name)
         last_response = response_text
 
-        print("\nAI RESPONSE")
-        print("=" * 60)
+        print(f"\n{color}AI RESPONSE")
+        print(color + "=" * 60)
         print(response_text)
-        print("=" * 60)
+        print(color + "=" * 60)
 
         save_report(report_path, role_name, model, task, response_text)
         append_to_transcript(transcript_path, step, role_name, task, response_text)
