@@ -20,6 +20,10 @@ no cloud APIs, no data leaving your machine.
 - `--dry-run` flag — run a full session without calling Ollama, for testing
 - `--version` flag — show tool version and exit
 - `--help` flag — show usage and examples
+- `--delete-session` flag — delete a past session transcript from the command line
+- `--export-session` flag — export a session transcript as a plain text file
+- `--stats` flag — show statistics across all past sessions
+
 
 ---
 
@@ -85,6 +89,14 @@ Run without Ollama (dry run):
 
 Show version:
 python src/main.py --version
+
+Delete a past session transcript:
+python src/main.py --delete-session session_20260716_154643.md
+
+Export a session transcript as plain text:
+python src/main.py --export-session session_20260716_154643.md
+
+
 
 Workflow
 
