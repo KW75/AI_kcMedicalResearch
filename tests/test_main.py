@@ -710,6 +710,66 @@ def test_parse_args_stats_flag():
     sys.argv = ["main.py", "--stats"]
     args = parse_args()
     assert args.stats is True
+# rename_session tests
+
+def test_rename_session_renames_file(tmp_path, monkeypatch):
+    from src.main import rename_session
+    f = tmp_path / "session_20250101_120000.md"
+    f.write_text("content", encoding="utf-8")
+    monkeypatch.setattr("builtins.input", lambda _: "my-first-session")
+    rename_session(filename="session_20250101_120000.md", reports_dir=str(tmp_path))
+    assert (tmp_path / "my-first-session.md").exists()
+    assert not f.exists()
+
+
+def test_rename_session_file_not_found(tmp_path, capsys):
+    from src.main import rename_session
+    rename_session(filename="session_missing.md", reports_dir=str(tmp_path))
+    captured = capsys.readouterr()
+    assert "not found" in captured.out
+    assert "--list-sessions" in captured.out
+
+
+def test_rename_session_empty_name_cancelled(tmp_path, monkeypatch, capsys):
+    from src.main import rename_session
+    f = tmp_path / "session_20250101_120000.md"
+    f.write_text("content", encoding="utf-8")
+    monkeypatch.setattr("builtins.input", lambda _: "")
+    rename_session(filename="session_20250101_120000.md", reports_dir=str(tmp_path))
+    captured = capsys.readouterr()
+    assert "cannot be empty" in captured.out
+    assert f.exists()
+
+
+def test_rename_session_duplicate_name_cancelled(tmp_path, monkeypatch, capsys):
+    from src.main import rename_session
+    f = tmp_path / "session_20250101_120000.md"
+    f.write_text("content", encoding="utf-8")
+    existing = tmp_path / "my-first-session.md"
+    existing.write_text("other content", encoding="utf-8")
+    monkeypatch.setattr("builtins.input", lambda _: "my-first-session")
+    rename_session(filename="session_20250101_120000.md", reports_dir=str(tmp_path))
+    captured = capsys.readouterr()
+    assert "already exists" in captured.out
+    assert f.exists()
+
+
+def test_rename_session_prints_confirmation(tmp_path, monkeypatch, capsys):
+    from src.main import rename_session
+    f = tmp_path / "session_20250101_120000.md"
+    f.write_text("content", encoding="utf-8")
+    monkeypatch.setattr("builtins.input", lambda _: "my-renamed-session")
+    rename_session(filename="session_20250101_120000.md", reports_dir=str(tmp_path))
+    captured = capsys.readouterr()
+    assert "Renamed" in captured.out
+
+
+def test_parse_args_rename_session_flag():
+    from src.main import parse_args
+    import sys
+    sys.argv = ["main.py", "--rename-session", "session_20250101_120000.md"]
+    args = parse_args()
+    assert args.rename_session == "session_20250101_120000.md"
 
 
 

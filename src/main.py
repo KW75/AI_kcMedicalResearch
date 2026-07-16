@@ -335,6 +335,38 @@ def show_stats(reports_dir: str = "reports") -> None:
         print(f"  No steps recorded.")
     print(f"{Fore.MAGENTA}{'=' * 42}\n")
 
+def rename_session(filename: str, reports_dir: str = "reports") -> None:
+    """Rename a session transcript file to a user-supplied name."""
+    reports_path = Path(reports_dir)
+    session_path = reports_path / filename
+
+    if not session_path.exists():
+        print(f"{Fore.RED}Session file not found: {session_path}")
+        print(f"{Fore.YELLOW}Use --list-sessions to see available transcripts.")
+        return
+
+    new_name = input(
+        f"{Fore.WHITE}Enter new name for '{filename}' (without extension): "
+    ).strip()
+
+    if not new_name:
+        print(f"{Fore.RED}Name cannot be empty. Rename cancelled.")
+        return
+
+    new_filename = new_name + ".md"
+    new_path = reports_path / new_filename
+
+    if new_path.exists():
+        print(f"{Fore.RED}A file named '{new_filename}' already exists. Rename cancelled.")
+        return
+
+    session_path.rename(new_path)
+    print(f"{Fore.GREEN}Renamed: {filename} -> {new_filename}")
+
+
+
+
+
 
 def parse_args() -> argparse.Namespace:
     """Parse and return command line arguments."""
@@ -391,6 +423,15 @@ def parse_args() -> argparse.Namespace:
         default=False,
         help="Show statistics across all past session transcripts and exit",
     )
+
+    parser.add_argument(
+        "--rename-session",
+        type=str,
+        default=None,
+        metavar="FILENAME",
+        help="Rename a past session transcript file",
+    )
+
 
 
 
@@ -543,5 +584,8 @@ if __name__ == "__main__":
         export_session(filename=args.export_session, reports_dir=str(REPORTS_DIR))
     elif args.stats:
         show_stats(reports_dir=str(REPORTS_DIR))
+    elif args.rename_session:
+        rename_session(filename=args.rename_session, reports_dir=str(REPORTS_DIR))
     else:
         main(model_override=args.model, dry_run=args.dry_run)
+
