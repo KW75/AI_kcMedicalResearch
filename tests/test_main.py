@@ -623,6 +623,51 @@ def test_parse_args_delete_session_flag():
     args = parse_args()
     assert args.delete_session == "session_20250101_120000.md"
 
+# export_session tests
+
+def test_export_session_creates_txt_file(tmp_path):
+    from src.main import export_session
+    f = tmp_path / "session_20250101_120000.md"
+    f.write_text("# Session\n\nSome content here", encoding="utf-8")
+    export_session(filename="session_20250101_120000.md", reports_dir=str(tmp_path))
+    export_path = tmp_path / "session_20250101_120000.txt"
+    assert export_path.exists()
+
+
+def test_export_session_strips_markdown(tmp_path):
+    from src.main import export_session
+    f = tmp_path / "session_20250101_120000.md"
+    f.write_text("# Title\n\n## Section\n\n**bold** content", encoding="utf-8")
+    export_session(filename="session_20250101_120000.md", reports_dir=str(tmp_path))
+    export_path = tmp_path / "session_20250101_120000.txt"
+    content = export_path.read_text(encoding="utf-8")
+    assert "#" not in content
+    assert "**" not in content
+
+
+def test_export_session_file_not_found(tmp_path, capsys):
+    from src.main import export_session
+    export_session(filename="session_missing.md", reports_dir=str(tmp_path))
+    captured = capsys.readouterr()
+    assert "not found" in captured.out
+    assert "--list-sessions" in captured.out
+
+
+def test_export_session_prints_export_path(tmp_path, capsys):
+    from src.main import export_session
+    f = tmp_path / "session_20250101_120000.md"
+    f.write_text("Some content", encoding="utf-8")
+    export_session(filename="session_20250101_120000.md", reports_dir=str(tmp_path))
+    captured = capsys.readouterr()
+    assert "Exported" in captured.out
+
+
+def test_parse_args_export_session_flag():
+    from src.main import parse_args
+    import sys
+    sys.argv = ["main.py", "--export-session", "session_20250101_120000.md"]
+    args = parse_args()
+    assert args.export_session == "session_20250101_120000.md"
 
 
 

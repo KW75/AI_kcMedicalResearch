@@ -270,6 +270,30 @@ def delete_session(filename: str, reports_dir: str = "reports") -> None:
     print(f"{Fore.GREEN}Deleted: {filename}")
 
 
+def export_session(filename: str, reports_dir: str = "reports") -> None:
+    """Export a session transcript as a plain text file with markdown stripped."""
+    reports_path = Path(reports_dir)
+    session_path = reports_path / filename
+
+    if not session_path.exists():
+        print(f"{Fore.RED}Session file not found: {session_path}")
+        print(f"{Fore.YELLOW}Use --list-sessions to see available transcripts.")
+        return
+
+    content = session_path.read_text(encoding="utf-8")
+
+    # Strip common markdown symbols
+    plain = content
+    for symbol in ("##", "#", "**", "__", "---", "==="):
+        plain = plain.replace(symbol, "")
+
+    export_filename = Path(filename).stem + ".txt"
+    export_path = reports_path / export_filename
+
+    export_path.write_text(plain.strip(), encoding="utf-8")
+    print(f"{Fore.GREEN}Exported: {export_path}")
+
+
 def parse_args() -> argparse.Namespace:
     """Parse and return command line arguments."""
     parser = argparse.ArgumentParser(
@@ -310,6 +334,15 @@ def parse_args() -> argparse.Namespace:
         metavar="FILENAME",
         help="Delete a past session transcript by filename",
     )
+
+    parser.add_argument(
+        "--export-session",
+        type=str,
+        default=None,
+        metavar="FILENAME",
+        help="Export a session transcript as a plain text file",
+    )
+
 
     parser.add_argument(
         "--dry-run",
@@ -456,6 +489,8 @@ if __name__ == "__main__":
         read_session(filename=args.read_session, reports_dir=str(REPORTS_DIR))
     elif args.delete_session:
         delete_session(filename=args.delete_session, reports_dir=str(REPORTS_DIR))
+    elif args.export_session:
+        export_session(filename=args.export_session, reports_dir=str(REPORTS_DIR))
     else:
         main(model_override=args.model, dry_run=args.dry_run)
 
