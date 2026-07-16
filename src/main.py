@@ -225,7 +225,17 @@ def list_sessions(reports_dir: str = "reports") -> None:
     print()
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="AI Automation Tool")
+    parser = argparse.ArgumentParser(
+        description="AI Automation Tool - local AI assistant using Ollama",
+        epilog=(
+            "Examples:\n"
+            "  python src/main.py                        # start a session\n"
+            "  python src/main.py --model llama3.2:3b   # use a different model\n"
+            "  python src/main.py --list-sessions        # list past transcripts\n"
+            "  python src/main.py --version              # show version\n"
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     parser.add_argument(
         "--model",
         type=str,
@@ -246,6 +256,7 @@ def parse_args() -> argparse.Namespace:
     )
     return parser.parse_args()
 
+
 def main(model_override: str | None = None) -> None:
 
     load_dotenv(PROJECT_ROOT / ".env")
@@ -253,9 +264,14 @@ def main(model_override: str | None = None) -> None:
     model = model_override or os.getenv("OLLAMA_MODEL", DEFAULT_OLLAMA_MODEL)
     host = os.getenv("OLLAMA_HOST", DEFAULT_OLLAMA_HOST)
 
-    print("\nAI Automation Tool")
-    print("==================")
-    print("Type 'quit' or 'exit' at any prompt to stop.\n")
+    print(f"\n{Fore.MAGENTA}{'=' * 42}")
+    print(f"{Fore.MAGENTA}  AI Automation Tool  v{VERSION}")
+    print(f"{Fore.MAGENTA}{'=' * 42}")
+    print(f"  Model : {Fore.CYAN}{model}")
+    print(f"{Fore.WHITE}  Host  : {host}")
+    print(f"{Fore.MAGENTA}{'=' * 42}")
+    print(f"{Fore.WHITE}  Type 'quit' or 'exit' at any prompt to stop.")
+    print(f"{Fore.MAGENTA}{'=' * 42}\n")
 
     transcript_path = start_session_transcript(REPORTS_DIR)
     print(f"Session transcript: {transcript_path}\n")

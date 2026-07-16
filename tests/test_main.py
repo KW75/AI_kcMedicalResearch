@@ -500,4 +500,20 @@ def test_parse_args_version_flag(capsys):
     captured = capsys.readouterr()
     assert "AI Automation Tool" in captured.out
 
+# parse_args epilog test
+
+def test_parse_args_help_contains_examples(capsys):
+    from src.main import parse_args
+    import sys
+    sys.argv = ["main.py", "--help"]
+    try:
+        parse_args()
+    except SystemExit:
+        pass
+    captured = capsys.readouterr()
+    assert "Examples" in captured.out
+    assert "--model" in captured.out
+    assert "--list-sessions" in captured.out
+
+
 
