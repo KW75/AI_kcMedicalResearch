@@ -428,3 +428,56 @@ def test_parse_args_model_flag() -> None:
         args = parse_args()
     assert args.model == "llama3.2:3b"
 
+
+# list_sessions tests
+
+def test_list_sessions_no_reports_folder(capsys):
+    from src.main import list_sessions
+    list_sessions(reports_dir="nonexistent_reports_dir_xyz")
+    captured = capsys.readouterr()
+    assert "No reports folder found" in captured.out
+
+
+def test_list_sessions_empty_folder(tmp_path, capsys):
+    from src.main import list_sessions
+    list_sessions(reports_dir=str(tmp_path))
+    captured = capsys.readouterr()
+    assert "No session transcripts found" in captured.out
+
+
+def test_list_sessions_shows_files(tmp_path, capsys):
+    from src.main import list_sessions
+    (tmp_path / "session_20250101_120000.md").write_text("session 1")
+    (tmp_path / "session_20250102_120000.md").write_text("session 2")
+    list_sessions(reports_dir=str(tmp_path))
+    captured = capsys.readouterr()
+    assert "session_20250101_120000.md" in captured.out
+    assert "session_20250102_120000.md" in captured.out
+
+
+def test_list_sessions_sorted_newest_first(tmp_path, capsys):
+    from src.main import list_sessions
+    (tmp_path / "session_20250101_120000.md").write_text("older")
+    (tmp_path / "session_20250103_120000.md").write_text("newer")
+    list_sessions(reports_dir=str(tmp_path))
+    captured = capsys.readouterr()
+    pos_newer = captured.out.find("session_20250103")
+    pos_older = captured.out.find("session_20250101")
+    assert pos_newer < pos_older
+
+
+def test_parse_args_list_sessions_flag():
+    from src.main import parse_args
+    import sys
+    sys.argv = ["main.py", "--list-sessions"]
+    args = parse_args()
+    assert args.list_sessions is True
+
+
+def test_parse_args_list_sessions_default_false():
+    from src.main import parse_args
+    import sys
+    sys.argv = ["main.py"]
+    args = parse_args()
+    assert args.list_sessions is False
+

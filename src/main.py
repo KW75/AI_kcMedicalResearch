@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import argparse
+from collections import Counter
 from datetime import datetime
 from pathlib import Path
 from urllib.error import HTTPError, URLError
@@ -43,13 +44,12 @@ def read_text_file(path: Path) -> str:
 
 def build_project_context() -> str:
     sections = []
-
     for path in DOC_FILES:
         content = read_text_file(path)
         if content:
             sections.append(f"## {path.name}\n{content}")
-
     return "\n\n".join(sections)
+
 
 def choose_role() -> tuple[str, Path, Path]:
     while True:
@@ -93,7 +93,9 @@ def call_ollama(model: str, prompt: str, host: str) -> str:
             "Could not connect to Ollama. Make sure Ollama is running, then try: ollama list"
         ) from error
     except TimeoutError as error:
-        raise RuntimeError("Ollama took too long to respond. Try again or use a smaller model.") from error
+        raise RuntimeError(
+            "Ollama took too long to respond. Try again or use a smaller model."
+        ) from error
 
     result = json.loads(raw_response)
 
@@ -108,7 +110,9 @@ def call_ollama(model: str, prompt: str, host: str) -> str:
     return response_text
 
 
-def save_report(report_path: Path, role_name: str, model: str, task: str, response_text: str) -> None:
+def save_report(
+    report_path: Path, role_name: str, model: str, task: str, response_text: str
+) -> None:
     report_path.parent.mkdir(parents=True, exist_ok=True)
 
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -138,26 +142,42 @@ def start_session_transcript(reports_dir: Path) -> Path:
     reports_dir.mkdir(parents=True, exist_ok=True)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     transcript_path = reports_dir / f"session_{timestamp}.md"
-    header = f"# Session Transcript\n\nStarted: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n---\n"
+    header = (
+        f"# Session Transcript\n\n"
+        f"Started: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n---\n"
+    )
     transcript_path.write_text(header, encoding="utf-8")
     return transcript_path
 
 
-def append_to_transcript(transcript_path: Path, step: int, role_name: str, task: str, response_text: str) -> None:
-    entry = f"## Step {step} - {role_name} AI\n\n**Task:** {task}\n\n**Response:**\n\n{response_text}\n\n---\n"
+def append_to_transcript(
+    transcript_path: Path, step: int, role_name: str, task: str, response_text: str
+) -> None:
+    entry = (
+        f"## Step {step} - {role_name} AI\n\n"
+        f"**Task:** {task}\n\n"
+        f"**Response:**\n\n{response_text}\n\n---\n"
+    )
     with transcript_path.open("a", encoding="utf-8") as file:
         file.write(entry)
+
 
 def truncate_context(text: str, max_chars: int = 2000) -> str:
     if len(text) <= max_chars:
         return text
-    return text[:max_chars] + f"\n\n[Response truncated at {max_chars} characters to keep prompt size manageable.]"
+    return (
+        text[:max_chars]
+        + f"\n\n[Response truncated at {max_chars} characters to keep prompt size manageable.]"
+    )
 
 
-def print_session_summary(step: int, roles_used: list[str], transcript_path: Path) -> None:
-    from collections import Counter
+def print_session_summary(
+    step: int, roles_used: list[str], transcript_path: Path
+) -> None:
     role_counts = Counter(roles_used)
-    roles_str = ", ".join(f"{role} ({count})" for role, count in role_counts.items())
+    roles_str = ", ".join(
+        f"{role} ({count})" for role, count in role_counts.items()
+    )
     print("\n" + "=" * 42)
     print("Session Summary")
     print("=" * 42)
@@ -165,6 +185,29 @@ def print_session_summary(step: int, roles_used: list[str], transcript_path: Pat
     print(f"Roles used      : {roles_str if roles_str else 'none'}")
     print(f"Transcript saved: {transcript_path}")
     print("=" * 42 + "\n")
+
+
+def list_sessions(reports_dir: str = "reports") -> None:
+    """List all past session transcripts in reports/, sorted newest first."""
+    reports_path = Path(reports_dir)
+
+    if not reports_path.exists():
+        print("No reports folder found. No sessions have been run yet.")
+        return
+
+    session_files = sorted(
+        reports_path.glob("session_*.md"),
+        reverse=True,
+    )
+
+    if not session_files:
+        print("No session transcripts found in reports/.")
+        return
+
+    print(f"\nFound {len(session_files)} session transcript(s):\n")
+    for i, f in enumerate(session_files, start=1):
+        print(f"  {i:>3}.  {f.name}")
+    print()
 
 
 def parse_args() -> argparse.Namespace:
@@ -175,6 +218,12 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="Ollama model to use (overrides OLLAMA_MODEL in .env)",
     )
+    parser.add_argument(
+        "--list-sessions",
+        action="store_true",
+        default=False,
+        help="List all past session transcripts in reports/ and exit",
+    )
     return parser.parse_args()
 
 
@@ -183,7 +232,6 @@ def main(model_override: str | None = None) -> None:
     load_dotenv(PROJECT_ROOT / ".env")
 
     model = model_override or os.getenv("OLLAMA_MODEL", DEFAULT_OLLAMA_MODEL)
-
     host = os.getenv("OLLAMA_HOST", DEFAULT_OLLAMA_HOST)
 
     print("\nAI Automation Tool")
@@ -196,7 +244,6 @@ def main(model_override: str | None = None) -> None:
     step = 0
     roles_used = []
     last_response = ""
-
 
     while True:
         role_name, prompt_path, report_path = choose_role()
@@ -243,7 +290,9 @@ Project context:
 Respond as the {role_name} AI.
 """
 
-        print(f"\nSending task to local {role_name} AI using Ollama model {model}...\n")
+        print(
+            f"\nSending task to local {role_name} AI using Ollama model {model}...\n"
+        )
 
         try:
             response_text = call_ollama(model=model, prompt=full_prompt, host=host)
@@ -256,7 +305,6 @@ Respond as the {role_name} AI.
         roles_used.append(role_name)
         last_response = response_text
 
-
         print("\nAI RESPONSE")
         print("=" * 60)
         print(response_text)
@@ -268,7 +316,13 @@ Respond as the {role_name} AI.
         print(f"\nSaved response to: {report_path}")
         print(f"Session transcript updated: {transcript_path}")
 
-        again = input("\nSend another task? (yes to continue, anything else to quit): ").strip().lower()
+        again = (
+            input(
+                "\nSend another task? (yes to continue, anything else to quit): "
+            )
+            .strip()
+            .lower()
+        )
         if again != "yes":
             print_session_summary(step, roles_used, transcript_path)
             print("Goodbye.")
@@ -277,5 +331,7 @@ Respond as the {role_name} AI.
 
 if __name__ == "__main__":
     args = parse_args()
-    main(model_override=args.model)
-
+    if args.list_sessions:
+        list_sessions(reports_dir=str(REPORTS_DIR))
+    else:
+        main(model_override=args.model)
