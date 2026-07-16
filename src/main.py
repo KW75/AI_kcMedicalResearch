@@ -283,6 +283,13 @@ def parse_args() -> argparse.Namespace:
     )
 
     parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        default=False,
+        help="Run a session without calling Ollama - returns a fake response for testing",
+    )
+
+    parser.add_argument(
         "--version",
         action="version",
         version=f"AI Automation Tool v{VERSION}",
@@ -291,7 +298,7 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def main(model_override: str | None = None) -> None:
+def main(model_override: str | None = None, dry_run: bool = False) -> None:
     """Run the main interactive AI automation session loop."""
 
     load_dotenv(PROJECT_ROOT / ".env")
@@ -307,6 +314,9 @@ def main(model_override: str | None = None) -> None:
     print(f"{Fore.MAGENTA}{'=' * 42}")
     print(f"{Fore.WHITE}  Type 'quit' or 'exit' at any prompt to stop.")
     print(f"{Fore.MAGENTA}{'=' * 42}\n")
+    if dry_run:
+       print(f"{Fore.YELLOW}  DRY RUN MODE - Ollama will not be called.\n")
+
 
     transcript_path = start_session_transcript(REPORTS_DIR)
     print(f"Session transcript: {transcript_path}\n")
@@ -367,12 +377,19 @@ Respond as the {role_name} AI.
             f"using Ollama model {model}...\n"
         )
 
-        try:
-            response_text = call_ollama(model=model, prompt=full_prompt, host=host)
-        except RuntimeError as error:
-            print(f"\n{Fore.RED}Error: {error}")
-            print(f"{Fore.RED}Please check Ollama is running and try again.\n")
-            continue
+        if dry_run:
+            response_text = (
+                f"[DRY RUN] This is a simulated response from the {role_name} AI. "
+                f"Ollama was not called. Model would have been: {model}"
+            )
+        else:
+            try:
+                response_text = call_ollama(model=model, prompt=full_prompt, host=host)
+            except RuntimeError as error:
+                print(f"\n{Fore.RED}Error: {error}")
+                print(f"{Fore.RED}Please check Ollama is running and try again.\n")
+                continue
+
 
         step += 1
         roles_used.append(role_name)
@@ -408,6 +425,7 @@ if __name__ == "__main__":
     elif args.read_session:
         read_session(filename=args.read_session, reports_dir=str(REPORTS_DIR))
     else:
-        main(model_override=args.model)
+        main(model_override=args.model, dry_run=args.dry_run)
+
 
 

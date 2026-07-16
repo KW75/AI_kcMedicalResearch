@@ -550,6 +550,33 @@ def test_parse_args_read_session_flag():
     args = parse_args()
     assert args.read_session == "session_20250101_120000.md"
 
+# --dry-run tests
+
+def test_parse_args_dry_run_flag():
+    from src.main import parse_args
+    import sys
+    sys.argv = ["main.py", "--dry-run"]
+    args = parse_args()
+    assert args.dry_run is True
+
+
+def test_parse_args_dry_run_default_false():
+    from src.main import parse_args
+    import sys
+    sys.argv = ["main.py"]
+    args = parse_args()
+    assert args.dry_run is False
+
+
+def test_main_dry_run_does_not_call_ollama(tmp_path, monkeypatch):
+    from src.main import main
+    import sys
+    inputs = iter(["1", "test dry run task", "no"])
+    monkeypatch.setattr("builtins.input", lambda _: next(inputs))
+    monkeypatch.setattr("src.main.REPORTS_DIR", tmp_path)
+    main(dry_run=True)
+
+
 
 
 
