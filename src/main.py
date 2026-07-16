@@ -23,6 +23,8 @@ REPORTS_DIR = PROJECT_ROOT / "reports"
 
 DEFAULT_OLLAMA_HOST = "http://localhost:11434"
 DEFAULT_OLLAMA_MODEL = "qwen2.5-coder:3b"
+VERSION = "1.0.0"
+
 
 ROLE_FILES = {
     "1": ("Builder", AI_DIR / "builder-prompt.md", REPORTS_DIR / "builder-output.md"),
@@ -222,7 +224,6 @@ def list_sessions(reports_dir: str = "reports") -> None:
         print(f"  {i:>3}.  {f.name}")
     print()
 
-
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="AI Automation Tool")
     parser.add_argument(
@@ -237,8 +238,13 @@ def parse_args() -> argparse.Namespace:
         default=False,
         help="List all past session transcripts in reports/ and exit",
     )
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=f"AI Automation Tool v{VERSION}",
+        help="Show version and exit",
+    )
     return parser.parse_args()
-
 
 def main(model_override: str | None = None) -> None:
 

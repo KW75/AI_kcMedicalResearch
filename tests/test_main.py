@@ -481,3 +481,23 @@ def test_parse_args_list_sessions_default_false():
     args = parse_args()
     assert args.list_sessions is False
 
+# --version flag tests
+
+def test_version_constant_is_defined():
+    from src.main import VERSION
+    assert isinstance(VERSION, str)
+    assert len(VERSION) > 0
+
+
+def test_parse_args_version_flag(capsys):
+    from src.main import parse_args
+    import sys
+    sys.argv = ["main.py", "--version"]
+    try:
+        parse_args()
+    except SystemExit:
+        pass
+    captured = capsys.readouterr()
+    assert "AI Automation Tool" in captured.out
+
+
