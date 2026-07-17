@@ -862,6 +862,7 @@ def test_all_modes_contains_coding_and_writing() -> None:
     from src.main import ALL_MODES
     assert "coding" in ALL_MODES
     assert "writing" in ALL_MODES
+    assert "rct_search" in ALL_MODES
 
 
 # ===========================================================================
@@ -1230,3 +1231,132 @@ def test_parse_args_list_roles_with_mode_writing() -> None:
         args = parse_args()
     assert args.list_roles is True
     assert args.mode == "writing"
+
+# ===========================================================================
+# rct_search mode tests
+# ===========================================================================
+
+def test_rct_search_mode_has_three_roles() -> None:
+    from src.main import ALL_MODES
+    assert len(ALL_MODES["rct_search"]) == 3
+
+
+def test_rct_search_mode_roles_are_formulator_searcher_validator() -> None:
+    from src.main import ALL_MODES
+    role_names = [name for name, _, _ in ALL_MODES["rct_search"].values()]
+    assert "Formulator" in role_names
+    assert "Searcher" in role_names
+    assert "Validator" in role_names
+
+
+def test_choose_role_rct_search_returns_formulator() -> None:
+    with patch("builtins.input", return_value="1"):
+        role_name, prompt_path, report_path = choose_role(mode="rct_search")
+    assert role_name == "Formulator"
+
+
+def test_choose_role_rct_search_returns_searcher() -> None:
+    with patch("builtins.input", return_value="2"):
+        role_name, prompt_path, report_path = choose_role(mode="rct_search")
+    assert role_name == "Searcher"
+
+
+def test_choose_role_rct_search_returns_validator() -> None:
+    with patch("builtins.input", return_value="3"):
+        role_name, prompt_path, report_path = choose_role(mode="rct_search")
+    assert role_name == "Validator"
+
+
+def test_formulator_receives_pico_framework(tmp_path, monkeypatch) -> None:
+    from src import main as m
+    pico = tmp_path / "pico-framework.md"
+    pico.write_text("pico framework content", encoding="utf-8")
+    monkeypatch.setattr(m, "DOC_FILES_BY_ROLE", {"Formulator": [pico]})
+    result = m.build_project_context(role_name="Formulator")
+    assert "pico framework content" in result
+
+
+def test_searcher_receives_pico_framework_and_database_guide(tmp_path, monkeypatch) -> None:
+    from src import main as m
+    pico = tmp_path / "pico-framework.md"
+    db   = tmp_path / "database-guide.md"
+    pico.write_text("pico content", encoding="utf-8")
+    db.write_text("database guide content", encoding="utf-8")
+    monkeypatch.setattr(m, "DOC_FILES_BY_ROLE", {"Searcher": [pico, db]})
+    result = m.build_project_context(role_name="Searcher")
+    assert "pico content" in result
+    assert "database guide content" in result
+
+
+def test_validator_receives_pico_framework_and_validation_criteria(tmp_path, monkeypatch) -> None:
+    from src import main as m
+    pico       = tmp_path / "pico-framework.md"
+    validation = tmp_path / "validation-criteria.md"
+    pico.write_text("pico content", encoding="utf-8")
+    validation.write_text("validation criteria content", encoding="utf-8")
+    monkeypatch.setattr(m, "DOC_FILES_BY_ROLE", {"Validator": [pico, validation]})
+    result = m.build_project_context(role_name="Validator")
+    assert "pico content" in result
+    assert "validation criteria content" in result
+
+
+def test_formulator_does_not_receive_database_guide(tmp_path, monkeypatch) -> None:
+    from src import main as m
+    pico = tmp_path / "pico-framework.md"
+    pico.write_text("pico content", encoding="utf-8")
+    monkeypatch.setattr(m, "DOC_FILES_BY_ROLE", {"Formulator": [pico]})
+    result = m.build_project_context(role_name="Formulator")
+    assert "database guide content" not in result
+
+
+def test_validator_does_not_receive_database_guide(tmp_path, monkeypatch) -> None:
+    from src import main as m
+    pico       = tmp_path / "pico-framework.md"
+    validation = tmp_path / "validation-criteria.md"
+    pico.write_text("pico content", encoding="utf-8")
+    validation.write_text("validation criteria content", encoding="utf-8")
+    monkeypatch.setattr(m, "DOC_FILES_BY_ROLE", {"Validator": [pico, validation]})
+    result = m.build_project_context(role_name="Validator")
+    assert "database guide content" not in result
+
+
+def test_parse_args_mode_rct_search() -> None:
+    from src.main import parse_args
+    with patch("sys.argv", ["main.py", "--mode", "rct_search"]):
+        args = parse_args()
+    assert args.mode == "rct_search"
+
+
+def test_list_roles_rct_search_shows_correct_roles(capsys) -> None:
+    from src.main import list_roles
+    list_roles(mode="rct_search")
+    captured = capsys.readouterr()
+    assert "Formulator" in captured.out
+    assert "Searcher" in captured.out
+    assert "Validator" in captured.out
+
+
+def test_list_roles_rct_search_shows_correct_docs(capsys) -> None:
+    from src.main import list_roles
+    list_roles(mode="rct_search")
+    captured = capsys.readouterr()
+    assert "pico-framework.md" in captured.out
+    assert "database-guide.md" in captured.out
+    assert "validation-criteria.md" in captured.out
+
+
+def test_list_roles_rct_search_does_not_show_coding_docs(capsys) -> None:
+    from src.main import list_roles
+    list_roles(mode="rct_search")
+    captured = capsys.readouterr()
+    assert "coding-standards.md" not in captured.out
+    assert "test-strategy.md" not in captured.out
+
+
+def test_main_dry_run_rct_search_mode(tmp_path, monkeypatch) -> None:
+    from src.main import main
+    inputs = iter(["1", "test RCT search task", "no"])
+    monkeypatch.setattr("builtins.input", lambda _: next(inputs))
+    monkeypatch.setattr("src.main.REPORTS_DIR", tmp_path)
+    main(dry_run=True, mode="rct_search")
+

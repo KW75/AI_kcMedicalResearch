@@ -21,6 +21,7 @@ AI_DIR        = PROJECT_ROOT / "ai"
 DOCS_DIR      = PROJECT_ROOT / "docs"
 DOCS_CODING   = DOCS_DIR / "coding"
 DOCS_WRITING  = DOCS_DIR / "writing"
+DOCS_RCT_SEARCH = DOCS_DIR / "rct_search"
 REPORTS_DIR   = PROJECT_ROOT / "reports"
 
 DEFAULT_OLLAMA_HOST  = "http://localhost:11434"
@@ -46,10 +47,18 @@ ROLE_FILES_WRITING = {
     "3": ("QA",     AI_DIR / "qa-prompt.md",     REPORTS_DIR / "qa-report.md"),
 }
 
-ALL_MODES = {
-    "coding": ROLE_FILES_CODING,
-    "writing": ROLE_FILES_WRITING,
+ROLE_FILES_RCT_SEARCH = {
+    "1": ("Formulator", AI_DIR / "formulator-prompt.md", REPORTS_DIR / "formulator-output.md"),
+    "2": ("Searcher",   AI_DIR / "searcher-prompt.md",   REPORTS_DIR / "searcher-output.md"),
+    "3": ("Validator",  AI_DIR / "validator-prompt.md",  REPORTS_DIR / "validator-output.md"),
 }
+
+ALL_MODES = {
+    "coding":     ROLE_FILES_CODING,
+    "writing":    ROLE_FILES_WRITING,
+    "rct_search": ROLE_FILES_RCT_SEARCH,
+}
+
 
 # ---------------------------------------------------------------------------
 # Role-aware documentation files
@@ -86,6 +95,18 @@ DOC_FILES_BY_ROLE = {
         DOCS_WRITING / "project-brief.md",
         DOCS_WRITING / "qa-checklist.md",
     ],
+    # RCT search roles
+    "Formulator": [
+        DOCS_RCT_SEARCH / "pico-framework.md",
+    ],
+    "Searcher": [
+        DOCS_RCT_SEARCH / "pico-framework.md",
+        DOCS_RCT_SEARCH / "database-guide.md",
+    ],
+    "Validator": [
+        DOCS_RCT_SEARCH / "pico-framework.md",
+        DOCS_RCT_SEARCH / "validation-criteria.md",
+    ],
 }
 
 def list_roles(mode: str = "coding") -> None:
@@ -106,15 +127,19 @@ def list_roles(mode: str = "coding") -> None:
 
     print(f"\n{Fore.MAGENTA}{'=' * 42}\n")
 
+
 def role_color(role_name: str) -> str:
     """Return a colorama Fore colour code for the given role name."""
     colors = {
-        "Builder": Fore.CYAN,
-        "Reviewer": Fore.YELLOW,
-        "Tester": Fore.GREEN,
-        "Writer": Fore.CYAN,
-        "Editor": Fore.YELLOW,
-        "QA": Fore.GREEN,
+        "Builder":    Fore.CYAN,
+        "Reviewer":   Fore.YELLOW,
+        "Tester":     Fore.GREEN,
+        "Writer":     Fore.CYAN,
+        "Editor":     Fore.YELLOW,
+        "QA":         Fore.GREEN,
+        "Formulator": Fore.CYAN,
+        "Searcher":   Fore.YELLOW,
+        "Validator":  Fore.GREEN,
     }
     return colors.get(role_name, Fore.WHITE)
 
@@ -517,7 +542,11 @@ def show_stats(reports_dir: str = "reports") -> None:
     for session_file in session_files:
         content = session_file.read_text(encoding="utf-8")
         for line in content.splitlines():
-            for role in ("Builder", "Reviewer", "Tester", "Writer", "Editor", "QA"):
+            for role in (
+                "Builder", "Reviewer", "Tester",
+                "Writer", "Editor", "QA",
+                "Formulator", "Searcher", "Validator",
+            ):
                 if "## Step" in line and f"{role} AI" in line:
                     role_counts[role] = role_counts.get(role, 0) + 1
 
@@ -572,6 +601,7 @@ def parse_args() -> argparse.Namespace:
             "Examples:\n"
             "  python src/main.py                        # start a session\n"
             "  python src/main.py --mode writing         # writing mode\n"
+            "  python src/main.py --mode rct_search      # RCT search mode\n"
             "  python src/main.py --model llama3.2:3b    # different model\n"
             "  python src/main.py --provider openai      # use OpenAI\n"
             "  python src/main.py --list-sessions        # list transcripts\n"
@@ -582,7 +612,7 @@ def parse_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument("--model",          type=str,  default=None)
-    parser.add_argument("--mode",           type=str,  default="coding", choices=["coding", "writing"])
+    parser.add_argument("--mode",           type=str,  default="coding", choices=["coding", "writing", "rct_search"])
     parser.add_argument("--provider",       type=str,  default="ollama", choices=["ollama", "openai", "anthropic"])
     parser.add_argument("--list-sessions",  action="store_true", default=False)
     parser.add_argument("--read-session",   type=str,  default=None, metavar="FILENAME")
