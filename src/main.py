@@ -8,6 +8,7 @@ from datetime import datetime
 from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
+
 from colorama import Fore, init as colorama_init
 from dotenv import load_dotenv
 
@@ -22,23 +23,56 @@ REPORTS_DIR = PROJECT_ROOT / "reports"
 
 DEFAULT_OLLAMA_HOST = "http://localhost:11434"
 DEFAULT_OLLAMA_MODEL = "qwen2.5-coder:3b"
-VERSION = "1.0.0"
+DEFAULT_PROVIDER = "ollama"
+DEFAULT_MODE = "coding"
 
+VERSION = "2.0.0"
 
-ROLE_FILES = {
-    "1": ("Builder", AI_DIR / "builder-prompt.md", REPORTS_DIR / "builder-output.md"),
+# ---------------------------------------------------------------------------
+# Role file sets - one dictionary per mode
+# ---------------------------------------------------------------------------
+
+ROLE_FILES_CODING = {
+    "1": ("Builder",  AI_DIR / "builder-prompt.md",  REPORTS_DIR / "builder-output.md"),
     "2": ("Reviewer", AI_DIR / "reviewer-prompt.md", REPORTS_DIR / "review-log.md"),
-    "3": ("Tester", AI_DIR / "tester-prompt.md", REPORTS_DIR / "test-report.md"),
+    "3": ("Tester",   AI_DIR / "tester-prompt.md",   REPORTS_DIR / "test-report.md"),
 }
 
-DOC_FILES = [
+ROLE_FILES_WRITING = {
+    "1": ("Writer", AI_DIR / "writer-prompt.md", REPORTS_DIR / "writer-output.md"),
+    "2": ("Editor", AI_DIR / "editor-prompt.md", REPORTS_DIR / "editor-log.md"),
+    "3": ("QA",     AI_DIR / "qa-prompt.md",     REPORTS_DIR / "qa-report.md"),
+}
+
+ALL_MODES = {
+    "coding": ROLE_FILES_CODING,
+    "writing": ROLE_FILES_WRITING,
+}
+
+
+
+# ---------------------------------------------------------------------------
+# Mode-aware documentation files
+# ---------------------------------------------------------------------------
+
+DOC_FILES_COMMON = [
     DOCS_DIR / "PRD.md",
     DOCS_DIR / "architecture.md",
-    DOCS_DIR / "coding-standards.md",
-    DOCS_DIR / "test-strategy.md",
     DOCS_DIR / "decision-log.md",
 ]
 
+
+DOC_FILES_CODING = DOC_FILES_COMMON + [
+    DOCS_DIR / "coding-standards.md",
+    DOCS_DIR / "test-strategy.md",
+]
+
+DOC_FILES_WRITING = DOC_FILES_COMMON
+
+DOC_FILES_BY_MODE = {
+    "coding": DOC_FILES_CODING,
+    "writing": DOC_FILES_WRITING,
+}
 
 def role_color(role_name: str) -> str:
     """Return a colorama Fore colour code for the given role name."""
@@ -46,48 +80,54 @@ def role_color(role_name: str) -> str:
         "Builder": Fore.CYAN,
         "Reviewer": Fore.YELLOW,
         "Tester": Fore.GREEN,
+        "Writer": Fore.CYAN,
+        "Editor": Fore.YELLOW,
+        "QA": Fore.GREEN,
     }
     return colors.get(role_name, Fore.WHITE)
 
 
 def read_text_file(path: Path) -> str:
     """Read a file and return its content stripped of whitespace. Returns empty string if missing."""
-
     if not path.exists():
         return ""
     return path.read_text(encoding="utf-8").strip()
 
 
-def build_project_context() -> str:
-    """Combine all project doc files into a single context string for the AI prompt."""
-
+def build_project_context(mode: str = "coding") -> str:
+    """Combine project doc files into a context string. Only injects docs relevant to the active mode."""
+    doc_files = DOC_FILES_BY_MODE.get(mode, DOC_FILES_CODING)
     sections = []
-    for path in DOC_FILES:
+    for path in doc_files:
         content = read_text_file(path)
         if content:
             sections.append(f"## {path.name}\n{content}")
     return "\n\n".join(sections)
 
 
-def choose_role() -> tuple[str, Path, Path]:
-    """Prompt the user to choose an AI role. Loops until a valid choice is made."""
-
+def choose_role(mode: str = "coding") -> tuple[str, Path, Path]:
+    """Prompt the user to choose an AI role for the active mode. Loops until a valid choice is made."""
+    role_files = ALL_MODES.get(mode, ROLE_FILES_CODING)
     while True:
         print(f"\n{Fore.WHITE}Choose AI role:")
-        print(f"{Fore.CYAN}1. Builder AI")
-        print(f"{Fore.YELLOW}2. Reviewer AI")
-        print(f"{Fore.GREEN}3. Tester AI")
+        for key, (role_name, _, _) in role_files.items():
+            color = role_color(role_name)
+            print(f"{color}{key}. {role_name} AI")
 
         choice = input("\nEnter 1, 2, or 3: ").strip()
 
-        if choice in ROLE_FILES:
-            return ROLE_FILES[choice]
+        if choice in role_files:
+            return role_files[choice]
 
         print(f"{Fore.RED}Invalid choice. Please enter 1, 2, or 3.")
 
-def call_ollama(model: str, prompt: str, host: str) -> str:
-    """Send a prompt to the Ollama API and return the response text."""
 
+# ---------------------------------------------------------------------------
+# Provider caller functions
+# ---------------------------------------------------------------------------
+
+def call_ollama_provider(model: str, prompt: str, host: str) -> str:
+    """Send a prompt to the Ollama API and return the response text."""
     url = host.rstrip("/") + "/api/generate"
 
     payload = {
@@ -130,11 +170,132 @@ def call_ollama(model: str, prompt: str, host: str) -> str:
 
     return response_text
 
+
+def call_openai_provider(model: str, prompt: str, host: str) -> str:
+    """Send a prompt to the OpenAI API and return the response text."""
+    api_key = os.getenv("OPENAI_API_KEY", "")
+    if not api_key:
+        raise RuntimeError(
+            "OPENAI_API_KEY is not set. Add it to your .env file."
+        )
+
+    url = "https://api.openai.com/v1/chat/completions"
+
+    payload = {
+        "model": model,
+        "messages": [{"role": "user", "content": prompt}],
+    }
+
+    request = Request(
+        url,
+        data=json.dumps(payload).encode("utf-8"),
+        headers={
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {api_key}",
+        },
+        method="POST",
+    )
+
+    try:
+        with urlopen(request, timeout=180) as response:
+            raw_response = response.read().decode("utf-8")
+    except HTTPError as error:
+        body = error.read().decode("utf-8", errors="replace")
+        raise RuntimeError(f"OpenAI HTTP error {error.code}: {body}") from error
+    except URLError as error:
+        raise RuntimeError(
+            "Could not connect to OpenAI. Check your internet connection."
+        ) from error
+    except TimeoutError as error:
+        raise RuntimeError(
+            "OpenAI took too long to respond. Try again."
+        ) from error
+
+    result = json.loads(raw_response)
+
+    if "error" in result:
+        raise RuntimeError(f"OpenAI error: {result['error']}")
+
+    response_text = result["choices"][0]["message"]["content"].strip()
+
+    if not response_text:
+        raise RuntimeError(f"OpenAI returned no response. Raw result: {result}")
+
+    return response_text
+
+
+def call_anthropic_provider(model: str, prompt: str, host: str) -> str:
+    """Send a prompt to the Anthropic API and return the response text."""
+    api_key = os.getenv("ANTHROPIC_API_KEY", "")
+    if not api_key:
+        raise RuntimeError(
+            "ANTHROPIC_API_KEY is not set. Add it to your .env file."
+        )
+
+    url = "https://api.anthropic.com/v1/messages"
+
+    payload = {
+        "model": model,
+        "max_tokens": 4096,
+        "messages": [{"role": "user", "content": prompt}],
+    }
+
+    request = Request(
+        url,
+        data=json.dumps(payload).encode("utf-8"),
+        headers={
+            "Content-Type": "application/json",
+            "x-api-key": api_key,
+            "anthropic-version": "2023-06-01",
+        },
+        method="POST",
+    )
+
+    try:
+        with urlopen(request, timeout=180) as response:
+            raw_response = response.read().decode("utf-8")
+    except HTTPError as error:
+        body = error.read().decode("utf-8", errors="replace")
+        raise RuntimeError(f"Anthropic HTTP error {error.code}: {body}") from error
+    except URLError as error:
+        raise RuntimeError(
+            "Could not connect to Anthropic. Check your internet connection."
+        ) from error
+    except TimeoutError as error:
+        raise RuntimeError(
+            "Anthropic took too long to respond. Try again."
+        ) from error
+
+    result = json.loads(raw_response)
+
+    if "error" in result:
+        raise RuntimeError(f"Anthropic error: {result['error']}")
+
+    response_text = result["content"][0]["text"].strip()
+
+    if not response_text:
+        raise RuntimeError(f"Anthropic returned no response. Raw result: {result}")
+
+    return response_text
+
+
+PROVIDERS = {
+    "ollama": call_ollama_provider,
+    "openai": call_openai_provider,
+    "anthropic": call_anthropic_provider,
+}
+
+
+def call_ai(model: str, prompt: str, host: str, provider: str = "ollama") -> str:
+    """Universal AI caller. Dispatches to the correct provider function."""
+    caller = PROVIDERS.get(provider, call_ollama_provider)
+    return caller(model, prompt, host)
+
+
 def save_report(
     report_path: Path, role_name: str, model: str, task: str, response_text: str
 ) -> None:
     """Append a formatted AI response entry to the role report file."""
-
     report_path.parent.mkdir(parents=True, exist_ok=True)
 
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -159,6 +320,7 @@ Model: {model}
     with report_path.open("a", encoding="utf-8") as file:
         file.write(entry)
 
+
 def start_session_transcript(reports_dir: Path) -> Path:
     """Create a timestamped session transcript file and return its path."""
     reports_dir.mkdir(parents=True, exist_ok=True)
@@ -170,6 +332,7 @@ def start_session_transcript(reports_dir: Path) -> Path:
     )
     transcript_path.write_text(header, encoding="utf-8")
     return transcript_path
+
 
 def append_to_transcript(
     transcript_path: Path, step: int, role_name: str, task: str, response_text: str
@@ -183,6 +346,7 @@ def append_to_transcript(
     with transcript_path.open("a", encoding="utf-8") as file:
         file.write(entry)
 
+
 def truncate_context(text: str, max_chars: int = 2000) -> str:
     """Truncate text to max_chars. Appends a notice if truncation occurred."""
     if len(text) <= max_chars:
@@ -191,6 +355,7 @@ def truncate_context(text: str, max_chars: int = 2000) -> str:
         text[:max_chars]
         + f"\n\n[Response truncated at {max_chars} characters to keep prompt size manageable.]"
     )
+
 
 def print_session_summary(
     step: int, roles_used: list[str], transcript_path: Path
@@ -231,6 +396,7 @@ def list_sessions(reports_dir: str = "reports") -> None:
         print(f"  {i:>3}.  {f.name}")
     print()
 
+
 def read_session(filename: str, reports_dir: str = "reports") -> None:
     """Print the contents of a named session transcript to the terminal."""
     reports_path = Path(reports_dir)
@@ -247,6 +413,7 @@ def read_session(filename: str, reports_dir: str = "reports") -> None:
     print(f"{Fore.MAGENTA}{'=' * 42}\n")
     print(content)
     print(f"{Fore.MAGENTA}{'=' * 42}\n")
+
 
 def delete_session(filename: str, reports_dir: str = "reports") -> None:
     """Delete a named session transcript after confirmation."""
@@ -282,7 +449,6 @@ def export_session(filename: str, reports_dir: str = "reports") -> None:
 
     content = session_path.read_text(encoding="utf-8")
 
-    # Strip common markdown symbols
     plain = content
     for symbol in ("##", "#", "**", "__", "---", "==="):
         plain = plain.replace(symbol, "")
@@ -318,8 +484,8 @@ def show_stats(reports_dir: str = "reports") -> None:
     for session_file in session_files:
         content = session_file.read_text(encoding="utf-8")
         for line in content.splitlines():
-            for role in ("Builder", "Reviewer", "Tester"):
-                if f"## Step" in line and f"{role} AI" in line:
+            for role in ("Builder", "Reviewer", "Tester", "Writer", "Editor", "QA"):
+                if "## Step" in line and f"{role} AI" in line:
                     role_counts[role] = role_counts.get(role, 0) + 1
 
     print(f"\n{Fore.MAGENTA}{'=' * 42}")
@@ -334,6 +500,7 @@ def show_stats(reports_dir: str = "reports") -> None:
     if not role_counts:
         print(f"  No steps recorded.")
     print(f"{Fore.MAGENTA}{'=' * 42}\n")
+
 
 def rename_session(filename: str, reports_dir: str = "reports") -> None:
     """Rename a session transcript file to a user-supplied name."""
@@ -363,114 +530,70 @@ def rename_session(filename: str, reports_dir: str = "reports") -> None:
     session_path.rename(new_path)
     print(f"{Fore.GREEN}Renamed: {filename} -> {new_filename}")
 
-
-
-
-
-
 def parse_args() -> argparse.Namespace:
-    """Parse and return command line arguments."""
+    """Parse command-line arguments."""
     parser = argparse.ArgumentParser(
-        description="AI Automation Tool - local AI assistant using Ollama",
+        description="AI Automation Tool",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=(
             "Examples:\n"
             "  python src/main.py                        # start a session\n"
-            "  python src/main.py --model llama3.2:3b    # use a different model\n"
-            "  python src/main.py --list-sessions        # list past transcripts\n"
+            "  python src/main.py --mode writing         # writing mode\n"
+            "  python src/main.py --model llama3.2:3b    # different model\n"
+            "  python src/main.py --provider openai      # use OpenAI\n"
+            "  python src/main.py --list-sessions        # list transcripts\n"
+            "  python src/main.py --dry-run              # simulate session\n"
             "  python src/main.py --version              # show version\n"
         ),
-        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    parser.add_argument(
-        "--model",
-        type=str,
-        default=None,
-        help="Ollama model to use (overrides OLLAMA_MODEL in .env)",
-    )
-    parser.add_argument(
-        "--list-sessions",
-        action="store_true",
-        default=False,
-        help="List all past session transcripts in reports/ and exit",
-    )
-    parser.add_argument(
-        "--read-session",
-        type=str,
-        default=None,
-        metavar="FILENAME",
-        help="Print a past session transcript to the terminal by filename",
-    )
-
-    parser.add_argument(
-        "--delete-session",
-        type=str,
-        default=None,
-        metavar="FILENAME",
-        help="Delete a past session transcript by filename",
-    )
-
-    parser.add_argument(
-        "--export-session",
-        type=str,
-        default=None,
-        metavar="FILENAME",
-        help="Export a session transcript as a plain text file",
-    )
-
-    parser.add_argument(
-        "--stats",
-        action="store_true",
-        default=False,
-        help="Show statistics across all past session transcripts and exit",
-    )
-
-    parser.add_argument(
-        "--rename-session",
-        type=str,
-        default=None,
-        metavar="FILENAME",
-        help="Rename a past session transcript file",
-    )
-
-
-
-
-
-    parser.add_argument(
-        "--dry-run",
-        action="store_true",
-        default=False,
-        help="Run a session without calling Ollama - returns a fake response for testing",
-    )
-
-    parser.add_argument(
-        "--version",
-        action="version",
-        version=f"AI Automation Tool v{VERSION}",
-        help="Show version and exit",
-    )
+    parser.add_argument("--model", type=str, default=None)
+    parser.add_argument("--mode", type=str, default="coding", choices=["coding", "writing"])
+    parser.add_argument("--provider", type=str, default="ollama", choices=["ollama", "openai", "anthropic"])
+    parser.add_argument("--list-sessions", action="store_true", default=False)
+    parser.add_argument("--read-session", type=str, default=None, metavar="FILENAME")
+    parser.add_argument("--delete-session", type=str, default=None, metavar="FILENAME")
+    parser.add_argument("--export-session", type=str, default=None, metavar="FILENAME")
+    parser.add_argument("--rename-session", type=str, default=None, metavar="FILENAME")
+    parser.add_argument("--stats", action="store_true", default=False)
+    parser.add_argument("--dry-run", action="store_true", default=False)
+    parser.add_argument("--version", action="version", version=f"AI Automation Tool v{VERSION}")
     return parser.parse_args()
 
 
-def main(model_override: str | None = None, dry_run: bool = False) -> None:
+def main(
+    model_override: str | None = None,
+    dry_run: bool = False,
+    mode: str = DEFAULT_MODE,
+    provider: str = DEFAULT_PROVIDER,
+) -> None:
     """Run the main interactive AI automation session loop."""
 
     load_dotenv(PROJECT_ROOT / ".env")
 
-    model = model_override or os.getenv("OLLAMA_MODEL", DEFAULT_OLLAMA_MODEL)
+    # Resolve model based on active provider
+    if model_override:
+        model = model_override
+    elif provider == "openai":
+        model = os.getenv("OPENAI_MODEL", "gpt-4o")
+    elif provider == "anthropic":
+        model = os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-6")
+    else:
+        model = os.getenv("OLLAMA_MODEL", DEFAULT_OLLAMA_MODEL)
+
     host = os.getenv("OLLAMA_HOST", DEFAULT_OLLAMA_HOST)
 
     print(f"\n{Fore.MAGENTA}{'=' * 42}")
     print(f"{Fore.MAGENTA}  AI Automation Tool  v{VERSION}")
     print(f"{Fore.MAGENTA}{'=' * 42}")
-    print(f"  Model : {Fore.CYAN}{model}")
-    print(f"{Fore.WHITE}  Host  : {host}")
+    print(f"  Mode     : {Fore.CYAN}{mode}")
+    print(f"  Provider : {Fore.CYAN}{provider}")
+    print(f"  Model    : {Fore.CYAN}{model}")
+    print(f"{Fore.WHITE}  Host     : {host}")
     if dry_run:
-        print(f"{Fore.YELLOW}  Mode  : DRY RUN - Ollama will not be called.")
+       print(f"{Fore.YELLOW}  DRY RUN  : AI will not be called.")
     print(f"{Fore.MAGENTA}{'=' * 42}")
     print(f"{Fore.WHITE}  Type 'quit' or 'exit' at any prompt to stop.")
     print(f"{Fore.MAGENTA}{'=' * 42}\n")
-
 
     transcript_path = start_session_transcript(REPORTS_DIR)
     print(f"Session transcript: {transcript_path}\n")
@@ -480,10 +603,10 @@ def main(model_override: str | None = None, dry_run: bool = False) -> None:
     last_response = ""
 
     while True:
-        role_name, prompt_path, report_path = choose_role()
+        role_name, prompt_path, report_path = choose_role(mode=mode)
 
         role_prompt = read_text_file(prompt_path)
-        project_context = build_project_context()
+        project_context = build_project_context(mode=mode)
 
         task = input("\nEnter your task for the AI: ").strip()
 
@@ -527,23 +650,27 @@ Respond as the {role_name} AI.
         color = role_color(role_name)
 
         print(
-            f"\n{color}Sending task to local {role_name} AI "
-            f"using Ollama model {model}...\n"
+            f"\n{color}Sending task to {role_name} AI "
+            f"using {provider} model {model}...\n"
         )
 
         if dry_run:
             response_text = (
-                f"[DRY RUN] This is a simulated response from the {role_name} AI. "
-                f"Ollama was not called. Model would have been: {model}"
+                f"[DRY RUN] Simulated response from {role_name} AI. "
+                f"Provider: {provider}. Model: {model}. Mode: {mode}."
             )
         else:
             try:
-                response_text = call_ollama(model=model, prompt=full_prompt, host=host)
+                response_text = call_ai(
+                    model=model,
+                    prompt=full_prompt,
+                    host=host,
+                    provider=provider,
+                )
             except RuntimeError as error:
                 print(f"\n{Fore.RED}Error: {error}")
-                print(f"{Fore.RED}Please check Ollama is running and try again.\n")
+                print(f"{Fore.RED}Please check your provider settings and try again.\n")
                 continue
-
 
         step += 1
         roles_used.append(role_name)
@@ -572,6 +699,7 @@ Respond as the {role_name} AI.
             print("Goodbye.")
             break
 
+
 if __name__ == "__main__":
     args = parse_args()
     if args.list_sessions:
@@ -582,10 +710,9 @@ if __name__ == "__main__":
         delete_session(filename=args.delete_session, reports_dir=str(REPORTS_DIR))
     elif args.export_session:
         export_session(filename=args.export_session, reports_dir=str(REPORTS_DIR))
-    elif args.stats:
-        show_stats(reports_dir=str(REPORTS_DIR))
     elif args.rename_session:
         rename_session(filename=args.rename_session, reports_dir=str(REPORTS_DIR))
+    elif args.stats:
+        show_stats(reports_dir=str(REPORTS_DIR))
     else:
-        main(model_override=args.model, dry_run=args.dry_run)
-
+        main(model_override=args.model, dry_run=args.dry_run, mode=args.mode, provider=args.provider)

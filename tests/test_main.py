@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import json
-from io import BytesIO
+import pytest
 from pathlib import Path
 from unittest.mock import patch, MagicMock
-from src.main import read_text_file, save_report, build_project_context, call_ollama, choose_role
+from urllib.error import HTTPError, URLError
+from src.main import read_text_file, save_report, build_project_context, call_ollama_provider, call_ai, choose_role
 
 
 
@@ -135,136 +136,108 @@ def test_save_report_appends_on_second_call(tmp_path: Path) -> None:
 def test_build_project_context_includes_file_content(tmp_path: Path) -> None:
     doc_file = tmp_path / "PRD.md"
     doc_file.write_text("This is the PRD content.", encoding="utf-8")
-    with patch("src.main.DOC_FILES", [doc_file]):
-        result = build_project_context()
+    fake_map = {"coding": [doc_file], "writing": [doc_file]}
+    with patch("src.main.DOC_FILES_BY_MODE", fake_map):
+        result = build_project_context(mode="coding")
     assert "This is the PRD content." in result
 
 
 def test_build_project_context_includes_filename(tmp_path: Path) -> None:
     doc_file = tmp_path / "coding-standards.md"
     doc_file.write_text("Keep functions small.", encoding="utf-8")
-    with patch("src.main.DOC_FILES", [doc_file]):
-        result = build_project_context()
+    fake_map = {"coding": [doc_file], "writing": []}
+    with patch("src.main.DOC_FILES_BY_MODE", fake_map):
+        result = build_project_context(mode="coding")
     assert "coding-standards.md" in result
 
 
 def test_build_project_context_skips_missing_files(tmp_path: Path) -> None:
     missing_file = tmp_path / "missing.md"
-    with patch("src.main.DOC_FILES", [missing_file]):
-        result = build_project_context()
+    fake_map = {"coding": [missing_file], "writing": []}
+    with patch("src.main.DOC_FILES_BY_MODE", fake_map):
+        result = build_project_context(mode="coding")
     assert result == ""
-
 
 def test_build_project_context_combines_multiple_files(tmp_path: Path) -> None:
     file_one = tmp_path / "PRD.md"
     file_two = tmp_path / "architecture.md"
     file_one.write_text("PRD content.", encoding="utf-8")
     file_two.write_text("Architecture content.", encoding="utf-8")
-    with patch("src.main.DOC_FILES", [file_one, file_two]):
-        result = build_project_context()
+    fake_map = {"coding": [file_one, file_two], "writing": []}
+    with patch("src.main.DOC_FILES_BY_MODE", fake_map):
+        result = build_project_context(mode="coding")
     assert "PRD content." in result
     assert "Architecture content." in result
 
 
-def test_call_ollama_returns_response_text() -> None:
-    fake_response = json.dumps({"response": "Hello from Ollama."}).encode("utf-8")
-    mock_response = MagicMock()
-    mock_response.read.return_value = fake_response
-    mock_response.__enter__ = lambda s: s
-    mock_response.__exit__ = MagicMock(return_value=False)
-    with patch("src.main.urlopen", return_value=mock_response):
-        result = call_ollama(
-            model="qwen2.5-coder:3b",
-            prompt="Say hello.",
-            host="http://localhost:11434",
+def test_call_ollama_provider_returns_response_text() -> None:
+    from src.main import call_ollama_provider
+    mock_response = json.dumps({"response": "Hello from Ollama"}).encode("utf-8")
+    with patch("src.main.urlopen") as mock_urlopen:
+        mock_urlopen.return_value.__enter__ = lambda s: s
+        mock_urlopen.return_value.__exit__ = MagicMock(return_value=False)
+        mock_urlopen.return_value.read.return_value = mock_response
+        result = call_ollama_provider(
+            model="qwen2.5-coder:3b", prompt="Hello", host="http://localhost:11434"
         )
-    assert result == "Hello from Ollama."
+    assert result == "Hello from Ollama"
 
-
-def test_call_ollama_raises_on_empty_response() -> None:
-    fake_response = json.dumps({"response": ""}).encode("utf-8")
-    mock_response = MagicMock()
-    mock_response.read.return_value = fake_response
-    mock_response.__enter__ = lambda s: s
-    mock_response.__exit__ = MagicMock(return_value=False)
-    with patch("src.main.urlopen", return_value=mock_response):
-        try:
-            call_ollama(
-                model="qwen2.5-coder:3b",
-                prompt="Say hello.",
-                host="http://localhost:11434",
+def test_call_ollama_provider_raises_on_empty_response() -> None:
+    from src.main import call_ollama_provider
+    mock_response = json.dumps({"response": ""}).encode("utf-8")
+    with patch("src.main.urlopen") as mock_urlopen:
+        mock_urlopen.return_value.__enter__ = lambda s: s
+        mock_urlopen.return_value.__exit__ = MagicMock(return_value=False)
+        mock_urlopen.return_value.read.return_value = mock_response
+        with pytest.raises(RuntimeError, match="no response"):
+            call_ollama_provider(
+                model="qwen2.5-coder:3b", prompt="Hello", host="http://localhost:11434"
             )
-            assert False, "Expected RuntimeError was not raised."
-        except RuntimeError as error:
-            assert "no response" in str(error).lower()
 
-
-def test_call_ollama_raises_on_ollama_error() -> None:
-    fake_response = json.dumps({"error": "model not found"}).encode("utf-8")
-    mock_response = MagicMock()
-    mock_response.read.return_value = fake_response
-    mock_response.__enter__ = lambda s: s
-    mock_response.__exit__ = MagicMock(return_value=False)
-    with patch("src.main.urlopen", return_value=mock_response):
-        try:
-            call_ollama(
-                model="qwen2.5-coder:3b",
-                prompt="Say hello.",
-                host="http://localhost:11434",
+def test_call_ollama_provider_raises_on_ollama_error() -> None:
+    from src.main import call_ollama_provider
+    mock_response = json.dumps({"error": "model not found"}).encode("utf-8")
+    with patch("src.main.urlopen") as mock_urlopen:
+        mock_urlopen.return_value.__enter__ = lambda s: s
+        mock_urlopen.return_value.__exit__ = MagicMock(return_value=False)
+        mock_urlopen.return_value.read.return_value = mock_response
+        with pytest.raises(RuntimeError, match="model not found"):
+            call_ollama_provider(
+                model="qwen2.5-coder:3b", prompt="Hello", host="http://localhost:11434"
             )
-            assert False, "Expected RuntimeError was not raised."
-        except RuntimeError as error:
-            assert "model not found" in str(error).lower()
 
-
-def test_call_ollama_raises_on_http_error() -> None:
-    from urllib.error import HTTPError
-    fake_error = HTTPError(
-        url="http://localhost:11434/api/generate",
-        code=500,
-        msg="Internal Server Error",
-        hdrs=None,
-        fp=BytesIO(b"something went wrong"),
-    )
-    with patch("src.main.urlopen", side_effect=fake_error):
-        try:
-            call_ollama(
-                model="qwen2.5-coder:3b",
-                prompt="Say hello.",
-                host="http://localhost:11434",
+def test_call_ollama_provider_raises_on_http_error() -> None:
+    from src.main import call_ollama_provider
+    with patch("src.main.urlopen") as mock_urlopen:
+        mock_urlopen.side_effect = HTTPError(
+            url="http://localhost:11434",
+            code=500,
+            msg="Internal Server Error",
+            hdrs=None,
+            fp=MagicMock(read=lambda: b"server error"),
+        )
+        with pytest.raises(RuntimeError, match="HTTP error"):
+            call_ollama_provider(
+                model="qwen2.5-coder:3b", prompt="Hello", host="http://localhost:11434"
             )
-            assert False, "Expected RuntimeError was not raised."
-        except RuntimeError as error:
-            assert "500" in str(error)
 
-
-def test_call_ollama_raises_on_url_error() -> None:
-    from urllib.error import URLError
-    fake_error = URLError(reason="Connection refused")
-    with patch("src.main.urlopen", side_effect=fake_error):
-        try:
-            call_ollama(
-                model="qwen2.5-coder:3b",
-                prompt="Say hello.",
-                host="http://localhost:11434",
+def test_call_ollama_provider_raises_on_url_error() -> None:
+    from src.main import call_ollama_provider
+    with patch("src.main.urlopen") as mock_urlopen:
+        mock_urlopen.side_effect = URLError("connection refused")
+        with pytest.raises(RuntimeError, match="Could not connect"):
+            call_ollama_provider(
+                model="qwen2.5-coder:3b", prompt="Hello", host="http://localhost:11434"
             )
-            assert False, "Expected RuntimeError was not raised."
-        except RuntimeError as error:
-            assert "ollama" in str(error).lower()
 
-
-def test_call_ollama_raises_on_timeout() -> None:
-    with patch("src.main.urlopen", side_effect=TimeoutError()):
-        try:
-            call_ollama(
-                model="qwen2.5-coder:3b",
-                prompt="Say hello.",
-                host="http://localhost:11434",
+def test_call_ollama_provider_raises_on_timeout() -> None:
+    from src.main import call_ollama_provider
+    with patch("src.main.urlopen") as mock_urlopen:
+        mock_urlopen.side_effect = TimeoutError()
+        with pytest.raises(RuntimeError, match="too long"):
+            call_ollama_provider(
+                model="qwen2.5-coder:3b", prompt="Hello", host="http://localhost:11434"
             )
-            assert False, "Expected RuntimeError was not raised."
-        except RuntimeError as error:
-            assert "too long" in str(error).lower()
-
 
 def test_choose_role_returns_builder(tmp_path: Path) -> None:
     from src.main import choose_role
@@ -567,8 +540,7 @@ def test_parse_args_dry_run_default_false():
     args = parse_args()
     assert args.dry_run is False
 
-
-def test_main_dry_run_does_not_call_ollama(tmp_path, monkeypatch):
+def test_main_dry_run_does_not_call_ai(tmp_path, monkeypatch):
     from src.main import main
     import sys
     inputs = iter(["1", "test dry run task", "no"])
@@ -770,6 +742,57 @@ def test_parse_args_rename_session_flag():
     sys.argv = ["main.py", "--rename-session", "session_20250101_120000.md"]
     args = parse_args()
     assert args.rename_session == "session_20250101_120000.md"
+
+def test_build_project_context_coding_includes_coding_standards(tmp_path, monkeypatch):
+    from src import main as m
+    fake = {
+        "coding": [tmp_path / "coding-standards.md"],
+        "writing": [tmp_path / "PRD.md"],
+    }
+    (tmp_path / "coding-standards.md").write_text("coding rules")
+    (tmp_path / "PRD.md").write_text("prd content")
+    monkeypatch.setattr(m, "DOC_FILES_BY_MODE", fake)
+    result = m.build_project_context(mode="coding")
+    assert "coding rules" in result
+
+def test_build_project_context_writing_excludes_coding_standards(tmp_path, monkeypatch):
+    from src import main as m
+    fake = {
+        "coding": [tmp_path / "coding-standards.md"],
+        "writing": [tmp_path / "PRD.md"],
+    }
+    (tmp_path / "coding-standards.md").write_text("coding rules")
+    (tmp_path / "PRD.md").write_text("prd content")
+    monkeypatch.setattr(m, "DOC_FILES_BY_MODE", fake)
+    result = m.build_project_context(mode="writing")
+    assert "coding rules" not in result
+
+def test_parse_args_mode_default():
+    import sys
+    from src.main import parse_args
+    sys.argv = ["main.py"]
+    args = parse_args()
+    assert args.mode == "coding"
+
+def test_parse_args_mode_writing():
+    import sys
+    from src.main import parse_args
+    sys.argv = ["main.py", "--mode", "writing"]
+    args = parse_args()
+    assert args.mode == "writing"
+
+def test_parse_args_provider_default():
+    import sys
+    from src.main import parse_args
+    sys.argv = ["main.py"]
+    args = parse_args()
+    assert args.provider == "ollama"
+
+def test_all_modes_contains_coding_and_writing():
+    from src.main import ALL_MODES
+    assert "coding" in ALL_MODES
+    assert "writing" in ALL_MODES
+
 
 
 
