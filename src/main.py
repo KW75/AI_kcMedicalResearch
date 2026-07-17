@@ -17,14 +17,16 @@ colorama_init(autoreset=True)
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
-AI_DIR = PROJECT_ROOT / "ai"
-DOCS_DIR = PROJECT_ROOT / "docs"
-REPORTS_DIR = PROJECT_ROOT / "reports"
+AI_DIR        = PROJECT_ROOT / "ai"
+DOCS_DIR      = PROJECT_ROOT / "docs"
+DOCS_CODING   = DOCS_DIR / "coding"
+DOCS_WRITING  = DOCS_DIR / "writing"
+REPORTS_DIR   = PROJECT_ROOT / "reports"
 
-DEFAULT_OLLAMA_HOST = "http://localhost:11434"
+DEFAULT_OLLAMA_HOST  = "http://localhost:11434"
 DEFAULT_OLLAMA_MODEL = "qwen2.5-coder:3b"
-DEFAULT_PROVIDER = "ollama"
-DEFAULT_MODE = "coding"
+DEFAULT_PROVIDER     = "ollama"
+DEFAULT_MODE         = "coding"
 
 VERSION = "2.0.0"
 
@@ -49,30 +51,60 @@ ALL_MODES = {
     "writing": ROLE_FILES_WRITING,
 }
 
-
-
 # ---------------------------------------------------------------------------
-# Mode-aware documentation files
+# Role-aware documentation files
+# Each role receives only the docs relevant to its specific job.
 # ---------------------------------------------------------------------------
 
-DOC_FILES_COMMON = [
-    DOCS_DIR / "PRD.md",
-    DOCS_DIR / "architecture.md",
-    DOCS_DIR / "decision-log.md",
-]
-
-
-DOC_FILES_CODING = DOC_FILES_COMMON + [
-    DOCS_DIR / "coding-standards.md",
-    DOCS_DIR / "test-strategy.md",
-]
-
-DOC_FILES_WRITING = DOC_FILES_COMMON
-
-DOC_FILES_BY_MODE = {
-    "coding": DOC_FILES_CODING,
-    "writing": DOC_FILES_WRITING,
+DOC_FILES_BY_ROLE = {
+    # Coding roles
+    "Builder":  [
+        DOCS_CODING / "PRD.md",
+        DOCS_CODING / "architecture.md",
+        DOCS_CODING / "coding-standards.md",
+    ],
+    "Reviewer": [
+        DOCS_CODING / "PRD.md",
+        DOCS_CODING / "architecture.md",
+        DOCS_CODING / "decision-log.md",
+    ],
+    "Tester": [
+        DOCS_CODING / "PRD.md",
+        DOCS_CODING / "architecture.md",
+        DOCS_CODING / "test-strategy.md",
+    ],
+    # Writing roles
+    "Writer": [
+        DOCS_WRITING / "project-brief.md",
+        DOCS_WRITING / "style-guide.md",
+    ],
+    "Editor": [
+        DOCS_WRITING / "project-brief.md",
+        DOCS_WRITING / "editorial-standards.md",
+    ],
+    "QA": [
+        DOCS_WRITING / "project-brief.md",
+        DOCS_WRITING / "qa-checklist.md",
+    ],
 }
+
+def list_roles(mode: str = "coding") -> None:
+    """Print the roles for the given mode and the doc files each role receives."""
+    role_files = ALL_MODES.get(mode, ROLE_FILES_CODING)
+
+    print(f"\n{Fore.MAGENTA}{'=' * 42}")
+    print(f"{Fore.MAGENTA}  Roles — {mode} mode")
+    print(f"{Fore.MAGENTA}{'=' * 42}")
+
+    for key, (role_name, prompt_path, _) in role_files.items():
+        color = role_color(role_name)
+        doc_files = DOC_FILES_BY_ROLE.get(role_name, [])
+        doc_names = [f.name for f in doc_files] if doc_files else ["(none)"]
+        print(f"\n{color}{key}. {role_name} AI")
+        print(f"   Prompt : {prompt_path.relative_to(PROJECT_ROOT)}")
+        print(f"   Docs   : {', '.join(doc_names)}")
+
+    print(f"\n{Fore.MAGENTA}{'=' * 42}\n")
 
 def role_color(role_name: str) -> str:
     """Return a colorama Fore colour code for the given role name."""
@@ -94,9 +126,10 @@ def read_text_file(path: Path) -> str:
     return path.read_text(encoding="utf-8").strip()
 
 
-def build_project_context(mode: str = "coding") -> str:
-    """Combine project doc files into a context string. Only injects docs relevant to the active mode."""
-    doc_files = DOC_FILES_BY_MODE.get(mode, DOC_FILES_CODING)
+def build_project_context(role_name: str) -> str:
+    """Combine doc files for the given role into a context string.
+    Each role receives only the documentation relevant to its specific job."""
+    doc_files = DOC_FILES_BY_ROLE.get(role_name, [])
     sections = []
     for path in doc_files:
         content = read_text_file(path)
@@ -280,8 +313,8 @@ def call_anthropic_provider(model: str, prompt: str, host: str) -> str:
 
 
 PROVIDERS = {
-    "ollama": call_ollama_provider,
-    "openai": call_openai_provider,
+    "ollama":    call_ollama_provider,
+    "openai":    call_openai_provider,
     "anthropic": call_anthropic_provider,
 }
 
@@ -542,21 +575,24 @@ def parse_args() -> argparse.Namespace:
             "  python src/main.py --model llama3.2:3b    # different model\n"
             "  python src/main.py --provider openai      # use OpenAI\n"
             "  python src/main.py --list-sessions        # list transcripts\n"
+            "  python src/main.py --list-roles           # show roles and docs\n"
+            "  python src/main.py --list-roles --mode writing\n"
             "  python src/main.py --dry-run              # simulate session\n"
             "  python src/main.py --version              # show version\n"
         ),
     )
-    parser.add_argument("--model", type=str, default=None)
-    parser.add_argument("--mode", type=str, default="coding", choices=["coding", "writing"])
-    parser.add_argument("--provider", type=str, default="ollama", choices=["ollama", "openai", "anthropic"])
-    parser.add_argument("--list-sessions", action="store_true", default=False)
-    parser.add_argument("--read-session", type=str, default=None, metavar="FILENAME")
-    parser.add_argument("--delete-session", type=str, default=None, metavar="FILENAME")
-    parser.add_argument("--export-session", type=str, default=None, metavar="FILENAME")
-    parser.add_argument("--rename-session", type=str, default=None, metavar="FILENAME")
-    parser.add_argument("--stats", action="store_true", default=False)
-    parser.add_argument("--dry-run", action="store_true", default=False)
-    parser.add_argument("--version", action="version", version=f"AI Automation Tool v{VERSION}")
+    parser.add_argument("--model",          type=str,  default=None)
+    parser.add_argument("--mode",           type=str,  default="coding", choices=["coding", "writing"])
+    parser.add_argument("--provider",       type=str,  default="ollama", choices=["ollama", "openai", "anthropic"])
+    parser.add_argument("--list-sessions",  action="store_true", default=False)
+    parser.add_argument("--read-session",   type=str,  default=None, metavar="FILENAME")
+    parser.add_argument("--delete-session", type=str,  default=None, metavar="FILENAME")
+    parser.add_argument("--export-session", type=str,  default=None, metavar="FILENAME")
+    parser.add_argument("--rename-session", type=str,  default=None, metavar="FILENAME")
+    parser.add_argument("--stats",          action="store_true", default=False)
+    parser.add_argument("--dry-run",        action="store_true", default=False)
+    parser.add_argument("--version",        action="version", version=f"AI Automation Tool v{VERSION}")
+    parser.add_argument("--list-roles",     action="store_true", default=False)
     return parser.parse_args()
 
 
@@ -590,7 +626,7 @@ def main(
     print(f"  Model    : {Fore.CYAN}{model}")
     print(f"{Fore.WHITE}  Host     : {host}")
     if dry_run:
-       print(f"{Fore.YELLOW}  DRY RUN  : AI will not be called.")
+        print(f"{Fore.YELLOW}  DRY RUN  : AI will not be called.")
     print(f"{Fore.MAGENTA}{'=' * 42}")
     print(f"{Fore.WHITE}  Type 'quit' or 'exit' at any prompt to stop.")
     print(f"{Fore.MAGENTA}{'=' * 42}\n")
@@ -605,8 +641,8 @@ def main(
     while True:
         role_name, prompt_path, report_path = choose_role(mode=mode)
 
-        role_prompt = read_text_file(prompt_path)
-        project_context = build_project_context(mode=mode)
+        role_prompt       = read_text_file(prompt_path)
+        project_context   = build_project_context(role_name=role_name)
 
         task = input("\nEnter your task for the AI: ").strip()
 
@@ -714,5 +750,7 @@ if __name__ == "__main__":
         rename_session(filename=args.rename_session, reports_dir=str(REPORTS_DIR))
     elif args.stats:
         show_stats(reports_dir=str(REPORTS_DIR))
+    elif args.list_roles:
+        list_roles(mode=args.mode)
     else:
         main(model_override=args.model, dry_run=args.dry_run, mode=args.mode, provider=args.provider)
