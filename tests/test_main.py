@@ -793,6 +793,317 @@ def test_all_modes_contains_coding_and_writing():
     assert "coding" in ALL_MODES
     assert "writing" in ALL_MODES
 
+# ===========================================================================
+# call_openai_provider tests
+# ===========================================================================
+
+def test_call_openai_provider_returns_response_text() -> None:
+    from src.main import call_openai_provider
+    mock_response = json.dumps({
+        "choices": [{"message": {"content": "Hello from OpenAI"}}]
+    }).encode("utf-8")
+    with patch("src.main.urlopen") as mock_urlopen, \
+         patch.dict("os.environ", {"OPENAI_API_KEY": "sk-test-key"}):
+        mock_urlopen.return_value.__enter__ = lambda s: s
+        mock_urlopen.return_value.__exit__ = MagicMock(return_value=False)
+        mock_urlopen.return_value.read.return_value = mock_response
+        result = call_openai_provider(
+            model="gpt-4o", prompt="Hello", host=""
+        )
+    assert result == "Hello from OpenAI"
+
+
+def test_call_openai_provider_raises_when_api_key_missing() -> None:
+    from src.main import call_openai_provider
+    with patch.dict("os.environ", {}, clear=True):
+        with pytest.raises(RuntimeError, match="OPENAI_API_KEY"):
+            call_openai_provider(model="gpt-4o", prompt="Hello", host="")
+
+
+def test_call_openai_provider_raises_on_empty_response() -> None:
+    from src.main import call_openai_provider
+    mock_response = json.dumps({
+        "choices": [{"message": {"content": ""}}]
+    }).encode("utf-8")
+    with patch("src.main.urlopen") as mock_urlopen, \
+         patch.dict("os.environ", {"OPENAI_API_KEY": "sk-test-key"}):
+        mock_urlopen.return_value.__enter__ = lambda s: s
+        mock_urlopen.return_value.__exit__ = MagicMock(return_value=False)
+        mock_urlopen.return_value.read.return_value = mock_response
+        with pytest.raises(RuntimeError, match="no response"):
+            call_openai_provider(model="gpt-4o", prompt="Hello", host="")
+
+
+def test_call_openai_provider_raises_on_api_error() -> None:
+    from src.main import call_openai_provider
+    mock_response = json.dumps({
+        "error": {"message": "invalid model"}
+    }).encode("utf-8")
+    with patch("src.main.urlopen") as mock_urlopen, \
+         patch.dict("os.environ", {"OPENAI_API_KEY": "sk-test-key"}):
+        mock_urlopen.return_value.__enter__ = lambda s: s
+        mock_urlopen.return_value.__exit__ = MagicMock(return_value=False)
+        mock_urlopen.return_value.read.return_value = mock_response
+        with pytest.raises(RuntimeError, match="OpenAI error"):
+            call_openai_provider(model="gpt-4o", prompt="Hello", host="")
+
+
+def test_call_openai_provider_raises_on_http_error() -> None:
+    from src.main import call_openai_provider
+    with patch("src.main.urlopen") as mock_urlopen, \
+         patch.dict("os.environ", {"OPENAI_API_KEY": "sk-test-key"}):
+        mock_urlopen.side_effect = HTTPError(
+            url="https://api.openai.com/v1/chat/completions",
+            code=401,
+            msg="Unauthorized",
+            hdrs=None,
+            fp=MagicMock(read=lambda: b"unauthorized"),
+        )
+        with pytest.raises(RuntimeError, match="HTTP error"):
+            call_openai_provider(model="gpt-4o", prompt="Hello", host="")
+
+
+def test_call_openai_provider_raises_on_url_error() -> None:
+    from src.main import call_openai_provider
+    with patch("src.main.urlopen") as mock_urlopen, \
+         patch.dict("os.environ", {"OPENAI_API_KEY": "sk-test-key"}):
+        mock_urlopen.side_effect = URLError("network unreachable")
+        with pytest.raises(RuntimeError, match="Could not connect to OpenAI"):
+            call_openai_provider(model="gpt-4o", prompt="Hello", host="")
+
+
+def test_call_openai_provider_raises_on_timeout() -> None:
+    from src.main import call_openai_provider
+    with patch("src.main.urlopen") as mock_urlopen, \
+         patch.dict("os.environ", {"OPENAI_API_KEY": "sk-test-key"}):
+        mock_urlopen.side_effect = TimeoutError()
+        with pytest.raises(RuntimeError, match="too long"):
+            call_openai_provider(model="gpt-4o", prompt="Hello", host="")
+
+
+def test_call_openai_provider_sends_correct_payload() -> None:
+    from src.main import call_openai_provider
+    mock_response = json.dumps({
+        "choices": [{"message": {"content": "Response text"}}]
+    }).encode("utf-8")
+    with patch("src.main.urlopen") as mock_urlopen, \
+         patch.dict("os.environ", {"OPENAI_API_KEY": "sk-test-key"}):
+        mock_urlopen.return_value.__enter__ = lambda s: s
+        mock_urlopen.return_value.__exit__ = MagicMock(return_value=False)
+        mock_urlopen.return_value.read.return_value = mock_response
+        call_openai_provider(model="gpt-4o", prompt="Say hello", host="")
+
+    sent_request = mock_urlopen.call_args[0][0]
+    payload = json.loads(sent_request.data.decode("utf-8"))
+    assert payload["model"] == "gpt-4o"
+    assert payload["messages"][0]["role"] == "user"
+    assert payload["messages"][0]["content"] == "Say hello"
+
+
+def test_call_openai_provider_sends_auth_header() -> None:
+    from src.main import call_openai_provider
+    mock_response = json.dumps({
+        "choices": [{"message": {"content": "Response text"}}]
+    }).encode("utf-8")
+    with patch("src.main.urlopen") as mock_urlopen, \
+         patch.dict("os.environ", {"OPENAI_API_KEY": "sk-test-key"}):
+        mock_urlopen.return_value.__enter__ = lambda s: s
+        mock_urlopen.return_value.__exit__ = MagicMock(return_value=False)
+        mock_urlopen.return_value.read.return_value = mock_response
+        call_openai_provider(model="gpt-4o", prompt="Hello", host="")
+
+    sent_request = mock_urlopen.call_args[0][0]
+    assert sent_request.get_header("Authorization") == "Bearer sk-test-key"
+
+
+# ===========================================================================
+# call_anthropic_provider tests
+# ===========================================================================
+
+def test_call_anthropic_provider_returns_response_text() -> None:
+    from src.main import call_anthropic_provider
+    mock_response = json.dumps({
+        "content": [{"text": "Hello from Anthropic"}]
+    }).encode("utf-8")
+    with patch("src.main.urlopen") as mock_urlopen, \
+         patch.dict("os.environ", {"ANTHROPIC_API_KEY": "sk-ant-test-key"}):
+        mock_urlopen.return_value.__enter__ = lambda s: s
+        mock_urlopen.return_value.__exit__ = MagicMock(return_value=False)
+        mock_urlopen.return_value.read.return_value = mock_response
+        result = call_anthropic_provider(
+            model="claude-sonnet-4-6", prompt="Hello", host=""
+        )
+    assert result == "Hello from Anthropic"
+
+
+def test_call_anthropic_provider_raises_when_api_key_missing() -> None:
+    from src.main import call_anthropic_provider
+    with patch.dict("os.environ", {}, clear=True):
+        with pytest.raises(RuntimeError, match="ANTHROPIC_API_KEY"):
+            call_anthropic_provider(
+                model="claude-sonnet-4-6", prompt="Hello", host=""
+            )
+
+
+def test_call_anthropic_provider_raises_on_empty_response() -> None:
+    from src.main import call_anthropic_provider
+    mock_response = json.dumps({
+        "content": [{"text": ""}]
+    }).encode("utf-8")
+    with patch("src.main.urlopen") as mock_urlopen, \
+         patch.dict("os.environ", {"ANTHROPIC_API_KEY": "sk-ant-test-key"}):
+        mock_urlopen.return_value.__enter__ = lambda s: s
+        mock_urlopen.return_value.__exit__ = MagicMock(return_value=False)
+        mock_urlopen.return_value.read.return_value = mock_response
+        with pytest.raises(RuntimeError, match="no response"):
+            call_anthropic_provider(
+                model="claude-sonnet-4-6", prompt="Hello", host=""
+            )
+
+
+def test_call_anthropic_provider_raises_on_api_error() -> None:
+    from src.main import call_anthropic_provider
+    mock_response = json.dumps({
+        "error": {"type": "invalid_request_error", "message": "bad request"}
+    }).encode("utf-8")
+    with patch("src.main.urlopen") as mock_urlopen, \
+         patch.dict("os.environ", {"ANTHROPIC_API_KEY": "sk-ant-test-key"}):
+        mock_urlopen.return_value.__enter__ = lambda s: s
+        mock_urlopen.return_value.__exit__ = MagicMock(return_value=False)
+        mock_urlopen.return_value.read.return_value = mock_response
+        with pytest.raises(RuntimeError, match="Anthropic error"):
+            call_anthropic_provider(
+                model="claude-sonnet-4-6", prompt="Hello", host=""
+            )
+
+
+def test_call_anthropic_provider_raises_on_http_error() -> None:
+    from src.main import call_anthropic_provider
+    with patch("src.main.urlopen") as mock_urlopen, \
+         patch.dict("os.environ", {"ANTHROPIC_API_KEY": "sk-ant-test-key"}):
+        mock_urlopen.side_effect = HTTPError(
+            url="https://api.anthropic.com/v1/messages",
+            code=403,
+            msg="Forbidden",
+            hdrs=None,
+            fp=MagicMock(read=lambda: b"forbidden"),
+        )
+        with pytest.raises(RuntimeError, match="HTTP error"):
+            call_anthropic_provider(
+                model="claude-sonnet-4-6", prompt="Hello", host=""
+            )
+
+
+def test_call_anthropic_provider_raises_on_url_error() -> None:
+    from src.main import call_anthropic_provider
+    with patch("src.main.urlopen") as mock_urlopen, \
+         patch.dict("os.environ", {"ANTHROPIC_API_KEY": "sk-ant-test-key"}):
+        mock_urlopen.side_effect = URLError("network unreachable")
+        with pytest.raises(RuntimeError, match="Could not connect to Anthropic"):
+            call_anthropic_provider(
+                model="claude-sonnet-4-6", prompt="Hello", host=""
+            )
+
+
+def test_call_anthropic_provider_raises_on_timeout() -> None:
+    from src.main import call_anthropic_provider
+    with patch("src.main.urlopen") as mock_urlopen, \
+         patch.dict("os.environ", {"ANTHROPIC_API_KEY": "sk-ant-test-key"}):
+        mock_urlopen.side_effect = TimeoutError()
+        with pytest.raises(RuntimeError, match="too long"):
+            call_anthropic_provider(
+                model="claude-sonnet-4-6", prompt="Hello", host=""
+            )
+
+
+def test_call_anthropic_provider_sends_correct_payload() -> None:
+    from src.main import call_anthropic_provider
+    mock_response = json.dumps({
+        "content": [{"text": "Response text"}]
+    }).encode("utf-8")
+    with patch("src.main.urlopen") as mock_urlopen, \
+         patch.dict("os.environ", {"ANTHROPIC_API_KEY": "sk-ant-test-key"}):
+        mock_urlopen.return_value.__enter__ = lambda s: s
+        mock_urlopen.return_value.__exit__ = MagicMock(return_value=False)
+        mock_urlopen.return_value.read.return_value = mock_response
+        call_anthropic_provider(
+            model="claude-sonnet-4-6", prompt="Say hello", host=""
+        )
+
+    sent_request = mock_urlopen.call_args[0][0]
+    payload = json.loads(sent_request.data.decode("utf-8"))
+    assert payload["model"] == "claude-sonnet-4-6"
+    assert payload["max_tokens"] == 4096
+    assert payload["messages"][0]["role"] == "user"
+    assert payload["messages"][0]["content"] == "Say hello"
+
+
+def test_call_anthropic_provider_sends_api_key_header() -> None:
+    from src.main import call_anthropic_provider
+    mock_response = json.dumps({
+        "content": [{"text": "Response text"}]
+    }).encode("utf-8")
+    with patch("src.main.urlopen") as mock_urlopen, \
+         patch.dict("os.environ", {"ANTHROPIC_API_KEY": "sk-ant-test-key"}):
+        mock_urlopen.return_value.__enter__ = lambda s: s
+        mock_urlopen.return_value.__exit__ = MagicMock(return_value=False)
+        mock_urlopen.return_value.read.return_value = mock_response
+        call_anthropic_provider(
+            model="claude-sonnet-4-6", prompt="Hello", host=""
+        )
+
+    sent_request = mock_urlopen.call_args[0][0]
+    # urllib capitalises the first letter of each header word
+    assert sent_request.get_header("X-api-key") == "sk-ant-test-key"
+
+
+def test_call_anthropic_provider_sends_anthropic_version_header() -> None:
+    from src.main import call_anthropic_provider
+    mock_response = json.dumps({
+        "content": [{"text": "Response text"}]
+    }).encode("utf-8")
+    with patch("src.main.urlopen") as mock_urlopen, \
+         patch.dict("os.environ", {"ANTHROPIC_API_KEY": "sk-ant-test-key"}):
+        mock_urlopen.return_value.__enter__ = lambda s: s
+        mock_urlopen.return_value.__exit__ = MagicMock(return_value=False)
+        mock_urlopen.return_value.read.return_value = mock_response
+        call_anthropic_provider(
+            model="claude-sonnet-4-6", prompt="Hello", host=""
+        )
+
+    sent_request = mock_urlopen.call_args[0][0]
+    assert sent_request.get_header("Anthropic-version") == "2023-06-01"
+
+
+# ===========================================================================
+# call_ai dispatcher tests
+# ===========================================================================
+
+def test_call_ai_dispatches_to_openai() -> None:
+    with patch.dict("src.main.PROVIDERS", {"openai": MagicMock(return_value="openai result")}):
+        result = call_ai(
+            model="gpt-4o", prompt="Hello", host="", provider="openai"
+        )
+    assert result == "openai result"
+
+
+def test_call_ai_dispatches_to_anthropic() -> None:
+    with patch.dict("src.main.PROVIDERS", {"anthropic": MagicMock(return_value="anthropic result")}):
+        result = call_ai(
+            model="claude-sonnet-4-6", prompt="Hello", host="", provider="anthropic"
+        )
+    assert result == "anthropic result"
+
+
+def test_call_ai_falls_back_to_ollama_for_unknown_provider() -> None:
+    with patch("src.main.call_ollama_provider") as mock_ollama:
+        mock_ollama.return_value = "ollama fallback"
+        result = call_ai(
+            model="qwen2.5-coder:3b", prompt="Hello",
+            host="http://localhost:11434", provider="unknown-provider"
+        )
+    mock_ollama.assert_called_once()
+    assert result == "ollama fallback"
 
 
 
