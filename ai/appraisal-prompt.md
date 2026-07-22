@@ -38,7 +38,7 @@ Be rigorous, evidence-based, and specific. Quote or paraphrase the article
 where relevant to support your assessments.
 
 ## Output Requirements
-- Your report must not exceed **1000 words** in total.
+- Your report must not exceed **1500 words** in total.
 - Use the section headers above as the structure.
 - Be concise but thorough within each section.
 - Prioritise clinical relevance and evidence quality.
