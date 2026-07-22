@@ -1,0 +1,371 @@
+@'
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>AI Automation Tool — Help Guide</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:"Segoe UI",Arial,sans-serif;background:#0f172a;color:#e2e8f0;min-height:100vh;padding:32px 20px}
+h1{text-align:center;font-size:1.8rem;font-weight:800;color:#f1f5f9;margin-bottom:6px}
+.subtitle{text-align:center;font-size:.85rem;color:#94a3b8;margin-bottom:36px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:20px;max-width:1300px;margin:0 auto}
+.card{background:#1e293b;border:1px solid #334155;border-radius:14px;overflow:hidden;cursor:pointer;transition:transform .18s,box-shadow .18s}
+.card:hover{transform:translateY(-3px);box-shadow:0 8px 32px rgba(0,0,0,.4)}
+.card-header{padding:18px 22px;display:flex;align-items:center;gap:12px}
+.card-icon{font-size:1.6rem;width:44px;height:44px;display:flex;align-items:center;justify-content:center;border-radius:10px;flex-shrink:0}
+.card-title{font-size:1rem;font-weight:700;color:#f1f5f9}
+.card-badge{font-size:.68rem;background:#334155;color:#94a3b8;border-radius:20px;padding:2px 10px;margin-top:3px;display:inline-block}
+.card-body{padding:0 22px 22px;display:none}
+.card.open .card-body{display:block}
+.card-body table{width:100%;border-collapse:collapse;font-size:.8rem;margin-bottom:14px}
+.card-body th{text-align:left;padding:7px 10px;background:#0f172a;color:#94a3b8;font-size:.7rem;text-transform:uppercase;letter-spacing:.8px}
+.card-body td{padding:7px 10px;border-bottom:1px solid #1e293b;color:#cbd5e1;vertical-align:top}
+.card-body tr:last-child td{border-bottom:none}
+.card-body code{background:#0f172a;color:#7dd3fc;border-radius:5px;padding:2px 7px;font-size:.78rem;font-family:"Cascadia Code","Consolas",monospace}
+.card-body pre{background:#0f172a;border:1px solid #334155;border-radius:8px;padding:14px;font-size:.76rem;color:#7dd3fc;overflow-x:auto;margin-bottom:14px;font-family:"Cascadia Code","Consolas",monospace;white-space:pre-wrap}
+.section-label{font-size:.68rem;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:#64748b;margin:14px 0 6px}
+.pill{display:inline-block;border-radius:20px;padding:2px 10px;font-size:.7rem;font-weight:700;margin:2px}
+.pill-blue{background:#1e3a5f;color:#7dd3fc}
+.pill-green{background:#14532d;color:#86efac}
+.pill-purple{background:#3b1f6e;color:#c4b5fd}
+.pill-orange{background:#7c2d12;color:#fdba74}
+.pill-teal{background:#134e4a;color:#5eead4}
+.pill-red{background:#7f1d1d;color:#fca5a5}
+.pill-yellow{background:#713f12;color:#fde68a}
+.warn{background:#451a03;border:1px solid #92400e;border-radius:8px;padding:10px 14px;font-size:.78rem;color:#fde68a;margin-bottom:12px}
+.info{background:#0c2a4a;border:1px solid #1e4976;border-radius:8px;padding:10px 14px;font-size:.78rem;color:#93c5fd;margin-bottom:12px}
+.toggle-all{display:block;margin:0 auto 28px;background:#3b82f6;color:#fff;border:none;border-radius:8px;padding:9px 28px;font-size:.85rem;font-weight:600;cursor:pointer}
+.toggle-all:hover{background:#2563eb}
+.h-coding{background:linear-gradient(135deg,#1e3a5f,#1e293b)}
+.h-writing{background:linear-gradient(135deg,#14532d,#1e293b)}
+.h-rct{background:linear-gradient(135deg,#3b1f6e,#1e293b)}
+.h-search{background:linear-gradient(135deg,#0c4a6e,#1e293b)}
+.h-appraisal{background:linear-gradient(135deg,#7c2d12,#1e293b)}
+.h-sr{background:linear-gradient(135deg,#134e4a,#1e293b)}
+.h-provider{background:linear-gradient(135deg,#1c1917,#1e293b)}
+.h-rag{background:linear-gradient(135deg,#312e81,#1e293b)}
+footer{text-align:center;margin-top:48px;font-size:.76rem;color:#475569}
+</style>
+</head>
+<body>
+<h1>&#129302; AI Automation Tool</h1>
+<p class="subtitle">Interactive Help Guide &nbsp;&middot;&nbsp; 226 tests &nbsp;&middot;&nbsp; 87% coverage &nbsp;&middot;&nbsp; 6 modes &nbsp;&middot;&nbsp; 5 providers</p>
+<button class="toggle-all" onclick="toggleAll()">Expand All</button>
+<div class="grid">
+
+<!-- CODING -->
+<div class="card" onclick="toggle(this)">
+<div class="card-header h-coding">
+  <div class="card-icon" style="background:#1e3a5f">&#128187;</div>
+  <div><div class="card-title">Coding Mode</div><div class="card-badge">--mode coding (default)</div></div>
+</div>
+<div class="card-body">
+  <div class="section-label">Roles</div>
+  <span class="pill pill-blue">&#127959; Builder</span>
+  <span class="pill pill-blue">&#128269; Reviewer</span>
+  <span class="pill pill-blue">&#129514; Tester</span>
+  <div class="section-label">What it does</div>
+  <table>
+    <tr><th>Role</th><th>Purpose</th></tr>
+    <tr><td>Builder</td><td>Writes and extends code based on your task description</td></tr>
+    <tr><td>Reviewer</td><td>Reviews code quality, security, and best practices</td></tr>
+    <tr><td>Tester</td><td>Generates pytest test cases for your code</td></tr>
+  </table>
+  <div class="section-label">Input — place files here before starting</div>
+  <table>
+    <tr><th>Folder</th><th>File types</th></tr>
+    <tr><td><code>uploads/coding/</code></td><td>.py .js .ts .json .yaml .md .txt</td></tr>
+    <tr><td><code>docs/coding/</code></td><td>PRD.md, architecture.md, coding-standards.md</td></tr>
+  </table>
+  <div class="section-label">Run</div>
+  <pre>python src\main.py
+python src\main.py --provider deepseek
+python src\main.py --model llama3.2:3b
+python src\main.py --dry-run</pre>
+  <div class="section-label">Output</div>
+  <table>
+    <tr><td>Session transcript</td><td><code>reports/session_YYYYMMDD_HHMMSS.md</code></td></tr>
+  </table>
+</div></div>
+
+<!-- WRITING -->
+<div class="card" onclick="toggle(this)">
+<div class="card-header h-writing">
+  <div class="card-icon" style="background:#14532d">&#9997;&#65039;</div>
+  <div><div class="card-title">Writing Mode</div><div class="card-badge">--mode writing</div></div>
+</div>
+<div class="card-body">
+  <div class="section-label">Roles</div>
+  <span class="pill pill-green">&#9997; Writer</span>
+  <span class="pill pill-green">&#128196; Editor</span>
+  <span class="pill pill-green">&#9989; QA</span>
+  <div class="section-label">What it does</div>
+  <table>
+    <tr><th>Role</th><th>Purpose</th></tr>
+    <tr><td>Writer</td><td>Drafts content based on your brief and style guide</td></tr>
+    <tr><td>Editor</td><td>Improves clarity, structure, and readability</td></tr>
+    <tr><td>QA</td><td>Checks against editorial standards and quality checklist</td></tr>
+  </table>
+  <div class="section-label">Input</div>
+  <table>
+    <tr><th>Folder</th><th>File types</th></tr>
+    <tr><td><code>uploads/writing/</code></td><td>.txt .md .pdf — also bare URLs (fetched automatically)</td></tr>
+    <tr><td><code>docs/writing/</code></td><td>project-brief.md, style-guide.md, editorial-standards.md</td></tr>
+  </table>
+  <div class="section-label">Run</div>
+  <pre>python src\main.py --mode writing
+python src\main.py --mode writing --report
+python src\main.py --mode writing --provider openai</pre>
+  <div class="section-label">Output</div>
+  <table>
+    <tr><td>Session transcript</td><td><code>reports/session_*.md</code></td></tr>
+    <tr><td>Summary report (--report)</td><td><code>reports/writing_report_*.md</code></td></tr>
+  </table>
+</div></div>
+
+<!-- RCT SEARCH -->
+<div class="card" onclick="toggle(this)">
+<div class="card-header h-rct">
+  <div class="card-icon" style="background:#3b1f6e">&#128300;</div>
+  <div><div class="card-title">RCT Search Mode</div><div class="card-badge">--mode rct_search</div></div>
+</div>
+<div class="card-body">
+  <div class="section-label">Roles</div>
+  <span class="pill pill-purple">&#128196; Formulator</span>
+  <span class="pill pill-purple">&#128269; Searcher</span>
+  <span class="pill pill-purple">&#9989; Validator</span>
+  <div class="section-label">What it does</div>
+  <table>
+    <tr><th>Role</th><th>Purpose</th></tr>
+    <tr><td>Formulator</td><td>Builds PICO-based search strategy from your framework</td></tr>
+    <tr><td>Searcher</td><td>Generates database-specific search strings (PubMed, Embase, etc.)</td></tr>
+    <tr><td>Validator</td><td>Validates strategy against inclusion/exclusion criteria</td></tr>
+  </table>
+  <div class="section-label">Input — edit before running</div>
+  <table>
+    <tr><th>File</th><th>Action required</th></tr>
+    <tr><td><code>docs/rct_search/pico-framework.md</code></td><td>&#9888; Edit with your PICO before running</td></tr>
+    <tr><td><code>docs/rct_search/database-guide.md</code></td><td>Database-specific syntax guide</td></tr>
+    <tr><td><code>docs/rct_search/validation-criteria.md</code></td><td>Inclusion/exclusion criteria</td></tr>
+  </table>
+  <div class="warn">&#9888; Edit pico-framework.md before every new review — the tool will remind you at startup.</div>
+  <div class="section-label">Run</div>
+  <pre>python src\main.py --mode rct_search
+python src\main.py --mode rct_search --provider deepseek</pre>
+  <div class="section-label">Output</div>
+  <table>
+    <tr><td>Article links report</td><td><code>reports/rct_search_*.md</code></td></tr>
+  </table>
+</div></div>
+
+<!-- MEDICAL SEARCH -->
+<div class="card" onclick="toggle(this)">
+<div class="card-header h-search">
+  <div class="card-icon" style="background:#0c4a6e">&#128269;</div>
+  <div><div class="card-title">Medical Search Mode</div><div class="card-badge">--mode search</div></div>
+</div>
+<div class="card-body">
+  <div class="section-label">Roles</div>
+  <span class="pill pill-blue">&#128203; Researcher</span>
+  <div class="section-label">What it does</div>
+  <p style="font-size:.82rem;color:#cbd5e1;margin-bottom:12px;">Prompts for a medical topic, fetches up to 10 PubMed articles via NCBI E-utilities (no API key required), and generates a structured evidence report with article links.</p>
+  <table>
+    <tr><th>Section</th><th>Content</th></tr>
+    <tr><td>Overview</td><td>What is currently known about the topic</td></tr>
+    <tr><td>Key findings</td><td>Summary table of retrieved articles</td></tr>
+    <tr><td>Research gaps</td><td>Identified gaps in current evidence</td></tr>
+    <tr><td>Clinical relevance</td><td>Practice implications</td></tr>
+    <tr><td>Article links</td><td>Numbered PubMed URLs for download</td></tr>
+  </table>
+  <div class="section-label">Input</div>
+  <p style="font-size:.82rem;color:#cbd5e1;margin-bottom:12px;">Interactive prompt — type your medical topic when asked. No files required.</p>
+  <div class="section-label">Run</div>
+  <pre>python src\main.py --mode search
+python src\main.py --mode search --provider groq</pre>
+  <div class="section-label">Output</div>
+  <table>
+    <tr><td>Evidence report</td><td><code>reports/search_*.md</code></td></tr>
+  </table>
+  <div class="info">&#128161; Use article links with Appraisal mode: download PDFs, place in <code>uploads/appraisal/</code>, then run <code>--mode appraisal</code>.</div>
+</div></div>
+
+<!-- APPRAISAL -->
+<div class="card" onclick="toggle(this)">
+<div class="card-header h-appraisal">
+  <div class="card-icon" style="background:#7c2d12">&#9878;&#65039;</div>
+  <div><div class="card-title">Article Appraisal Mode</div><div class="card-badge">--mode appraisal</div></div>
+</div>
+<div class="card-body">
+  <div class="section-label">Roles</div>
+  <span class="pill pill-orange">&#128203; Appraiser</span>
+  <span class="pill pill-orange">&#128200; Methodologist</span>
+  <span class="pill pill-orange">&#128466; Summariser</span>
+  <div class="section-label">What it does</div>
+  <table>
+    <tr><th>Role</th><th>Purpose</th></tr>
+    <tr><td>Appraiser</td><td>Critical appraisal: study design, bias, validity, applicability</td></tr>
+    <tr><td>Methodologist</td><td>Detailed methodological checklist: sampling, randomisation, blinding, stats</td></tr>
+    <tr><td>Summariser</td><td>Plain-language summary (≤150 words), key-findings table, evidence grade</td></tr>
+  </table>
+  <div class="section-label">Input — place articles here before starting</div>
+  <table>
+    <tr><th>Folder</th><th>File types</th></tr>
+    <tr><td><code>uploads/appraisal/</code></td><td>.pdf .txt .md — also bare URLs</td></tr>
+    <tr><td><code>docs/appraisal/</code></td><td>Any reference documents</td></tr>
+  </table>
+  <div class="info">&#128161; Works best with PDF articles from Search mode. Download PDFs, place in uploads/appraisal/, then run appraisal.</div>
+  <div class="section-label">Run</div>
+  <pre>python src\main.py --mode appraisal
+python src\main.py --mode appraisal --provider anthropic</pre>
+  <div class="section-label">Output</div>
+  <table>
+    <tr><td>Appraisal transcript</td><td><code>reports/session_*.md</code></td></tr>
+  </table>
+</div></div>
+
+<!-- SR PIPELINE -->
+<div class="card" onclick="toggle(this)">
+<div class="card-header h-sr">
+  <div class="card-icon" style="background:#134e4a">&#128202;</div>
+  <div><div class="card-title">Systematic Review Pipeline</div><div class="card-badge">--mode sr</div></div>
+</div>
+<div class="card-body">
+  <div class="warn">&#9888; Research accelerator only. All outputs require human verification. PRISMA 2020 requires dual independent reviewers.</div>
+  <div class="section-label">Pipeline Stages</div>
+  <table>
+    <tr><th>#</th><th>Stage</th><th>Output</th></tr>
+    <tr><td>1</td><td>Upload PDFs (SHA-256 dedup)</td><td><code>data/uploads/upload_manifest.csv</code></td></tr>
+    <tr><td>2</td><td>Relevance screening (INCLUDE/EXCLUDE/UNCERTAIN)</td><td><code>data/screened/screening_log.csv</code></td></tr>
+    <tr><td>3</td><td>Data extraction (PICO-anchored)</td><td><code>data/extracted/extracted_data.csv</code></td></tr>
+    <tr><td>3.5</td><td>RoB 2.0 (5 Cochrane domains)</td><td><code>data/extracted/rob2_assessment.csv</code></td></tr>
+    <tr><td>4</td><td>Meta-analysis (DerSimonian-Laird RE)</td><td><code>data/results/meta_analysis_results.csv</code></td></tr>
+    <tr><td>5</td><td>Forest plot (weight-scaled)</td><td><code>outputs/figures/forest_plot.png</code></td></tr>
+    <tr><td>6</td><td>Reports (DOCX + HTML + PDF)</td><td><code>outputs/reports/</code></td></tr>
+  </table>
+  <div class="section-label">Setup — before every new review</div>
+  <table>
+    <tr><th>Step</th><th>Action</th></tr>
+    <tr><td>1</td><td>Edit <code>sr\config\prisma_criteria.yaml</code> — set PICO, effect_measure, criteria</td></tr>
+    <tr><td>2</td><td>Place RCT PDFs in <code>sr\data\uploads\</code></td></tr>
+    <tr><td>3</td><td>Set <code>ANTHROPIC_API_KEY</code> environment variable</td></tr>
+  </table>
+  <div class="section-label">Run</div>
+  <pre>python src\main.py --mode sr              # shows instructions
+cd D:\ai-automation-tool
+python sr\main.py --pdf-dir sr\data\uploads
+python sr\main.py --pdf-dir sr\data\uploads --effect-measure SMD
+python sr\main.py --pdf-dir sr\data\uploads --model claude-opus-4-7</pre>
+  <div class="section-label">Effect Measure Guide</div>
+  <table>
+    <tr><th>Outcome type</th><th>Use</th><th>Notes</th></tr>
+    <tr><td>Continuous, same scale</td><td><code>MD</code></td><td>e.g. all studies use VAS 0-10</td></tr>
+    <tr><td>Continuous, mixed scales</td><td><code>SMD</code></td><td>Hedges g — safe default for mixed instruments</td></tr>
+    <tr><td>Binary / event</td><td><code>OR</code> or <code>RR</code></td><td>needs event counts</td></tr>
+  </table>
+  <div class="section-label">Key Config Fields (prisma_criteria.yaml)</div>
+  <pre>pico:
+  population:   "Adults (>=18 years) with fibromyalgia"
+  intervention: "Cognitive-Behavioral Therapy"
+  comparator:   "Placebo or active comparator"
+  outcome:      "Pain intensity at post intervention timepoint"
+  study_design: "Randomised controlled trials (RCTs)"
+effect_measure: SMD
+inclusion_criteria:
+  - "RCT study design"
+exclusion_criteria:
+  - "Non-randomised designs"</pre>
+</div></div>
+
+<!-- PROVIDERS -->
+<div class="card" onclick="toggle(this)">
+<div class="card-header h-provider">
+  <div class="card-icon" style="background:#1c1917">&#9881;&#65039;</div>
+  <div><div class="card-title">Providers &amp; API Keys</div><div class="card-badge">--provider &lt;name&gt;</div></div>
+</div>
+<div class="card-body">
+  <table>
+    <tr><th>Provider</th><th>Flag</th><th>Env var (.env)</th><th>Notes</th></tr>
+    <tr><td>Ollama</td><td><code>--provider ollama</code></td><td>none</td><td>Default — runs locally</td></tr>
+    <tr><td>OpenAI</td><td><code>--provider openai</code></td><td><code>OPENAI_API_KEY</code></td><td>GPT-4o etc.</td></tr>
+    <tr><td>Anthropic</td><td><code>--provider anthropic</code></td><td><code>ANTHROPIC_API_KEY</code></td><td>Claude models</td></tr>
+    <tr><td>DeepSeek</td><td><code>--provider deepseek</code></td><td><code>DEEPSEEK_API_KEY</code></td><td>Geo-unrestricted</td></tr>
+    <tr><td>Groq</td><td><code>--provider groq</code></td><td><code>GROQ_API_KEY</code></td><td>Fast inference</td></tr>
+  </table>
+  <div class="section-label">.env file</div>
+  <pre>OLLAMA_URL=http://localhost:11434
+OLLAMA_MODEL=llama3.2
+OPENAI_API_KEY=sk-...
+OPENAI_MODEL=gpt-4o
+ANTHROPIC_API_KEY=sk-ant-...
+ANTHROPIC_MODEL=claude-sonnet-4-5
+DEEPSEEK_API_KEY=sk-...
+DEEPSEEK_MODEL=deepseek-chat
+GROQ_API_KEY=gsk_...
+GROQ_MODEL=llama-3.3-70b-versatile</pre>
+  <div class="section-label">Common CLI flags</div>
+  <table>
+    <tr><th>Flag</th><th>Effect</th></tr>
+    <tr><td><code>--provider &lt;name&gt;</code></td><td>Select AI provider</td></tr>
+    <tr><td><code>--model &lt;name&gt;</code></td><td>Override default model</td></tr>
+    <tr><td><code>--dry-run</code></td><td>Run without AI calls (testing)</td></tr>
+    <tr><td><code>--list-roles</code></td><td>Show roles and prompt files for current mode</td></tr>
+    <tr><td><code>--list-sessions</code></td><td>List saved transcripts</td></tr>
+    <tr><td><code>--help-guide</code></td><td>Open this HTML guide in browser</td></tr>
+    <tr><td><code>--report</code></td><td>Generate writing report (writing mode only)</td></tr>
+  </table>
+</div></div>
+
+<!-- RAG -->
+<div class="card" onclick="toggle(this)">
+<div class="card-header h-rag">
+  <div class="card-icon" style="background:#312e81">&#128190;</div>
+  <div><div class="card-title">RAG — File &amp; URL Indexing</div><div class="card-badge">Automatic at session start</div></div>
+</div>
+<div class="card-body">
+  <p style="font-size:.82rem;color:#cbd5e1;margin-bottom:12px;">Files placed in the uploads folder are automatically chunked, embedded, and stored in a per-session ChromaDB collection. Content is retrieved and injected into the AI context at each step.</p>
+  <div class="section-label">Supported file types</div>
+  <span class="pill pill-purple">.txt</span>
+  <span class="pill pill-purple">.md</span>
+  <span class="pill pill-purple">.pdf</span>
+  <span class="pill pill-purple">.py</span>
+  <span class="pill pill-purple">.js</span>
+  <span class="pill pill-purple">.ts</span>
+  <span class="pill pill-purple">.json</span>
+  <span class="pill pill-purple">.yaml</span>
+  <span class="pill pill-purple">.sql</span>
+  <span class="pill pill-purple">.sh</span>
+  <div class="section-label" style="margin-top:12px">URL fetching</div>
+  <p style="font-size:.82rem;color:#cbd5e1;margin-bottom:10px;">Place a .txt or .md file with bare URLs (one per line) in the uploads folder. Each URL is fetched, HTML stripped, and indexed automatically.</p>
+  <pre># reading-list.md
+https://pubmed.ncbi.nlm.nih.gov/12345678/
+https://www.example.com/article</pre>
+  <div class="section-label">Upload folders by mode</div>
+  <table>
+    <tr><th>Mode</th><th>Upload folder</th></tr>
+    <tr><td>coding</td><td><code>uploads/coding/</code></td></tr>
+    <tr><td>writing</td><td><code>uploads/writing/</code></td></tr>
+    <tr><td>rct_search</td><td><code>uploads/rct_search/</code></td></tr>
+    <tr><td>appraisal</td><td><code>uploads/appraisal/</code></td></tr>
+    <tr><td>search</td><td><code>uploads/search/</code></td></tr>
+  </table>
+  <div class="section-label">Embedding setup (.env)</div>
+  <pre>EMBEDDING_PROVIDER=ollama
+EMBEDDING_MODEL=nomic-embed-text</pre>
+  <div class="info">&#128161; Pull the embedding model first: <code>ollama pull nomic-embed-text</code></div>
+</div></div>
+
+</div><!-- end grid -->
+<footer>AI Automation Tool &nbsp;&middot;&nbsp; PRISMA 2020 / Cochrane Handbook v6.5 &nbsp;&middot;&nbsp; 226 tests &nbsp;&middot;&nbsp; 87% coverage &nbsp;&middot;&nbsp; All SR outputs require human verification.</footer>
+<script>
+function toggle(card){card.classList.toggle("open")}
+function toggleAll(){
+  var cards=document.querySelectorAll(".card");
+  var anyOpen=Array.from(cards).some(c=>c.classList.contains("open"));
+  cards.forEach(c=>anyOpen?c.classList.remove("open"):c.classList.add("open"));
+  document.querySelector(".toggle-all").textContent=anyOpen?"Expand All":"Collapse All";
+}
+</script>
+</body></html>
+'@ | Set-Content -Path "D:\ai-automation-tool\docs\flashcard-help.html" -Encoding UTF8
