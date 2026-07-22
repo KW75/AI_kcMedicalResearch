@@ -1651,7 +1651,8 @@ def test_run_search_mode_dry_run_creates_report(tmp_path, monkeypatch):
     ai_dir = tmp_path / "ai"
     ai_dir.mkdir()
     (ai_dir / "researcher-prompt.md").write_text("You are a researcher.", encoding="utf-8")
-    monkeypatch.setattr("builtins.input", lambda _: "heart failure treatment")
+    responses = iter(["2", "heart failure treatment"])
+    monkeypatch.setattr("builtins.input", lambda _: next(responses))
     result = run_search_mode(dry_run=True, ai_dir=ai_dir, reports_dir=tmp_path)
     assert result.exists()
     content = result.read_text(encoding="utf-8")
@@ -1661,7 +1662,8 @@ def test_run_search_mode_dry_run_creates_report(tmp_path, monkeypatch):
 
 def test_run_search_mode_empty_topic_exits(monkeypatch):
     from src.main import run_search_mode
-    monkeypatch.setattr("builtins.input", lambda _: "")
+    responses = iter(["1", ""])
+    monkeypatch.setattr("builtins.input", lambda _: next(responses))
     with pytest.raises(SystemExit):
         run_search_mode(dry_run=True)
 
@@ -1670,7 +1672,8 @@ def test_run_search_mode_no_articles_exits(monkeypatch, tmp_path):
     from src.main import run_search_mode
     monkeypatch.setattr("src.main.REPORTS_DIR", tmp_path)
     monkeypatch.setattr("src.main.AI_DIR", Path("ai"))
-    monkeypatch.setattr("builtins.input", lambda _: "xyznotreal")
+    responses = iter(["2", "xyznotreal"])
+    monkeypatch.setattr("builtins.input", lambda _: next(responses))
     monkeypatch.setattr("src.main.fetch_pubmed_articles", lambda q, max_results=10: [])
     with pytest.raises(SystemExit):
         run_search_mode(dry_run=False)

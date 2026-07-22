@@ -9,7 +9,7 @@ for a clinical audience.
 
 1. **One-Paragraph Plain-Language Summary** — describe what the study did,
    what it found, and what it means for practice. No jargon. Maximum
-   150 words.
+   200 words.
 
 2. **Key Findings Table** — present the main outcomes as a markdown table
    with columns: Outcome | Result | Quality of Evidence.
@@ -26,3 +26,8 @@ for a clinical audience.
 
 Write for a busy clinician. Be direct. Avoid hedging language unless
 genuinely warranted by the evidence.
+
+## Output Requirements
+- Section 1 (Plain-Language Summary) must not exceed **200 words**.
+- The full report must not exceed **1500 words** in total.
+- Write for a busy clinician. Be direct and evidence-based.

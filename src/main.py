@@ -894,7 +894,21 @@ def run_search_mode(
     print("  to the reports/ folder.")
     print("=" * 55 + "\n")
 
-    topic = input("Search topic: ").strip()
+    # ── Runtime search type prompt ──────────────────────────────────
+    print("What are you searching for?")
+    print("  [1] A research paper (generates critical appraisal report)")
+    print("  [2] A clinical topic  (generates reviewer-format summary)")
+    while True:
+        search_type = input("Enter 1 or 2: ").strip()
+        if search_type in ("1", "2"):
+            break
+        print("  Please enter 1 or 2.")
+    is_paper_search = search_type == "1"
+
+    if is_paper_search:
+        topic = input("Paper title, author, or PMID: ").strip()
+    else:
+        topic = input("Clinical topic: ").strip()
     if not topic:
         print("No topic entered. Exiting.")
         sys.exit(0)
@@ -930,8 +944,10 @@ def run_search_mode(
         )
     abstracts_text = "\n\n".join(abstract_sections)
 
+    search_type_label = "RESEARCH PAPER" if is_paper_search else "CLINICAL TOPIC"
     full_prompt = (
         f"{researcher_prompt}\n\n"
+        f"## Search Type\n{search_type_label}\n\n"
         f"## Search Topic\n{topic}\n\n"
         f"## PubMed Abstracts\n\n{abstracts_text}"
     )
@@ -963,7 +979,7 @@ def run_search_mode(
     out_path  = _reports_dir / f"search_{timestamp}.md"
     _reports_dir.mkdir(parents=True, exist_ok=True)
     out_path.write_text(
-        f"# Medical Search Report\n"
+        f"# Medical Search Report — {'Research Paper' if is_paper_search else 'Clinical Topic'}\n"
         f"Topic: {topic}\n"
         f"Generated: {timestamp}\n\n"
         f"{links_section}\n\n"
