@@ -1,0 +1,31 @@
+﻿review_title: >
+  Effect of Cognitive-Behavioral Therapy on Pain intensity: A Systematic Review and Meta-Analysis
+
+pico:
+  population:   "Adults (>=18 years) with fibromyalgia"
+  intervention: "Cognitive-Behavioral Therapy"
+  comparator:   "Placebo or active comparator"
+  outcome:      "Pain intensity at post intervention timepoint"
+  study_design: "Randomised controlled trials (RCTs)"
+
+effect_measure: SMD
+
+inclusion_criteria:
+  - "RCT study design (parallel-group or crossover)"
+  - "Adult human participants (>=18 years)"
+  - "Diagnosed fibromyalgia per ACR or equivalent criteria"
+  - "Intervention is Cognitive-Behavioral Therapy (individual or group)"
+  - "Comparator is placebo, active comparator, usual care, or waitlist"
+  - "Reports pain intensity as a primary or secondary outcome"
+  - "Full text available in English"
+
+exclusion_criteria:
+  - "Non-randomised or observational study designs"
+  - "Paediatric population (mean age <18 years)"
+  - "Conference abstracts without full-text companion paper"
+  - "Animal or in vitro studies"
+  - "Duplicate publications (select most complete dataset)"
+  - "CBT delivered solely as a minor co-intervention"
+
+language:
+  - "English"

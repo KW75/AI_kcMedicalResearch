@@ -1,0 +1,13 @@
+﻿pipeline:
+  default_model:           claude-opus-4-7
+  default_effect_measure:  OR
+  screening_delay_sec:     1.0
+  extraction_delay_sec:    2.0
+
+anthropic:
+  beta_header:             files-api-2025-04-14
+  max_tokens_screening:    1024
+  max_tokens_extraction:   4096
+
+# NOTE: config.yaml is documentation only.
+# main.py reads prisma_criteria.yaml for effect_measure, not this file.

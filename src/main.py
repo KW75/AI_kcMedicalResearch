@@ -835,6 +835,34 @@ def fetch_pubmed_articles(
 
     return articles
 
+
+def run_sr_launcher() -> None:
+    """Print SR pipeline launch instructions."""
+    sr_dir = Path(__file__).resolve().parent.parent / "sr"
+    print("\n" + "="*58)
+    print("  SR Automation Pipeline")
+    print("  PRISMA 2020  |  Cochrane Handbook v6.5")
+    print("="*58)
+    print(f"\n  Location : {sr_dir}")
+    print("\n  Before running:")
+    print("    1. Edit  sr\\config\\prisma_criteria.yaml  (PICO + criteria)")
+    print("    2. Place PDF articles in  sr\\data\\uploads\\")
+    print("    3. Set ANTHROPIC_API_KEY in your environment")
+    print("\n  Run the pipeline:")
+    print("    cd D:\\ai-automation-tool")
+    print("    python sr\\main.py --pdf-dir sr\\data\\uploads")
+    print("    python sr\\main.py --pdf-dir sr\\data\\uploads --effect-measure SMD")
+    print("\n  Outputs land in:")
+    print("    sr\\data\\screened\\screening_log.csv")
+    print("    sr\\data\\extracted\\extracted_data.csv")
+    print("    sr\\data\\extracted\\rob2_assessment.csv")
+    print("    sr\\data\\results\\meta_analysis_results.csv")
+    print("    sr\\outputs\\figures\\forest_plot.png")
+    print("    sr\\outputs\\reports\\systematic_review.html  (full record)")
+    print("    sr\\outputs\\reports\\systematic_review.docx  (summary)")
+    print("\n  Full guide: docs\\flashcard-help.html")
+    print("="*58 + "\n")
+
 def run_search_mode(
     provider: str = "ollama",
     model: str | None = None,
@@ -1106,6 +1134,17 @@ def main(
 # ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
+def open_help_guide() -> None:
+    """Open the HTML flashcard help guide in the default browser."""
+    import webbrowser
+    guide_path = BASE_DIR / "docs" / "flashcard-help.html"
+    if not guide_path.exists():
+        print(f"Help guide not found: {guide_path}")
+        print("Expected location: docs/flashcard-help.html")
+        sys.exit(1)
+    webbrowser.open(guide_path.as_uri())
+    print(f"Opening help guide in browser: {guide_path.name}")
+
 def parse_args(args: list[str] | None = None) -> argparse.Namespace:
     """Parse command-line arguments."""
     parser = argparse.ArgumentParser(
@@ -1129,7 +1168,7 @@ def parse_args(args: list[str] | None = None) -> argparse.Namespace:
 
     parser.add_argument("--mode", type=str, default="coding",
                         choices=["coding", "writing", "rct_search",
-                                 "appraisal", "search"])
+                                 "appraisal", "search", "sr"])
   
     parser.add_argument("--report", action="store_true", default=False,
                         help="Generate a summary report from docs/ files (writing mode only)")
@@ -1145,7 +1184,10 @@ def parse_args(args: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--version",        action="version",
                         version=f"AI Automation Tool v{VERSION}")
     parser.add_argument("--list-roles",     action="store_true", default=False)
+    parser.add_argument("--help-guide", action="store_true", default=False,
+                        help="Open the interactive HTML help guide in your browser")
     return parser.parse_args(args)
+
 
 if __name__ == "__main__":
     args = parse_args()
@@ -1163,6 +1205,8 @@ if __name__ == "__main__":
         show_stats(reports_dir=str(REPORTS_DIR))
     elif args.list_roles:
         list_roles(mode=args.mode)
+    elif args.help_guide:
+        open_help_guide()
     elif args.report:
         if args.mode != "writing":
             print("--report is only available in writing mode.")
@@ -1175,6 +1219,8 @@ if __name__ == "__main__":
             model=args.model,
             dry_run=args.dry_run,
         )
+    elif args.mode == "sr":
+        run_sr_launcher()
     else:
         if args.mode == "rct_search":
             rct_search_reminder()
