@@ -43,6 +43,9 @@ UPLOAD_DIR      = BASE_DIR / os.getenv("UPLOAD_DIR", "uploads")
 UPLOADS_CODING      = UPLOAD_DIR / "coding"
 UPLOADS_WRITING     = UPLOAD_DIR / "writing"
 UPLOADS_RCT_SEARCH  = UPLOAD_DIR / "rct_search"
+UPLOADS_APPRAISAL   = UPLOAD_DIR / "appraisal"
+DOCS_APPRAISAL      = DOCS_DIR / "appraisal"
+
 
 REPORTS_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -83,11 +86,21 @@ ROLE_FILES_RCT_SEARCH = {
     "Validator":  {"prompt": AI_DIR / "validator-prompt.md",  "report": "validator-report.md"},
 }
 
+ROLE_FILES_APPRAISAL = {
+    "Appraiser": {
+        "prompt": AI_DIR / "appraisal-prompt.md",
+        "report": "appraisal-report.md",
+    },
+}
+
+
 ALL_MODES: dict[str, dict] = {
     "coding":     ROLE_FILES_CODING,
     "writing":    ROLE_FILES_WRITING,
     "rct_search": ROLE_FILES_RCT_SEARCH,
+    "appraisal":  ROLE_FILES_APPRAISAL,
 }
+
 
 # ---------------------------------------------------------------------------
 # Role-specific documentation injection (least-privilege)
@@ -113,6 +126,7 @@ DOC_FILES_BY_ROLE: dict[str, list[Path]] = {
                    DOCS_RCT_SEARCH / "database-guide.md"],
     "Validator":  [DOCS_RCT_SEARCH / "pico-framework.md",
                    DOCS_RCT_SEARCH / "validation-criteria.md"],
+    "Appraiser":   [],   # articles supplied via uploads/appraisal/ RAG only
 }
 
 # ---------------------------------------------------------------------------
@@ -607,6 +621,89 @@ def show_stats(reports_dir: str = str(REPORTS_DIR)) -> None:
         print(f"  {colour}{role:<14}{RESET}: {count} interaction(s)")
 
 
+def generate_writing_report(
+    docs_dir: Path = DOCS_WRITING,
+    reports_dir: Path = REPORTS_DIR,
+    provider: str = "ollama",
+    model: str | None = None,
+) -> Path:
+    """
+    Read all files in docs_dir, send them to the AI with the writing-report
+    prompt, and save the result to reports/writing_report_{timestamp}.md.
+    Returns the path of the saved report.
+    """
+    files = sorted(
+        f for f in docs_dir.iterdir()
+        if f.is_file() and f.suffix.lower() in {".txt", ".md", ".pdf"}
+    ) if docs_dir.exists() else []
+
+    if not files:
+        print(f"No files found in {docs_dir}. Add .txt, .md, or .pdf files first.")
+        return reports_dir / "writing_report_empty.md"
+
+    prompt_path = AI_DIR / "writing-report-prompt.md"
+    if not prompt_path.exists():
+        raise FileNotFoundError(f"Writing report prompt not found: {prompt_path}")
+
+    system_prompt = prompt_path.read_text(encoding="utf-8", errors="replace")
+
+    sections: list[str] = []
+    for f in files:
+        content = read_text_file(f) if f.suffix.lower() != ".pdf" else ""
+        if f.suffix.lower() == ".pdf":
+            try:
+                from pypdf import PdfReader
+                reader = PdfReader(str(f))
+                content = "\n".join(p.extract_text() or "" for p in reader.pages)
+            except Exception as exc:  # noqa: BLE001
+                content = f"[Could not read PDF: {exc}]"
+        if content.strip():
+            sections.append(f"### {f.name}\n{content.strip()}")
+
+    combined = "\n\n".join(sections)
+    full_prompt = f"{system_prompt}\n\n## Documents to Summarise\n\n{combined}"
+
+    print(f"Generating writing report from {len(files)} file(s)...")
+    try:
+        response = call_ai(prompt=full_prompt, provider=provider, model=model)
+    except RuntimeError as exc:
+        response = f"[ERROR generating report: {exc}]"
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    out_path  = reports_dir / f"writing_report_{timestamp}.md"
+    reports_dir.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(
+        f"# Writing Report\nGenerated: {timestamp}\n\n{response}\n",
+        encoding="utf-8",
+    )
+    print(f"Report saved to: {out_path.name}")
+    return out_path
+
+
+def rct_search_reminder() -> None:
+    """Print a reminder to edit the PICO framework before starting a search."""
+    print("\n" + "=" * 55)
+    print("  RCT SEARCH MODE")
+    print("=" * 55)
+    print("  IMPORTANT: Before proceeding, ensure you have edited")
+    print("  your PICO framework file:")
+    print(f"  {DOCS_RCT_SEARCH / 'pico-framework.md'}")
+    print()
+    print("  Population  : who are the patients?")
+    print("  Intervention: what is being tested?")
+    print("  Comparison  : what is the control/comparator?")
+    print("  Outcome     : what are you measuring?")
+    print()
+    print("  Search links will be saved to the reports/ folder.")
+    print("=" * 55 + "\n")
+    confirm = input("Have you edited your PICO file? [y/N]: ").strip().lower()
+    if confirm != "y":
+        print("Please edit the PICO file first, then re-run rct_search mode.")
+        sys.exit(0)
+
+
+
+
 # ---------------------------------------------------------------------------
 # --list-roles
 # ---------------------------------------------------------------------------
@@ -778,8 +875,10 @@ def parse_args(args: list[str] | None = None) -> argparse.Namespace:
         ),
     )
     parser.add_argument("--model",          type=str,  default=None)
-    parser.add_argument("--mode",           type=str,  default="coding",
-                        choices=["coding", "writing", "rct_search"])
+    parser.add_argument("--mode",   type=str, default="coding",
+                        choices=["coding", "writing", "rct_search", "appraisal"])
+    parser.add_argument("--report", action="store_true", default=False,
+                        help="Generate a summary report from docs/ files (writing mode only)")
     parser.add_argument("--provider",       type=str,  default="ollama",
                         choices=["ollama", "openai", "anthropic", "deepseek", "groq"])
     parser.add_argument("--list-sessions",  action="store_true", default=False)
@@ -793,8 +892,6 @@ def parse_args(args: list[str] | None = None) -> argparse.Namespace:
                         version=f"AI Automation Tool v{VERSION}")
     parser.add_argument("--list-roles",     action="store_true", default=False)
     return parser.parse_args(args)
-
-
 
 if __name__ == "__main__":
     args = parse_args()
@@ -812,10 +909,19 @@ if __name__ == "__main__":
         show_stats(reports_dir=str(REPORTS_DIR))
     elif args.list_roles:
         list_roles(mode=args.mode)
+    elif args.report:
+        if args.mode != "writing":
+            print("--report is only available in writing mode.")
+            print("Use: python src/main.py --mode writing --report")
+            sys.exit(1)
+        generate_writing_report(provider=args.provider, model=args.model)
     else:
+        if args.mode == "rct_search":
+            rct_search_reminder()
         main(
             model_override=args.model,
             dry_run=args.dry_run,
             mode=args.mode,
             provider=args.provider,
         )
+

@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import json
 import urllib.error
@@ -1222,3 +1222,144 @@ def test_parse_args_provider_deepseek():
 def test_parse_args_provider_groq():
     args = parse_args(["--provider", "groq"])
     assert args.provider == "groq"
+
+# ---------------------------------------------------------------------------
+# generate_writing_report tests
+# ---------------------------------------------------------------------------
+
+def test_generate_writing_report_no_files(tmp_path):
+    from src.main import generate_writing_report
+    result = generate_writing_report(
+        docs_dir=tmp_path / "empty",
+        reports_dir=tmp_path / "reports",
+    )
+    assert result.name == "writing_report_empty.md"
+
+
+def test_generate_writing_report_creates_report(tmp_path, monkeypatch):
+    from src.main import generate_writing_report
+    docs = tmp_path / "docs"
+    docs.mkdir()
+    (docs / "brief.md").write_text("This is the project brief.", encoding="utf-8")
+
+    prompt_dir = tmp_path / "ai"
+    prompt_dir.mkdir()
+    (prompt_dir / "writing-report-prompt.md").write_text(
+        "Summarise the documents.", encoding="utf-8"
+    )
+
+    reports = tmp_path / "reports"
+    monkeypatch.setattr("src.main.AI_DIR", prompt_dir)
+
+    with patch.dict("src.main.PROVIDERS", {"ollama": lambda p, model=None: "Summary output"}):
+        result = generate_writing_report(
+            docs_dir=docs,
+            reports_dir=reports,
+            provider="ollama",
+        )
+
+    assert result.exists()
+    content = result.read_text(encoding="utf-8")
+    assert "Summary output" in content
+    assert "Writing Report" in content
+
+
+def test_generate_writing_report_missing_prompt(tmp_path, monkeypatch):
+    from src.main import generate_writing_report
+    docs = tmp_path / "docs"
+    docs.mkdir()
+    (docs / "brief.md").write_text("content", encoding="utf-8")
+    monkeypatch.setattr("src.main.AI_DIR", tmp_path / "no_ai_dir")
+    with pytest.raises(FileNotFoundError, match="writing-report-prompt"):
+        generate_writing_report(docs_dir=docs, reports_dir=tmp_path / "reports")
+
+
+# ---------------------------------------------------------------------------
+# rct_search_reminder tests
+# ---------------------------------------------------------------------------
+
+def test_rct_search_reminder_proceeds_on_y(monkeypatch, capsys):
+    from src.main import rct_search_reminder
+    monkeypatch.setattr("builtins.input", lambda _: "y")
+    rct_search_reminder()   # should not raise or exit
+    out = capsys.readouterr().out
+    assert "PICO" in out
+
+
+def test_rct_search_reminder_exits_on_n(monkeypatch):
+    from src.main import rct_search_reminder
+    monkeypatch.setattr("builtins.input", lambda _: "n")
+    with pytest.raises(SystemExit):
+        rct_search_reminder()
+
+
+# ---------------------------------------------------------------------------
+# appraisal mode tests
+# ---------------------------------------------------------------------------
+
+def test_appraisal_mode_in_all_modes():
+    from src.main import ALL_MODES
+    assert "appraisal" in ALL_MODES
+
+
+def test_appraisal_mode_has_appraiser_role():
+    from src.main import ALL_MODES
+    assert "Appraiser" in ALL_MODES["appraisal"]
+
+
+def test_parse_args_mode_appraisal():
+    args = parse_args(["--mode", "appraisal"])
+    assert args.mode == "appraisal"
+
+
+def test_parse_args_report_flag():
+    args = parse_args(["--mode", "writing", "--report"])
+    assert args.report is True
+
+
+def test_parse_args_report_default_false():
+    args = parse_args([])
+    assert args.report is False
+
+
+
+
+def test_generate_writing_report_missing_prompt(tmp_path, monkeypatch):
+    from src.main import generate_writing_report
+    docs = tmp_path / "docs"
+    docs.mkdir()
+    (docs / "brief.md").write_text("content", encoding="utf-8")
+    monkeypatch.setattr("src.main.AI_DIR", tmp_path / "no_ai_dir")
+    with pytest.raises(FileNotFoundError, match="writing-report-prompt"):
+        generate_writing_report(docs_dir=docs, reports_dir=tmp_path / "reports")
+
+
+# ---------------------------------------------------------------------------
+# rct_search_reminder tests
+# ---------------------------------------------------------------------------
+
+def test_rct_search_reminder_proceeds_on_y(monkeypatch, capsys):
+    from src.main import rct_search_reminder
+    monkeypatch.setattr("builtins.input", lambda _: "y")
+    rct_search_reminder()
+    out = capsys.readouterr().out
+    assert "PICO" in out
+
+
+def test_rct_search_reminder_exits_on_n(monkeypatch):
+    from src.main import rct_search_reminder
+    monkeypatch.setattr("builtins.input", lambda _: "n")
+    with pytest.raises(SystemExit):
+        rct_search_reminder()
+
+
+
+
+def test_generate_writing_report_missing_prompt(tmp_path, monkeypatch):
+    from src.main import generate_writing_report
+    docs = tmp_path / "docs"
+    docs.mkdir()
+    (docs / "brief.md").write_text("content", encoding="utf-8")
+    monkeypatch.setattr("src.main.AI_DIR", tmp_path / "no_ai_dir")
+    with pytest.raises(FileNotFoundError, match="writing-report-prompt"):
+        generate_writing_report(docs_dir=docs, reports_dir=tmp_path / "reports")
