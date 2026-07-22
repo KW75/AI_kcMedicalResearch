@@ -1,0 +1,3 @@
+cd D:\ai-automation-tool
+.venv\Scripts\Activate.ps1
+

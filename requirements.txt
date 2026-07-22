@@ -1,5 +1,4 @@
+chromadb
+pypdf
 python-dotenv
-pytest
-pytest-cov
 requests
-colorama

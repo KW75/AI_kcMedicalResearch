@@ -1,34 +1,43 @@
 # AI Automation Tool
 
 A local Python AI automation tool supporting multiple AI providers and workflow
-modes. Run Builder, Reviewer, and Tester roles in coding mode, or Writer,
-Editor, and QA roles in writing mode — powered by Ollama locally or OpenAI /
-Anthropic via API.
+modes. Run Builder, Reviewer, and Tester roles in coding mode, Writer, Editor,
+and QA roles in writing mode, or Formulator, Searcher, and Validator roles in
+RCT search mode — powered by Ollama locally or OpenAI / Anthropic via API.
 
 ---
 
 ## Features
 
-- **Two workflow modes** — `coding` mode (Builder, Reviewer, Tester) and
-  `writing` mode (Writer, Editor, QA)
+- **Three workflow modes** — `coding`, `writing`, and `rct_search`
 - **Three provider choices** — `ollama` (local, default), `openai`, `anthropic`
 - Three AI roles per mode — each with its own prompt file in `ai/`
-- Multi-task sessions — stay in a session and send multiple tasks without restarting
-- Forward context passing — each step automatically receives the previous AI response
-- Session transcripts — timestamped markdown file saved per session in `reports/`
-- Session summary — printed at exit showing steps completed, roles used, and transcript path
-- Coloured terminal output — each role has its own colour, errors in red, summary in magenta
-- `--mode` flag — switch between `coding` and `writing` workflows
+- Role-aware doc injection — each role receives only the documentation
+  relevant to its specific job
+- Multi-task sessions — stay in a session and send multiple tasks without
+  restarting
+- Forward context passing — each step automatically receives the previous
+  AI response
+- Session transcripts — timestamped markdown file saved per session in
+  `reports/`
+- Session summary — printed at exit showing steps completed, roles used,
+  and transcript path
+- Coloured terminal output — each role has its own colour, errors in red,
+  summary in magenta
+- `--mode` flag — switch between `coding`, `writing`, and `rct_search`
+  workflows
 - `--provider` flag — choose `ollama`, `openai`, or `anthropic`
 - `--model` flag — override the model for any provider from the command line
 - `--list-roles` flag — show roles, prompt files, and injected docs for a mode
 - `--list-sessions` flag — list all past session transcripts sorted newest first
 - `--read-session` flag — print a past session transcript to the terminal
-- `--delete-session` flag — delete a past session transcript from the command line
+- `--delete-session` flag — delete a past session transcript from the command
+  line
 - `--export-session` flag — export a session transcript as a plain text file
 - `--rename-session` flag — rename a past session transcript file
 - `--stats` flag — show statistics across all past sessions
-- `--dry-run` flag — run a full session without calling any AI provider, for testing
+- `--dry-run` flag — run a full session without calling any AI provider,
+  for testing
 - `--version` flag — show tool version and exit
 - `--help` flag — show usage and examples
 
@@ -37,7 +46,8 @@ Anthropic via API.
 ## Requirements
 
 - Python 3.11+
-- [Ollama](https://ollama.com) installed and running locally (for `ollama` provider)
+- [Ollama](https://ollama.com) installed and running locally (for `ollama`
+  provider)
 - A pulled Ollama model (default: `qwen2.5-coder:3b`)
 - An `OPENAI_API_KEY` in `.env` (for `openai` provider)
 - An `ANTHROPIC_API_KEY` in `.env` (for `anthropic` provider)
@@ -94,11 +104,23 @@ Anthropic 	--provider anthropic 	❌ No 	✅ ANTHROPIC_API_KEY 	claude-sonnet-4-
 
 ollama is the default. No API key or internet connection is needed to get started.
 Modes
-Mode 	Flag 	Roles 	Docs injected per role
-Coding 	--mode coding 	Builder, Reviewer, Tester 	PRD + architecture (all); coding-standards (Builder); decision-log (Reviewer); test-strategy (Tester)
-Writing 	--mode writing 	Writer, Editor, QA 	project-brief (all); style-guide (Writer); editorial-standards (Editor); qa-checklist (QA)
+Mode 	Flag 	Roles
+Coding 	--mode coding 	Builder, Reviewer, Tester
+Writing 	--mode writing 	Writer, Editor, QA
+RCT Search 	--mode rct_search 	Formulator, Searcher, Validator
 
-coding is the default. Each role receives only the documentation relevant to its specific job — no role receives another role's instructions. Use --list-roles to inspect the exact docs injected for any mode.
+coding is the default. Each role receives only the documentation relevant to its specific job. Use --list-roles to inspect the exact docs and prompt file for any role in any mode.
+Doc injection per role
+Role 	Docs injected
+Builder 	PRD, architecture, coding-standards
+Reviewer 	PRD, architecture, decision-log
+Tester 	PRD, architecture, test-strategy
+Writer 	project-brief, style-guide
+Editor 	project-brief, editorial-standards
+QA 	project-brief, qa-checklist
+Formulator 	pico-framework
+Searcher 	pico-framework, database-guide
+Validator 	pico-framework, validation-criteria
 Usage
 
 Start a coding session (default):
@@ -109,13 +131,17 @@ Start a writing session:
 
 python src/main.py --mode writing
 
+Start an RCT search session:
+
+python src/main.py --mode rct_search
+
 Use OpenAI instead of Ollama:
 
 python src/main.py --provider openai
 
-Use Anthropic in writing mode:
+Use Anthropic in RCT search mode:
 
-python src/main.py --mode writing --provider anthropic
+python src/main.py --mode rct_search --provider anthropic
 
 Use a different model:
 
@@ -126,31 +152,32 @@ Show roles, prompt files, and injected docs for a mode:
 
 python src/main.py --list-roles
 python src/main.py --list-roles --mode writing
+python src/main.py --list-roles --mode rct_search
 
-Example output for --list-roles (coding mode):
+Example output for --list-roles --mode rct_search:
 
 ==========================================
-  Roles — coding mode
+  Roles — rct_search mode
 ==========================================
 
-1. Builder AI
-   Prompt : ai\builder-prompt.md
-   Docs   : PRD.md, architecture.md, coding-standards.md
+1. Formulator AI
+   Prompt : ai\formulator-prompt.md
+   Docs   : pico-framework.md
 
-2. Reviewer AI
-   Prompt : ai\reviewer-prompt.md
-   Docs   : PRD.md, architecture.md, decision-log.md
+2. Searcher AI
+   Prompt : ai\searcher-prompt.md
+   Docs   : pico-framework.md, database-guide.md
 
-3. Tester AI
-   Prompt : ai\tester-prompt.md
-   Docs   : PRD.md, architecture.md, test-strategy.md
+3. Validator AI
+   Prompt : ai\validator-prompt.md
+   Docs   : pico-framework.md, validation-criteria.md
 
 ==========================================
 
 Run without calling any AI provider (dry run):
 
 python src/main.py --dry-run
-python src/main.py --mode writing --provider anthropic --dry-run
+python src/main.py --mode rct_search --dry-run
 
 List past session transcripts:
 
@@ -180,7 +207,7 @@ Show version:
 
 python src/main.py --version
 
-Workflow
+Workflows
 
 Coding mode:
 
@@ -197,13 +224,37 @@ Editor AI   →  reviews structure, clarity, and tone
 QA AI       →  checks accuracy, consistency, and completeness
 Human       →  approves before publishing
 
-Each step automatically passes the previous AI response as context to the next step.
+RCT search mode:
+
+User sets research topic
+        ↓
+Formulator AI  →  structures topic into formal PICO question
+        ↓
+Searcher AI    →  builds full search strategy across all 7 SR databases
+        ↓
+Validator AI   →  checks strategy aligns with PICO, flags any gaps
+        ↓
+        ├── gaps found → return to Formulator to refine PICO
+        │                Searcher reruns with refined strategy
+        │                Validator checks again
+        │
+        └── validated → article list ready for download and SR
+
+The refinement loop is handled naturally by the existing session loop — choose role 1 again if the Validator flags that the PICO needs revision.
+
+Databases searched in RCT search mode:
+
+PubMed / MEDLINE, Cochrane CENTRAL, EMBASE, CINAHL, PsycINFO, Scopus, Web of Science.
+
+Scope: RCT search mode locates articles for download only. Quality appraisal for systematic review is a separate step outside this tool.
+
+Each step in all modes automatically passes the previous AI response as context to the next step.
 Running Tests
 
 python -m pytest -v
 python -m pytest -v --cov=src --cov-report=term-missing
 
-Current status: 121 tests, 121 passing, 94% coverage.
+Current status: 136 tests, 136 passing, 94% coverage.
 Project Structure
 
 ai-automation-tool/
@@ -219,7 +270,10 @@ ai-automation-tool/
 │   ├── tester-prompt.md
 │   ├── writer-prompt.md
 │   ├── editor-prompt.md
-│   └── qa-prompt.md
+│   ├── qa-prompt.md
+│   ├── formulator-prompt.md
+│   ├── searcher-prompt.md
+│   └── validator-prompt.md
 ├── docs/
 │   ├── coding/
 │   │   ├── PRD.md
@@ -227,11 +281,15 @@ ai-automation-tool/
 │   │   ├── coding-standards.md
 │   │   ├── decision-log.md
 │   │   └── test-strategy.md
-│   └── writing/
-│       ├── project-brief.md
-│       ├── style-guide.md
-│       ├── editorial-standards.md
-│       └── qa-checklist.md
+│   ├── writing/
+│   │   ├── project-brief.md
+│   │   ├── style-guide.md
+│   │   ├── editorial-standards.md
+│   │   └── qa-checklist.md
+│   └── rct_search/
+│       ├── pico-framework.md
+│       ├── database-guide.md
+│       └── validation-criteria.md
 ├── reports/              # ignored by git
 ├── .venv/                # ignored by git
 ├── .env                  # ignored by git
@@ -256,6 +314,12 @@ Writing mode:
     Editor AI — reviews structure, clarity, tone, and flow. Receives editorial-standards.md defining what to check and what to leave to the Writer.
     QA AI — checks for accuracy, consistency, and completeness before publication. Receives qa-checklist.md with explicit sign-off criteria.
 
+RCT search mode:
+
+    Formulator AI — asks the user for their raw research topic and structures it into a formal PICO question defining Population, Intervention, Comparison, and Outcome. Can be called again to refine the PICO if the Validator flags gaps. Receives pico-framework.md as a structural reference.
+    Searcher AI — takes the PICO question and builds a comprehensive, reproducible search strategy for all seven standard SR databases, including MeSH terms, Boolean operators, truncation, and RCT filters. Receives pico-framework.md and database-guide.md.
+    Validator AI — reviews the search strategy for completeness and alignment with the PICO question. Produces a clear pass or fail decision with specific recommendations if refinement is needed. Receives pico-framework.md and validation-criteria.md.
+
 License
 
 MIT
@@ -267,5 +331,6 @@ MIT
 
 ```powershell
 git add README.md
-git commit -m "Step 55: update README — add --list-roles, correct modes table to show per-role doc injection, update project structure and test count"
+git commit -m "Step 57: update README — add rct_search mode, workflow diagram, role table, doc injection table, usage examples"
+
 

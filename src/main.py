@@ -1,597 +1,674 @@
+"""
+main.py — AI Automation Tool
+Supports three workflow modes: coding, writing, rct_search.
+Supports three AI providers: ollama (default), openai, anthropic.
+RAG layer: per-session, mode-specific uploads/ folder indexing via rag.py.
+"""
+
 from __future__ import annotations
 
+import argparse
 import json
 import os
-import argparse
-from collections import Counter
+import re
+import sys
+import time
+import urllib.error
+import urllib.request
+from urllib.request import urlopen  # bare name so tests can patch src.main.urlopen
+import uuid
 from datetime import datetime
 from pathlib import Path
-from urllib.error import HTTPError, URLError
-from urllib.request import Request, urlopen
 
-from colorama import Fore, init as colorama_init
 from dotenv import load_dotenv
 
-colorama_init(autoreset=True)
+load_dotenv()
 
-
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-
-AI_DIR        = PROJECT_ROOT / "ai"
-DOCS_DIR      = PROJECT_ROOT / "docs"
-DOCS_CODING   = DOCS_DIR / "coding"
-DOCS_WRITING  = DOCS_DIR / "writing"
-DOCS_RCT_SEARCH = DOCS_DIR / "rct_search"
-REPORTS_DIR   = PROJECT_ROOT / "reports"
-
-DEFAULT_OLLAMA_HOST  = "http://localhost:11434"
-DEFAULT_OLLAMA_MODEL = "qwen2.5-coder:3b"
-DEFAULT_PROVIDER     = "ollama"
-DEFAULT_MODE         = "coding"
-
+# ---------------------------------------------------------------------------
+# Version
+# ---------------------------------------------------------------------------
 VERSION = "2.0.0"
 
 # ---------------------------------------------------------------------------
-# Role file sets - one dictionary per mode
+# Paths
 # ---------------------------------------------------------------------------
+BASE_DIR        = Path(__file__).parent.parent
+REPORTS_DIR     = BASE_DIR / "reports"
+DOCS_DIR        = BASE_DIR / "docs"
+DOCS_CODING     = DOCS_DIR / "coding"
+DOCS_WRITING    = DOCS_DIR / "writing"
+DOCS_RCT_SEARCH = DOCS_DIR / "rct_search"
+AI_DIR          = BASE_DIR / "ai"
+UPLOAD_DIR      = BASE_DIR / os.getenv("UPLOAD_DIR", "uploads")
+UPLOADS_CODING      = UPLOAD_DIR / "coding"
+UPLOADS_WRITING     = UPLOAD_DIR / "writing"
+UPLOADS_RCT_SEARCH  = UPLOAD_DIR / "rct_search"
 
+REPORTS_DIR.mkdir(parents=True, exist_ok=True)
+
+# ---------------------------------------------------------------------------
+# Environment / provider config
+# ---------------------------------------------------------------------------
+OLLAMA_HOST         = os.getenv("OLLAMA_HOST",         "http://localhost:11434")
+OLLAMA_MODEL        = os.getenv("OLLAMA_MODEL",        "qwen2.5-coder:3b")
+OPENAI_API_KEY      = os.getenv("OPENAI_API_KEY",      "")
+OPENAI_MODEL        = os.getenv("OPENAI_MODEL",        "gpt-4o-mini")
+ANTHROPIC_API_KEY   = os.getenv("ANTHROPIC_API_KEY",   "")
+ANTHROPIC_MODEL     = os.getenv("ANTHROPIC_MODEL",     "claude-sonnet-4-6")
+EMBEDDING_PROVIDER  = os.getenv("EMBEDDING_PROVIDER",  "ollama")
+EMBEDDING_MODEL     = os.getenv("EMBEDDING_MODEL",     "nomic-embed-text")
+
+# ---------------------------------------------------------------------------
+# Role / mode definitions
+# ---------------------------------------------------------------------------
 ROLE_FILES_CODING = {
-    "1": ("Builder",  AI_DIR / "builder-prompt.md",  REPORTS_DIR / "builder-output.md"),
-    "2": ("Reviewer", AI_DIR / "reviewer-prompt.md", REPORTS_DIR / "review-log.md"),
-    "3": ("Tester",   AI_DIR / "tester-prompt.md",   REPORTS_DIR / "test-report.md"),
+    "Builder":  {"prompt": AI_DIR / "builder-prompt.md",  "report": "builder-report.md"},
+    "Reviewer": {"prompt": AI_DIR / "reviewer-prompt.md", "report": "reviewer-report.md"},
+    "Tester":   {"prompt": AI_DIR / "tester-prompt.md",   "report": "tester-report.md"},
 }
 
 ROLE_FILES_WRITING = {
-    "1": ("Writer", AI_DIR / "writer-prompt.md", REPORTS_DIR / "writer-output.md"),
-    "2": ("Editor", AI_DIR / "editor-prompt.md", REPORTS_DIR / "editor-log.md"),
-    "3": ("QA",     AI_DIR / "qa-prompt.md",     REPORTS_DIR / "qa-report.md"),
+    "Writer": {"prompt": AI_DIR / "writer-prompt.md", "report": "writer-report.md"},
+    "Editor": {"prompt": AI_DIR / "editor-prompt.md", "report": "editor-report.md"},
+    "QA":     {"prompt": AI_DIR / "qa-prompt.md",     "report": "qa-report.md"},
 }
 
 ROLE_FILES_RCT_SEARCH = {
-    "1": ("Formulator", AI_DIR / "formulator-prompt.md", REPORTS_DIR / "formulator-output.md"),
-    "2": ("Searcher",   AI_DIR / "searcher-prompt.md",   REPORTS_DIR / "searcher-output.md"),
-    "3": ("Validator",  AI_DIR / "validator-prompt.md",  REPORTS_DIR / "validator-output.md"),
+    "Formulator": {"prompt": AI_DIR / "formulator-prompt.md", "report": "formulator-report.md"},
+    "Searcher":   {"prompt": AI_DIR / "searcher-prompt.md",   "report": "searcher-report.md"},
+    "Validator":  {"prompt": AI_DIR / "validator-prompt.md",  "report": "validator-report.md"},
 }
 
-ALL_MODES = {
+ALL_MODES: dict[str, dict] = {
     "coding":     ROLE_FILES_CODING,
     "writing":    ROLE_FILES_WRITING,
     "rct_search": ROLE_FILES_RCT_SEARCH,
 }
 
-
 # ---------------------------------------------------------------------------
-# Role-aware documentation files
-# Each role receives only the docs relevant to its specific job.
+# Role-specific documentation injection (least-privilege)
 # ---------------------------------------------------------------------------
-
-DOC_FILES_BY_ROLE = {
-    # Coding roles
-    "Builder":  [
-        DOCS_CODING / "PRD.md",
-        DOCS_CODING / "architecture.md",
-        DOCS_CODING / "coding-standards.md",
-    ],
-    "Reviewer": [
-        DOCS_CODING / "PRD.md",
-        DOCS_CODING / "architecture.md",
-        DOCS_CODING / "decision-log.md",
-    ],
-    "Tester": [
-        DOCS_CODING / "PRD.md",
-        DOCS_CODING / "architecture.md",
-        DOCS_CODING / "test-strategy.md",
-    ],
-    # Writing roles
-    "Writer": [
-        DOCS_WRITING / "project-brief.md",
-        DOCS_WRITING / "style-guide.md",
-    ],
-    "Editor": [
-        DOCS_WRITING / "project-brief.md",
-        DOCS_WRITING / "editorial-standards.md",
-    ],
-    "QA": [
-        DOCS_WRITING / "project-brief.md",
-        DOCS_WRITING / "qa-checklist.md",
-    ],
-    # RCT search roles
-    "Formulator": [
-        DOCS_RCT_SEARCH / "pico-framework.md",
-    ],
-    "Searcher": [
-        DOCS_RCT_SEARCH / "pico-framework.md",
-        DOCS_RCT_SEARCH / "database-guide.md",
-    ],
-    "Validator": [
-        DOCS_RCT_SEARCH / "pico-framework.md",
-        DOCS_RCT_SEARCH / "validation-criteria.md",
-    ],
+DOC_FILES_BY_ROLE: dict[str, list[Path]] = {
+    "Builder":  [DOCS_CODING / "PRD.md",
+                 DOCS_CODING / "architecture.md",
+                 DOCS_CODING / "coding-standards.md"],
+    "Reviewer": [DOCS_CODING / "PRD.md",
+                 DOCS_CODING / "architecture.md",
+                 DOCS_CODING / "decision-log.md"],
+    "Tester":   [DOCS_CODING / "PRD.md",
+                 DOCS_CODING / "architecture.md",
+                 DOCS_CODING / "test-strategy.md"],
+    "Writer": [DOCS_WRITING / "project-brief.md",
+               DOCS_WRITING / "style-guide.md"],
+    "Editor": [DOCS_WRITING / "project-brief.md",
+               DOCS_WRITING / "editorial-standards.md"],
+    "QA":     [DOCS_WRITING / "project-brief.md",
+               DOCS_WRITING / "qa-checklist.md"],
+    "Formulator": [DOCS_RCT_SEARCH / "pico-framework.md"],
+    "Searcher":   [DOCS_RCT_SEARCH / "pico-framework.md",
+                   DOCS_RCT_SEARCH / "database-guide.md"],
+    "Validator":  [DOCS_RCT_SEARCH / "pico-framework.md",
+                   DOCS_RCT_SEARCH / "validation-criteria.md"],
 }
 
-def list_roles(mode: str = "coding") -> None:
-    """Print the roles for the given mode and the doc files each role receives."""
-    role_files = ALL_MODES.get(mode, ROLE_FILES_CODING)
-
-    print(f"\n{Fore.MAGENTA}{'=' * 42}")
-    print(f"{Fore.MAGENTA}  Roles — {mode} mode")
-    print(f"{Fore.MAGENTA}{'=' * 42}")
-
-    for key, (role_name, prompt_path, _) in role_files.items():
-        color = role_color(role_name)
-        doc_files = DOC_FILES_BY_ROLE.get(role_name, [])
-        doc_names = [f.name for f in doc_files] if doc_files else ["(none)"]
-        print(f"\n{color}{key}. {role_name} AI")
-        print(f"   Prompt : {prompt_path.relative_to(PROJECT_ROOT)}")
-        print(f"   Docs   : {', '.join(doc_names)}")
-
-    print(f"\n{Fore.MAGENTA}{'=' * 42}\n")
-
-
-def role_color(role_name: str) -> str:
-    """Return a colorama Fore colour code for the given role name."""
-    colors = {
-        "Builder":    Fore.CYAN,
-        "Reviewer":   Fore.YELLOW,
-        "Tester":     Fore.GREEN,
-        "Writer":     Fore.CYAN,
-        "Editor":     Fore.YELLOW,
-        "QA":         Fore.GREEN,
-        "Formulator": Fore.CYAN,
-        "Searcher":   Fore.YELLOW,
-        "Validator":  Fore.GREEN,
-    }
-    return colors.get(role_name, Fore.WHITE)
-
-
-def read_text_file(path: Path) -> str:
-    """Read a file and return its content stripped of whitespace. Returns empty string if missing."""
-    if not path.exists():
-        return ""
-    return path.read_text(encoding="utf-8").strip()
-
-
-def build_project_context(role_name: str) -> str:
-    """Combine doc files for the given role into a context string.
-    Each role receives only the documentation relevant to its specific job."""
-    doc_files = DOC_FILES_BY_ROLE.get(role_name, [])
-    sections = []
-    for path in doc_files:
-        content = read_text_file(path)
-        if content:
-            sections.append(f"## {path.name}\n{content}")
-    return "\n\n".join(sections)
-
-
-def choose_role(mode: str = "coding") -> tuple[str, Path, Path]:
-    """Prompt the user to choose an AI role for the active mode. Loops until a valid choice is made."""
-    role_files = ALL_MODES.get(mode, ROLE_FILES_CODING)
-    while True:
-        print(f"\n{Fore.WHITE}Choose AI role:")
-        for key, (role_name, _, _) in role_files.items():
-            color = role_color(role_name)
-            print(f"{color}{key}. {role_name} AI")
-
-        choice = input("\nEnter 1, 2, or 3: ").strip()
-
-        if choice in role_files:
-            return role_files[choice]
-
-        print(f"{Fore.RED}Invalid choice. Please enter 1, 2, or 3.")
-
-
 # ---------------------------------------------------------------------------
-# Provider caller functions
+# Provider registry
 # ---------------------------------------------------------------------------
-
-def call_ollama_provider(model: str, prompt: str, host: str) -> str:
-    """Send a prompt to the Ollama API and return the response text."""
-    url = host.rstrip("/") + "/api/generate"
-
-    payload = {
-        "model": model,
-        "prompt": prompt,
-        "stream": False,
-    }
-
-    request = Request(
+def call_openai_provider(
+    prompt: str,
+    model: str | None = None,
+    max_tokens: int = 2048,
+) -> str:
+    """Send a prompt to the OpenAI chat completions endpoint."""
+    if not OPENAI_API_KEY:
+        raise RuntimeError("OPENAI_API_KEY is not set. Add it to your .env file.")
+    model = model or OPENAI_MODEL
+    url   = "https://api.openai.com/v1/chat/completions"
+    payload = json.dumps({
+        "model":      model,
+        "messages":   [{"role": "user", "content": prompt}],
+        "max_tokens": max_tokens,
+    }).encode()
+    req = urllib.request.Request(
         url,
-        data=json.dumps(payload).encode("utf-8"),
-        headers={"Content-Type": "application/json"},
-        method="POST",
-    )
-
-    try:
-        with urlopen(request, timeout=180) as response:
-            raw_response = response.read().decode("utf-8")
-    except HTTPError as error:
-        body = error.read().decode("utf-8", errors="replace")
-        raise RuntimeError(f"Ollama HTTP error {error.code}: {body}") from error
-    except URLError as error:
-        raise RuntimeError(
-            "Could not connect to Ollama. Make sure Ollama is running, then try: ollama list"
-        ) from error
-    except TimeoutError as error:
-        raise RuntimeError(
-            "Ollama took too long to respond. Try again or use a smaller model."
-        ) from error
-
-    result = json.loads(raw_response)
-
-    if "error" in result:
-        raise RuntimeError(f"Ollama error: {result['error']}")
-
-    response_text = result.get("response", "").strip()
-
-    if not response_text:
-        raise RuntimeError(f"Ollama returned no response. Raw result: {result}")
-
-    return response_text
-
-
-def call_openai_provider(model: str, prompt: str, host: str) -> str:
-    """Send a prompt to the OpenAI API and return the response text."""
-    api_key = os.getenv("OPENAI_API_KEY", "")
-    if not api_key:
-        raise RuntimeError(
-            "OPENAI_API_KEY is not set. Add it to your .env file."
-        )
-
-    url = "https://api.openai.com/v1/chat/completions"
-
-    payload = {
-        "model": model,
-        "messages": [{"role": "user", "content": prompt}],
-    }
-
-    request = Request(
-        url,
-        data=json.dumps(payload).encode("utf-8"),
+        data=payload,
         headers={
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {api_key}",
+            "Content-Type":  "application/json",
+            "Authorization": f"Bearer {OPENAI_API_KEY}",
         },
         method="POST",
     )
-
     try:
-        with urlopen(request, timeout=180) as response:
-            raw_response = response.read().decode("utf-8")
-    except HTTPError as error:
-        body = error.read().decode("utf-8", errors="replace")
-        raise RuntimeError(f"OpenAI HTTP error {error.code}: {body}") from error
-    except URLError as error:
-        raise RuntimeError(
-            "Could not connect to OpenAI. Check your internet connection."
-        ) from error
-    except TimeoutError as error:
-        raise RuntimeError(
-            "OpenAI took too long to respond. Try again."
-        ) from error
-
-    result = json.loads(raw_response)
-
-    if "error" in result:
-        raise RuntimeError(f"OpenAI error: {result['error']}")
-
-    response_text = result["choices"][0]["message"]["content"].strip()
-
-    if not response_text:
-        raise RuntimeError(f"OpenAI returned no response. Raw result: {result}")
-
-    return response_text
+        with urlopen(req, timeout=60) as resp:
+            data = json.loads(resp.read())
+        choices = data.get("choices", [])
+        if not choices or not choices[0].get("message", {}).get("content"):
+            raise RuntimeError("OpenAI returned an empty response.")
+        return choices[0]["message"]["content"]
+    except urllib.error.HTTPError as exc:
+        raise RuntimeError(f"OpenAI HTTP error {exc.code}: {exc.reason}") from exc
+    except urllib.error.URLError as exc:
+        raise RuntimeError(f"OpenAI connection error: {exc.reason}") from exc
+    except (KeyError, IndexError) as exc:
+        raise RuntimeError(f"OpenAI unexpected response format: {exc}") from exc
 
 
-def call_anthropic_provider(model: str, prompt: str, host: str) -> str:
-    """Send a prompt to the Anthropic API and return the response text."""
-    api_key = os.getenv("ANTHROPIC_API_KEY", "")
-    if not api_key:
-        raise RuntimeError(
-            "ANTHROPIC_API_KEY is not set. Add it to your .env file."
-        )
-
-    url = "https://api.anthropic.com/v1/messages"
-
-    payload = {
-        "model": model,
-        "max_tokens": 4096,
-        "messages": [{"role": "user", "content": prompt}],
-    }
-
-    request = Request(
+def call_anthropic_provider(
+    prompt: str,
+    model: str | None = None,
+    max_tokens: int = 2048,
+) -> str:
+    """Send a prompt to the Anthropic messages endpoint."""
+    if not ANTHROPIC_API_KEY:
+        raise RuntimeError("ANTHROPIC_API_KEY is not set. Add it to your .env file.")
+    model = model or ANTHROPIC_MODEL
+    url   = "https://api.anthropic.com/v1/messages"
+    payload = json.dumps({
+        "model":      model,
+        "messages":   [{"role": "user", "content": prompt}],
+        "max_tokens": max_tokens,
+    }).encode()
+    req = urllib.request.Request(
         url,
-        data=json.dumps(payload).encode("utf-8"),
+        data=payload,
         headers={
-            "Content-Type": "application/json",
-            "x-api-key": api_key,
+            "Content-Type":      "application/json",
+            "x-api-key":         ANTHROPIC_API_KEY,
             "anthropic-version": "2023-06-01",
         },
         method="POST",
     )
-
     try:
-        with urlopen(request, timeout=180) as response:
-            raw_response = response.read().decode("utf-8")
-    except HTTPError as error:
-        body = error.read().decode("utf-8", errors="replace")
-        raise RuntimeError(f"Anthropic HTTP error {error.code}: {body}") from error
-    except URLError as error:
-        raise RuntimeError(
-            "Could not connect to Anthropic. Check your internet connection."
-        ) from error
-    except TimeoutError as error:
-        raise RuntimeError(
-            "Anthropic took too long to respond. Try again."
-        ) from error
-
-    result = json.loads(raw_response)
-
-    if "error" in result:
-        raise RuntimeError(f"Anthropic error: {result['error']}")
-
-    response_text = result["content"][0]["text"].strip()
-
-    if not response_text:
-        raise RuntimeError(f"Anthropic returned no response. Raw result: {result}")
-
-    return response_text
+        with urlopen(req, timeout=60) as resp:
+            data = json.loads(resp.read())
+        content = data.get("content", [])
+        if not content or not content[0].get("text"):
+            raise RuntimeError("Anthropic returned an empty response.")
+        return content[0]["text"]
+    except urllib.error.HTTPError as exc:
+        raise RuntimeError(f"Anthropic HTTP error {exc.code}: {exc.reason}") from exc
+    except urllib.error.URLError as exc:
+        raise RuntimeError(f"Anthropic connection error: {exc.reason}") from exc
+    except (KeyError, IndexError) as exc:
+        raise RuntimeError(f"Anthropic unexpected response format: {exc}") from exc
 
 
-PROVIDERS = {
+def call_ollama_provider(
+    prompt: str,
+    model: str | None = None,
+    max_tokens: int = 2048,
+) -> str:
+    """Send a prompt to the local Ollama generate endpoint."""
+    model = model or OLLAMA_MODEL
+    url   = f"{OLLAMA_HOST}/api/generate"
+    payload = json.dumps({
+        "model":   model,
+        "prompt":  prompt,
+        "stream":  False,
+        "options": {"num_predict": max_tokens},
+    }).encode()
+    req = urllib.request.Request(
+        url,
+        data=payload,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        with urlopen(req, timeout=120) as resp:
+            data = json.loads(resp.read())
+        response_text = data.get("response", "")
+        if not response_text:
+            raise RuntimeError("Ollama returned an empty response.")
+        return response_text
+    except urllib.error.HTTPError as exc:
+        raise RuntimeError(f"Ollama HTTP error {exc.code}: {exc.reason}") from exc
+    except urllib.error.URLError as exc:
+        raise RuntimeError(f"Ollama connection error: {exc.reason}") from exc
+
+
+PROVIDERS: dict[str, callable] = {
     "ollama":    call_ollama_provider,
     "openai":    call_openai_provider,
     "anthropic": call_anthropic_provider,
 }
 
 
-def call_ai(model: str, prompt: str, host: str, provider: str = "ollama") -> str:
-    """Universal AI caller. Dispatches to the correct provider function."""
-    caller = PROVIDERS.get(provider, call_ollama_provider)
-    return caller(model, prompt, host)
+def call_ai(
+    prompt: str,
+    provider: str = "ollama",
+    model: str | None = None,
+) -> str:
+    """Dispatch an AI call to the correct provider function."""
+    fn = PROVIDERS.get(provider, call_ollama_provider)
+    return fn(prompt, model=model)
 
 
-def save_report(
-    report_path: Path, role_name: str, model: str, task: str, response_text: str
-) -> None:
-    """Append a formatted AI response entry to the role report file."""
-    report_path.parent.mkdir(parents=True, exist_ok=True)
+# ---------------------------------------------------------------------------
+# Context builder (with optional RAG)
+# ---------------------------------------------------------------------------
+def build_project_context(
+    role_name: str,
+    query: str = "",
+    mode: str = "",
+    session_id: str = "",
+) -> str:
+    """
+    Build the project context string injected into every AI prompt.
+    Reads small docs/ files for the role, then optionally appends RAG chunks.
+    """
+    doc_files = DOC_FILES_BY_ROLE.get(role_name, [])
+    sections: list[str] = []
 
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    for doc_path in doc_files:
+        if doc_path.exists():
+            content = doc_path.read_text(encoding="utf-8", errors="replace").strip()
+            if content:
+                sections.append(f"### {doc_path.name}\n{content}")
 
-    entry = f"""
-# {role_name} AI Response
+    if query and mode and session_id:
+        try:
+            from src import rag
+            rag_context = rag.retrieve(query, mode, session_id)
+            if rag_context:
+                sections.append(rag_context)
+        except Exception as exc:  # noqa: BLE001
+            print(f"[RAG] Retrieval warning: {exc}")
 
-Time: {timestamp}
-Model: {model}
-
-## User Task
-
-{task}
-
-## AI Response
-
-{response_text}
-
----
-"""
-
-    with report_path.open("a", encoding="utf-8") as file:
-        file.write(entry)
-
-
-def start_session_transcript(reports_dir: Path) -> Path:
-    """Create a timestamped session transcript file and return its path."""
-    reports_dir.mkdir(parents=True, exist_ok=True)
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    transcript_path = reports_dir / f"session_{timestamp}.md"
-    header = (
-        f"# Session Transcript\n\n"
-        f"Started: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n---\n"
-    )
-    transcript_path.write_text(header, encoding="utf-8")
-    return transcript_path
-
-
-def append_to_transcript(
-    transcript_path: Path, step: int, role_name: str, task: str, response_text: str
-) -> None:
-    """Append a step entry to the session transcript file."""
-    entry = (
-        f"## Step {step} - {role_name} AI\n\n"
-        f"**Task:** {task}\n\n"
-        f"**Response:**\n\n{response_text}\n\n---\n"
-    )
-    with transcript_path.open("a", encoding="utf-8") as file:
-        file.write(entry)
+    return "\n\n".join(sections)
 
 
 def truncate_context(text: str, max_chars: int = 2000) -> str:
-    """Truncate text to max_chars. Appends a notice if truncation occurred."""
+    """
+    Return *text* unchanged if it fits within *max_chars*, otherwise
+    truncate and append an ellipsis character.
+    """
     if len(text) <= max_chars:
         return text
-    return (
-        text[:max_chars]
-        + f"\n\n[Response truncated at {max_chars} characters to keep prompt size manageable.]"
+    return text[:max_chars] + "…"
+
+
+# ---------------------------------------------------------------------------
+# File utilities
+# ---------------------------------------------------------------------------
+def read_text_file(path: Path) -> str:
+    """Read a text file, strip whitespace. Returns '' if missing."""
+    try:
+        return path.read_text(encoding="utf-8", errors="replace").strip()
+    except (FileNotFoundError, OSError):
+        return ""
+
+
+def save_report(
+    path: Path,
+    role_name: str,
+    model: str,
+    task: str,
+    response: str,
+) -> None:
+    """Append a role interaction to a markdown report file."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    entry = (
+        f"\n## {role_name}\n"
+        f"**Model:** {model}\n\n"
+        f"**Task:** {task}\n\n"
+        f"**Response:**\n{response}\n"
     )
+    with path.open("a", encoding="utf-8") as fh:
+        fh.write(entry)
+
+
+def start_session_transcript(reports_dir: Path) -> Path:
+    """
+    Create a new timestamped session transcript file with a header.
+    Returns the Path of the newly created file.
+    """
+    reports_dir.mkdir(parents=True, exist_ok=True)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    path      = reports_dir / f"session_{timestamp}.md"
+    path.write_text(
+        f"# Session Transcript\nStarted: {timestamp}\n",
+        encoding="utf-8",
+    )
+    return path
+
+
+def append_to_transcript(
+    path: Path,
+    role_name: str,
+    step: int,
+    task: str,
+    response: str,
+) -> None:
+    """Append one interaction step to an existing transcript file."""
+    entry = (
+        f"\n## Step {step} — {role_name}\n"
+        f"**Task:** {task}\n\n"
+        f"**Response:**\n{response}\n"
+    )
+    with path.open("a", encoding="utf-8") as fh:
+        fh.write(entry)
 
 
 def print_session_summary(
-    step: int, roles_used: list[str], transcript_path: Path
+    transcript_path: Path,
+    step_count: int,
+    role_counts: dict[str, int],
 ) -> None:
-    """Print a formatted session summary showing steps completed, roles used, and transcript path."""
-    role_counts = Counter(roles_used)
-    roles_str = ", ".join(
-        f"{role} ({count})" for role, count in role_counts.items()
-    )
-    print("\n" + f"{Fore.MAGENTA}" + "=" * 42)
-    print(f"{Fore.MAGENTA}Session Summary")
-    print(f"{Fore.MAGENTA}" + "=" * 42)
-    print(f"Steps completed : {step}")
-    print(f"Roles used      : {roles_str if roles_str else 'none'}")
-    print(f"Transcript saved: {transcript_path}")
-    print(f"{Fore.MAGENTA}" + "=" * 42 + "\n")
+    """Print a summary of the completed session to stdout."""
+    print(f"\n{'='*55}")
+    print(f"  Session complete")
+    print(f"  Transcript : {transcript_path.name}")
+    print(f"  Total steps: {step_count}")
+    if step_count == 0:
+        print("  No steps recorded.")
+    else:
+        print("\n  Role usage:")
+        for role, count in role_counts.items():
+            if count > 0:
+                print(f"    {role}: {count} step(s)")
+    print(f"{'='*55}\n")
 
 
-def list_sessions(reports_dir: str = "reports") -> None:
-    """List all past session transcripts in reports/, sorted newest first."""
-    reports_path = Path(reports_dir)
+# ---------------------------------------------------------------------------
+# Colour helpers
+# ---------------------------------------------------------------------------
+COLOURS = {
+    "Builder":    "\033[94m",
+    "Reviewer":   "\033[93m",
+    "Tester":     "\033[92m",
+    "Writer":     "\033[95m",
+    "Editor":     "\033[96m",
+    "QA":         "\033[91m",
+    "Formulator": "\033[94m",
+    "Searcher":   "\033[92m",
+    "Validator":  "\033[93m",
+}
+RESET = "\033[0m"
 
-    if not reports_path.exists():
-        print("No reports folder found. No sessions have been run yet.")
+
+def role_color(role_name: str) -> str:
+    return COLOURS.get(role_name, RESET)
+
+
+def choose_role(mode: str = "coding") -> tuple[str, dict]:
+    """Prompt the user to pick a role and return (role_name, role_config)."""
+    roles      = ALL_MODES[mode]
+    role_names = list(roles.keys())
+
+    print(f"\nSelect a role for {mode} mode:")
+    for i, name in enumerate(role_names, start=1):
+        colour = role_color(name)
+        print(f"  {colour}{i}. {name}{RESET}")
+
+    while True:
+        choice = input("Enter number: ").strip()
+        if choice.isdigit() and 1 <= int(choice) <= len(role_names):
+            name = role_names[int(choice) - 1]
+            return name, roles[name]
+        print(f"Please enter a number between 1 and {len(role_names)}.")
+
+
+# ---------------------------------------------------------------------------
+# Session management
+# ---------------------------------------------------------------------------
+def list_sessions(reports_dir: str = str(REPORTS_DIR)) -> None:
+    """Print all saved session transcript files, newest first."""
+    path = Path(reports_dir)
+    if not path.exists():
+        print("No reports folder found.")
+        return
+    files = sorted(path.glob("session_*.md"), reverse=True)
+    if not files:
+        print("No session transcripts found.")
+        return
+    print(f"\n{'#':<4} {'Filename':<45} {'Size':>8}")
+    print("-" * 60)
+    for i, f in enumerate(files, start=1):
+        print(f"{i:<4} {f.name:<45} {f.stat().st_size:>6} B")
+
+
+def read_session(filename: str, reports_dir: str = str(REPORTS_DIR)) -> None:
+    """Print the contents of a saved session transcript."""
+    path = Path(reports_dir) / filename
+    if not path.exists():
+        print(f"File not found: {filename}. Use --list-sessions to see available files.")
+        return
+    print(f"--- {filename} ---")
+    print(path.read_text(encoding="utf-8"))
+
+
+def delete_session(filename: str, reports_dir: str = str(REPORTS_DIR)) -> None:
+    """Delete a saved session transcript after confirmation."""
+    path = Path(reports_dir) / filename
+    if not path.exists():
+        print(f"File not found: {filename}. Use --list-sessions to see available files.")
+        return
+    confirm = input(f"Delete '{filename}'? [y/N]: ").strip().lower()
+    if confirm == "y":
+        path.unlink()
+        print(f"Deleted: {filename}")
+    else:
+        print("cancelled.")
+
+
+def export_session(filename: str, reports_dir: str = str(REPORTS_DIR)) -> None:
+    """Export a session transcript as a plain-text .txt file in the CWD."""
+    src = Path(reports_dir) / filename
+    if not src.exists():
+        print(f"File not found: {filename}. Use --list-sessions to see available files.")
+        return
+    # Strip markdown and write as .txt
+    raw     = src.read_text(encoding="utf-8")
+    cleaned = re.sub(r"#{1,6}\s*", "", raw)          # remove headings
+    cleaned = re.sub(r"\*\*(.+?)\*\*", r"\1", cleaned)  # remove bold
+    cleaned = re.sub(r"\*(.+?)\*",   r"\1", cleaned)    # remove italic
+    txt_name = Path(filename).stem + ".txt"
+    dest     = Path(reports_dir) / txt_name
+    dest.write_text(cleaned, encoding="utf-8")
+    print(f"Exported to: {dest}")
+
+
+def rename_session(filename: str, reports_dir: str = str(REPORTS_DIR)) -> None:
+    """Rename a session transcript file, appending .md automatically."""
+    src = Path(reports_dir) / filename
+    if not src.exists():
+        print(f"File not found: {filename}. Use --list-sessions to see available files.")
+        return
+    raw_name = input("New filename (without extension): ").strip()
+    if not raw_name:
+        print("Name cannot be empty. Cancelled.")
+        return
+    new_name = raw_name if raw_name.endswith(".md") else raw_name + ".md"
+    dest = Path(reports_dir) / new_name
+    if dest.exists():
+        print(f"A file named '{new_name}' already exists. Cancelled.")
+        return
+    src.rename(dest)
+    print(f"Renamed to: {new_name}")
+
+
+def show_stats(reports_dir: str = str(REPORTS_DIR)) -> None:
+    """Print session statistics for all saved transcripts."""
+    path = Path(reports_dir)
+    if not path.exists():
+        print("No reports folder found.")
+        return
+    files = sorted(path.glob("session_*.md"))
+    if not files:
+        print("No session transcripts found.")
         return
 
-    session_files = sorted(
-        reports_path.glob("session_*.md"),
-        reverse=True,
-    )
-
-    if not session_files:
-        print("No session transcripts found in reports/.")
-        return
-
-    print(f"\nFound {len(session_files)} session transcript(s):\n")
-    for i, f in enumerate(session_files, start=1):
-        print(f"  {i:>3}.  {f.name}")
-    print()
-
-
-def read_session(filename: str, reports_dir: str = "reports") -> None:
-    """Print the contents of a named session transcript to the terminal."""
-    reports_path = Path(reports_dir)
-    session_path = reports_path / filename
-
-    if not session_path.exists():
-        print(f"{Fore.RED}Session file not found: {session_path}")
-        print(f"{Fore.YELLOW}Use --list-sessions to see available transcripts.")
-        return
-
-    content = session_path.read_text(encoding="utf-8")
-    print(f"\n{Fore.MAGENTA}{'=' * 42}")
-    print(f"{Fore.MAGENTA}  Session: {filename}")
-    print(f"{Fore.MAGENTA}{'=' * 42}\n")
-    print(content)
-    print(f"{Fore.MAGENTA}{'=' * 42}\n")
-
-
-def delete_session(filename: str, reports_dir: str = "reports") -> None:
-    """Delete a named session transcript after confirmation."""
-    reports_path = Path(reports_dir)
-    session_path = reports_path / filename
-
-    if not session_path.exists():
-        print(f"{Fore.RED}Session file not found: {session_path}")
-        print(f"{Fore.YELLOW}Use --list-sessions to see available transcripts.")
-        return
-
-    confirm = input(
-        f"{Fore.YELLOW}Delete {filename}? This cannot be undone. Type 'yes' to confirm: "
-    ).strip().lower()
-
-    if confirm != "yes":
-        print(f"{Fore.WHITE}Delete cancelled.")
-        return
-
-    session_path.unlink()
-    print(f"{Fore.GREEN}Deleted: {filename}")
-
-
-def export_session(filename: str, reports_dir: str = "reports") -> None:
-    """Export a session transcript as a plain text file with markdown stripped."""
-    reports_path = Path(reports_dir)
-    session_path = reports_path / filename
-
-    if not session_path.exists():
-        print(f"{Fore.RED}Session file not found: {session_path}")
-        print(f"{Fore.YELLOW}Use --list-sessions to see available transcripts.")
-        return
-
-    content = session_path.read_text(encoding="utf-8")
-
-    plain = content
-    for symbol in ("##", "#", "**", "__", "---", "==="):
-        plain = plain.replace(symbol, "")
-
-    export_filename = Path(filename).stem + ".txt"
-    export_path = reports_path / export_filename
-
-    export_path.write_text(plain.strip(), encoding="utf-8")
-    print(f"{Fore.GREEN}Exported: {export_path}")
-
-
-def show_stats(reports_dir: str = "reports") -> None:
-    """Scan all session transcripts and print summary statistics."""
-    reports_path = Path(reports_dir)
-
-    if not reports_path.exists():
-        print("No reports folder found. No sessions have been run yet.")
-        return
-
-    session_files = sorted(
-        reports_path.glob("session_*.md"),
-        reverse=True,
-    )
-
-    if not session_files:
-        print("No session transcripts found in reports/.")
-        return
-
-    total_sessions = len(session_files)
-    most_recent = session_files[0].name
+    total_size  = 0
     role_counts: dict[str, int] = {}
+    all_role_names = [r for mode_roles in ALL_MODES.values() for r in mode_roles]
+    for role in all_role_names:
+        role_counts[role] = 0
 
-    for session_file in session_files:
-        content = session_file.read_text(encoding="utf-8")
-        for line in content.splitlines():
-            for role in (
-                "Builder", "Reviewer", "Tester",
-                "Writer", "Editor", "QA",
-                "Formulator", "Searcher", "Validator",
-            ):
-                if "## Step" in line and f"{role} AI" in line:
-                    role_counts[role] = role_counts.get(role, 0) + 1
+    for f in files:
+        total_size += f.stat().st_size
+        content     = f.read_text(encoding="utf-8", errors="replace")
+        for role in all_role_names:
+            role_counts[role] += content.count(f"## {role}")
 
-    print(f"\n{Fore.MAGENTA}{'=' * 42}")
-    print(f"{Fore.MAGENTA}  Session Statistics")
-    print(f"{Fore.MAGENTA}{'=' * 42}")
-    print(f"  Total sessions    : {total_sessions}")
-    print(f"  Most recent       : {most_recent}")
-    print(f"  Role usage across all sessions:")
+    print(f"\nTotal sessions    : {len(files)}")
+    print(f"Total size        : {total_size} bytes")
+    print("\nRole usage across all sessions:")
     for role, count in role_counts.items():
-        color = role_color(role)
-        print(f"    {color}{role:<10}: {count} step(s)")
-    if not role_counts:
-        print(f"  No steps recorded.")
-    print(f"{Fore.MAGENTA}{'=' * 42}\n")
+        colour = role_color(role)
+        print(f"  {colour}{role:<14}{RESET}: {count} interaction(s)")
 
 
-def rename_session(filename: str, reports_dir: str = "reports") -> None:
-    """Rename a session transcript file to a user-supplied name."""
-    reports_path = Path(reports_dir)
-    session_path = reports_path / filename
+# ---------------------------------------------------------------------------
+# --list-roles
+# ---------------------------------------------------------------------------
+def list_roles(mode: str = "coding") -> None:
+    """Print each role's prompt file and injected documentation for a mode."""
+    roles = ALL_MODES.get(mode, {})
+    print(f"\n{'='*55}")
+    print(f"  Roles for mode: {mode}")
+    print(f"{'='*55}")
+    for role_name, role_cfg in roles.items():
+        colour    = role_color(role_name)
+        prompt    = Path(role_cfg["prompt"]).relative_to(BASE_DIR)
+        doc_files = DOC_FILES_BY_ROLE.get(role_name, [])
+        doc_names = [d.name for d in doc_files]
+        print(f"\n{colour}{role_name}{RESET}")
+        print(f"  Prompt : {prompt}")
+        print(f"  Docs   : {', '.join(doc_names) if doc_names else 'none'}")
+    print(f"\n{'='*55}\n")
 
-    if not session_path.exists():
-        print(f"{Fore.RED}Session file not found: {session_path}")
-        print(f"{Fore.YELLOW}Use --list-sessions to see available transcripts.")
-        return
 
-    new_name = input(
-        f"{Fore.WHITE}Enter new name for '{filename}' (without extension): "
-    ).strip()
+# ---------------------------------------------------------------------------
+# Main session loop
+# ---------------------------------------------------------------------------
+def main(
+    model_override: str | None = None,
+    dry_run: bool = False,
+    mode: str = "coding",
+    provider: str = "ollama",
+) -> None:
+    """Run an interactive AI session."""
+    session_id   = uuid.uuid4().hex[:8]
+    transcript   = start_session_transcript(REPORTS_DIR)
+    step_count   = 0
+    role_counts: dict[str, int] = {
+        r: 0 for mode_roles in ALL_MODES.values() for r in mode_roles
+    }
 
-    if not new_name:
-        print(f"{Fore.RED}Name cannot be empty. Rename cancelled.")
-        return
+    print(f"\n{'='*55}")
+    print(f"  AI Automation Tool  v{VERSION}")
+    print(f"  Mode    : {mode}")
+    print(f"  Provider: {provider}")
+    print(f"  Session : {session_id}")
+    if dry_run:
+        print("  DRY RUN — AI calls will be skipped")
+    print(f"{'='*55}\n")
 
-    new_filename = new_name + ".md"
-    new_path = reports_path / new_filename
+    # --- Index uploads (RAG) ------------------------------------------------
+    rag_enabled   = False
+    upload_folder = UPLOAD_DIR / mode
+    upload_folder.mkdir(parents=True, exist_ok=True)
 
-    if new_path.exists():
-        print(f"{Fore.RED}A file named '{new_filename}' already exists. Rename cancelled.")
-        return
+    if not dry_run:
+        try:
+            from src import rag as rag_module
+            n_chunks = rag_module.index_uploads(
+                mode=mode,
+                session_id=session_id,
+                upload_base=str(UPLOAD_DIR),
+            )
+            if n_chunks > 0:
+                rag_enabled = True
+                print(f"[RAG] Indexed {n_chunks} chunk(s) from uploads/{mode}/\n")
+        except Exception as exc:  # noqa: BLE001
+            print(f"[RAG] Indexing skipped: {exc}\n")
 
-    session_path.rename(new_path)
-    print(f"{Fore.GREEN}Renamed: {filename} -> {new_filename}")
+    # --- Role selection ------------------------------------------------------
+    role_name, role_cfg = choose_role(mode)
+    colour      = role_color(role_name)
+    prompt_path = Path(role_cfg["prompt"])
 
+    if not prompt_path.exists():
+        print(f"Prompt file not found: {prompt_path}")
+        sys.exit(1)
+
+    role_prompt = prompt_path.read_text(encoding="utf-8", errors="replace")
+    print(f"\n{colour}Starting session as {role_name}{RESET}")
+    print("Type your task below. Press Ctrl+C to end the session.\n")
+
+    previous_response = ""
+
+    try:
+        while True:
+            task = input(f"{colour}{role_name} >{RESET} ").strip()
+            if not task:
+                continue
+
+            context = build_project_context(
+                role_name=role_name,
+                query=task if rag_enabled else "",
+                mode=mode,
+                session_id=session_id,
+            )
+
+            parts = [role_prompt]
+            if context:
+                parts.append(f"## Project Context\n{context}")
+            if previous_response:
+                parts.append(
+                    f"## Previous Response\n{truncate_context(previous_response)}"
+                )
+            parts.append(f"## Task\n{task}")
+            full_prompt = "\n\n".join(parts)
+
+            start = time.time()
+            if dry_run:
+                response = f"[DRY RUN] {role_name} would respond here."
+            else:
+                try:
+                    response = call_ai(
+                        prompt=full_prompt,
+                        provider=provider,
+                        model=model_override,
+                    )
+                except RuntimeError as exc:
+                    response = f"[ERROR] {exc}"
+
+            elapsed = time.time() - start
+            step_count += 1
+            role_counts[role_name] = role_counts.get(role_name, 0) + 1
+
+            print(f"\n{colour}--- {role_name} response ({elapsed:.1f}s) ---{RESET}")
+            print(response)
+            print()
+
+            append_to_transcript(
+                path=transcript,
+                role_name=role_name,
+                step=step_count,
+                task=task,
+                response=response,
+            )
+            previous_response = response
+
+    except KeyboardInterrupt:
+        print(f"\n\n{colour}Session ended.{RESET}")
+
+    finally:
+        print_session_summary(transcript, step_count, role_counts)
+
+        if rag_enabled and not dry_run:
+            try:
+                from src import rag as rag_module
+                rag_module.clear_session(mode=mode, session_id=session_id)
+                print("[RAG] Session collection cleared.")
+            except Exception as exc:  # noqa: BLE001
+                print(f"[RAG] Clear warning: {exc}")
+
+
+# ---------------------------------------------------------------------------
+# CLI
+# ---------------------------------------------------------------------------
 def parse_args() -> argparse.Namespace:
     """Parse command-line arguments."""
     parser = argparse.ArgumentParser(
@@ -599,21 +676,23 @@ def parse_args() -> argparse.Namespace:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=(
             "Examples:\n"
-            "  python src/main.py                        # start a session\n"
-            "  python src/main.py --mode writing         # writing mode\n"
-            "  python src/main.py --mode rct_search      # RCT search mode\n"
-            "  python src/main.py --model llama3.2:3b    # different model\n"
-            "  python src/main.py --provider openai      # use OpenAI\n"
-            "  python src/main.py --list-sessions        # list transcripts\n"
-            "  python src/main.py --list-roles           # show roles and docs\n"
-            "  python src/main.py --list-roles --mode writing\n"
-            "  python src/main.py --dry-run              # simulate session\n"
-            "  python src/main.py --version              # show version\n"
+            "  python src/main.py                           # coding session\n"
+            "  python src/main.py --mode writing            # writing mode\n"
+            "  python src/main.py --mode rct_search         # RCT search mode\n"
+            "  python src/main.py --model llama3.2:3b       # different model\n"
+            "  python src/main.py --provider openai         # use OpenAI\n"
+            "  python src/main.py --list-sessions           # list transcripts\n"
+            "  python src/main.py --list-roles              # show roles/docs\n"
+            "  python src/main.py --list-roles --mode rct_search\n"
+            "  python src/main.py --dry-run                 # simulate session\n"
+            "  python src/main.py --version                 # show version\n"
         ),
     )
     parser.add_argument("--model",          type=str,  default=None)
-    parser.add_argument("--mode",           type=str,  default="coding", choices=["coding", "writing", "rct_search"])
-    parser.add_argument("--provider",       type=str,  default="ollama", choices=["ollama", "openai", "anthropic"])
+    parser.add_argument("--mode",           type=str,  default="coding",
+                        choices=["coding", "writing", "rct_search"])
+    parser.add_argument("--provider",       type=str,  default="ollama",
+                        choices=["ollama", "openai", "anthropic"])
     parser.add_argument("--list-sessions",  action="store_true", default=False)
     parser.add_argument("--read-session",   type=str,  default=None, metavar="FILENAME")
     parser.add_argument("--delete-session", type=str,  default=None, metavar="FILENAME")
@@ -621,149 +700,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--rename-session", type=str,  default=None, metavar="FILENAME")
     parser.add_argument("--stats",          action="store_true", default=False)
     parser.add_argument("--dry-run",        action="store_true", default=False)
-    parser.add_argument("--version",        action="version", version=f"AI Automation Tool v{VERSION}")
+    parser.add_argument("--version",        action="version",
+                        version=f"AI Automation Tool v{VERSION}")
     parser.add_argument("--list-roles",     action="store_true", default=False)
     return parser.parse_args()
-
-
-def main(
-    model_override: str | None = None,
-    dry_run: bool = False,
-    mode: str = DEFAULT_MODE,
-    provider: str = DEFAULT_PROVIDER,
-) -> None:
-    """Run the main interactive AI automation session loop."""
-
-    load_dotenv(PROJECT_ROOT / ".env")
-
-    # Resolve model based on active provider
-    if model_override:
-        model = model_override
-    elif provider == "openai":
-        model = os.getenv("OPENAI_MODEL", "gpt-4o")
-    elif provider == "anthropic":
-        model = os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-6")
-    else:
-        model = os.getenv("OLLAMA_MODEL", DEFAULT_OLLAMA_MODEL)
-
-    host = os.getenv("OLLAMA_HOST", DEFAULT_OLLAMA_HOST)
-
-    print(f"\n{Fore.MAGENTA}{'=' * 42}")
-    print(f"{Fore.MAGENTA}  AI Automation Tool  v{VERSION}")
-    print(f"{Fore.MAGENTA}{'=' * 42}")
-    print(f"  Mode     : {Fore.CYAN}{mode}")
-    print(f"  Provider : {Fore.CYAN}{provider}")
-    print(f"  Model    : {Fore.CYAN}{model}")
-    print(f"{Fore.WHITE}  Host     : {host}")
-    if dry_run:
-        print(f"{Fore.YELLOW}  DRY RUN  : AI will not be called.")
-    print(f"{Fore.MAGENTA}{'=' * 42}")
-    print(f"{Fore.WHITE}  Type 'quit' or 'exit' at any prompt to stop.")
-    print(f"{Fore.MAGENTA}{'=' * 42}\n")
-
-    transcript_path = start_session_transcript(REPORTS_DIR)
-    print(f"Session transcript: {transcript_path}\n")
-
-    step = 0
-    roles_used = []
-    last_response = ""
-
-    while True:
-        role_name, prompt_path, report_path = choose_role(mode=mode)
-
-        role_prompt       = read_text_file(prompt_path)
-        project_context   = build_project_context(role_name=role_name)
-
-        task = input("\nEnter your task for the AI: ").strip()
-
-        if task.lower() in ("quit", "exit"):
-            print("\nGoodbye.")
-            break
-
-        if not task:
-            print("Task cannot be empty. Please try again.")
-            continue
-
-        safety_rules = """
-Safety rules:
-- Do not include secrets, passwords, or API keys.
-- Do not create malware, spyware, keyloggers, credential theft tools, exploit payloads, reverse shells, or unauthorized scanning tools.
-- If a task is unsafe, refuse and suggest a safe defensive alternative.
-"""
-
-        previous_context = (
-            f"\nPrevious AI output:\n\n{truncate_context(last_response)}\n"
-            if last_response
-            else ""
-        )
-
-        full_prompt = f"""
-{role_prompt}
-
-{safety_rules}
-
-Project context:
-
-{project_context}
-
-{previous_context}User task:
-
-{task}
-
-Respond as the {role_name} AI.
-"""
-
-        color = role_color(role_name)
-
-        print(
-            f"\n{color}Sending task to {role_name} AI "
-            f"using {provider} model {model}...\n"
-        )
-
-        if dry_run:
-            response_text = (
-                f"[DRY RUN] Simulated response from {role_name} AI. "
-                f"Provider: {provider}. Model: {model}. Mode: {mode}."
-            )
-        else:
-            try:
-                response_text = call_ai(
-                    model=model,
-                    prompt=full_prompt,
-                    host=host,
-                    provider=provider,
-                )
-            except RuntimeError as error:
-                print(f"\n{Fore.RED}Error: {error}")
-                print(f"{Fore.RED}Please check your provider settings and try again.\n")
-                continue
-
-        step += 1
-        roles_used.append(role_name)
-        last_response = response_text
-
-        print(f"\n{color}AI RESPONSE")
-        print(color + "=" * 60)
-        print(response_text)
-        print(color + "=" * 60)
-
-        save_report(report_path, role_name, model, task, response_text)
-        append_to_transcript(transcript_path, step, role_name, task, response_text)
-
-        print(f"\nSaved response to: {report_path}")
-        print(f"Session transcript updated: {transcript_path}")
-
-        again = (
-            input(
-                "\nSend another task? (yes to continue, anything else to quit): "
-            )
-            .strip()
-            .lower()
-        )
-        if again != "yes":
-            print_session_summary(step, roles_used, transcript_path)
-            print("Goodbye.")
-            break
 
 
 if __name__ == "__main__":
@@ -783,4 +723,9 @@ if __name__ == "__main__":
     elif args.list_roles:
         list_roles(mode=args.mode)
     else:
-        main(model_override=args.model, dry_run=args.dry_run, mode=args.mode, provider=args.provider)
+        main(
+            model_override=args.model,
+            dry_run=args.dry_run,
+            mode=args.mode,
+            provider=args.provider,
+        )
