@@ -46,7 +46,8 @@ Produce a **structured critical appraisal report** covering:
 5. Bias Assessment (selection, performance, detection, attrition, reporting bias)
 6. Applicability (generalisability, target population fit)
 7. Overall Appraisal Verdict (High / Moderate / Low quality / Not appraisable + one-sentence justification)
-Word limit: 1000 words maximum.
+- Section 1 (Plain-Language Summary) must not exceed **200 words**.
+- The full report must not exceed **1500 words** in total.
 
 ### If the user is searching for a CLINICAL TOPIC:
 Produce a **reviewer-format summary** covering:
