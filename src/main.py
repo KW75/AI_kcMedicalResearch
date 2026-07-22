@@ -1,5 +1,5 @@
-"""
-main.py — AI Automation Tool
+﻿"""
+main.py ??AI Automation Tool
 Supports three workflow modes: coding, writing, rct_search.
 Supports three AI providers: ollama (default), openai, anthropic.
 RAG layer: per-session, mode-specific uploads/ folder indexing via rag.py.
@@ -14,6 +14,7 @@ import re
 import sys
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from urllib.request import urlopen  # bare name so tests can patch src.main.urlopen
 import uuid
@@ -101,12 +102,21 @@ ROLE_FILES_APPRAISAL = {
     },
 }
 
+ROLE_FILES_SEARCH = {
+    "Researcher": {
+        "prompt": AI_DIR / "researcher-prompt.md",
+        "report": "researcher-report.md",
+    },
+}
+
+
 
 ALL_MODES: dict[str, dict] = {
     "coding":     ROLE_FILES_CODING,
     "writing":    ROLE_FILES_WRITING,
     "rct_search": ROLE_FILES_RCT_SEARCH,
     "appraisal":  ROLE_FILES_APPRAISAL,
+    "search":     ROLE_FILES_SEARCH,
 }
 
 
@@ -137,6 +147,8 @@ DOC_FILES_BY_ROLE: dict[str, list[Path]] = {
     "Appraiser":     [],  # articles supplied via uploads/appraisal/ RAG only
     "Methodologist": [],  # articles supplied via uploads/appraisal/ RAG only
     "Summariser":    [],  # articles supplied via uploads/appraisal/ RAG only
+    "Researcher":    [],  # context built from live PubMed fetch only
+
 }
 
 # ---------------------------------------------------------------------------
@@ -261,7 +273,7 @@ def call_deepseek_provider(
 ) -> str:
     """Send a prompt to the DeepSeek chat completions endpoint.
     Uses the OpenAI-compatible API at api.deepseek.com.
-    Globally reachable — no geo-restrictions on the API."""
+    Globally reachable ??no geo-restrictions on the API."""
     if not DEEPSEEK_API_KEY:
         raise RuntimeError("DEEPSEEK_API_KEY is not set. Add it to your .env file.")
     model = model or DEEPSEEK_MODEL
@@ -397,7 +409,7 @@ def truncate_context(text: str, max_chars: int = 2000) -> str:
     """
     if len(text) <= max_chars:
         return text
-    return text[:max_chars] + "…"
+    return text[:max_chars] + "\u2026"
 
 
 # ---------------------------------------------------------------------------
@@ -454,7 +466,7 @@ def append_to_transcript(
 ) -> None:
     """Append one interaction step to an existing transcript file."""
     entry = (
-        f"\n## Step {step} — {role_name}\n"
+        f"\n## Step {step} ??{role_name}\n"
         f"**Task:** {task}\n\n"
         f"**Response:**\n{response}\n"
     )
@@ -498,6 +510,7 @@ COLOURS = {
     "Appraiser":     "\033[95m",
     "Methodologist": "\033[96m",
     "Summariser":    "\033[92m",
+    "Researcher": "\033[94m",
 }
 RESET = "\033[0m"
 
@@ -754,6 +767,188 @@ def save_rct_search_links(
     return out_path
 
 
+def fetch_pubmed_articles(
+    query: str,
+    max_results: int = 10,
+) -> list[dict]:
+    """
+    Search PubMed using the NCBI E-utilities API (no API key required).
+    Returns a list of dicts with keys: pmid, title, abstract, url.
+    Returns an empty list on any network or parsing error.
+    """
+    base = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils"
+
+    # Step 1 ??search for PMIDs
+    search_url = (
+        f"{base}/esearch.fcgi?db=pubmed&term={urllib.parse.quote(query)}"
+        f"&retmax={max_results}&retmode=json"
+    )
+    try:
+        with urlopen(search_url, timeout=15) as resp:
+            search_data = json.loads(resp.read())
+        pmids = search_data["esearchresult"]["idlist"]
+    except Exception:  # noqa: BLE001
+        return []
+
+    if not pmids:
+        return []
+
+    # Step 2 ??fetch abstracts for all PMIDs in one call
+    ids_str   = ",".join(pmids)
+    fetch_url = (
+        f"{base}/efetch.fcgi?db=pubmed&id={ids_str}"
+        f"&rettype=abstract&retmode=xml"
+    )
+    try:
+        with urlopen(fetch_url, timeout=15) as resp:
+            xml_data = resp.read().decode("utf-8", errors="replace")
+    except Exception:  # noqa: BLE001
+        return []
+
+    # Parse XML with standard library only ??no lxml or bs4 needed
+    import xml.etree.ElementTree as ET
+    try:
+        root = ET.fromstring(xml_data)
+    except ET.ParseError:
+        return []
+
+    articles = []
+    for article in root.findall(".//PubmedArticle"):
+        pmid_el    = article.find(".//PMID")
+        title_el   = article.find(".//ArticleTitle")
+        abstract_el = article.find(".//AbstractText")
+
+        pmid     = pmid_el.text.strip()     if pmid_el     is not None else "unknown"
+        title    = title_el.text.strip()    if title_el    is not None else "No title"
+        abstract = abstract_el.text.strip() if abstract_el is not None else "No abstract available."
+
+        # Clean any XML character artefacts
+        title    = re.sub(r"\s+", " ", title)
+        abstract = re.sub(r"\s+", " ", abstract)
+
+        articles.append({
+            "pmid":     pmid,
+            "title":    title,
+            "abstract": abstract,
+            "url":      f"https://pubmed.ncbi.nlm.nih.gov/{pmid}/",
+        })
+
+    return articles
+
+def run_search_mode(
+    provider: str = "ollama",
+    model: str | None = None,
+    dry_run: bool = False,
+    ai_dir: Path | None = None,
+    reports_dir: Path | None = None,
+) -> Path:
+
+
+    """
+    Interactive single-pass medical topic search.
+    Fetches PubMed abstracts, sends them to the AI Researcher role,
+    and saves a report to reports/search_{timestamp}.md.
+    Returns the path of the saved report.
+    """
+    prompt_path = (ai_dir or AI_DIR) / "researcher-prompt.md"
+    if not prompt_path.exists():
+        print(f"Researcher prompt not found: {prompt_path}")
+        sys.exit(1)
+
+    researcher_prompt = prompt_path.read_text(encoding="utf-8", errors="replace")
+
+    print("\n" + "=" * 55)
+    print("  MEDICAL SEARCH MODE")
+    print("=" * 55)
+    print("  Enter a medical topic, condition, or question.")
+    print("  PubMed will be searched for the top 10 articles.")
+    print("  A summary report and article links will be saved")
+    print("  to the reports/ folder.")
+    print("=" * 55 + "\n")
+
+    topic = input("Search topic: ").strip()
+    if not topic:
+        print("No topic entered. Exiting.")
+        sys.exit(0)
+
+    print(f"\nSearching PubMed for: {topic}")
+
+    if dry_run:
+        articles = [
+            {
+                "pmid":     "00000001",
+                "title":    "Dry run article title",
+                "abstract": "Dry run abstract content.",
+                "url":      "https://pubmed.ncbi.nlm.nih.gov/00000001/",
+            }
+        ]
+    else:
+        articles = fetch_pubmed_articles(topic)
+
+    if not articles:
+        print("No articles found. Try a different search term.")
+        sys.exit(0)
+
+    print(f"Found {len(articles)} article(s). Generating report...\n")
+
+    # Build context from abstracts
+    abstract_sections = []
+    for i, art in enumerate(articles, start=1):
+        abstract_sections.append(
+            f"### Article {i}: {art['title']}\n"
+            f"PMID: {art['pmid']}\n"
+            f"URL: {art['url']}\n\n"
+            f"{art['abstract']}"
+        )
+    abstracts_text = "\n\n".join(abstract_sections)
+
+    full_prompt = (
+        f"{researcher_prompt}\n\n"
+        f"## Search Topic\n{topic}\n\n"
+        f"## PubMed Abstracts\n\n{abstracts_text}"
+    )
+
+    if dry_run:
+        ai_report = "[DRY RUN] Researcher would generate report here."
+    else:
+        try:
+            ai_report = call_ai(
+                prompt=full_prompt,
+                provider=provider,
+                model=model,
+            )
+        except RuntimeError as exc:
+            ai_report = f"[ERROR generating report: {exc}]"
+
+    # Build link list
+    link_lines = ["## Article Links\n"]
+    for i, art in enumerate(articles, start=1):
+        link_lines.append(
+            f"{i}. [{art['title']}]({art['url']})  \n"
+            f"   PMID: {art['pmid']}"
+        )
+    links_section = "\n".join(link_lines)
+
+    # Save report
+    _reports_dir = reports_dir or REPORTS_DIR
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    out_path  = _reports_dir / f"search_{timestamp}.md"
+    _reports_dir.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(
+        f"# Medical Search Report\n"
+        f"Topic: {topic}\n"
+        f"Generated: {timestamp}\n\n"
+        f"{links_section}\n\n"
+        f"---\n\n"
+        f"## AI Research Summary\n\n"
+        f"{ai_report}\n",
+        encoding="utf-8",
+    )
+
+    print(f"Report saved to: reports\\{out_path.name}")
+    print("Tip: copy any article URL above into --mode appraisal for deeper review.\n")
+    return out_path
+
 
 # ---------------------------------------------------------------------------
 # --list-roles
@@ -798,7 +993,7 @@ def main(
     print(f"  Provider: {provider}")
     print(f"  Session : {session_id}")
     if dry_run:
-        print("  DRY RUN — AI calls will be skipped")
+        print("  DRY RUN ??AI calls will be skipped")
     print(f"{'='*55}\n")
 
     # --- Index uploads (RAG) ------------------------------------------------
@@ -931,8 +1126,11 @@ def parse_args(args: list[str] | None = None) -> argparse.Namespace:
         ),
     )
     parser.add_argument("--model",          type=str,  default=None)
-    parser.add_argument("--mode",   type=str, default="coding",
-                        choices=["coding", "writing", "rct_search", "appraisal"])
+
+    parser.add_argument("--mode", type=str, default="coding",
+                        choices=["coding", "writing", "rct_search",
+                                 "appraisal", "search"])
+  
     parser.add_argument("--report", action="store_true", default=False,
                         help="Generate a summary report from docs/ files (writing mode only)")
     parser.add_argument("--provider",       type=str,  default="ollama",
@@ -971,6 +1169,12 @@ if __name__ == "__main__":
             print("Use: python src/main.py --mode writing --report")
             sys.exit(1)
         generate_writing_report(provider=args.provider, model=args.model)
+    elif args.mode == "search":
+        run_search_mode(
+            provider=args.provider,
+            model=args.model,
+            dry_run=args.dry_run,
+        )
     else:
         if args.mode == "rct_search":
             rct_search_reminder()
@@ -980,4 +1184,3 @@ if __name__ == "__main__":
             mode=args.mode,
             provider=args.provider,
         )
-

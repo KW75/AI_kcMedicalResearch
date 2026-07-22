@@ -3,16 +3,16 @@
 import json
 import urllib.error
 import pytest
+from urllib.error import HTTPError, URLError
 import chromadb
 from pathlib import Path
 from unittest.mock import patch, MagicMock
-from urllib.error import HTTPError, URLError
 from src.main import (
     read_text_file, save_report, build_project_context,
     call_ollama_provider, call_openai_provider, call_anthropic_provider,
     call_deepseek_provider, call_groq_provider,
     call_ai, choose_role, DOC_FILES_BY_ROLE,
-    PROVIDERS, parse_args,
+    PROVIDERS, parse_args, BASE_DIR,
     start_session_transcript, append_to_transcript, print_session_summary,
     truncate_context, list_sessions, read_session, delete_session,
     export_session, rename_session, show_stats, list_roles,
@@ -1573,3 +1573,132 @@ def test_save_rct_search_links_cleans_trailing_punctuation(tmp_path):
     content = result.read_text(encoding="utf-8")
     assert "example.com/search?q=rct" in content
     assert content.count("example.com/search?q=rct,") == 0
+
+# ---------------------------------------------------------------------------
+# fetch_pubmed_articles tests
+# ---------------------------------------------------------------------------
+
+def test_fetch_pubmed_returns_empty_on_network_error():
+    from src.main import fetch_pubmed_articles
+    with patch("src.main.urlopen", side_effect=Exception("network error")):
+        result = fetch_pubmed_articles("hypertension")
+    assert result == []
+
+
+def test_fetch_pubmed_returns_empty_when_no_ids():
+    from src.main import fetch_pubmed_articles
+    search_response = json.dumps(
+        {"esearchresult": {"idlist": []}}
+    ).encode()
+    mock_resp = MagicMock()
+    mock_resp.read.return_value = search_response
+    mock_resp.__enter__ = lambda s: s
+    mock_resp.__exit__ = MagicMock(return_value=False)
+    with patch("src.main.urlopen", return_value=mock_resp):
+        result = fetch_pubmed_articles("xyznotamedicalterm")
+    assert result == []
+
+
+def test_fetch_pubmed_parses_xml_correctly():
+    from src.main import fetch_pubmed_articles
+    search_json = json.dumps(
+        {"esearchresult": {"idlist": ["12345678"]}}
+    ).encode()
+    xml_response = b"""<?xml version="1.0"?>
+    <PubmedArticleSet>
+      <PubmedArticle>
+        <MedlineCitation>
+          <PMID>12345678</PMID>
+          <Article>
+            <ArticleTitle>Test Article Title</ArticleTitle>
+            <Abstract>
+              <AbstractText>This is the abstract text.</AbstractText>
+            </Abstract>
+          </Article>
+        </MedlineCitation>
+      </PubmedArticle>
+    </PubmedArticleSet>"""
+
+    call_count = 0
+    def mock_urlopen(url, timeout=None):
+        nonlocal call_count
+        mock_resp = MagicMock()
+        mock_resp.__enter__ = lambda s: s
+        mock_resp.__exit__ = MagicMock(return_value=False)
+        if call_count == 0:
+            mock_resp.read.return_value = search_json
+        else:
+            mock_resp.read.return_value = xml_response
+        call_count += 1
+        return mock_resp
+
+    with patch("src.main.urlopen", side_effect=mock_urlopen):
+        result = fetch_pubmed_articles("test query")
+
+    assert len(result) == 1
+    assert result[0]["pmid"] == "12345678"
+    assert result[0]["title"] == "Test Article Title"
+    assert result[0]["abstract"] == "This is the abstract text."
+    assert result[0]["url"] == "https://pubmed.ncbi.nlm.nih.gov/12345678/"
+
+
+# ---------------------------------------------------------------------------
+# run_search_mode tests
+# ---------------------------------------------------------------------------
+
+def test_run_search_mode_dry_run_creates_report(tmp_path, monkeypatch):
+    from src.main import run_search_mode
+    ai_dir = tmp_path / "ai"
+    ai_dir.mkdir()
+    (ai_dir / "researcher-prompt.md").write_text("You are a researcher.", encoding="utf-8")
+    monkeypatch.setattr("builtins.input", lambda _: "heart failure treatment")
+    result = run_search_mode(dry_run=True, ai_dir=ai_dir, reports_dir=tmp_path)
+    assert result.exists()
+    content = result.read_text(encoding="utf-8")
+    assert "heart failure treatment" in content
+    assert "Article Links" in content
+    assert "DRY RUN" in content
+
+def test_run_search_mode_empty_topic_exits(monkeypatch):
+    from src.main import run_search_mode
+    monkeypatch.setattr("builtins.input", lambda _: "")
+    with pytest.raises(SystemExit):
+        run_search_mode(dry_run=True)
+
+
+def test_run_search_mode_no_articles_exits(monkeypatch, tmp_path):
+    from src.main import run_search_mode
+    monkeypatch.setattr("src.main.REPORTS_DIR", tmp_path)
+    monkeypatch.setattr("src.main.AI_DIR", Path("ai"))
+    monkeypatch.setattr("builtins.input", lambda _: "xyznotreal")
+    monkeypatch.setattr("src.main.fetch_pubmed_articles", lambda q, max_results=10: [])
+    with pytest.raises(SystemExit):
+        run_search_mode(dry_run=False)
+
+
+# ---------------------------------------------------------------------------
+# search mode registration tests
+# ---------------------------------------------------------------------------
+
+def test_search_mode_in_all_modes():
+    from src.main import ALL_MODES
+    assert "search" in ALL_MODES
+
+
+def test_search_mode_has_researcher_role():
+    from src.main import ALL_MODES
+    assert "Researcher" in ALL_MODES["search"]
+
+
+def test_researcher_in_doc_files_by_role():
+    assert "Researcher" in DOC_FILES_BY_ROLE
+
+
+def test_parse_args_mode_search():
+    args = parse_args(["--mode", "search"])
+    assert args.mode == "search"
+
+
+def test_researcher_colour_defined():
+    from src.main import COLOURS
+    assert "Researcher" in COLOURS
