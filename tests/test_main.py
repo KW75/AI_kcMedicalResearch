@@ -1,13 +1,20 @@
 from __future__ import annotations
 
 import json
+import urllib.error
 import pytest
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 from urllib.error import HTTPError, URLError
 from src.main import (
     read_text_file, save_report, build_project_context,
-    call_ollama_provider, call_ai, choose_role, DOC_FILES_BY_ROLE,
+    call_ollama_provider, call_openai_provider, call_anthropic_provider,
+    call_deepseek_provider, call_groq_provider,
+    call_ai, choose_role, DOC_FILES_BY_ROLE,
+    PROVIDERS, parse_args,
+    start_session_transcript, append_to_transcript, print_session_summary,
+    truncate_context, list_sessions, read_session, delete_session,
+    export_session, rename_session, show_stats, list_roles,
 )
 
 
@@ -1110,3 +1117,108 @@ def test_main_dry_run_rct_search_mode(tmp_path, monkeypatch) -> None:
         except StopIteration:
             pass
     mock_ai.assert_not_called()
+
+# ---------------------------------------------------------------------------
+# DeepSeek provider tests
+# ---------------------------------------------------------------------------
+
+def test_call_deepseek_provider_raises_without_key(monkeypatch):
+    monkeypatch.setattr("src.main.DEEPSEEK_API_KEY", "")
+    with pytest.raises(RuntimeError, match="DEEPSEEK_API_KEY"):
+        call_deepseek_provider("hello")
+
+
+def test_call_deepseek_provider_returns_content(monkeypatch):
+    monkeypatch.setattr("src.main.DEEPSEEK_API_KEY", "test-key")
+    fake = {"choices": [{"message": {"content": "DeepSeek reply"}}]}
+    mock_resp = MagicMock()
+    mock_resp.read.return_value = json.dumps(fake).encode()
+    mock_resp.__enter__ = lambda s: s
+    mock_resp.__exit__ = MagicMock(return_value=False)
+    with patch("src.main.urlopen", return_value=mock_resp):
+        result = call_deepseek_provider("hello", model="deepseek-v4-flash")
+    assert result == "DeepSeek reply"
+
+
+def test_call_deepseek_provider_http_error(monkeypatch):
+    monkeypatch.setattr("src.main.DEEPSEEK_API_KEY", "test-key")
+    with patch("src.main.urlopen", side_effect=urllib.error.HTTPError(
+            None, 401, "Unauthorized", {}, None)):
+        with pytest.raises(RuntimeError, match="DeepSeek HTTP error 401"):
+            call_deepseek_provider("hello")
+
+
+def test_call_deepseek_provider_empty_response(monkeypatch):
+    monkeypatch.setattr("src.main.DEEPSEEK_API_KEY", "test-key")
+    fake = {"choices": []}
+    mock_resp = MagicMock()
+    mock_resp.read.return_value = json.dumps(fake).encode()
+    mock_resp.__enter__ = lambda s: s
+    mock_resp.__exit__ = MagicMock(return_value=False)
+    with patch("src.main.urlopen", return_value=mock_resp):
+        with pytest.raises(RuntimeError, match="empty response"):
+            call_deepseek_provider("hello", model="deepseek-v4-flash")
+
+
+# ---------------------------------------------------------------------------
+# Groq provider tests
+# ---------------------------------------------------------------------------
+
+def test_call_groq_provider_raises_without_key(monkeypatch):
+    monkeypatch.setattr("src.main.GROQ_API_KEY", "")
+    with pytest.raises(RuntimeError, match="GROQ_API_KEY"):
+        call_groq_provider("hello")
+
+
+def test_call_groq_provider_returns_content(monkeypatch):
+    monkeypatch.setattr("src.main.GROQ_API_KEY", "test-key")
+    fake = {"choices": [{"message": {"content": "Groq reply"}}]}
+    mock_resp = MagicMock()
+    mock_resp.read.return_value = json.dumps(fake).encode()
+    mock_resp.__enter__ = lambda s: s
+    mock_resp.__exit__ = MagicMock(return_value=False)
+    with patch("src.main.urlopen", return_value=mock_resp):
+        result = call_groq_provider("hello", model="llama-3.3-70b-versatile")
+    assert result == "Groq reply"
+
+
+def test_call_groq_provider_http_error(monkeypatch):
+    monkeypatch.setattr("src.main.GROQ_API_KEY", "test-key")
+    with patch("src.main.urlopen", side_effect=urllib.error.HTTPError(
+            None, 429, "Too Many Requests", {}, None)):
+        with pytest.raises(RuntimeError, match="Groq HTTP error 429"):
+            call_groq_provider("hello")
+
+
+def test_call_groq_provider_empty_response(monkeypatch):
+    monkeypatch.setattr("src.main.GROQ_API_KEY", "test-key")
+    fake = {"choices": []}
+    mock_resp = MagicMock()
+    mock_resp.read.return_value = json.dumps(fake).encode()
+    mock_resp.__enter__ = lambda s: s
+    mock_resp.__exit__ = MagicMock(return_value=False)
+    with patch("src.main.urlopen", return_value=mock_resp):
+        with pytest.raises(RuntimeError, match="empty response"):
+            call_groq_provider("hello", model="llama-3.3-70b-versatile")
+
+
+# ---------------------------------------------------------------------------
+# Provider registry includes new providers
+# ---------------------------------------------------------------------------
+
+def test_providers_dict_contains_deepseek():
+    assert "deepseek" in PROVIDERS
+
+
+def test_providers_dict_contains_groq():
+    assert "groq" in PROVIDERS
+
+
+def test_parse_args_provider_deepseek():
+    args = parse_args(["--provider", "deepseek"])
+    assert args.provider == "deepseek"
+
+
+def test_parse_args_provider_groq():
+    args = parse_args(["--provider", "groq"])
+    assert args.provider == "groq"

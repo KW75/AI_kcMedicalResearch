@@ -55,6 +55,10 @@ OPENAI_API_KEY      = os.getenv("OPENAI_API_KEY",      "")
 OPENAI_MODEL        = os.getenv("OPENAI_MODEL",        "gpt-4o-mini")
 ANTHROPIC_API_KEY   = os.getenv("ANTHROPIC_API_KEY",   "")
 ANTHROPIC_MODEL     = os.getenv("ANTHROPIC_MODEL",     "claude-sonnet-4-6")
+DEEPSEEK_API_KEY    = os.getenv("DEEPSEEK_API_KEY",  "")
+DEEPSEEK_MODEL      = os.getenv("DEEPSEEK_MODEL",    "deepseek-v4-flash")
+GROQ_API_KEY        = os.getenv("GROQ_API_KEY",      "")
+GROQ_MODEL          = os.getenv("GROQ_MODEL",        "llama-3.3-70b-versatile")
 EMBEDDING_PROVIDER  = os.getenv("EMBEDDING_PROVIDER",  "ollama")
 EMBEDDING_MODEL     = os.getenv("EMBEDDING_MODEL",     "nomic-embed-text")
 
@@ -226,10 +230,95 @@ def call_ollama_provider(
         raise RuntimeError(f"Ollama connection error: {exc.reason}") from exc
 
 
+def call_deepseek_provider(
+    prompt: str,
+    model: str | None = None,
+    max_tokens: int = 2048,
+) -> str:
+    """Send a prompt to the DeepSeek chat completions endpoint.
+    Uses the OpenAI-compatible API at api.deepseek.com.
+    Globally reachable — no geo-restrictions on the API."""
+    if not DEEPSEEK_API_KEY:
+        raise RuntimeError("DEEPSEEK_API_KEY is not set. Add it to your .env file.")
+    model = model or DEEPSEEK_MODEL
+    url   = "https://api.deepseek.com/chat/completions"
+    payload = json.dumps({
+        "model":      model,
+        "messages":   [{"role": "user", "content": prompt}],
+        "max_tokens": max_tokens,
+        "stream":     False,
+    }).encode()
+    req = urllib.request.Request(
+        url,
+        data=payload,
+        headers={
+            "Content-Type":  "application/json",
+            "Authorization": f"Bearer {DEEPSEEK_API_KEY}",
+        },
+        method="POST",
+    )
+    try:
+        with urlopen(req, timeout=60) as resp:
+            data = json.loads(resp.read())
+        choices = data.get("choices", [])
+        if not choices or not choices[0].get("message", {}).get("content"):
+            raise RuntimeError("DeepSeek returned an empty response.")
+        return choices[0]["message"]["content"]
+    except urllib.error.HTTPError as exc:
+        raise RuntimeError(f"DeepSeek HTTP error {exc.code}: {exc.reason}") from exc
+    except urllib.error.URLError as exc:
+        raise RuntimeError(f"DeepSeek connection error: {exc.reason}") from exc
+    except (KeyError, IndexError) as exc:
+        raise RuntimeError(f"DeepSeek unexpected response format: {exc}") from exc
+
+
+def call_groq_provider(
+    prompt: str,
+    model: str | None = None,
+    max_tokens: int = 2048,
+) -> str:
+    """Send a prompt to the Groq inference endpoint.
+    Groq is globally available, fast, and has a free developer tier."""
+    if not GROQ_API_KEY:
+        raise RuntimeError("GROQ_API_KEY is not set. Add it to your .env file.")
+    model = model or GROQ_MODEL
+    url   = "https://api.groq.com/openai/v1/chat/completions"
+    payload = json.dumps({
+        "model":      model,
+        "messages":   [{"role": "user", "content": prompt}],
+        "max_tokens": max_tokens,
+        "stream":     False,
+    }).encode()
+    req = urllib.request.Request(
+        url,
+        data=payload,
+        headers={
+            "Content-Type":  "application/json",
+            "Authorization": f"Bearer {GROQ_API_KEY}",
+        },
+        method="POST",
+    )
+    try:
+        with urlopen(req, timeout=60) as resp:
+            data = json.loads(resp.read())
+        choices = data.get("choices", [])
+        if not choices or not choices[0].get("message", {}).get("content"):
+            raise RuntimeError("Groq returned an empty response.")
+        return choices[0]["message"]["content"]
+    except urllib.error.HTTPError as exc:
+        raise RuntimeError(f"Groq HTTP error {exc.code}: {exc.reason}") from exc
+    except urllib.error.URLError as exc:
+        raise RuntimeError(f"Groq connection error: {exc.reason}") from exc
+    except (KeyError, IndexError) as exc:
+        raise RuntimeError(f"Groq unexpected response format: {exc}") from exc
+
+
 PROVIDERS: dict[str, callable] = {
     "ollama":    call_ollama_provider,
     "openai":    call_openai_provider,
     "anthropic": call_anthropic_provider,
+    "deepseek":  call_deepseek_provider,
+    "groq":      call_groq_provider,
 }
 
 
@@ -669,7 +758,7 @@ def main(
 # ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
-def parse_args() -> argparse.Namespace:
+def parse_args(args: list[str] | None = None) -> argparse.Namespace:
     """Parse command-line arguments."""
     parser = argparse.ArgumentParser(
         description="AI Automation Tool",
@@ -692,7 +781,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--mode",           type=str,  default="coding",
                         choices=["coding", "writing", "rct_search"])
     parser.add_argument("--provider",       type=str,  default="ollama",
-                        choices=["ollama", "openai", "anthropic"])
+                        choices=["ollama", "openai", "anthropic", "deepseek", "groq"])
     parser.add_argument("--list-sessions",  action="store_true", default=False)
     parser.add_argument("--read-session",   type=str,  default=None, metavar="FILENAME")
     parser.add_argument("--delete-session", type=str,  default=None, metavar="FILENAME")
@@ -703,7 +792,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--version",        action="version",
                         version=f"AI Automation Tool v{VERSION}")
     parser.add_argument("--list-roles",     action="store_true", default=False)
-    return parser.parse_args()
+    return parser.parse_args(args)
+
 
 
 if __name__ == "__main__":
