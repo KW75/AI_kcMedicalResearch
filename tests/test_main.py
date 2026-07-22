@@ -3,6 +3,7 @@
 import json
 import urllib.error
 import pytest
+import chromadb
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 from urllib.error import HTTPError, URLError
@@ -1363,3 +1364,112 @@ def test_generate_writing_report_missing_prompt(tmp_path, monkeypatch):
     monkeypatch.setattr("src.main.AI_DIR", tmp_path / "no_ai_dir")
     with pytest.raises(FileNotFoundError, match="writing-report-prompt"):
         generate_writing_report(docs_dir=docs, reports_dir=tmp_path / "reports")
+
+# ---------------------------------------------------------------------------
+# appraisal mode full role set tests
+# ---------------------------------------------------------------------------
+
+def test_appraisal_mode_has_methodologist_role():
+    from src.main import ALL_MODES
+    assert "Methodologist" in ALL_MODES["appraisal"]
+
+
+def test_appraisal_mode_has_summariser_role():
+    from src.main import ALL_MODES
+    assert "Summariser" in ALL_MODES["appraisal"]
+
+
+def test_appraisal_mode_has_three_roles():
+    from src.main import ALL_MODES
+    assert len(ALL_MODES["appraisal"]) == 3
+
+
+def test_appraiser_in_doc_files_by_role():
+    assert "Appraiser" in DOC_FILES_BY_ROLE
+
+
+def test_methodologist_in_doc_files_by_role():
+    assert "Methodologist" in DOC_FILES_BY_ROLE
+
+
+def test_summariser_in_doc_files_by_role():
+    assert "Summariser" in DOC_FILES_BY_ROLE
+
+
+def test_appraiser_colour_defined():
+    from src.main import COLOURS
+    assert "Appraiser" in COLOURS
+
+
+def test_methodologist_colour_defined():
+    from src.main import COLOURS
+    assert "Methodologist" in COLOURS
+
+
+def test_summariser_colour_defined():
+    from src.main import COLOURS
+    assert "Summariser" in COLOURS
+
+
+def test_list_roles_appraisal_shows_all_three(capsys):
+    list_roles(mode="appraisal")
+    out = capsys.readouterr().out
+    assert "Appraiser" in out
+    assert "Methodologist" in out
+    assert "Summariser" in out
+
+
+# ---------------------------------------------------------------------------
+# rag.py code file extension tests
+# ---------------------------------------------------------------------------
+
+
+
+def test_rag_indexes_python_file(tmp_path):
+    from src import rag
+    import chromadb as _chromadb
+    client = _chromadb.Client()
+    rag.set_client(client)
+
+    upload_dir = tmp_path / "uploads" / "coding"
+    upload_dir.mkdir(parents=True)
+    (upload_dir / "example.py").write_text(
+        "def hello():\n    return 'world'\n" * 20,
+        encoding="utf-8",
+    )
+
+    def fake_embeddings(texts):
+        return [[0.1] * 5 for _ in texts]
+
+    with patch.object(rag, "get_embeddings", side_effect=fake_embeddings):
+        count = rag.index_uploads(
+            mode="coding",
+            session_id="testpyfile",
+            upload_base=str(tmp_path / "uploads"),
+        )
+    assert count > 0
+
+
+def test_rag_indexes_json_file(tmp_path):
+    from src import rag
+    import chromadb as _chromadb
+    client = _chromadb.Client()
+    rag.set_client(client)
+
+    upload_dir = tmp_path / "uploads" / "coding"
+    upload_dir.mkdir(parents=True)
+    (upload_dir / "config.json").write_text(
+        '{"key": "value", "items": [1, 2, 3]}' * 30,
+        encoding="utf-8",
+    )
+
+    def fake_embeddings(texts):
+        return [[0.1] * 5 for _ in texts]
+
+    with patch.object(rag, "get_embeddings", side_effect=fake_embeddings):
+        count = rag.index_uploads(
+            mode="coding",
+            session_id="testjsonfile",
+            upload_base=str(tmp_path / "uploads"),
+        )
+    assert count > 0

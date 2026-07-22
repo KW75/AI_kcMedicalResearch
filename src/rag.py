@@ -190,7 +190,12 @@ def index_uploads(mode: str, session_id: str, upload_base: str = "uploads") -> i
 
     files = [
         f for f in folder.iterdir()
-        if f.is_file() and f.suffix.lower() in {".txt", ".md", ".pdf"}
+
+        if f.is_file() and f.suffix.lower() in {
+            ".txt", ".md", ".pdf",
+            ".py", ".js", ".ts", ".html", ".css", ".json", ".yaml", ".yml",
+            ".sh", ".bat", ".ps1", ".sql", ".r", ".R",
+        }
     ]
     if not files:
         return 0

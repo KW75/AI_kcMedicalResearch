@@ -91,6 +91,14 @@ ROLE_FILES_APPRAISAL = {
         "prompt": AI_DIR / "appraisal-prompt.md",
         "report": "appraisal-report.md",
     },
+    "Methodologist": {
+        "prompt": AI_DIR / "methodologist-prompt.md",
+        "report": "methodologist-report.md",
+    },
+    "Summariser": {
+        "prompt": AI_DIR / "summariser-prompt.md",
+        "report": "summariser-report.md",
+    },
 }
 
 
@@ -115,18 +123,20 @@ DOC_FILES_BY_ROLE: dict[str, list[Path]] = {
     "Tester":   [DOCS_CODING / "PRD.md",
                  DOCS_CODING / "architecture.md",
                  DOCS_CODING / "test-strategy.md"],
-    "Writer": [DOCS_WRITING / "project-brief.md",
-               DOCS_WRITING / "style-guide.md"],
-    "Editor": [DOCS_WRITING / "project-brief.md",
-               DOCS_WRITING / "editorial-standards.md"],
-    "QA":     [DOCS_WRITING / "project-brief.md",
-               DOCS_WRITING / "qa-checklist.md"],
+    "Writer":   [DOCS_WRITING / "project-brief.md",
+                 DOCS_WRITING / "style-guide.md"],
+    "Editor":   [DOCS_WRITING / "project-brief.md",
+                 DOCS_WRITING / "editorial-standards.md"],
+    "QA":       [DOCS_WRITING / "project-brief.md",
+                 DOCS_WRITING / "qa-checklist.md"],
     "Formulator": [DOCS_RCT_SEARCH / "pico-framework.md"],
     "Searcher":   [DOCS_RCT_SEARCH / "pico-framework.md",
                    DOCS_RCT_SEARCH / "database-guide.md"],
     "Validator":  [DOCS_RCT_SEARCH / "pico-framework.md",
                    DOCS_RCT_SEARCH / "validation-criteria.md"],
-    "Appraiser":   [],   # articles supplied via uploads/appraisal/ RAG only
+    "Appraiser":     [],  # articles supplied via uploads/appraisal/ RAG only
+    "Methodologist": [],  # articles supplied via uploads/appraisal/ RAG only
+    "Summariser":    [],  # articles supplied via uploads/appraisal/ RAG only
 }
 
 # ---------------------------------------------------------------------------
@@ -485,6 +495,9 @@ COLOURS = {
     "Formulator": "\033[94m",
     "Searcher":   "\033[92m",
     "Validator":  "\033[93m",
+    "Appraiser":     "\033[95m",
+    "Methodologist": "\033[96m",
+    "Summariser":    "\033[92m",
 }
 RESET = "\033[0m"
 
