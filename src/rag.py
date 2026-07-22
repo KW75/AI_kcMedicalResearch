@@ -165,6 +165,46 @@ def _embed_openai(texts: list[str]) -> list[list[float]]:
     except (urllib.error.URLError, urllib.error.HTTPError, KeyError) as exc:
         raise RuntimeError(f"OpenAI embedding failed: {exc}") from exc
 
+def _fetch_url(url: str) -> str:
+    """
+    Fetch a public URL and return its text content with HTML tags stripped.
+    Returns an empty string on any network or parsing error.
+    Respects a 10-second timeout to avoid blocking the session start.
+    """
+    import html
+    import re as _re
+    req = urllib.request.Request(
+        url,
+        headers={"User-Agent": "Mozilla/5.0 (compatible; ai-automation-tool/1.0)"},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            raw = resp.read().decode("utf-8", errors="replace")
+    except Exception:  # noqa: BLE001
+        return ""
+
+    # Strip <script> and <style> blocks first
+    raw = _re.sub(r"(?is)<(script|style)[^>]*>.*?</\1>", "", raw)
+    # Strip all remaining HTML tags
+    raw = _re.sub(r"<[^>]+>", " ", raw)
+    # Decode HTML entities
+    raw = html.unescape(raw)
+    # Collapse whitespace
+    raw = _re.sub(r"\s+", " ", raw).strip()
+    return raw
+
+def _extract_urls(text: str) -> list[str]:
+    """
+    Return all lines in *text* that are bare URLs (start with http:// or
+    https:// and contain no spaces). One URL per line is the expected format.
+    """
+    urls = []
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped.startswith(("http://", "https://")) and " " not in stripped:
+            urls.append(stripped)
+    return urls
+
 
 # ---------------------------------------------------------------------------
 # 3. index_uploads
@@ -210,6 +250,13 @@ def index_uploads(mode: str, session_id: str, upload_base: str = "uploads") -> i
         if not text.strip():
             continue
 
+        # Fetch any bare URLs found in the file and append their content
+        urls = _extract_urls(text)
+        for url in urls:
+            fetched = _fetch_url(url)
+            if fetched.strip():
+                text += f"\n\n[Fetched from {url}]\n{fetched}"
+
         chunks = chunk_text(text)
         if not chunks:
             continue
@@ -224,7 +271,7 @@ def index_uploads(mode: str, session_id: str, upload_base: str = "uploads") -> i
         ]
 
         collection.add(
-            documents=chunks,       # ChromaDB documents must be strings
+            documents=chunks,
             embeddings=embeddings,
             ids=ids,
             metadatas=metadatas,

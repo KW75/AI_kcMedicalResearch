@@ -715,6 +715,44 @@ def rct_search_reminder() -> None:
         sys.exit(0)
 
 
+def save_rct_search_links(
+    response: str,
+    reports_dir: Path = REPORTS_DIR,
+) -> Path:
+    """
+    Extract URLs from an AI response and save them as a markdown link list
+    in reports/rct_search_{timestamp}.md. Returns the path of the saved file.
+    Reminds the user to download the file from the reports/ folder.
+    """
+    import re as _re
+    urls = _re.findall(r'https?://\S+', response)
+    # Clean trailing punctuation that may have been captured
+    urls = [u.rstrip(".,);\"'") for u in urls]
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    out_path  = reports_dir / f"rct_search_{timestamp}.md"
+    reports_dir.mkdir(parents=True, exist_ok=True)
+
+    lines = [
+        "# RCT Search Links",
+        f"Generated: {timestamp}",
+        "",
+        "Download this file from the `reports/` folder.",
+        "",
+        "## Search Result Links",
+        "",
+    ]
+    if urls:
+        for url in urls:
+            lines.append(f"- [{url}]({url})")
+    else:
+        lines.append("_No URLs found in the AI response._")
+
+    out_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    print(f"\n[RCT Search] Links saved to: {out_path.name}")
+    print(f"[RCT Search] Open reports\\{out_path.name} to download your links.\n")
+    return out_path
+
 
 
 # ---------------------------------------------------------------------------
@@ -849,6 +887,11 @@ def main(
                 response=response,
             )
             previous_response = response
+
+            # Save search links to reports/ for rct_search mode
+            if mode == "rct_search" and not dry_run:
+                save_rct_search_links(response=response, reports_dir=REPORTS_DIR)
+
 
     except KeyboardInterrupt:
         print(f"\n\n{colour}Session ended.{RESET}")

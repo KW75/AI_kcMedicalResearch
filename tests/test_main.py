@@ -1473,3 +1473,103 @@ def test_rag_indexes_json_file(tmp_path):
             upload_base=str(tmp_path / "uploads"),
         )
     assert count > 0
+
+# ---------------------------------------------------------------------------
+# URL fetching tests (rag.py)
+# ---------------------------------------------------------------------------
+
+def test_extract_urls_finds_bare_urls():
+    from src.rag import _extract_urls
+    text = "Some text\nhttps://pubmed.ncbi.nlm.nih.gov/12345\nmore text"
+    urls = _extract_urls(text)
+    assert urls == ["https://pubmed.ncbi.nlm.nih.gov/12345"]
+
+
+def test_extract_urls_ignores_inline_urls():
+    from src.rag import _extract_urls
+    text = "See https://example.com for details"
+    urls = _extract_urls(text)
+    assert urls == []
+
+
+def test_extract_urls_empty_text():
+    from src.rag import _extract_urls
+    assert _extract_urls("") == []
+
+
+def test_fetch_url_returns_empty_on_error():
+    from src.rag import _fetch_url
+    with patch("urllib.request.urlopen", side_effect=Exception("network error")):
+        result = _fetch_url("https://example.com")
+    assert result == ""
+
+
+def test_fetch_url_strips_html_tags():
+    from src.rag import _fetch_url
+    html_bytes = b"<html><body><p>Hello world</p></body></html>"
+    mock_resp = MagicMock()
+    mock_resp.read.return_value = html_bytes
+    mock_resp.__enter__ = lambda s: s
+    mock_resp.__exit__ = MagicMock(return_value=False)
+    with patch("urllib.request.urlopen", return_value=mock_resp):
+        result = _fetch_url("https://example.com")
+    assert "Hello world" in result
+    assert "<p>" not in result
+
+
+def test_index_uploads_fetches_urls_in_txt_file(tmp_path):
+    from src import rag
+    import chromadb as _chromadb
+    client = _chromadb.Client()
+    rag.set_client(client)
+
+    upload_dir = tmp_path / "uploads" / "appraisal"
+    upload_dir.mkdir(parents=True)
+    (upload_dir / "links.txt").write_text(
+        "https://pubmed.ncbi.nlm.nih.gov/12345\n",
+        encoding="utf-8",
+    )
+
+    def fake_embeddings(texts):
+        return [[0.1] * 5 for _ in texts]
+
+    with patch.object(rag, "_fetch_url", return_value="Fetched article content " * 20), \
+         patch.object(rag, "get_embeddings", side_effect=fake_embeddings):
+        count = rag.index_uploads(
+            mode="appraisal",
+            session_id="testurlfile",
+            upload_base=str(tmp_path / "uploads"),
+        )
+    assert count > 0
+
+
+# ---------------------------------------------------------------------------
+# save_rct_search_links tests
+# ---------------------------------------------------------------------------
+
+def test_save_rct_search_links_creates_file(tmp_path):
+    from src.main import save_rct_search_links
+    response = "Search here: https://pubmed.ncbi.nlm.nih.gov/search?term=rct"
+    result = save_rct_search_links(response=response, reports_dir=tmp_path)
+    assert result.exists()
+    content = result.read_text(encoding="utf-8")
+    assert "pubmed" in content
+    assert "RCT Search Links" in content
+
+
+def test_save_rct_search_links_no_urls(tmp_path):
+    from src.main import save_rct_search_links
+    response = "No links in this response."
+    result = save_rct_search_links(response=response, reports_dir=tmp_path)
+    assert result.exists()
+    content = result.read_text(encoding="utf-8")
+    assert "No URLs found" in content
+
+
+def test_save_rct_search_links_cleans_trailing_punctuation(tmp_path):
+    from src.main import save_rct_search_links
+    response = "See https://example.com/search?q=rct, for details."
+    result = save_rct_search_links(response=response, reports_dir=tmp_path)
+    content = result.read_text(encoding="utf-8")
+    assert "example.com/search?q=rct" in content
+    assert content.count("example.com/search?q=rct,") == 0
