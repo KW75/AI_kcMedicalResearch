@@ -205,15 +205,31 @@ python src\main.py --mode search --provider groq</pre>
   <div class="section-label">What it does</div>
   <table>
     <tr><th>Role</th><th>Purpose</th></tr>
-    <tr><td>Appraiser</td><td>Critical appraisal: study design, bias, validity, applicability</td></tr>
-    <tr><td>Methodologist</td><td>Detailed methodological checklist: sampling, randomisation, blinding, stats</td></tr>
-    <tr><td>Summariser</td><td>Plain-language summary (≤150 words), key-findings table, evidence grade</td></tr>
+    <tr><td>Appraiser</td><td>7-section critical appraisal: study design, PICO, methodology, results, bias, applicability, verdict</td></tr>
+    <tr><td>Methodologist</td><td>RoB 2 / CASP / AMSTAR 2 scoring; GRADE evidence quality rating</td></tr>
+    <tr><td>Summariser</td><td>Plain-language summary (&le;150 words), key-findings table, evidence grade</td></tr>
   </table>
-  <div class="section-label">Input — place articles here before starting</div>
+  <div class="section-label">7-Section Report Structure (&le;1500 words total)</div>
+  <table>
+    <tr><th>#</th><th>Section</th><th>Word limit</th></tr>
+    <tr><td>1</td><td>Study Details</td><td>&le;100</td></tr>
+    <tr><td>2</td><td>PICO</td><td>&le;150</td></tr>
+    <tr><td>3</td><td>Methodology</td><td>&le;250</td></tr>
+    <tr><td>4</td><td>Results</td><td>&le;300</td></tr>
+    <tr><td>5</td><td>Risk of Bias</td><td>&le;250</td></tr>
+    <tr><td>6</td><td>Clinical Applicability</td><td>&le;200</td></tr>
+    <tr><td>7</td><td>Overall Judgement</td><td>&le;150</td></tr>
+  </table>
+  <div class="section-label">Scoring Tools</div>
+  <span class="pill pill-orange">RoB 2 &mdash; RCTs</span>
+  <span class="pill pill-orange">CASP &mdash; Observational</span>
+  <span class="pill pill-orange">AMSTAR 2 &mdash; Systematic Reviews</span>
+  <span class="pill pill-orange">GRADE &mdash; Evidence Quality</span>
+  <div class="section-label" style="margin-top:12px">Input &mdash; place articles here before starting</div>
   <table>
     <tr><th>Folder</th><th>File types</th></tr>
-    <tr><td><code>uploads/appraisal/</code></td><td>.pdf .txt .md — also bare URLs</td></tr>
-    <tr><td><code>docs/appraisal/</code></td><td>Any reference documents</td></tr>
+    <tr><td><code>uploads/appraisal/</code></td><td>.pdf .txt .md &mdash; also bare URLs</td></tr>
+    <tr><td><code>docs/appraisal/</code></td><td>appraisal-guide.md, scoring-criteria.md</td></tr>
   </table>
   <div class="info">&#128161; Works best with PDF articles from Search mode. Download PDFs, place in uploads/appraisal/, then run appraisal.</div>
   <div class="section-label">Run</div>
