@@ -1,28 +1,29 @@
-﻿# Editorial Standards
+# Editorial Standards
 
-## What the Editor AI reviews
+## Accuracy
+- All factual claims verified against at least one peer-reviewed source.
+- Statistics reproduced verbatim from the original paper; do not round further.
+- Dates, dosages, and drug names cross-checked for correctness.
 
-### Structure
-- Does the content follow a clear logical flow?
-- Is the opening strong — does it state the purpose immediately?
-- Does each section serve the overall goal?
-- Is the conclusion clear and actionable?
+## Structure and Completeness
+- Report must contain: Introduction, Methods summary, Results, Discussion, Conclusion.
+- Word limits: full report ≤ 1500 words; abstract/summary ≤ 300 words.
+- All section headings present before submission to Editor role.
 
-### Clarity
-- Are sentences concise and unambiguous?
-- Has jargon been explained or removed?
-- Are transitions between sections smooth?
+## Consistency
+- Consistent terminology throughout (choose one spelling/abbreviation and stick to it).
+- Figures and tables referenced in the body text before they appear.
+- Reference list formatted consistently in the chosen style.
 
-### Consistency
-- Is terminology used consistently throughout?
-- Does the tone remain consistent from start to finish?
-- Are formatting conventions applied uniformly?
+## Ethical Considerations
+- No fabricated citations; if a source cannot be verified, flag it with [UNVERIFIED].
+- Disclose AI involvement at the foot of any public-facing document.
+- Do not reproduce more than 150 consecutive words from a single copyrighted source.
 
-### Alignment with brief
-- Does the content address the audience defined in project-brief.md?
-- Does it achieve the goal stated in project-brief.md?
-- Does it stay within the defined scope?
-
-## What the Editor AI does not change
-- Factual content — that is the QA AI's responsibility
-- The Writer's structural choices unless they conflict with the brief
+## QA Checklist (applied by QA role)
+- [ ] Spelling and grammar checked
+- [ ] Word count within limit
+- [ ] All citations present and formatted correctly
+- [ ] Headings hierarchy logical (H1 > H2 > H3)
+- [ ] Plain-language summary included for public-facing output
+- [ ] Disclosure statement present

@@ -1,19 +1,19 @@
-﻿# Project Brief
+# Writing Project Brief
 
-## What is being written
-[Describe the document, article, report, or content being produced.]
+## Purpose
+This file tells the Writer role what to produce.
+Fill in one section per writing job, then run:
+    python src/main.py --mode writing
 
-## Audience
-[Who will read this content — their background, expectations, and level of expertise.]
+## Fields
+- **Topic / Title**: [e.g. "Effect of metformin on HbA1c in type 2 diabetes — plain-language summary"]
+- **Target audience**: [e.g. "General public", "Clinicians", "Policy makers"]
+- **Desired format**: [e.g. "1500-word narrative review", "250-word abstract", "blog post"]
+- **Key message**: [The single most important take-away]
+- **Sources / references**: [List DOIs or paste abstracts below this line]
 
-## Goal
-[What should the reader understand, feel, or do after reading this content.]
-
-## Scope
-[What is included. What is explicitly out of scope.]
-
-## Deliverables
-[List the specific outputs expected — e.g. a 1000-word article, a two-page report.]
-
-## Deadline and constraints
-[Any time, length, format, or platform constraints.]
+## Current Job
+Topic: (replace this line)
+Audience: (replace this line)
+Format: (replace this line)
+Key message: (replace this line)

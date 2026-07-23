@@ -1,21 +1,27 @@
-﻿# Style Guide
+# Writing Style Guide
 
-## Tone of voice
-[Describe the desired tone — e.g. professional but approachable, authoritative, conversational.]
+## Voice and Tone
+- Use plain, accessible English; avoid jargon unless the audience is clinical.
+- Active voice preferred; passive permitted when the subject is unknown.
+- Sentence length: aim for 15–25 words on average.
+- Avoid hyperbole ("revolutionary", "breakthrough") unless directly supported by data.
 
-## Vocabulary
-- Prefer plain language over jargon
-- Define technical terms on first use
-- Avoid filler phrases — e.g. 'it is worth noting that', 'as mentioned above'
+## Medical Accuracy
+- Every clinical claim must cite a source (author-date or numbered reference).
+- Spell out drug names in full on first use; generic name first, brand name in parentheses.
+- State effect sizes and confidence intervals wherever possible, not just p-values.
+- Include the study design when describing evidence (e.g. "In a double-blind RCT…").
 
-## Formatting rules
-- Use sentence case for headings
-- Bullet points for lists of three or more items
-- Maximum paragraph length: four sentences
-- Use active voice by default
+## Structure
+- Use headings (##, ###) to break text into logical sections.
+- Each section should open with a topic sentence.
+- Conclude with a summary or "key take-aways" bullet list.
 
-## Terminology preferences
-[List any project-specific preferred terms or terms to avoid.]
+## Plain-Language Principles (for public-facing output)
+- Replace "myocardial infarction" → "heart attack".
+- Replace "hypertension" → "high blood pressure".
+- Define any retained technical term in parentheses on first use.
 
-## Examples of good writing in this style
-[Optionally paste one or two short examples that demonstrate the desired style.]
+## Referencing
+- Academic: Vancouver numbered style.
+- Public-facing: hyperlinked author-date in-text citations.
