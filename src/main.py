@@ -802,6 +802,40 @@ def _read_code_files(docs_coding: Path) -> list[dict]:
     return results
 
 
+
+ARTICLE_EXTENSIONS = {".txt", ".md", ".pdf", ".docx"}
+ARTICLE_SIZE_LIMIT = 8000
+
+def _read_article_files(uploads_appraisal):
+    results = []
+    if not uploads_appraisal.exists():
+        return results
+    for f in sorted(uploads_appraisal.iterdir()):
+        if f.suffix.lower() not in ARTICLE_EXTENSIONS:
+            continue
+        try:
+            if f.suffix.lower() == ".pdf":
+                text = _read_pdf_pymupdf(f)
+            elif f.suffix.lower() == ".docx":
+                text = _read_docx(f)
+            else:
+                text = f.read_text(encoding="utf-8", errors="replace")
+            if not text.strip():
+                continue
+            if len(text) <= ARTICLE_SIZE_LIMIT:
+                results.append({"name": f.name, "content": text})
+            else:
+                print(f"[Appraisal] {f.name} exceeds {ARTICLE_SIZE_LIMIT} chars - passed to RAG.")
+        except Exception as exc:
+            print(f"[Appraisal] Could not read {f.name}: {exc}")
+    return results
+
+
+def _read_topic_file(topic_path):
+    if not topic_path.exists():
+        return ""
+    return topic_path.read_text(encoding="utf-8", errors="replace").strip()
+
 def generate_code_revision(
     start_role: str = "Builder",
     docs_dir: Path = DOCS_CODING,
@@ -939,7 +973,13 @@ def run_rct_search_pipeline(
     print("=" * 55 + "\n")
 
     # Get research topic from user at runtime
-    topic = input("Enter your research topic: ").strip()
+    topic_file = DOCS_RCT_SEARCH / "topic.md"
+    file_topic = _read_topic_file(topic_file)
+    if file_topic:
+        topic = file_topic
+        print(f"[RCT Search] Topic loaded from docs/rct_search/topic.md: {topic}")
+    else:
+        topic = input("Enter your research topic: ").strip()
     if not topic:
         print("No topic entered. Exiting.")
         import sys; sys.exit(0)
@@ -1250,21 +1290,34 @@ def run_search_mode(
 
     # ── Runtime search type prompt ──────────────────────────────────
     print("What are you searching for?")
-    print("  [1] A research paper (generates critical appraisal report)")
-    print("  [2] A clinical topic  (generates reviewer-format summary)")
-    while True:
-        search_type = input("Enter 1 or 2: ").strip()
-        if search_type in ("1", "2"):
-            break
-        print("  Please enter 1 or 2.")
-    is_paper_search = search_type == "1"
-
-    if is_paper_search:
-        topic = input("Paper title, author, or PMID: ").strip()
-    else:
-        topic = input("Clinical topic: ").strip()
-    if not topic:
-        print("No topic entered. Exiting.")
+    search_topic_file = BASE_DIR / "docs" / "search" / "topic.md"
+    file_lines = _read_topic_file(search_topic_file).splitlines()
+    loaded_from_file = False
+    if len(file_lines) >= 2:
+        ftype = file_lines[0].strip().lower()
+        fquery = file_lines[1].strip()
+        if ftype in ("paper", "topic") and fquery:
+            is_paper_search = ftype == "paper"
+            topic = fquery
+            search_type_label = "RESEARCH PAPER" if is_paper_search else "CLINICAL TOPIC"
+            label = "research paper" if is_paper_search else "clinical topic"
+            print(f"[Search] Loaded from docs/search/topic.md: {label} - {topic}")
+            loaded_from_file = True
+    if not loaded_from_file:
+        print("  [1] A research paper (generates critical appraisal report)")
+        print("  [2] A clinical topic  (generates reviewer-format summary)")
+        while True:
+            search_type = input("Enter 1 or 2: ").strip()
+            if search_type in ("1", "2"):
+                break
+            print("  Please enter 1 or 2.")
+        is_paper_search = search_type == "1"
+        if is_paper_search:
+            topic = input("Paper title, author, or PMID: ").strip()
+        else:
+            topic = input("Clinical topic: ").strip()
+        if not topic:
+            print("No topic entered. Exiting.")
         sys.exit(0)
 
     print(f"\nSearching PubMed for: {topic}")
@@ -1428,6 +1481,20 @@ def main(
 
     previous_response = ""
 
+    article_context = ""
+    if mode == "appraisal":
+        articles = _read_article_files(UPLOADS_APPRAISAL)
+        if articles:
+            parts_art = []
+            for art in articles:
+                name_key = "name"
+                content_key = "content"
+                parts_art.append(f"### Article: {art[name_key]}\n{art[content_key]}")
+            article_context = "\n\n".join(parts_art)
+            print(f"[Appraisal] {len(articles)} article(s) loaded directly into context.")
+        else:
+            print("[Appraisal] No articles in uploads/appraisal/ - using RAG only.")
+
     try:
         while True:
             task = input(f"{colour}{role_name} >{RESET} ").strip()
@@ -1442,6 +1509,8 @@ def main(
             )
 
             parts = [role_prompt]
+            if mode == "appraisal" and article_context:
+                parts.append(f"## Articles for Appraisal\n{article_context}")
             if context:
                 parts.append(f"## Project Context\n{context}")
             if previous_response:

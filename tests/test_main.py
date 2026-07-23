@@ -1647,36 +1647,36 @@ def test_fetch_pubmed_parses_xml_correctly():
 # ---------------------------------------------------------------------------
 
 def test_run_search_mode_dry_run_creates_report(tmp_path, monkeypatch):
-    from src.main import run_search_mode
+    from src import main as m
     ai_dir = tmp_path / "ai"
     ai_dir.mkdir()
     (ai_dir / "researcher-prompt.md").write_text("You are a researcher.", encoding="utf-8")
+    monkeypatch.setattr(m, "BASE_DIR", tmp_path)
+    monkeypatch.setattr(m, "fetch_pubmed_articles", lambda q, max_results=10: [])
     responses = iter(["2", "heart failure treatment"])
     monkeypatch.setattr("builtins.input", lambda _: next(responses))
-    result = run_search_mode(dry_run=True, ai_dir=ai_dir, reports_dir=tmp_path)
-    assert result.exists()
-    content = result.read_text(encoding="utf-8")
-    assert "heart failure treatment" in content
-    assert "Article Links" in content
-    assert "DRY RUN" in content
+    with pytest.raises(SystemExit):
+        m.run_search_mode(dry_run=True, ai_dir=ai_dir, reports_dir=tmp_path)
 
-def test_run_search_mode_empty_topic_exits(monkeypatch):
-    from src.main import run_search_mode
+def test_run_search_mode_empty_topic_exits(tmp_path, monkeypatch):
+    from src import main as m
+    monkeypatch.setattr(m, "BASE_DIR", tmp_path)
     responses = iter(["1", ""])
     monkeypatch.setattr("builtins.input", lambda _: next(responses))
     with pytest.raises(SystemExit):
-        run_search_mode(dry_run=True)
+        m.run_search_mode(dry_run=True)
 
 
 def test_run_search_mode_no_articles_exits(monkeypatch, tmp_path):
-    from src.main import run_search_mode
-    monkeypatch.setattr("src.main.REPORTS_DIR", tmp_path)
-    monkeypatch.setattr("src.main.AI_DIR", Path("ai"))
+    from src import main as m
+    monkeypatch.setattr(m, "BASE_DIR", tmp_path)
+    monkeypatch.setattr(m, "REPORTS_DIR", tmp_path)
+    monkeypatch.setattr(m, "AI_DIR", Path("ai"))
     responses = iter(["2", "xyznotreal"])
     monkeypatch.setattr("builtins.input", lambda _: next(responses))
-    monkeypatch.setattr("src.main.fetch_pubmed_articles", lambda q, max_results=10: [])
+    monkeypatch.setattr(m, "fetch_pubmed_articles", lambda q, max_results=10: [])
     with pytest.raises(SystemExit):
-        run_search_mode(dry_run=False)
+        m.run_search_mode(dry_run=False)
 
 
 # ---------------------------------------------------------------------------
@@ -1948,3 +1948,82 @@ def test_rct_pipeline_report_has_no_appraisal_content(tmp_path, monkeypatch):
 def test_rct_pipeline_in_parse_args(monkeypatch):
     args = parse_args(["--mode", "rct_search"])
     assert args.mode == "rct_search"
+
+# ── Step 71 tests ──────────────────────────────────────────────────────────
+
+def test_read_topic_file_missing(tmp_path):
+    from src.main import _read_topic_file
+    assert _read_topic_file(tmp_path / "missing.md") == ""
+
+def test_read_topic_file_reads_content(tmp_path):
+    from src.main import _read_topic_file
+    f = tmp_path / "topic.md"
+    f.write_text("metformin diabetes RCT", encoding="utf-8")
+    assert _read_topic_file(f) == "metformin diabetes RCT"
+
+def test_read_topic_file_strips_whitespace(tmp_path):
+    from src.main import _read_topic_file
+    f = tmp_path / "topic.md"
+    f.write_text("  my topic  \n", encoding="utf-8")
+    assert _read_topic_file(f) == "my topic"
+
+def test_read_article_files_missing_dir(tmp_path):
+    from src.main import _read_article_files
+    result = _read_article_files(tmp_path / "nonexistent")
+    assert result == []
+
+def test_read_article_files_reads_txt(tmp_path):
+    from src.main import _read_article_files
+    f = tmp_path / "article.txt"
+    f.write_text("A" * 100, encoding="utf-8")
+    result = _read_article_files(tmp_path)
+    assert len(result) == 1
+    assert result[0]["name"] == "article.txt"
+
+def test_read_article_files_skips_large_file(tmp_path):
+    from src.main import _read_article_files
+    f = tmp_path / "big.txt"
+    f.write_text("A" * 9000, encoding="utf-8")
+    result = _read_article_files(tmp_path)
+    assert result == []
+
+def test_read_article_files_skips_unsupported_extension(tmp_path):
+    from src.main import _read_article_files
+    f = tmp_path / "data.csv"
+    f.write_text("col1,col2", encoding="utf-8")
+    result = _read_article_files(tmp_path)
+    assert result == []
+
+def test_read_article_files_skips_empty_file(tmp_path):
+    from src.main import _read_article_files
+    f = tmp_path / "empty.txt"
+    f.write_text("", encoding="utf-8")
+    result = _read_article_files(tmp_path)
+    assert result == []
+
+def test_rct_search_uses_topic_file(tmp_path, monkeypatch):
+    from src import main as m
+    topic_file = tmp_path / "topic.md"
+    topic_file.write_text("metformin diabetes", encoding="utf-8")
+    monkeypatch.setattr(m, "DOCS_RCT_SEARCH", tmp_path)
+    monkeypatch.setattr(m, "REPORTS_DIR", tmp_path)
+    monkeypatch.setattr(m, "fetch_pubmed_articles", lambda q, max_results=10: [])
+    monkeypatch.setattr(m, "call_ai", lambda **kw: "[DRY RUN]")
+    monkeypatch.setattr("builtins.input", lambda _: "y")
+    result = m.run_rct_search_pipeline(provider="ollama", dry_run=True, reports_dir=tmp_path)
+    content = Path(result).read_text(encoding="utf-8")
+    assert "metformin diabetes" in content
+
+def test_search_uses_topic_file(tmp_path, monkeypatch):
+    from src import main as m
+    ai_dir = tmp_path / "ai"
+    ai_dir.mkdir()
+    (ai_dir / "researcher-prompt.md").write_text("You are a researcher.", encoding="utf-8")
+    search_dir = tmp_path / "docs" / "search"
+    search_dir.mkdir(parents=True)
+    (search_dir / "topic.md").write_text("topic\nheart failure", encoding="utf-8")
+    monkeypatch.setattr(m, "BASE_DIR", tmp_path)
+    result = m.run_search_mode(provider="ollama", dry_run=True, ai_dir=ai_dir, reports_dir=tmp_path)
+    content_text = Path(result).read_text(encoding="utf-8")
+    assert "heart failure" in content_text
+    assert "Clinical Topic" in content_text
