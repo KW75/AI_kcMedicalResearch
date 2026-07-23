@@ -1,10 +1,9 @@
-@'
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>AI kcMedical Research — Help Guide</title>
+<title>AI kcMedical Research - Help Guide</title>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 body{font-family:"Segoe UI",Arial,sans-serif;background:#0f172a;color:#e2e8f0;min-height:100vh;padding:32px 20px}
@@ -73,7 +72,7 @@ footer{text-align:center;margin-top:48px;font-size:.76rem;color:#475569}
     <tr><td>Reviewer</td><td>Reviews code quality, security, and best practices</td></tr>
     <tr><td>Tester</td><td>Generates pytest test cases for your code</td></tr>
   </table>
-  <div class="section-label">Input — place files here before starting</div>
+  <div class="section-label">Input - place files here before starting</div>
   <table>
     <tr><th>Folder</th><th>File types</th></tr>
     <tr><td><code>uploads/coding/</code></td><td>.py .js .ts .json .yaml .md .txt</td></tr>
@@ -111,7 +110,7 @@ python src\main.py --dry-run</pre>
   <div class="section-label">Input</div>
   <table>
     <tr><th>Folder</th><th>File types</th></tr>
-    <tr><td><code>uploads/writing/</code></td><td>.txt .md .pdf — also bare URLs (fetched automatically)</td></tr>
+    <tr><td><code>uploads/writing/</code></td><td>.txt .md .pdf - also bare URLs (fetched automatically)</td></tr>
     <tr><td><code>docs/writing/</code></td><td>project-brief.md, style-guide.md, editorial-standards.md</td></tr>
   </table>
   <div class="section-label">Run</div>
@@ -143,14 +142,14 @@ python src\main.py --mode writing --provider openai</pre>
     <tr><td>Searcher</td><td>Generates database-specific search strings (PubMed, Embase, etc.)</td></tr>
     <tr><td>Validator</td><td>Validates strategy against inclusion/exclusion criteria</td></tr>
   </table>
-  <div class="section-label">Input — edit before running</div>
+  <div class="section-label">Input - edit before running</div>
   <table>
     <tr><th>File</th><th>Action required</th></tr>
     <tr><td><code>docs/rct_search/pico-framework.md</code></td><td>&#9888; Edit with your PICO before running</td></tr>
     <tr><td><code>docs/rct_search/database-guide.md</code></td><td>Database-specific syntax guide</td></tr>
     <tr><td><code>docs/rct_search/validation-criteria.md</code></td><td>Inclusion/exclusion criteria</td></tr>
   </table>
-  <div class="warn">&#9888; Edit pico-framework.md before every new review — the tool will remind you at startup.</div>
+  <div class="warn">&#9888; Edit pico-framework.md before every new review - the tool will remind you at startup.</div>
   <div class="section-label">Run</div>
   <pre>python src\main.py --mode rct_search
 python src\main.py --mode rct_search --provider deepseek</pre>
@@ -169,19 +168,28 @@ python src\main.py --mode rct_search --provider deepseek</pre>
 <div class="card-body">
   <div class="section-label">Roles</div>
   <span class="pill pill-blue">&#128203; Researcher</span>
-  <div class="section-label">What it does</div>
-  <p style="font-size:.82rem;color:#cbd5e1;margin-bottom:12px;">Prompts for a medical topic, fetches up to 10 PubMed articles via NCBI E-utilities (no API key required), and generates a structured evidence report with article links.</p>
+  <div class="section-label">Two search types</div>
   <table>
-    <tr><th>Section</th><th>Content</th></tr>
-    <tr><td>Overview</td><td>What is currently known about the topic</td></tr>
-    <tr><td>Key findings</td><td>Summary table of retrieved articles</td></tr>
-    <tr><td>Research gaps</td><td>Identified gaps in current evidence</td></tr>
-    <tr><td>Clinical relevance</td><td>Practice implications</td></tr>
-    <tr><td>Article links</td><td>Numbered PubMed URLs for download</td></tr>
+    <tr><th>Type</th><th>Use when</th><th>Output sections</th></tr>
+    <tr><td><strong>1 - Research Paper</strong></td><td>You have a title, author, or PMID</td><td>Identification, Best Match, Relevance Assessment, Further Results</td></tr>
+    <tr><td><strong>2 - Clinical Topic</strong></td><td>You want a summary of current evidence</td><td>Search Strategy, Evidence Summary, Clinical Implications, Reference List</td></tr>
   </table>
-  <div class="section-label">Input</div>
-  <p style="font-size:.82rem;color:#cbd5e1;margin-bottom:12px;">Interactive prompt — type your medical topic when asked. No files required.</p>
-  <div class="section-label">Run</div>
+  <div class="section-label">How to choose</div>
+  <p style="font-size:.82rem;color:#cbd5e1;margin-bottom:12px;">At startup the tool asks:<br><em>What are you searching for?<br>[1] A research paper &nbsp; [2] A clinical topic</em><br>Enter 1 or 2. Or pre-load via file (see below).</p>
+  <div class="section-label">File-based input (optional - skips interactive prompt)</div>
+  <p style="font-size:.82rem;color:#cbd5e1;margin-bottom:6px;">Create <code>docs/search/topic.md</code> with exactly two lines:</p>
+  <pre>paper
+Aspirin low dose myocardial infarction prevention</pre>
+  <p style="font-size:.82rem;color:#cbd5e1;margin-top:-8px;margin-bottom:6px;">Or for a clinical topic:</p>
+  <pre>topic
+Effect of metformin on HbA1c in type 2 diabetes</pre>
+  <p style="font-size:.82rem;color:#cbd5e1;margin-bottom:12px;">Line 1 must be exactly <code>paper</code> or <code>topic</code>. Line 2 is your query.</p>
+  <div class="section-label">Quality standards</div>
+  <span class="pill pill-blue">No fabricated citations</span>
+  <span class="pill pill-blue">Exact effect sizes and p-values</span>
+  <span class="pill pill-blue">Flag preprints</span>
+  <span class="pill pill-blue">Max 1500 words</span>
+  <div class="section-label" style="margin-top:12px">Run</div>
   <pre>python src\main.py --mode search
 python src\main.py --mode search --provider groq</pre>
   <div class="section-label">Output</div>
@@ -207,28 +215,28 @@ python src\main.py --mode search --provider groq</pre>
     <tr><th>Role</th><th>Purpose</th></tr>
     <tr><td>Appraiser</td><td>7-section critical appraisal: study design, PICO, methodology, results, bias, applicability, verdict</td></tr>
     <tr><td>Methodologist</td><td>RoB 2 / CASP / AMSTAR 2 scoring; GRADE evidence quality rating</td></tr>
-    <tr><td>Summariser</td><td>Plain-language summary (&le;150 words), key-findings table, evidence grade</td></tr>
+    <tr><td>Summariser</td><td>Plain-language summary (max 150 words), key-findings table, evidence grade</td></tr>
   </table>
-  <div class="section-label">7-Section Report Structure (&le;1500 words total)</div>
+  <div class="section-label">7-Section Report Structure (max 1500 words total)</div>
   <table>
     <tr><th>#</th><th>Section</th><th>Word limit</th></tr>
-    <tr><td>1</td><td>Study Details</td><td>&le;100</td></tr>
-    <tr><td>2</td><td>PICO</td><td>&le;150</td></tr>
-    <tr><td>3</td><td>Methodology</td><td>&le;250</td></tr>
-    <tr><td>4</td><td>Results</td><td>&le;300</td></tr>
-    <tr><td>5</td><td>Risk of Bias</td><td>&le;250</td></tr>
-    <tr><td>6</td><td>Clinical Applicability</td><td>&le;200</td></tr>
-    <tr><td>7</td><td>Overall Judgement</td><td>&le;150</td></tr>
+    <tr><td>1</td><td>Study Details</td><td>100</td></tr>
+    <tr><td>2</td><td>PICO</td><td>150</td></tr>
+    <tr><td>3</td><td>Methodology</td><td>250</td></tr>
+    <tr><td>4</td><td>Results</td><td>300</td></tr>
+    <tr><td>5</td><td>Risk of Bias</td><td>250</td></tr>
+    <tr><td>6</td><td>Clinical Applicability</td><td>200</td></tr>
+    <tr><td>7</td><td>Overall Judgement</td><td>150</td></tr>
   </table>
   <div class="section-label">Scoring Tools</div>
-  <span class="pill pill-orange">RoB 2 &mdash; RCTs</span>
-  <span class="pill pill-orange">CASP &mdash; Observational</span>
-  <span class="pill pill-orange">AMSTAR 2 &mdash; Systematic Reviews</span>
-  <span class="pill pill-orange">GRADE &mdash; Evidence Quality</span>
-  <div class="section-label" style="margin-top:12px">Input &mdash; place articles here before starting</div>
+  <span class="pill pill-orange">RoB 2 - RCTs</span>
+  <span class="pill pill-orange">CASP - Observational</span>
+  <span class="pill pill-orange">AMSTAR 2 - Systematic Reviews</span>
+  <span class="pill pill-orange">GRADE - Evidence Quality</span>
+  <div class="section-label" style="margin-top:12px">Input - place articles here before starting</div>
   <table>
     <tr><th>Folder</th><th>File types</th></tr>
-    <tr><td><code>uploads/appraisal/</code></td><td>.pdf .txt .md &mdash; also bare URLs</td></tr>
+    <tr><td><code>uploads/appraisal/</code></td><td>.pdf .txt .md - also bare URLs</td></tr>
     <tr><td><code>docs/appraisal/</code></td><td>appraisal-guide.md, scoring-criteria.md</td></tr>
   </table>
   <div class="info">&#128161; Works best with PDF articles from Search mode. Download PDFs, place in uploads/appraisal/, then run appraisal.</div>
@@ -260,10 +268,10 @@ python src\main.py --mode appraisal --provider anthropic</pre>
     <tr><td>5</td><td>Forest plot (weight-scaled)</td><td><code>outputs/figures/forest_plot.png</code></td></tr>
     <tr><td>6</td><td>Reports (DOCX + HTML + PDF)</td><td><code>outputs/reports/</code></td></tr>
   </table>
-  <div class="section-label">Setup — before every new review</div>
+  <div class="section-label">Setup - before every new review</div>
   <table>
     <tr><th>Step</th><th>Action</th></tr>
-    <tr><td>1</td><td>Edit <code>sr\config\prisma_criteria.yaml</code> — set PICO, effect_measure, criteria</td></tr>
+    <tr><td>1</td><td>Edit <code>sr\config\prisma_criteria.yaml</code> - set PICO, effect_measure, criteria</td></tr>
     <tr><td>2</td><td>Place RCT PDFs in <code>sr\data\uploads\</code></td></tr>
     <tr><td>3</td><td>Set <code>ANTHROPIC_API_KEY</code> environment variable</td></tr>
   </table>
@@ -277,7 +285,7 @@ python sr\main.py --pdf-dir sr\data\uploads --model claude-opus-4-7</pre>
   <table>
     <tr><th>Outcome type</th><th>Use</th><th>Notes</th></tr>
     <tr><td>Continuous, same scale</td><td><code>MD</code></td><td>e.g. all studies use VAS 0-10</td></tr>
-    <tr><td>Continuous, mixed scales</td><td><code>SMD</code></td><td>Hedges g — safe default for mixed instruments</td></tr>
+    <tr><td>Continuous, mixed scales</td><td><code>SMD</code></td><td>Hedges g - safe default for mixed instruments</td></tr>
     <tr><td>Binary / event</td><td><code>OR</code> or <code>RR</code></td><td>needs event counts</td></tr>
   </table>
   <div class="section-label">Key Config Fields (prisma_criteria.yaml)</div>
@@ -303,7 +311,7 @@ exclusion_criteria:
 <div class="card-body">
   <table>
     <tr><th>Provider</th><th>Flag</th><th>Env var (.env)</th><th>Notes</th></tr>
-    <tr><td>Ollama</td><td><code>--provider ollama</code></td><td>none</td><td>Default — runs locally</td></tr>
+    <tr><td>Ollama</td><td><code>--provider ollama</code></td><td>none</td><td>Default - runs locally</td></tr>
     <tr><td>OpenAI</td><td><code>--provider openai</code></td><td><code>OPENAI_API_KEY</code></td><td>GPT-4o etc.</td></tr>
     <tr><td>Anthropic</td><td><code>--provider anthropic</code></td><td><code>ANTHROPIC_API_KEY</code></td><td>Claude models</td></tr>
     <tr><td>DeepSeek</td><td><code>--provider deepseek</code></td><td><code>DEEPSEEK_API_KEY</code></td><td>Geo-unrestricted</td></tr>
@@ -337,7 +345,7 @@ GROQ_MODEL=llama-3.3-70b-versatile</pre>
 <div class="card" onclick="toggle(this)">
 <div class="card-header h-rag">
   <div class="card-icon" style="background:#312e81">&#128190;</div>
-  <div><div class="card-title">RAG — File &amp; URL Indexing</div><div class="card-badge">Automatic at session start</div></div>
+  <div><div class="card-title">RAG - File &amp; URL Indexing</div><div class="card-badge">Automatic at session start</div></div>
 </div>
 <div class="card-body">
   <p style="font-size:.82rem;color:#cbd5e1;margin-bottom:12px;">Files placed in the uploads folder are automatically chunked, embedded, and stored in a per-session ChromaDB collection. Content is retrieved and injected into the AI context at each step.</p>
@@ -384,4 +392,3 @@ function toggleAll(){
 }
 </script>
 </body></html>
-'@ | Set-Content -Path "D:\AI_kcMedicalResearch\docs\flashcard-help.html" -Encoding UTF8
