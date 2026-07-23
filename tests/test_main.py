@@ -1850,3 +1850,101 @@ def test_parse_args_role_reviewer():
 def test_parse_args_role_tester():
     args = parse_args(["--mode", "coding", "--revise", "--role", "Tester"])
     assert args.role == "Tester"
+
+# ---------------------------------------------------------------------------
+# run_rct_search_pipeline tests
+# ---------------------------------------------------------------------------
+
+def test_rct_pipeline_empty_topic_exits(monkeypatch):
+    from src.main import run_rct_search_pipeline
+    monkeypatch.setattr("builtins.input", lambda _: "")
+    with pytest.raises(SystemExit):
+        run_rct_search_pipeline(dry_run=True)
+
+
+def test_rct_pipeline_creates_md_report(tmp_path, monkeypatch):
+    from src.main import run_rct_search_pipeline
+    monkeypatch.setattr("builtins.input", lambda _: "metformin in type 2 diabetes")
+    result = run_rct_search_pipeline(
+        reports_dir=tmp_path,
+        dry_run=True,
+    )
+    assert result.exists()
+    assert result.suffix == ".md"
+
+
+def test_rct_pipeline_report_contains_topic(tmp_path, monkeypatch):
+    from src.main import run_rct_search_pipeline
+    monkeypatch.setattr("builtins.input", lambda _: "metformin in type 2 diabetes")
+    result = run_rct_search_pipeline(
+        reports_dir=tmp_path,
+        dry_run=True,
+    )
+    content = result.read_text(encoding="utf-8")
+    assert "metformin in type 2 diabetes" in content
+
+
+def test_rct_pipeline_report_contains_all_stages(tmp_path, monkeypatch):
+    from src.main import run_rct_search_pipeline
+    monkeypatch.setattr("builtins.input", lambda _: "aspirin for stroke prevention")
+    result = run_rct_search_pipeline(
+        reports_dir=tmp_path,
+        dry_run=True,
+    )
+    content = result.read_text(encoding="utf-8")
+    assert "Formulator Output" in content
+    assert "Searcher Output" in content
+    assert "Validator Output" in content
+
+
+def test_rct_pipeline_report_contains_final_status(tmp_path, monkeypatch):
+    from src.main import run_rct_search_pipeline
+    monkeypatch.setattr("builtins.input", lambda _: "beta blockers in heart failure")
+    result = run_rct_search_pipeline(
+        reports_dir=tmp_path,
+        dry_run=True,
+    )
+    content = result.read_text(encoding="utf-8")
+    assert "Final Status" in content
+
+
+def test_rct_pipeline_report_contains_next_steps(tmp_path, monkeypatch):
+    from src.main import run_rct_search_pipeline
+    monkeypatch.setattr("builtins.input", lambda _: "beta blockers in heart failure")
+    result = run_rct_search_pipeline(
+        reports_dir=tmp_path,
+        dry_run=True,
+    )
+    content = result.read_text(encoding="utf-8")
+    assert "Next Steps" in content
+    assert "appraisal" in content
+
+
+def test_rct_pipeline_creates_docx(tmp_path, monkeypatch):
+    from src.main import run_rct_search_pipeline
+    monkeypatch.setattr("builtins.input", lambda _: "statins in cardiovascular disease")
+    run_rct_search_pipeline(
+        reports_dir=tmp_path,
+        dry_run=True,
+    )
+    docx_files = list(tmp_path.glob("rct_search_*.docx"))
+    assert len(docx_files) == 1
+    assert docx_files[0].stat().st_size > 0
+
+
+def test_rct_pipeline_report_has_no_appraisal_content(tmp_path, monkeypatch):
+    from src.main import run_rct_search_pipeline
+    monkeypatch.setattr("builtins.input", lambda _: "insulin therapy in type 1 diabetes")
+    result = run_rct_search_pipeline(
+        reports_dir=tmp_path,
+        dry_run=True,
+    )
+    content = result.read_text(encoding="utf-8")
+    assert "Appraiser Output" not in content
+    assert "Methodologist Output" not in content
+    assert "Summariser Output" not in content
+
+
+def test_rct_pipeline_in_parse_args(monkeypatch):
+    args = parse_args(["--mode", "rct_search"])
+    assert args.mode == "rct_search"

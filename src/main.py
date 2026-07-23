@@ -914,6 +914,152 @@ def generate_code_revision(
     return md_path
 
 
+def run_rct_search_pipeline(
+    provider: str = "ollama",
+    model: str | None = None,
+    reports_dir: Path = REPORTS_DIR,
+    dry_run: bool = False,
+) -> Path:
+    """
+    Single-pass RCT search pipeline:
+      1. Formulator  — structures user topic into PICO question
+      2. Searcher    — builds full Boolean search strategy for all 7 databases
+      3. Validator   — validates alignment and approves or requests refinement
+    Saves output as reports/rct_search_{timestamp}.md and .docx.
+    Returns path of the .md report.
+    """
+    print("\n" + "=" * 55)
+    print("  RCT SEARCH PIPELINE")
+    print("=" * 55)
+    print("  This pipeline will:")
+    print("  1. Structure your topic into a PICO question")
+    print("  2. Build a search strategy for all 7 SR databases")
+    print("  3. Validate the strategy before download")
+    print("  No article appraisal — use --mode appraisal for that.")
+    print("=" * 55 + "\n")
+
+    # Get research topic from user at runtime
+    topic = input("Enter your research topic: ").strip()
+    if not topic:
+        print("No topic entered. Exiting.")
+        import sys; sys.exit(0)
+
+    # Read pico-framework.md as shared context
+    pico_path = DOCS_RCT_SEARCH / "pico-framework.md"
+    pico_context = pico_path.read_text(encoding="utf-8", errors="replace") if pico_path.exists() else ""
+
+    # Read database-guide.md and validation-criteria.md if present
+    db_guide = (DOCS_RCT_SEARCH / "database-guide.md")
+    val_criteria = (DOCS_RCT_SEARCH / "validation-criteria.md")
+    db_guide_text = db_guide.read_text(encoding="utf-8", errors="replace") if db_guide.exists() else ""
+    val_criteria_text = val_criteria.read_text(encoding="utf-8", errors="replace") if val_criteria.exists() else ""
+
+    stages = [
+        {
+            "role": "Formulator",
+            "prompt_file": AI_DIR / "formulator-prompt.md",
+            "extra_context": pico_context,
+            "task": f"The user's research topic is: {topic}\n\nStructure this into a formal PICO question.",
+        },
+        {
+            "role": "Searcher",
+            "prompt_file": AI_DIR / "searcher-prompt.md",
+            "extra_context": db_guide_text,
+            "task": "Build a comprehensive Boolean search strategy for all 7 SR databases based on the PICO question above.",
+        },
+        {
+            "role": "Validator",
+            "prompt_file": AI_DIR / "validator-prompt.md",
+            "extra_context": val_criteria_text,
+            "task": "Validate the search strategy above. Check PICO alignment, database coverage, syntax, and RCT filters. Return APPROVED FOR DOWNLOAD or REQUIRES REFINEMENT with specific justification.",
+        },
+    ]
+
+    report_parts = [
+        "# RCT Search Strategy Report",
+        f"Topic: {topic}",
+        f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M')}",
+        "",
+        "---",
+        "",
+        "> **Note:** This report contains the validated search strategy only.",
+        "> For article appraisal, copy URLs into --mode appraisal.",
+        "",
+    ]
+
+    previous_response = ""
+
+    for stage in stages:
+        role = stage["role"]
+        print(f"Running {role}...")
+        colour = role_color(role)
+
+        prompt_file = Path(stage["prompt_file"])
+        if not prompt_file.exists():
+            print(f"  Prompt not found: {prompt_file} — skipping {role}.")
+            continue
+
+        role_prompt = prompt_file.read_text(encoding="utf-8", errors="replace")
+
+        parts = [role_prompt]
+        if pico_context:
+            parts.append(f"## PICO Framework Reference\n{pico_context}")
+        if stage["extra_context"]:
+            parts.append(f"## Reference Document\n{stage['extra_context']}")
+        if previous_response:
+            parts.append(f"## Previous Stage Output\n{previous_response}")
+        parts.append(f"## Task\n{stage['task']}")
+        full_prompt = "\n\n".join(parts)
+
+        if dry_run:
+            response = f"[DRY RUN] {role} would respond here."
+        else:
+            try:
+                response = call_ai(prompt=full_prompt, provider=provider, model=model)
+            except RuntimeError as exc:
+                response = f"[ERROR in {role}: {exc}]"
+
+        previous_response = response
+        report_parts.append(f"## {role} Output\n\n{response}\n")
+        print(f"{colour}{role} complete.{RESET}\n")
+
+    # Check validator decision
+    validator_output = previous_response.upper()
+    if "APPROVED FOR DOWNLOAD" in validator_output:
+        status = "APPROVED FOR DOWNLOAD"
+        print("\n✅ Search strategy APPROVED FOR DOWNLOAD.")
+    else:
+        status = "REQUIRES REFINEMENT"
+        print("\n⚠️  Search strategy REQUIRES REFINEMENT — see Validator output.")
+
+    report_parts.append(f"## Final Status\n\n**{status}**\n")
+    report_parts.append(
+        "## Next Steps\n\n"
+        "- If APPROVED: copy database search strings into each SR database platform\n"
+        "- Download article lists from each database\n"
+        "- Run python src/main.py --mode appraisal to appraise individual articles\n"
+        "- Run python src/main.py --mode sr for full systematic review pipeline\n"
+    )
+
+    # Save reports
+    reports_dir.mkdir(parents=True, exist_ok=True)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    md_path   = reports_dir / f"rct_search_{timestamp}.md"
+    docx_path = reports_dir / f"rct_search_{timestamp}.docx"
+
+    md_content = "\n".join(report_parts)
+    md_path.write_text(md_content, encoding="utf-8")
+    print(f"Markdown report saved : reports\\{md_path.name}")
+
+    try:
+        _md_to_docx(md_content, f"RCT Search Strategy — {timestamp}", docx_path)
+        print(f"Word document saved   : reports\\{docx_path.name}")
+    except Exception as exc:  # noqa: BLE001
+        print(f"  Warning: could not generate .docx — {exc}")
+
+    return md_path
+
+
 def rct_search_reminder() -> None:
     """Print a reminder to edit the PICO framework before starting a search."""
     print("\n" + "=" * 55)
@@ -1461,9 +1607,13 @@ if __name__ == "__main__":
         )
     elif args.mode == "sr":
         run_sr_launcher()
+    elif args.mode == "rct_search":
+        run_rct_search_pipeline(
+            provider=args.provider,
+            model=args.model,
+            dry_run=args.dry_run,
+        )
     else:
-        if args.mode == "rct_search":
-            rct_search_reminder()
         main(
             model_override=args.model,
             dry_run=args.dry_run,
