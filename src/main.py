@@ -1634,58 +1634,62 @@ def parse_args(args: list[str] | None = None) -> argparse.Namespace:
 
 
 if __name__ == "__main__":
-    args = parse_args()
-    if args.list_sessions:
-        list_sessions(reports_dir=str(REPORTS_DIR))
-    elif args.read_session:
-        read_session(filename=args.read_session, reports_dir=str(REPORTS_DIR))
-    elif args.delete_session:
-        delete_session(filename=args.delete_session, reports_dir=str(REPORTS_DIR))
-    elif args.export_session:
-        export_session(filename=args.export_session, reports_dir=str(REPORTS_DIR))
-    elif args.rename_session:
-        rename_session(filename=args.rename_session, reports_dir=str(REPORTS_DIR))
-    elif args.stats:
-        show_stats(reports_dir=str(REPORTS_DIR))
-    elif args.list_roles:
-        list_roles(mode=args.mode)
-    elif args.help_guide:
-        open_help_guide()
-    elif args.revise:
-        if args.mode != "coding":
-            print("--revise is only available in coding mode.")
-            print("Use: python src/main.py --mode coding --revise")
-            sys.exit(1)
-        generate_code_revision(
-            start_role=args.role,
-            provider=args.provider,
-            model=args.model,
-            dry_run=args.dry_run,
-        )
-    elif args.report:
-        if args.mode != "writing":
-            print("--report is only available in writing mode.")
-            print("Use: python src/main.py --mode writing --report")
-            sys.exit(1)
-        generate_writing_report(provider=args.provider, model=args.model)
-    elif args.mode == "search":
-        run_search_mode(
-            provider=args.provider,
-            model=args.model,
-            dry_run=args.dry_run,
-        )
-    elif args.mode == "sr":
-        run_sr_launcher()
-    elif args.mode == "rct_search":
-        run_rct_search_pipeline(
-            provider=args.provider,
-            model=args.model,
-            dry_run=args.dry_run,
-        )
-    else:
-        main(
-            model_override=args.model,
-            dry_run=args.dry_run,
-            mode=args.mode,
-            provider=args.provider,
-        )
+    try:
+        args = parse_args()
+        if args.list_sessions:
+            list_sessions(reports_dir=str(REPORTS_DIR))
+        elif args.read_session:
+            read_session(filename=args.read_session, reports_dir=str(REPORTS_DIR))
+        elif args.delete_session:
+            delete_session(filename=args.delete_session, reports_dir=str(REPORTS_DIR))
+        elif args.export_session:
+            export_session(filename=args.export_session, reports_dir=str(REPORTS_DIR))
+        elif args.rename_session:
+            rename_session(filename=args.rename_session, reports_dir=str(REPORTS_DIR))
+        elif args.stats:
+            show_stats(reports_dir=str(REPORTS_DIR))
+        elif args.list_roles:
+            list_roles(mode=args.mode)
+        elif args.help_guide:
+            open_help_guide()
+        elif args.revise:
+            if args.mode != "coding":
+                print("--revise is only available in coding mode.")
+                print("Use: python src/main.py --mode coding --revise")
+                sys.exit(1)
+            generate_code_revision(
+                start_role=args.role,
+                provider=args.provider,
+                model=args.model,
+                dry_run=args.dry_run,
+            )
+        elif args.report:
+            if args.mode != "writing":
+                print("--report is only available in writing mode.")
+                print("Use: python src/main.py --mode writing --report")
+                sys.exit(1)
+            generate_writing_report(provider=args.provider, model=args.model)
+        elif args.mode == "search":
+            run_search_mode(
+                provider=args.provider,
+                model=args.model,
+                dry_run=args.dry_run,
+            )
+        elif args.mode == "sr":
+            run_sr_launcher()
+        elif args.mode == "rct_search":
+            run_rct_search_pipeline(
+                provider=args.provider,
+                model=args.model,
+                dry_run=args.dry_run,
+            )
+        else:
+            main(
+                model_override=args.model,
+                dry_run=args.dry_run,
+                mode=args.mode,
+                provider=args.provider,
+            )
+    except KeyboardInterrupt:
+        print("\n\nSession stopped. Returning to menu...\n")
+        raise SystemExit(0)
