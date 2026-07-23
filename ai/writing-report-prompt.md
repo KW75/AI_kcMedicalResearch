@@ -23,3 +23,9 @@ documents and produce a single consolidated summary report in markdown format.
 
 Be direct, specific, and professional. Do not pad the report with
 compliments or filler text.
+
+## Output Requirements
+- Your report must not exceed **1500 words** in total.
+- Use the section headers above as the structure.
+- Be direct, specific, and professional.
+- Do not pad with compliments or filler text.

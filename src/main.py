@@ -647,6 +647,64 @@ def show_stats(reports_dir: str = str(REPORTS_DIR)) -> None:
         print(f"  {colour}{role:<14}{RESET}: {count} interaction(s)")
 
 
+def _read_docx(path: Path) -> str:
+    """Extract plain text from a .docx file using python-docx."""
+    try:
+        import docx as _docx
+        doc = _docx.Document(str(path))
+        return "\n".join(p.text for p in doc.paragraphs if p.text.strip())
+    except Exception as exc:  # noqa: BLE001
+        return f"[Could not read DOCX: {exc}]"
+
+
+def _read_pdf_pymupdf(path: Path, max_chars: int = 30_000) -> str:
+    """Extract plain text from a PDF using PyMuPDF (fitz)."""
+    try:
+        import fitz
+        doc = fitz.open(str(path))
+        text = "\n\n".join(page.get_text() for page in doc)
+        doc.close()
+        return text[:max_chars]
+    except Exception as exc:  # noqa: BLE001
+        return f"[Could not read PDF: {exc}]"
+
+
+def _md_to_docx(md_text: str, title: str, out_path: Path) -> None:
+    """Convert a markdown report string to a .docx file using python-docx."""
+    import docx as _docx
+    from docx.shared import Pt, RGBColor
+    from docx.enum.text import WD_ALIGN_PARAGRAPH
+
+    document = _docx.Document()
+
+    # Title
+    title_para = document.add_heading(title, level=0)
+    title_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+
+    for line in md_text.splitlines():
+        stripped = line.strip()
+        if not stripped:
+            document.add_paragraph("")
+        elif stripped.startswith("## "):
+            document.add_heading(stripped[3:], level=1)
+        elif stripped.startswith("### "):
+            document.add_heading(stripped[4:], level=2)
+        elif stripped.startswith("#### "):
+            document.add_heading(stripped[5:], level=3)
+        elif stripped.startswith("- ") or stripped.startswith("* "):
+            document.add_paragraph(stripped[2:], style="List Bullet")
+        elif re.match(r"^\d+\. ", stripped):
+            document.add_paragraph(re.sub(r"^\d+\. ", "", stripped), style="List Number")
+        elif stripped.startswith("**") and stripped.endswith("**"):
+            p = document.add_paragraph()
+            run = p.add_run(stripped.strip("*"))
+            run.bold = True
+        else:
+            document.add_paragraph(stripped)
+
+    document.save(str(out_path))
+
+
 def generate_writing_report(
     docs_dir: Path = DOCS_WRITING,
     reports_dir: Path = REPORTS_DIR,
@@ -654,17 +712,20 @@ def generate_writing_report(
     model: str | None = None,
 ) -> Path:
     """
-    Read all files in docs_dir, send them to the AI with the writing-report
-    prompt, and save the result to reports/writing_report_{timestamp}.md.
-    Returns the path of the saved report.
+    Read all .txt, .md, .pdf, .docx files in docs_dir, send them to the AI
+    with the writing-report prompt, and save the result as both
+    reports/writing_report_{timestamp}.md and .docx.
+    Returns the path of the saved .md report.
     """
+    SUPPORTED = {".txt", ".md", ".pdf", ".docx"}
     files = sorted(
         f for f in docs_dir.iterdir()
-        if f.is_file() and f.suffix.lower() in {".txt", ".md", ".pdf"}
+        if f.is_file() and f.suffix.lower() in SUPPORTED
     ) if docs_dir.exists() else []
 
     if not files:
-        print(f"No files found in {docs_dir}. Add .txt, .md, or .pdf files first.")
+        print(f"No files found in {docs_dir}.")
+        print(f"Add .txt, .md, .pdf, or .docx files to: {docs_dir}")
         return reports_dir / "writing_report_empty.md"
 
     prompt_path = AI_DIR / "writing-report-prompt.md"
@@ -675,35 +736,49 @@ def generate_writing_report(
 
     sections: list[str] = []
     for f in files:
-        content = read_text_file(f) if f.suffix.lower() != ".pdf" else ""
-        if f.suffix.lower() == ".pdf":
-            try:
-                from pypdf import PdfReader
-                reader = PdfReader(str(f))
-                content = "\n".join(p.extract_text() or "" for p in reader.pages)
-            except Exception as exc:  # noqa: BLE001
-                content = f"[Could not read PDF: {exc}]"
+        suffix = f.suffix.lower()
+        if suffix == ".pdf":
+            content = _read_pdf_pymupdf(f)
+        elif suffix == ".docx":
+            content = _read_docx(f)
+        else:
+            content = read_text_file(f)
         if content.strip():
             sections.append(f"### {f.name}\n{content.strip()}")
+        else:
+            print(f"  Warning: no readable content in {f.name} — skipped.")
+
+    if not sections:
+        print("No readable content found in any file. Exiting.")
+        return reports_dir / "writing_report_empty.md"
 
     combined = "\n\n".join(sections)
     full_prompt = f"{system_prompt}\n\n## Documents to Summarise\n\n{combined}"
 
-    print(f"Generating writing report from {len(files)} file(s)...")
+    print(f"Generating writing report from {len(sections)} file(s)...")
     try:
         response = call_ai(prompt=full_prompt, provider=provider, model=model)
     except RuntimeError as exc:
         response = f"[ERROR generating report: {exc}]"
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    out_path  = reports_dir / f"writing_report_{timestamp}.md"
     reports_dir.mkdir(parents=True, exist_ok=True)
-    out_path.write_text(
-        f"# Writing Report\nGenerated: {timestamp}\n\n{response}\n",
-        encoding="utf-8",
-    )
-    print(f"Report saved to: {out_path.name}")
-    return out_path
+
+    # Save .md
+    md_path = reports_dir / f"writing_report_{timestamp}.md"
+    md_content = f"# Writing Report\nGenerated: {timestamp}\n\n{response}\n"
+    md_path.write_text(md_content, encoding="utf-8")
+    print(f"Markdown report saved : reports\\{md_path.name}")
+
+    # Save .docx
+    docx_path = reports_dir / f"writing_report_{timestamp}.docx"
+    try:
+        _md_to_docx(response, f"Writing Report — {timestamp}", docx_path)
+        print(f"Word document saved   : reports\\{docx_path.name}")
+    except Exception as exc:  # noqa: BLE001
+        print(f"  Warning: could not generate .docx — {exc}")
+
+    return md_path
 
 
 def rct_search_reminder() -> None:
