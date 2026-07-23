@@ -1,5 +1,5 @@
 @'
-# AI Automation Tool
+# AI kcMedical Research
 
 A multi-mode AI assistant for coding, writing, medical research, systematic review, and critical appraisal.
 Runs locally via Ollama or via cloud providers (OpenAI, Anthropic, DeepSeek, Groq).
@@ -7,7 +7,7 @@ Runs locally via Ollama or via cloud providers (OpenAI, Anthropic, DeepSeek, Gro
 ## Quick Start
 
 ```powershell
-cd D:\ai-automation-tool
+cd D:\AI_kcMedicalResearch
 python src\main.py                          # coding mode (Ollama default)
 python src\main.py --mode writing           # writing mode
 python src\main.py --mode rct_search        # RCT search strategy
@@ -88,7 +88,7 @@ EMBEDDING_MODEL=nomic-embed-text
 
 Project Structure
 
-ai-automation-tool/
+AI_kcMedicalResearch/
 ├── src/
 │   ├── main.py              # main CLI — all interactive modes
 │   └── rag.py               # RAG: chunking, embedding, ChromaDB
@@ -136,5 +136,5 @@ Known Gaps
     PDF OCR not supported (text-based PDFs only)
     WeasyPrint PDF output requires native Pango/GObject libraries on Windows
     Interactive input() paths not unit-tested
-    Writing docs templates need project-specific content '@ | Set-Content -Path "D:\ai-automation-tool\README.md" -Encoding UTF8
+    Writing docs templates need project-specific content '@ | Set-Content -Path "D:\AI_kcMedicalResearch\README.md" -Encoding UTF8
 

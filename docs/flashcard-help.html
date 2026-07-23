@@ -4,7 +4,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>AI Automation Tool — Help Guide</title>
+<title>AI kcMedical Research — Help Guide</title>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 body{font-family:"Segoe UI",Arial,sans-serif;background:#0f172a;color:#e2e8f0;min-height:100vh;padding:32px 20px}
@@ -50,7 +50,7 @@ footer{text-align:center;margin-top:48px;font-size:.76rem;color:#475569}
 </style>
 </head>
 <body>
-<h1>&#129302; AI Automation Tool</h1>
+<h1>&#129302; AI kcMedical Research</h1>
 <p class="subtitle">Interactive Help Guide &nbsp;&middot;&nbsp; 226 tests &nbsp;&middot;&nbsp; 87% coverage &nbsp;&middot;&nbsp; 6 modes &nbsp;&middot;&nbsp; 5 providers</p>
 <button class="toggle-all" onclick="toggleAll()">Expand All</button>
 <div class="grid">
@@ -253,7 +253,7 @@ python src\main.py --mode appraisal --provider anthropic</pre>
   </table>
   <div class="section-label">Run</div>
   <pre>python src\main.py --mode sr              # shows instructions
-cd D:\ai-automation-tool
+cd D:\AI_kcMedicalResearch
 python sr\main.py --pdf-dir sr\data\uploads
 python sr\main.py --pdf-dir sr\data\uploads --effect-measure SMD
 python sr\main.py --pdf-dir sr\data\uploads --model claude-opus-4-7</pre>
@@ -357,7 +357,7 @@ EMBEDDING_MODEL=nomic-embed-text</pre>
 </div></div>
 
 </div><!-- end grid -->
-<footer>AI Automation Tool &nbsp;&middot;&nbsp; PRISMA 2020 / Cochrane Handbook v6.5 &nbsp;&middot;&nbsp; 226 tests &nbsp;&middot;&nbsp; 87% coverage &nbsp;&middot;&nbsp; All SR outputs require human verification.</footer>
+<footer>AI kcMedical Research &nbsp;&middot;&nbsp; PRISMA 2020 / Cochrane Handbook v6.5 &nbsp;&middot;&nbsp; 226 tests &nbsp;&middot;&nbsp; 87% coverage &nbsp;&middot;&nbsp; All SR outputs require human verification.</footer>
 <script>
 function toggle(card){card.classList.toggle("open")}
 function toggleAll(){
@@ -368,4 +368,4 @@ function toggleAll(){
 }
 </script>
 </body></html>
-'@ | Set-Content -Path "D:\ai-automation-tool\docs\flashcard-help.html" -Encoding UTF8
+'@ | Set-Content -Path "D:\AI_kcMedicalResearch\docs\flashcard-help.html" -Encoding UTF8

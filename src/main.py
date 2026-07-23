@@ -28,7 +28,7 @@ load_dotenv()
 # ---------------------------------------------------------------------------
 # Version
 # ---------------------------------------------------------------------------
-VERSION = "2.0.0"
+VERSION = "2.1.0"
 
 # ---------------------------------------------------------------------------
 # Paths
@@ -1203,7 +1203,7 @@ def run_sr_launcher() -> None:
     print("    2. Place PDF articles in  sr\\data\\uploads\\")
     print("    3. Set ANTHROPIC_API_KEY in your environment")
     print("\n  Run the pipeline:")
-    print("    cd D:\\ai-automation-tool")
+    print("    cd D:\\AI_kcMedicalResearch")
     print("    python sr\\main.py --pdf-dir sr\\data\\uploads")
     print("    python sr\\main.py --pdf-dir sr\\data\\uploads --effect-measure SMD")
     print("\n  Outputs land in:")
