@@ -1705,3 +1705,148 @@ def test_parse_args_mode_search():
 def test_researcher_colour_defined():
     from src.main import COLOURS
     assert "Researcher" in COLOURS
+
+# ---------------------------------------------------------------------------
+# generate_code_revision tests
+# ---------------------------------------------------------------------------
+
+def test_read_code_files_returns_empty_for_missing_dir(tmp_path):
+    from src.main import _read_code_files
+    result = _read_code_files(tmp_path / "nonexistent")
+    assert result == []
+
+
+def test_read_code_files_ignores_guidance_docs(tmp_path):
+    from src.main import _read_code_files
+    (tmp_path / "PRD.md").write_text("Product requirements", encoding="utf-8")
+    (tmp_path / "architecture.md").write_text("Architecture", encoding="utf-8")
+    result = _read_code_files(tmp_path)
+    assert result == []
+
+
+def test_read_code_files_reads_py_files(tmp_path):
+    from src.main import _read_code_files
+    (tmp_path / "example.py").write_text("def hello(): pass", encoding="utf-8")
+    result = _read_code_files(tmp_path)
+    assert len(result) == 1
+    assert result[0]["name"] == "example.py"
+    assert "hello" in result[0]["content"]
+
+
+def test_read_code_files_reads_multiple_extensions(tmp_path):
+    from src.main import _read_code_files
+    (tmp_path / "app.py").write_text("x = 1", encoding="utf-8")
+    (tmp_path / "style.css").write_text("body {}", encoding="utf-8")
+    (tmp_path / "query.sql").write_text("SELECT 1", encoding="utf-8")
+    result = _read_code_files(tmp_path)
+    names = [r["name"] for r in result]
+    assert "app.py" in names
+    assert "style.css" in names
+    assert "query.sql" in names
+
+
+def test_read_code_files_skips_empty_files(tmp_path):
+    from src.main import _read_code_files
+    (tmp_path / "empty.py").write_text("   ", encoding="utf-8")
+    result = _read_code_files(tmp_path)
+    assert result == []
+
+
+def test_generate_code_revision_no_files_returns_empty(tmp_path):
+    from src.main import generate_code_revision
+    result = generate_code_revision(
+        docs_dir=tmp_path / "empty",
+        reports_dir=tmp_path,
+        dry_run=True,
+    )
+    assert result.name == "code_revision_empty.md"
+
+
+def test_generate_code_revision_builder_pipeline_dry_run(tmp_path, monkeypatch):
+    from src.main import generate_code_revision
+    docs = tmp_path / "coding"
+    docs.mkdir()
+    (docs / "app.py").write_text("def add(a, b): return a + b", encoding="utf-8")
+    monkeypatch.setattr("builtins.input", lambda _: "improve readability")
+    result = generate_code_revision(
+        start_role="Builder",
+        docs_dir=docs,
+        reports_dir=tmp_path,
+        dry_run=True,
+    )
+    assert result.exists()
+    content = result.read_text(encoding="utf-8")
+    assert "Builder Output" in content
+    assert "Reviewer Output" in content
+    assert "Tester Output" in content
+
+
+def test_generate_code_revision_reviewer_pipeline_dry_run(tmp_path, monkeypatch):
+    from src.main import generate_code_revision
+    docs = tmp_path / "coding"
+    docs.mkdir()
+    (docs / "app.py").write_text("def add(a, b): return a + b", encoding="utf-8")
+    monkeypatch.setattr("builtins.input", lambda _: "")
+    result = generate_code_revision(
+        start_role="Reviewer",
+        docs_dir=docs,
+        reports_dir=tmp_path,
+        dry_run=True,
+    )
+    assert result.exists()
+    content = result.read_text(encoding="utf-8")
+    assert "Builder Output" not in content
+    assert "Reviewer Output" in content
+    assert "Tester Output" in content
+
+
+def test_generate_code_revision_tester_only_dry_run(tmp_path, monkeypatch):
+    from src.main import generate_code_revision
+    docs = tmp_path / "coding"
+    docs.mkdir()
+    (docs / "app.py").write_text("def add(a, b): return a + b", encoding="utf-8")
+    monkeypatch.setattr("builtins.input", lambda _: "")
+    result = generate_code_revision(
+        start_role="Tester",
+        docs_dir=docs,
+        reports_dir=tmp_path,
+        dry_run=True,
+    )
+    assert result.exists()
+    content = result.read_text(encoding="utf-8")
+    assert "Builder Output" not in content
+    assert "Reviewer Output" not in content
+    assert "Tester Output" in content
+
+
+def test_generate_code_revision_creates_docx(tmp_path, monkeypatch):
+    from src.main import generate_code_revision
+    docs = tmp_path / "coding"
+    docs.mkdir()
+    (docs / "app.py").write_text("def add(a, b): return a + b", encoding="utf-8")
+    monkeypatch.setattr("builtins.input", lambda _: "refactor")
+    generate_code_revision(
+        start_role="Tester",
+        docs_dir=docs,
+        reports_dir=tmp_path,
+        dry_run=True,
+    )
+    docx_files = list(tmp_path.glob("code_revision_*.docx"))
+    assert len(docx_files) == 1
+    assert docx_files[0].stat().st_size > 0
+
+
+def test_parse_args_revise_flag():
+    args = parse_args(["--mode", "coding", "--revise"])
+    assert args.revise is True
+    assert args.role == "Builder"
+
+
+def test_parse_args_role_reviewer():
+    args = parse_args(["--mode", "coding", "--revise", "--role", "Reviewer"])
+    assert args.role == "Reviewer"
+
+
+def test_parse_args_role_tester():
+    args = parse_args(["--mode", "coding", "--revise", "--role", "Tester"])
+    assert args.role == "Tester"

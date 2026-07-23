@@ -781,6 +781,139 @@ def generate_writing_report(
     return md_path
 
 
+# ---------------------------------------------------------------------------
+# Code revision pipeline (--revise flag)
+# ---------------------------------------------------------------------------
+CODE_EXTENSIONS = {".py", ".js", ".ts", ".cs", ".java", ".sql", ".html", ".css"}
+GUIDANCE_DOCS   = {"PRD.md", "architecture.md", "coding-standards.md",
+                   "decision-log.md", "test-strategy.md"}
+
+
+def _read_code_files(docs_coding: Path) -> list[dict]:
+    """Return list of {name, content} for code files in docs/coding/."""
+    results = []
+    if not docs_coding.exists():
+        return results
+    for f in sorted(docs_coding.iterdir()):
+        if f.is_file() and f.suffix.lower() in CODE_EXTENSIONS and f.name not in GUIDANCE_DOCS:
+            content = f.read_text(encoding="utf-8", errors="replace")
+            if content.strip():
+                results.append({"name": f.name, "content": content})
+    return results
+
+
+def generate_code_revision(
+    start_role: str = "Builder",
+    docs_dir: Path = DOCS_CODING,
+    reports_dir: Path = REPORTS_DIR,
+    provider: str = "ollama",
+    model: str | None = None,
+    dry_run: bool = False,
+) -> Path:
+    """
+    Single-pass code revision pipeline.
+    Builder  -> runs Build -> Review -> Test
+    Reviewer -> runs Review -> Test
+    Tester   -> runs Test only
+    Saves results as reports/code_revision_{timestamp}.md and .docx.
+    Returns path of the .md report.
+    """
+    # Determine pipeline stages
+    all_stages = ["Builder", "Reviewer", "Tester"]
+    start_idx  = all_stages.index(start_role) if start_role in all_stages else 0
+    stages     = all_stages[start_idx:]
+
+    # Read code files
+    code_files = _read_code_files(docs_dir)
+    if not code_files:
+        print(f"No code files found in {docs_dir}.")
+        print(f"Add .py/.js/.ts/.cs/.java/.sql/.html/.css files to: {docs_dir}")
+        return reports_dir / "code_revision_empty.md"
+
+    print(f"\n{'='*55}")
+    print(f"  CODE REVISION PIPELINE")
+    print(f"  Starting role : {start_role}")
+    print(f"  Pipeline      : {' -> '.join(stages)}")
+    print(f"  Code files    : {len(code_files)}")
+    print(f"{'='*55}\n")
+
+    # Build code context block
+    code_context = "\n\n".join(
+        f"### {cf['name']}\n`\n{cf['content']}\n`"
+        for cf in code_files
+    )
+
+    # Read guidance docs
+    guidance_parts = []
+    for doc_name in GUIDANCE_DOCS:
+        doc_path = docs_dir / doc_name
+        if doc_path.exists():
+            guidance_parts.append(
+                f"### {doc_name}\n{doc_path.read_text(encoding='utf-8', errors='replace').strip()}"
+            )
+    guidance_context = "\n\n".join(guidance_parts)
+
+    task = input("Describe the revision task (or press Enter for general review): ").strip()
+    if not task:
+        task = "Review and improve the code quality, readability, and correctness."
+
+    reports_dir.mkdir(parents=True, exist_ok=True)
+    timestamp  = datetime.now().strftime("%Y%m%d_%H%M%S")
+    md_path    = reports_dir / f"code_revision_{timestamp}.md"
+    docx_path  = reports_dir / f"code_revision_{timestamp}.docx"
+
+    full_report_parts = [
+        f"# Code Revision Report",
+        f"Generated: {timestamp}",
+        f"Pipeline: {' -> '.join(stages)}",
+        f"Task: {task}",
+        "",
+    ]
+
+    previous_response = ""
+
+    for stage in stages:
+        print(f"Running {stage}...")
+        role_cfg     = ALL_MODES["coding"][stage]
+        prompt_path  = Path(role_cfg["prompt"])
+        role_prompt  = prompt_path.read_text(encoding="utf-8", errors="replace")
+
+        parts = [role_prompt]
+        if guidance_context:
+            parts.append(f"## Project Guidance\n{guidance_context}")
+        parts.append(f"## Code Files\n{code_context}")
+        if previous_response:
+            parts.append(f"## Previous Stage Output\n{previous_response}")
+        parts.append(f"## Revision Task\n{task}")
+        full_prompt = "\n\n".join(parts)
+
+        if dry_run:
+            response = f"[DRY RUN] {stage} would respond here."
+        else:
+            try:
+                response = call_ai(prompt=full_prompt, provider=provider, model=model)
+            except RuntimeError as exc:
+                response = f"[ERROR in {stage}: {exc}]"
+
+        previous_response = response
+        full_report_parts.append(f"## {stage} Output\n\n{response}\n")
+        print(f"{stage} complete.\n")
+
+    # Save .md
+    md_content = "\n".join(full_report_parts)
+    md_path.write_text(md_content, encoding="utf-8")
+    print(f"Markdown report saved : reports\\{md_path.name}")
+
+    # Save .docx
+    try:
+        _md_to_docx(md_content, f"Code Revision Report — {timestamp}", docx_path)
+        print(f"Word document saved   : reports\\{docx_path.name}")
+    except Exception as exc:  # noqa: BLE001
+        print(f"  Warning: could not generate .docx — {exc}")
+
+    return md_path
+
+
 def rct_search_reminder() -> None:
     """Print a reminder to edit the PICO framework before starting a search."""
     print("\n" + "=" * 55)
@@ -1263,6 +1396,11 @@ def parse_args(args: list[str] | None = None) -> argparse.Namespace:
   
     parser.add_argument("--report", action="store_true", default=False,
                         help="Generate a summary report from docs/ files (writing mode only)")
+    parser.add_argument("--revise", action="store_true", default=False,
+                        help="Run single-pass code revision pipeline from docs/coding/ (coding mode only)")
+    parser.add_argument("--role", type=str, default="Builder",
+                        choices=["Builder", "Reviewer", "Tester"],
+                        help="Starting role for --revise pipeline (default: Builder)")
     parser.add_argument("--provider",       type=str,  default="ollama",
                         choices=["ollama", "openai", "anthropic", "deepseek", "groq"])
     parser.add_argument("--list-sessions",  action="store_true", default=False)
@@ -1298,6 +1436,17 @@ if __name__ == "__main__":
         list_roles(mode=args.mode)
     elif args.help_guide:
         open_help_guide()
+    elif args.revise:
+        if args.mode != "coding":
+            print("--revise is only available in coding mode.")
+            print("Use: python src/main.py --mode coding --revise")
+            sys.exit(1)
+        generate_code_revision(
+            start_role=args.role,
+            provider=args.provider,
+            model=args.model,
+            dry_run=args.dry_run,
+        )
     elif args.report:
         if args.mode != "writing":
             print("--report is only available in writing mode.")

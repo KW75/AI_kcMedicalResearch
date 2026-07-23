@@ -14,3 +14,11 @@ Return feedback in this format:
 3. Minor issues
 4. Suggested fixes
 5. Final decision: APPROVE or REQUEST CHANGES
+
+## Code Revision Mode
+If revised code is provided:
+- Review the revised code against the original where possible.
+- Check for regressions, removed functionality, and new bugs.
+- Verify the code follows the coding standards in docs/coding-standards.md.
+- Check that all changes are justified and explained.
+- Return feedback using the standard format (Blockers, Major, Minor, Fixes, Decision).
