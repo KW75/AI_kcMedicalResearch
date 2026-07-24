@@ -289,14 +289,87 @@ def _read_file(path: Path) -> str:
 
 
 def _read_pdf(path: Path) -> str:
-    """Extract all text from a PDF using pypdf."""
+    """
+    Extract text from a PDF using a three-stage fallback chain:
+
+    Stage 1 — PyMuPDF (fitz): fast, accurate for text-layer PDFs.
+    Stage 2 — pypdf: fallback if fitz is not installed.
+    Stage 3 — OCR (pytesseract + pdf2image): for scanned/image-only PDFs
+              where stages 1 and 2 return empty text.
+
+    OCR requires Tesseract binary and Poppler on PATH (or set via .env).
+    If OCR dependencies are missing, returns empty string with a warning.
+    """
+    text = ""
+
+    # Stage 1 — PyMuPDF
     try:
-        from pypdf import PdfReader  # imported lazily — not needed for .txt
-        reader = PdfReader(str(path))
-        pages  = [page.extract_text() or "" for page in reader.pages]
-        return "\n".join(pages)
+        import fitz  # PyMuPDF
+        doc  = fitz.open(str(path))
+        text = "\n\n".join(page.get_text() for page in doc)
+        doc.close()
+    except Exception:  # noqa: BLE001
+        pass
+
+    # Stage 2 — pypdf (if Stage 1 empty or failed)
+    if not text.strip():
+        try:
+            from pypdf import PdfReader
+            reader = PdfReader(str(path))
+            text   = "\n".join(page.extract_text() or "" for page in reader.pages)
+        except Exception:  # noqa: BLE001
+            pass
+
+    # Stage 3 — OCR fallback for scanned/image PDFs
+    if not text.strip():
+        text = _ocr_pdf(path)
+
+    if not text.strip():
+        print(f"[RAG] Warning: no text extracted from '{path.name}' "
+              f"(text-layer empty and OCR returned nothing).")
+    return text
+
+
+def _ocr_pdf(path: Path) -> str:
+    """
+    Convert each PDF page to an image and run Tesseract OCR.
+    Requires: pytesseract, pillow, pdf2image, Tesseract binary, Poppler.
+    Paths are read from TESSERACT_PATH and POPPLER_PATH in .env.
+    Returns empty string if any dependency is missing.
+    """
+    try:
+        import pytesseract
+        from pdf2image import convert_from_path
+
+        # Configure Tesseract binary path if set in .env
+        tesseract_path = os.getenv("TESSERACT_PATH", "")
+        if tesseract_path:
+            pytesseract.pytesseract.tesseract_cmd = tesseract_path
+
+        # Configure Poppler path if set in .env
+        poppler_path = os.getenv("POPPLER_PATH", "") or None
+
+        print(f"[RAG] OCR fallback activated for '{path.name}'...")
+        images = convert_from_path(str(path), poppler_path=poppler_path)
+        pages  = []
+        for i, image in enumerate(images, start=1):
+            page_text = pytesseract.image_to_string(image, lang="eng")
+            if page_text.strip():
+                pages.append(page_text)
+            print(f"[RAG] OCR page {i}/{len(images)} complete.")
+
+        result = "\n\n".join(pages)
+        if result.strip():
+            print(f"[RAG] OCR extracted {len(result)} chars from '{path.name}'.")
+        return result
+
+    except ImportError as exc:
+        print(f"[RAG] OCR skipped — missing dependency: {exc}")
+        print("[RAG] Install: pip install pytesseract pillow pdf2image")
+        print("[RAG] Then install Tesseract and Poppler binaries.")
+        return ""
     except Exception as exc:  # noqa: BLE001
-        print(f"[RAG] Warning: could not read PDF '{path.name}': {exc}")
+        print(f"[RAG] OCR failed for '{path.name}': {exc}")
         return ""
 
 
