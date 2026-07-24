@@ -1,7 +1,7 @@
 ﻿"""
 main.py ??AI Automation Tool
 Supports three workflow modes: coding, writing, rct_search.
-Supports three AI providers: ollama (default), openai, anthropic.
+Supports six AI providers: ollama (default), openai, anthropic, deepseek, groq, qwen.
 RAG layer: per-session, mode-specific uploads/ folder indexing via rag.py.
 """
 
@@ -1703,7 +1703,7 @@ def parse_args(args: list[str] | None = None) -> argparse.Namespace:
                         choices=["Builder", "Reviewer", "Tester"],
                         help="Starting role for --revise pipeline (default: Builder)")
     parser.add_argument("--provider",       type=str,  default="ollama",
-                        choices=["ollama", "openai", "anthropic", "deepseek", "groq"])
+                        choices=["ollama", "openai", "anthropic", "deepseek", "groq", "qwen"])
     parser.add_argument("--list-sessions",  action="store_true", default=False)
     parser.add_argument("--read-session",   type=str,  default=None, metavar="FILENAME")
     parser.add_argument("--delete-session", type=str,  default=None, metavar="FILENAME")

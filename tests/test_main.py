@@ -10,7 +10,7 @@ from unittest.mock import patch, MagicMock
 from src.main import (
     read_text_file, save_report, build_project_context,
     call_ollama_provider, call_openai_provider, call_anthropic_provider,
-    call_deepseek_provider, call_groq_provider,
+    call_deepseek_provider, call_groq_provider, call_qwen_provider,
     call_ai, choose_role, DOC_FILES_BY_ROLE,
     PROVIDERS, parse_args, BASE_DIR,
     start_session_transcript, append_to_transcript, print_session_summary,
@@ -2242,3 +2242,77 @@ class TestInteractiveInputPaths:
             rename_session(filename="session_old.md", reports_dir=str(tmp_path))
         assert (tmp_path / "session_new.md").exists()
         assert not f.exists()
+
+        # ---------------------------------------------------------------------------
+# Qwen provider tests
+# ---------------------------------------------------------------------------
+
+def test_call_qwen_provider_raises_without_key(monkeypatch):
+    monkeypatch.setattr("src.main.DASHSCOPE_API_KEY", "")
+    with pytest.raises(RuntimeError, match="DASHSCOPE_API_KEY"):
+        call_qwen_provider("hello")
+
+
+def test_call_qwen_provider_returns_content(monkeypatch):
+    monkeypatch.setattr("src.main.DASHSCOPE_API_KEY", "test-key")
+    fake = {"choices": [{"message": {"content": "Qwen reply"}}]}
+    mock_resp = MagicMock()
+    mock_resp.read.return_value = json.dumps(fake).encode()
+    mock_resp.__enter__ = lambda s: s
+    mock_resp.__exit__ = MagicMock(return_value=False)
+    with patch("src.main.urlopen", return_value=mock_resp):
+        result = call_qwen_provider("hello", model="qwen3.7-plus")
+    assert result == "Qwen reply"
+
+
+def test_call_qwen_provider_http_error(monkeypatch):
+    monkeypatch.setattr("src.main.DASHSCOPE_API_KEY", "test-key")
+    with patch("src.main.urlopen", side_effect=urllib.error.HTTPError(
+            None, 403, "Forbidden", {}, None)):
+        with pytest.raises(RuntimeError, match="Qwen HTTP error 403"):
+            call_qwen_provider("hello")
+
+
+def test_call_qwen_provider_empty_response(monkeypatch):
+    monkeypatch.setattr("src.main.DASHSCOPE_API_KEY", "test-key")
+    fake = {"choices": []}
+    mock_resp = MagicMock()
+    mock_resp.read.return_value = json.dumps(fake).encode()
+    mock_resp.__enter__ = lambda s: s
+    mock_resp.__exit__ = MagicMock(return_value=False)
+    with patch("src.main.urlopen", return_value=mock_resp):
+        with pytest.raises(RuntimeError, match="empty response"):
+            call_qwen_provider("hello", model="qwen3.7-plus")
+
+
+def test_call_qwen_provider_url_error(monkeypatch):
+    monkeypatch.setattr("src.main.DASHSCOPE_API_KEY", "test-key")
+    with patch("src.main.urlopen", side_effect=urllib.error.URLError("timeout")):
+        with pytest.raises(RuntimeError, match="Qwen connection error"):
+            call_qwen_provider("hello")
+
+
+# ---------------------------------------------------------------------------
+# Provider registry and arg parsing — Qwen
+# ---------------------------------------------------------------------------
+
+def test_providers_dict_contains_qwen():
+    assert "qwen" in PROVIDERS
+
+
+def test_parse_args_provider_qwen():
+    args = parse_args(["--provider", "qwen"])
+    assert args.provider == "qwen"
+
+
+def test_validate_api_keys_qwen_passes(monkeypatch):
+    from src.main import validate_api_keys
+    monkeypatch.setenv("DASHSCOPE_API_KEY", "sk-test-qwen-key")
+    validate_api_keys("qwen")   # should not raise
+
+
+def test_validate_api_keys_qwen_missing_raises():
+    from src.main import validate_api_keys
+    with patch.dict("os.environ", {}, clear=True):
+        with pytest.raises(EnvironmentError, match="DASHSCOPE_API_KEY"):
+            validate_api_keys("qwen")
