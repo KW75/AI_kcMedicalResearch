@@ -21,9 +21,23 @@ import uuid
 from datetime import datetime
 from pathlib import Path
 
+
 from dotenv import load_dotenv
 
 load_dotenv()
+
+# Ensure project root is on sys.path so `from src import rag` works
+_ROOT = Path(__file__).resolve().parent.parent
+if str(_ROOT) not in sys.path:
+    sys.path.insert(0, str(_ROOT))
+
+
+# Ensure project root is on sys.path so 'from src import rag' works
+# regardless of how main.py is launched (batch file, subprocess, direct)
+_ROOT = Path(__file__).resolve().parent.parent
+if str(_ROOT) not in sys.path:
+    sys.path.insert(0, str(_ROOT))
+
 
 # ---------------------------------------------------------------------------
 # Version

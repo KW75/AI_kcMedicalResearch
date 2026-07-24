@@ -135,31 +135,24 @@ def run_custom():
 
 
 def main():
-    os.chdir(BASE)
+    _cflags = subprocess.CREATE_NEW_PROCESS_GROUP if os.name == 'nt' else 0
     while True:
         label, mode_flag, is_custom, is_help = pick_mode()
 
-        if label is None and not is_custom and not is_help:
-            clear()
-            print()
-            print(f'  {ACCENT}Goodbye.{RESET}')
-            print()
-            break
-
         if is_help:
-            try:
-                subprocess.run(
-                    [PYTHON, str(BASE / 'src' / 'main.py'), '--help-guide'],
-                    cwd=str(BASE)
-                )
-            except (KeyboardInterrupt, EOFError):
-                pass
+            import webbrowser
+            webbrowser.open(str(BASE / 'docs' / 'flashcard-help.html'))
             safe_input(f'  {DIM}Press Enter to return to menu...{RESET}')
             continue
 
+        if label is None and not is_custom:
+            # Exit chosen
+            clear()
+            print(f'\n  {ACCENT}Goodbye!{RESET}\n')
+            break
+
         if is_custom:
             run_custom()
-            safe_input(f'  {DIM}Press Enter to return to menu...{RESET}')
             continue
 
         prov_flag = pick_provider()
@@ -172,8 +165,12 @@ def main():
         print(f'  {DIM}-------------------------------------------------------{RESET}')
         print()
         try:
-            result = subprocess.run(cmd, cwd=str(BASE))
-            if result.returncode != 0:
+            result = subprocess.run(
+                cmd,
+                cwd=str(BASE),
+                creationflags=_cflags,
+            )
+            if result.returncode not in (0, 1):
                 print(f'\n  {DIM}[exit code {result.returncode}]{RESET}')
         except (KeyboardInterrupt, EOFError):
             print(f'\n\n{ACCENT}Session stopped. Returning to menu...{RESET}\n')
@@ -182,3 +179,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+
