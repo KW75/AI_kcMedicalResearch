@@ -15,3 +15,5 @@ pyyaml
 pytesseract
 pdf2image
 pillow
+
+streamlit
