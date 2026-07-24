@@ -1294,31 +1294,38 @@ def fetch_pubmed_articles(
 
 
 def run_sr_launcher() -> None:
-    """Print SR pipeline launch instructions."""
-    sr_dir = Path(__file__).resolve().parent.parent / "sr"
-    print("\n" + "="*58)
+    """Launch the SR Streamlit UI in a separate window."""
+    import subprocess as _sp
+    sr_ui = Path(__file__).resolve().parent.parent / "sr" / "src" / "ui" / "app.py"
+    repo_root = Path(__file__).resolve().parent.parent
+
+    print("\n" + "=" * 58)
     print("  SR Automation Pipeline")
     print("  PRISMA 2020  |  Cochrane Handbook v6.5")
-    print("="*58)
-    print(f"\n  Location : {sr_dir}")
-    print("\n  Before running:")
-    print("    1. Edit  sr\\config\\prisma_criteria.yaml  (PICO + criteria)")
-    print("    2. Place PDF articles in  sr\\data\\uploads\\")
-    print("    3. Set ANTHROPIC_API_KEY in your environment")
-    print("\n  Run the pipeline:")
-    print("    cd D:\\AI_kcMedicalResearch")
-    print("    python sr\\main.py --pdf-dir sr\\data\\uploads")
-    print("    python sr\\main.py --pdf-dir sr\\data\\uploads --effect-measure SMD")
-    print("\n  Outputs land in:")
-    print("    sr\\data\\screened\\screening_log.csv")
-    print("    sr\\data\\extracted\\extracted_data.csv")
-    print("    sr\\data\\extracted\\rob2_assessment.csv")
-    print("    sr\\data\\results\\meta_analysis_results.csv")
-    print("    sr\\outputs\\figures\\forest_plot.png")
-    print("    sr\\outputs\\reports\\systematic_review.html  (full record)")
-    print("    sr\\outputs\\reports\\systematic_review.docx  (summary)")
-    print("\n  Full guide: docs\\flashcard-help.html")
-    print("="*58 + "\n")
+    print("=" * 58)
+    print("\n  Launching Streamlit UI in a new window...")
+    print("  URL: http://localhost:8501")
+    print("  Close the Streamlit window to stop the server.\n")
+
+
+    if os.name == 'nt':
+        # Open in a new visible cmd window — closing it stops Streamlit
+        _sp.Popen(
+            [
+                'cmd', '/c', 'start', 'SR Pipeline UI',
+                sys.executable, '-m', 'streamlit', 'run', str(sr_ui),
+            ],
+            cwd=str(repo_root),
+        )
+    else:
+        # macOS / Linux fallback
+        _sp.Popen(
+            [sys.executable, "-m", "streamlit", "run", str(sr_ui)],
+            cwd=str(repo_root),
+        )
+
+    print("  SR UI launched. Returning to menu...\n")
+
 
 def run_search_mode(
     provider: str = "ollama",

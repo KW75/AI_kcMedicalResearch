@@ -9,6 +9,8 @@ from pathlib import Path
 import pytest
 import pandas as pd
 import numpy as np
+import unittest.mock
+
 
 ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
@@ -225,14 +227,17 @@ class TestSRLauncher:
 
     def test_launcher_prints_prisma_yaml(self, capsys):
         from src.main import run_sr_launcher
-        run_sr_launcher()
+        with unittest.mock.patch("subprocess.Popen"):
+            run_sr_launcher()
         out = capsys.readouterr().out
-        assert "prisma_criteria.yaml" in out
+        assert "localhost:8501" in out
 
     def test_launcher_prints_output_files(self, capsys):
         from src.main import run_sr_launcher
-        run_sr_launcher()
+        with unittest.mock.patch("subprocess.Popen"):
+            run_sr_launcher()
         out = capsys.readouterr().out
-        assert "screening_log.csv" in out
-        assert "forest_plot.png" in out
-        assert "systematic_review.html" in out
+        assert "SR Automation Pipeline" in out
+        assert "Streamlit" in out
+        assert "SR UI launched" in out
+
