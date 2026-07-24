@@ -1570,6 +1570,42 @@ def main(
                 print(f"[RAG] Clear warning: {exc}")
 
 
+# ── API Key Validation ──────────────────────────────────────────────────────
+
+PROVIDER_ENV_VARS = {
+    "anthropic": "ANTHROPIC_API_KEY",
+    "openai":    "OPENAI_API_KEY",
+    "deepseek":  "DEEPSEEK_API_KEY",
+    "groq":      "GROQ_API_KEY",
+    "ollama":    None,   # local — no key required
+}
+
+def validate_api_keys(provider: str) -> None:
+    """
+    Validate that the required API key environment variable is set
+    for the selected provider. Raises EnvironmentError with a clear
+    message if the key is missing or empty. Ollama requires no key.
+    """
+    provider = provider.lower().strip()
+    if provider not in PROVIDER_ENV_VARS:
+        raise ValueError(
+            f"Unknown provider '{provider}'. "
+            f"Valid options: {', '.join(PROVIDER_ENV_VARS.keys())}"
+        )
+    env_var = PROVIDER_ENV_VARS[provider]
+    if env_var is None:
+        return   # ollama — no key needed
+    value = os.environ.get(env_var, "").strip()
+    if not value:
+        raise EnvironmentError(
+            f"\n"
+            f"  [API KEY ERROR]\n"
+            f"  Provider '{provider}' requires {env_var} to be set.\n"
+            f"  Add it to your .env file in the project root:\n"
+            f"  {env_var}=your-key-here\n"
+        )
+
+
 # ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
@@ -1636,6 +1672,22 @@ def parse_args(args: list[str] | None = None) -> argparse.Namespace:
 if __name__ == "__main__":
     try:
         args = parse_args()
+
+        # ── API key validation ─────────────────────────────────────────
+        non_ai_flags = (
+            args.list_sessions
+            or args.read_session
+            or args.delete_session
+            or args.export_session
+            or args.rename_session
+            or args.stats
+            or args.list_roles
+            or args.help_guide
+            or args.dry_run
+        )
+        if not non_ai_flags:
+            validate_api_keys(args.provider)
+
         if args.list_sessions:
             list_sessions(reports_dir=str(REPORTS_DIR))
         elif args.read_session:

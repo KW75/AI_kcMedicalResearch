@@ -2027,3 +2027,57 @@ def test_search_uses_topic_file(tmp_path, monkeypatch):
     content_text = Path(result).read_text(encoding="utf-8")
     assert "heart failure" in content_text
     assert "Clinical Topic" in content_text
+
+
+# ---------------------------------------------------------------------------
+# Tests for validate_api_keys
+# ---------------------------------------------------------------------------
+class TestValidateApiKeys:
+
+    def test_ollama_requires_no_key(self):
+        from src.main import validate_api_keys
+        validate_api_keys("ollama")  # should not raise
+
+    def test_anthropic_passes_when_key_present(self):
+        import os
+        from src.main import validate_api_keys
+        with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "sk-ant-test"}):
+            validate_api_keys("anthropic")
+
+    def test_openai_passes_when_key_present(self):
+        import os
+        from src.main import validate_api_keys
+        with patch.dict(os.environ, {"OPENAI_API_KEY": "sk-test"}):
+            validate_api_keys("openai")
+
+    def test_deepseek_passes_when_key_present(self):
+        import os
+        from src.main import validate_api_keys
+        with patch.dict(os.environ, {"DEEPSEEK_API_KEY": "sk-test"}):
+            validate_api_keys("deepseek")
+
+    def test_groq_passes_when_key_present(self):
+        import os
+        from src.main import validate_api_keys
+        with patch.dict(os.environ, {"GROQ_API_KEY": "gsk-test"}):
+            validate_api_keys("groq")
+
+    def test_missing_key_raises_environment_error(self):
+        import os
+        from src.main import validate_api_keys
+        with patch.dict(os.environ, {}, clear=True):
+            os.environ.pop("ANTHROPIC_API_KEY", None)
+            with pytest.raises(EnvironmentError, match="ANTHROPIC_API_KEY"):
+                validate_api_keys("anthropic")
+
+    def test_empty_string_key_raises_environment_error(self):
+        import os
+        from src.main import validate_api_keys
+        with patch.dict(os.environ, {"OPENAI_API_KEY": "   "}):
+            with pytest.raises(EnvironmentError, match="OPENAI_API_KEY"):
+                validate_api_keys("openai")
+
+    def test_unknown_provider_raises_value_error(self):
+        from src.main import validate_api_keys
+        with pytest.raises(ValueError, match="Unknown provider"):
+            validate_api_keys("unknown_provider")
