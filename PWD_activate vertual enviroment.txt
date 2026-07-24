@@ -1,3 +1,0 @@
-cd D:\AI_kcMedicalResearch
-.venv\Scripts\Activate.ps1
-

@@ -23,3 +23,19 @@ GITHUB_SETUP_REFERENCE*.md
 GITHUB_SETUP_REFERENCE*.html
 
 reports/
+
+# Sensitive and personal files
+PWD_*.txt
+PWD_*.TXT
+*.TXT
+*API*.txt
+*API*.TXT
+
+# uploads and SR working data
+uploads/
+sr/data/
+sr/outputs/
+
+# ChromaDB vector store
+chroma_db/
+*.sqlite3

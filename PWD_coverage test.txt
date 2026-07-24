@@ -1,2 +1,0 @@
-python -m pytest -v
-python -m pytest -v --cov=src --cov-report=term-missing
