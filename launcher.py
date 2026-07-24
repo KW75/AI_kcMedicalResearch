@@ -1,3 +1,4 @@
+
 import subprocess
 import sys
 import os
@@ -27,17 +28,26 @@ MODES = [
 ]
 
 PROVIDERS = [
-    ('1', 'Ollama (local - default)', ''),
+    ('1', 'Ollama (local - default)',    ''),
     ('2', 'Qwen (Alibaba - recommended)', '--provider qwen'),
     ('3', 'Groq',                         '--provider groq'),
     ('4', 'DeepSeek',                     '--provider deepseek'),
-    ('5', 'OpenAI',                        '--provider openai'),
-    ('6', 'Anthropic',                     '--provider anthropic'),
+    ('5', 'OpenAI',                       '--provider openai'),
+    ('6', 'Anthropic',                    '--provider anthropic'),
 ]
 
 
 def clear():
     os.system('cls' if os.name == 'nt' else 'clear')
+
+
+def safe_input(prompt, default=''):
+    """input() wrapper that handles EOFError and KeyboardInterrupt gracefully."""
+    try:
+        return input(prompt).strip()
+    except (KeyboardInterrupt, EOFError):
+        return default
+
 
 def banner():
     print()
@@ -46,18 +56,19 @@ def banner():
     print(f'  {FRAME}|{RESET}    {LOGO}##   ##    ####{RESET}                                      {FRAME}|{RESET}')
     print(f'  {FRAME}|{RESET}    {LOGO}##  ##    ##  ##{RESET}                                     {FRAME}|{RESET}')
     print(f'  {FRAME}|{RESET}    {LOGO}## ##    ##{RESET}       {LOGO_TXT}AI kcMedical Research{RESET}              {FRAME}|{RESET}')
-    print(f'  {FRAME}|{RESET}    {LOGO}####     ##{RESET}       {LOGO_TXT}Version 2.1.0{RESET}                      {FRAME}|{RESET}')
-    print(f'  {FRAME}|{RESET}    {LOGO}## ##    ##{RESET}       {LOGO_TXT}291 tests passing{RESET}                  {FRAME}|{RESET}')
+    print(f'  {FRAME}|{RESET}    {LOGO}####     ##{RESET}       {LOGO_TXT}Version 2.2.0{RESET}                      {FRAME}|{RESET}')
+    print(f'  {FRAME}|{RESET}    {LOGO}## ##    ##{RESET}       {LOGO_TXT}300 tests passing{RESET}                  {FRAME}|{RESET}')
     print(f'  {FRAME}|{RESET}    {LOGO}##  ##    ##  ##{RESET}                                     {FRAME}|{RESET}')
     print(f'  {FRAME}|{RESET}    {LOGO}##   ##    ####{RESET}   {LOGO_TXT}AI Medical  | Research  | Review{RESET}   {FRAME}|{RESET}')
     print(f'  {FRAME}|{RESET}                                                         {FRAME}|{RESET}')
     print(f'  {FRAME}+=========================================================+{RESET}')
     print()
     print(f'  {DIM}Modes:{RESET}      {ACCENT}coding  writing  appraisal  search  rct_search  sr{RESET}')
-    print(f'  {DIM}Providers:{RESET}  {ACCENT}ollama (default) qwen groq deepseek openai anthropic{RESET}')
+    print(f'  {DIM}Providers:{RESET}  {ACCENT}ollama (default)  qwen  groq  deepseek  openai  anthropic{RESET}')
     print()
     print(f'  {DIM}For help:{RESET}   {ACCENT}python src/main.py --help-guide{RESET}')
     print()
+
 
 def pick_mode():
     while True:
@@ -73,11 +84,8 @@ def pick_mode():
         print()
         print(f'  {DIM}TIP:{RESET} {TEXT}Press Ctrl+C inside a session to stop and return here.{RESET}')
         print()
-        try:
-            choice = input(f'  {ACCENT}Enter choice [1-8 H X]: {RESET}').strip().upper()
-        except KeyboardInterrupt:
-            return None, None, False, False
-        if choice == 'X':
+        choice = safe_input(f'  {ACCENT}Enter choice [1-8 H X]: {RESET}', default='X').upper()
+        if choice == 'X' or choice == '':
             return None, None, False, False
         if choice == 'H':
             return None, None, False, True
@@ -87,7 +95,8 @@ def pick_mode():
             if choice == key:
                 return label, flag, False, False
         print(f'  {ACCENT}Invalid choice.{RESET}')
-        input(f'  {DIM}Press Enter to try again...{RESET}')
+        safe_input(f'  {DIM}Press Enter to try again...{RESET}')
+
 
 def pick_provider():
     while True:
@@ -97,10 +106,7 @@ def pick_provider():
         for key, label, _ in PROVIDERS:
             print(f'  {TEXT}{key}{RESET}  {TEXT}{label}{RESET}')
         print()
-        try:
-            choice = input(f'  {ACCENT}Enter choice [1-6] or Enter for Ollama: {RESET}').strip()
-        except KeyboardInterrupt:
-            return ''
+        choice = safe_input(f'  {ACCENT}Enter choice [1-6] or Enter for Ollama: {RESET}', default='')
         if choice == '':
             return ''
         for key, label, flag in PROVIDERS:
@@ -108,46 +114,54 @@ def pick_provider():
                 return flag
         print(f'  {ACCENT}Invalid choice.{RESET}')
 
+
 def run_custom():
     print()
     print(f'  {ACCENT}Custom flags{RESET}')
-    print(f'  {TEXT}Type flags e.g. --mode writing --report --provider anthropic{RESET}')
+    print(f'  {TEXT}Type flags e.g. --mode writing --report --provider qwen{RESET}')
     print(f'  {DIM}Leave blank and press Enter to return to menu.{RESET}')
     print()
-    try:
-        custom = input(f'  {ACCENT}> python src/main.py {RESET}').strip()
-    except KeyboardInterrupt:
-        return
+    custom = safe_input(f'  {ACCENT}> python src/main.py {RESET}', default='')
     if not custom:
         return
     cmd = [PYTHON, str(BASE / 'src' / 'main.py')] + custom.split()
     print()
     try:
-        subprocess.run(cmd, cwd=str(BASE))
-    except KeyboardInterrupt:
+        result = subprocess.run(cmd, cwd=str(BASE))
+        if result.returncode != 0:
+            print(f'\n  {DIM}[exit code {result.returncode}]{RESET}')
+    except (KeyboardInterrupt, EOFError):
         print(f'\n\n{ACCENT}Session stopped. Returning to menu...{RESET}\n')
+
 
 def main():
     os.chdir(BASE)
     while True:
         label, mode_flag, is_custom, is_help = pick_mode()
+
         if label is None and not is_custom and not is_help:
             clear()
             print()
             print(f'  {ACCENT}Goodbye.{RESET}')
             print()
             break
+
         if is_help:
             try:
-                subprocess.run([PYTHON, str(BASE / 'src' / 'main.py'), '--help-guide'], cwd=str(BASE))
-            except KeyboardInterrupt:
+                subprocess.run(
+                    [PYTHON, str(BASE / 'src' / 'main.py'), '--help-guide'],
+                    cwd=str(BASE)
+                )
+            except (KeyboardInterrupt, EOFError):
                 pass
-            input(f'  {DIM}Press Enter to return to menu...{RESET}')
+            safe_input(f'  {DIM}Press Enter to return to menu...{RESET}')
             continue
+
         if is_custom:
             run_custom()
-            input(f'  {DIM}Press Enter to return to menu...{RESET}')
+            safe_input(f'  {DIM}Press Enter to return to menu...{RESET}')
             continue
+
         prov_flag = pick_provider()
         flags = [f for f in [mode_flag, prov_flag] if f]
         cmd = [PYTHON, str(BASE / 'src' / 'main.py')] + ' '.join(flags).split()
@@ -158,10 +172,13 @@ def main():
         print(f'  {DIM}-------------------------------------------------------{RESET}')
         print()
         try:
-            subprocess.run(cmd, cwd=str(BASE))
-        except KeyboardInterrupt:
+            result = subprocess.run(cmd, cwd=str(BASE))
+            if result.returncode != 0:
+                print(f'\n  {DIM}[exit code {result.returncode}]{RESET}')
+        except (KeyboardInterrupt, EOFError):
             print(f'\n\n{ACCENT}Session stopped. Returning to menu...{RESET}\n')
-        input(f'  {DIM}Press Enter to return to menu...{RESET}')
+        safe_input(f'  {DIM}Press Enter to return to menu...{RESET}')
+
 
 if __name__ == '__main__':
     main()

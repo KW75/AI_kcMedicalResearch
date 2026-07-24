@@ -1736,7 +1736,11 @@ if __name__ == "__main__":
             or args.dry_run
         )
         if not non_ai_flags:
-            validate_api_keys(args.provider)
+            try:
+                validate_api_keys(args.provider)
+            except (EnvironmentError, ValueError) as e:
+                print(e)
+                sys.exit(1)
 
         if args.list_sessions:
             list_sessions(reports_dir=str(REPORTS_DIR))
