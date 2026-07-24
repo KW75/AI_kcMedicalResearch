@@ -6,9 +6,10 @@
 - **GitHub:** https://github.com/KW75/AI_kcMedicalResearch
 - **VERSION:** 2.1.0
 
+
 ## Current Status
-- **Last commit:** 6006d23 (Step 77d)
-- **Tests:** 258 passing, 0 failing, ~87% coverage
+- **Last commit:** 80d2b57 (Step 78)
+- **Tests:** 291 passing, 0 failing, ~84% coverage
 - **Python:** 3.11+ recommended
 - **Virtual env:** .venv (in project root)
 
@@ -19,23 +20,36 @@
 | Step | Description | Commit |
 |------|-------------|--------|
 | 1–51 | Core tool, providers, RAG, all base modes | multiple |
-| 56 | rct_search mode (Formulator, Searcher, Validator) | — |
-| 64 | SR pipeline (sr/main.py, PRISMA, meta-analysis) | f8b588a |
-| 65 | Appraisal word limit 1500 words | — |
-| 66 | Writing mode PDF/DOCX output | — |
-| 68 | RCT search single-pass pipeline | — |
-| 69 | Rename project to AI_kcMedicalResearch, VERSION 2.1.0 | ea06c40 |
-| 70 | Update README and HANDOFF for all 6 modes and new flags | f2f2136 |
-| 71 | File-based I/O: topic.md for search/rct_search, direct article injection for appraisal | 4afcd2d |
+| 56  | rct_search mode (Formulator, Searcher, Validator) | — |
+| 64  | SR pipeline (sr/main.py, PRISMA, meta-analysis) | f8b588a |
+| 65  | Appraisal word limit 1500 words | — |
+| 66  | Writing mode PDF/DOCX output | — |
+| 68  | RCT search single-pass pipeline | — |
+| 69  | Rename project to AI_kcMedicalResearch, VERSION 2.1.0 | ea06c40 |
+| 70  | Update README and HANDOFF for all 6 modes and new flags | f2f2136 |
+| 71  | File-based I/O: topic.md for search/rct_search, direct article injection for appraisal | 4afcd2d |
 | 72a | Writing templates: project-brief, style-guide, editorial-standards, qa-checklist | — |
 | 72b | Appraisal templates: appraisal-guide, scoring-criteria; search-guide output standards | 0f682c7 |
-| 73 | Remove HANDOFF.md from .gitignore | 435b1bd |
-| 74 | Update README and HANDOFF — docs/ structure, file-based I/O | 24fb22a |
+| 73  | Remove HANDOFF.md from .gitignore | 435b1bd |
+| 74  | Update README and HANDOFF — docs/ structure, file-based I/O | 24fb22a |
 | 74b | Remove stale helper scripts | 7fc86d6 |
-| 77 | Align appraisal/methodologist/summariser prompts with 7-section guide | d296153 |
+| 75  |	GitHub Actions CI — pytest on push/PR, Python 3.11+3.12 matrix, coverage report | 0b2a9a5 |
+| 75b |	Add pytest, pytest-cov, anyio to requirements.txt for CI | a7a4024 |
+| 75c |	Add pandas, numpy, scipy, matplotlib, pyyaml to requirements.txt for CI | a71bf39 |
+| 76  | End-to-end mode tests — 16 new tests, 282 passing, all modes covered with dry-run | ebaaa9c |
+| 77  | Align appraisal/methodologist/summariser prompts with 7-section guide | d296153 |
 | 77b | Create flashcard.html quick-reference (later removed) | 3db9dcf |
 | 77c | Delete orphan flashcard.html, partial flashcard-help.html update | 152c892 |
 | 77d | Patch flashcard-help.html — 7-section appraisal card, 258 tests, claude-sonnet-4-6 | 6006d23 |
+| 78  |	Update README+HANDOFF (OCR, laptop transfer, batch files); add setup.bat and run.bat | 794a24a |
+| 78a |	Colour launcher: ANSI banner, mode/provider menus, Ctrl+C handling | c68a468 |
+| 78f+g | Python launcher with KC logo banner, menu loop, Ctrl+C returns to menu | c68a468 |
+| 78h |	Remove stale helper scripts — keep conftest.py, launcher.py, test_live_providers.py | c56e003 |
+| 78i |	flashcard-help.html — search card updated with paper vs topic distinction, file-based input, quality standards|	16ac91a |
+| 79  |	PDF OCR support — PyMuPDF/pypdf/pytesseract three-stage fallback, Tesseract+Poppler via .env 	(hash after push)
+| 80  |	API key validation on startup — validate_api_keys(), 8 new tests, 266 passing | 38822dc |
+| 81  |	Repo audit — purge DeepSeek API key from history, harden .gitignore, replace PWD .txt with .bat | 7b58879 |
+| 78  |	SR Streamlit UI — 5-page app, config editor, PDF upload, pipeline runner, results viewer, report downloads | 80d2b57|
 
 ---
 
@@ -161,11 +175,13 @@ All paths in src/main.py use BASE_DIR = Path(__file__).resolve().parent.parent s
 
 | # | Gap | Priority |
 |---|-----|----------|
-| 75 | GitHub Actions CI (pytest on every push) | High |
-| 76 | End-to-end mode testing with real templates | High |
-| 78 | SR Streamlit UI integration | Low |
-| 79 | PDF OCR support (pytesseract + Tesseract binary + Poppler) | Medium |
-| 80 | API key validation on startup | High |
-| 81 | GitHub repo audit (.gitignore, secrets, branch protection) | High |
-| 82 | WeasyPrint native Windows libs for PDF export | Low |
-| 83 | Interactive input() paths fully unit-tested | Low |
+| 75 | GitHub Actions CI (pytest on every push) | High | ✅ Done
+| 76 | End-to-end mode testing with real templates | High | ✅ Done
+| 78 | SR Streamlit UI integration | Low | ✅ Done
+| 79 | PDF OCR support (pytesseract + Tesseract binary + Poppler) | Medium | ✅ Done
+| 80 | API key validation on startup | High | ✅ Done
+| 81 | GitHub repo audit (.gitignore, secrets, branch protection) | High | ✅ Done
+| 82* | WeasyPrint native Windows libs for PDF export | Low | ✅ Done
+| 83 | Interactive input() paths fully unit-tested | Low |  ✅ Done
+Update Known Gaps — all closed.
+*Gap 82 (WeasyPrint) was already present in sr/requirements.txt — no additional work needed unless Windows-specific native lib issues arise at runtime.

@@ -63,6 +63,12 @@ DEEPSEEK_API_KEY    = os.getenv("DEEPSEEK_API_KEY",  "")
 DEEPSEEK_MODEL      = os.getenv("DEEPSEEK_MODEL",    "deepseek-v4-flash")
 GROQ_API_KEY        = os.getenv("GROQ_API_KEY",      "")
 GROQ_MODEL          = os.getenv("GROQ_MODEL",        "llama-3.3-70b-versatile")
+DASHSCOPE_API_KEY  = os.environ.get("DASHSCOPE_API_KEY", "")
+DASHSCOPE_BASE_URL = os.environ.get(
+    "DASHSCOPE_BASE_URL",
+    "https://dashscope-intl.aliyuncs.com/compatible-mode/v1"
+)
+QWEN_MODEL         = "qwen3.7-plus"
 EMBEDDING_PROVIDER  = os.getenv("EMBEDDING_PROVIDER",  "ollama")
 EMBEDDING_MODEL     = os.getenv("EMBEDDING_MODEL",     "nomic-embed-text")
 
@@ -348,6 +354,48 @@ def call_groq_provider(
     except (KeyError, IndexError) as exc:
         raise RuntimeError(f"Groq unexpected response format: {exc}") from exc
 
+def call_qwen_provider(
+    prompt: str,
+    model: str | None = None,
+    max_tokens: int = 2048,
+) -> str:
+    """Send a prompt to Alibaba Cloud Model Studio (Qwen) via OpenAI-compatible API.
+    Geo-unrestricted; supports Singapore, Hong Kong, Tokyo, Frankfurt regions."""
+    if not DASHSCOPE_API_KEY:
+        raise RuntimeError("DASHSCOPE_API_KEY is not set. Add it to your .env file.")
+    model = model or QWEN_MODEL
+    url   = f"{DASHSCOPE_BASE_URL.rstrip('/')}/chat/completions"
+    payload = json.dumps({
+        "model":          model,
+        "messages":       [{"role": "user", "content": prompt}],
+        "max_tokens":     max_tokens,
+        "stream":         False,
+        "enable_thinking": False,
+    }).encode()
+    req = urllib.request.Request(
+        url,
+        data=payload,
+        headers={
+            "Content-Type":  "application/json",
+            "Authorization": f"Bearer {DASHSCOPE_API_KEY}",
+        },
+        method="POST",
+    )
+    try:
+        with urlopen(req, timeout=60) as resp:
+            data = json.loads(resp.read())
+        choices = data.get("choices", [])
+        if not choices or not choices[0].get("message", {}).get("content"):
+            raise RuntimeError("Qwen returned an empty response.")
+        return choices[0]["message"]["content"]
+    except urllib.error.HTTPError as exc:
+        raise RuntimeError(f"Qwen HTTP error {exc.code}: {exc.reason}") from exc
+    except urllib.error.URLError as exc:
+        raise RuntimeError(f"Qwen connection error: {exc.reason}") from exc
+    except (KeyError, IndexError) as exc:
+        raise RuntimeError(f"Qwen unexpected response format: {exc}") from exc
+
+
 
 PROVIDERS: dict[str, callable] = {
     "ollama":    call_ollama_provider,
@@ -355,6 +403,7 @@ PROVIDERS: dict[str, callable] = {
     "anthropic": call_anthropic_provider,
     "deepseek":  call_deepseek_provider,
     "groq":      call_groq_provider,
+    "qwen":      call_qwen_provider,
 }
 
 
@@ -1577,6 +1626,7 @@ PROVIDER_ENV_VARS = {
     "openai":    "OPENAI_API_KEY",
     "deepseek":  "DEEPSEEK_API_KEY",
     "groq":      "GROQ_API_KEY",
+    "qwen":      "DASHSCOPE_API_KEY",
     "ollama":    None,   # local — no key required
 }
 

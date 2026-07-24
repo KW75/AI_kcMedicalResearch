@@ -42,29 +42,44 @@ Return null for any field you cannot find. Return ONLY valid JSON matching this 
  "adverse_events":{{"any_adverse_event_rr":null,"serious_adverse_event_rr":null,
   "withdrawals_due_to_ae":null,"notes":null}}}}'''
 
+
 class DataExtractor:
     def __init__(self, pico_criteria: Optional[dict]=None,
                  pico_outcome: Optional[str]=None,
-                 model: str="claude-opus-4-7",
+                 model: str="qwen3.7-plus",
+                 provider: str="qwen",
                  api_key: Optional[str]=None):
-        self.model=model
-        self.pico=pico_criteria or {}
-        self.outcome=pico_outcome or self.pico.get("outcome")
+        self.provider = provider.lower()
+        self.model    = model
+        self.pico     = pico_criteria or {}
+        self.outcome  = pico_outcome or self.pico.get("outcome")
         if not self.outcome:
             logger.warning("DataExtractor: no review outcome specified — "
                            "will extract paper's own primary outcome.")
-        self.client=anthropic.Anthropic(
-            api_key=api_key or os.environ["ANTHROPIC_API_KEY"])
+        if self.provider == "anthropic":
+            self.client = anthropic.Anthropic(
+                api_key=api_key or os.environ["ANTHROPIC_API_KEY"])
+        else:
+            from openai import OpenAI
+            from sr.src.screening.rob2_tool import _openai_compat_creds
+            _key, _base = _openai_compat_creds(self.provider, api_key)
+            self.client = OpenAI(api_key=_key, base_url=_base)
 
     def _prompt(self) -> str:
         return EXTRACTION_PROMPT_TEMPLATE.format(
             outcome      = self.outcome or "(not specified)",
-            population   = self.pico.get("population","(not specified)"),
-            intervention = self.pico.get("intervention","(not specified)"),
-            comparator   = self.pico.get("comparator","(not specified)"),
+            population   = self.pico.get("population", "(not specified)"),
+            intervention = self.pico.get("intervention", "(not specified)"),
+            comparator   = self.pico.get("comparator", "(not specified)"),
         )
 
     def extract_by_file_id(self, file_id, filename="") -> dict:
+        """Anthropic Files API path only."""
+        if self.provider != "anthropic":
+            raise RuntimeError(
+                "extract_by_file_id requires Anthropic. "
+                "Use extract_by_pdf_path() for other providers."
+            )
         try:
             resp = self.client.beta.messages.create(
                 model=self.model, max_tokens=4096,
@@ -77,16 +92,59 @@ class DataExtractor:
             if raw.startswith("```"):
                 raw=raw.split("```")[1]
                 if raw.startswith("json"): raw=raw[4:]
-            r=json.loads(raw)
+            r = json.loads(raw)
             r.update({"file_id":file_id,"filename":filename,"extraction_error":None})
             return r
         except Exception as e:
             return {"file_id":file_id,"filename":filename,"extraction_error":str(e)}
 
+    def _call_with_images(self, base64_images: list, prompt: str) -> str:
+        """Send PDF pages as base64 images via OpenAI-compatible vision API."""
+        content = [{"type": "text", "text": prompt}]
+        for img in base64_images[:5]:
+            content.append({
+                "type": "image_url",
+                "image_url": {"url": f"data:image/png;base64,{img}"}
+            })
+        resp = self.client.chat.completions.create(
+            model=self.model,
+            messages=[{"role": "user", "content": content}],
+            max_tokens=4096,
+            extra_body={"enable_thinking": False},
+        )
+        return resp.choices[0].message.content.strip()
+
+    def extract_by_pdf_path(self, pdf_path: str, filename="") -> dict:
+        """Vision-based extraction for non-Anthropic providers."""
+        try:
+            from pdf2image import convert_from_path
+            import io, base64
+            poppler = os.environ.get("POPPLER_PATH")
+            pages   = convert_from_path(pdf_path, dpi=150, poppler_path=poppler)
+            images  = []
+            for page in pages:
+                buf = io.BytesIO()
+                page.save(buf, format="PNG")
+                images.append(base64.b64encode(buf.getvalue()).decode())
+            raw = self._call_with_images(images, self._prompt())
+            if raw.startswith("```"):
+                raw = raw.split("```")[1]
+                if raw.startswith("json"): raw = raw[4:]
+            r = json.loads(raw)
+            r.update({"file_id": None, "filename": filename, "extraction_error": None})
+            return r
+        except Exception as e:
+            return {"file_id": None, "filename": filename, "extraction_error": str(e)}
+
     def extract_batch(self, included_records, delay_seconds=2.0) -> list[dict]:
-        results=[]
-        for i,r in enumerate(included_records,1):
+        results = []
+        for i, r in enumerate(included_records, 1):
             logger.info(f"[EXTRACT {i}/{len(included_records)}] {r['filename']}")
-            results.append(self.extract_by_file_id(r["file_id"],r["filename"]))
-            if i<len(included_records): time.sleep(delay_seconds)
+            if self.provider == "anthropic":
+                results.append(self.extract_by_file_id(r["file_id"], r["filename"]))
+            else:
+                results.append(self.extract_by_pdf_path(
+                    r.get("pdf_path", ""), r["filename"]))
+            if i < len(included_records):
+                time.sleep(delay_seconds)
         return results

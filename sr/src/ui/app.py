@@ -64,7 +64,7 @@ st.sidebar.markdown("""
 """)
 st.sidebar.markdown("---")
 st.sidebar.markdown(
-    "📖 [Full guide](../../../docs/flashcard-help.html)",
+    "📖 Full guide: open `docs/flashcard-help.html` in File Explorer",
     unsafe_allow_html=True,
 )
 
@@ -262,8 +262,41 @@ elif page == "▶️  Run Pipeline":
 
     st.markdown("---")
 
-    # Model selection
-    st.subheader("Model")
+    # Provider + Model selection
+    st.subheader("AI Provider & Model")
+    provider = st.selectbox(
+        "Provider",
+        ["qwen", "groq", "deepseek", "openai", "anthropic", "ollama"],
+        index=0,
+    )
+    MODEL_OPTIONS = {
+        "qwen":      ["qwen3.7-plus", "qwen3.7-max", "qwen3.6-flash"],
+        "groq":      ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "qwen/qwen3.6-27b"],
+        "deepseek":  ["deepseek-v4-flash", "deepseek-v4-pro"],
+        "openai":    ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo"],
+        "anthropic": ["claude-sonnet-4-6", "claude-opus-4-6", "claude-sonnet-4-5"],
+        "ollama":    ["llama3.2", "llama3.1", "mistral", "phi3"],
+    }
+    model = st.selectbox("AI model", MODEL_OPTIONS[provider])
+    if provider == "anthropic":
+        st.warning(
+            "⚠️ Anthropic may be geo-restricted in your region. "
+            "Qwen or Groq are recommended alternatives."
+        )
+    elif provider != "anthropic":
+        st.info(
+            "ℹ️ PDF pages are converted to images for processing. "
+            "Qwen (qwen3.7-plus) is recommended — fast, capable, and geo-unrestricted."
+        )
+
+    MODEL_OPTIONS = {
+        "anthropic": ["claude-sonnet-4-6", "claude-opus-4-6", "claude-sonnet-4-5"],
+        "openai":    ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo"],
+        "deepseek":  ["deepseek-chat", "deepseek-reasoner"],
+        "groq":      ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "mixtral-8x7b-32768"],
+        "ollama":    ["llama3.2", "llama3.1", "mistral", "phi3"],
+    }
+
     model = st.selectbox(
         "AI model",
         ["claude-sonnet-4-6", "claude-opus-4-6", "claude-sonnet-4-5"],
@@ -344,8 +377,13 @@ elif page == "▶️  Run Pipeline":
             progress.progress(45, text="Stage 3: Extracting data...")
             from sr.src.extraction.data_extractor import DataExtractor
             er = DataExtractor(
-                pico_criteria=cfg.get("pico", {}), model=model
+                pico_criteria=cfg.get("pico", {}),
+                pico_outcome=cfg.get("pico", {}).get("outcome"),
+                model=model,
+                provider=provider,
             ).extract_batch(included)
+
+
             (SR_DIR / "data" / "extracted").mkdir(parents=True, exist_ok=True)
             pd.json_normalize(er).to_csv(
                 SR_DIR / "data" / "extracted" / "extracted_data.csv", index=False
@@ -353,7 +391,7 @@ elif page == "▶️  Run Pipeline":
 
             progress.progress(55, text="Stage 3.5: RoB 2.0 assessment...")
             from sr.src.screening.rob2_tool import RoB2Assessor
-            rob = RoB2Assessor(model=model).assess_batch(included)
+            rob = RoB2Assessor(model=model, provider=provider).assess_batch(included)
             pd.json_normalize(rob).to_csv(
                 SR_DIR / "data" / "extracted" / "rob2_assessment.csv", index=False
             )
