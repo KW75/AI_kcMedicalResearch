@@ -1648,15 +1648,23 @@ def test_fetch_pubmed_parses_xml_correctly():
 
 def test_run_search_mode_dry_run_creates_report(tmp_path, monkeypatch):
     from src import main as m
+    from pathlib import Path
     ai_dir = tmp_path / "ai"
     ai_dir.mkdir()
     (ai_dir / "researcher-prompt.md").write_text("You are a researcher.", encoding="utf-8")
     monkeypatch.setattr(m, "BASE_DIR", tmp_path)
-    monkeypatch.setattr(m, "fetch_pubmed_articles", lambda q, max_results=10: [])
+    monkeypatch.setattr(m, "fetch_pubmed_articles", lambda q, max_results=10: [{
+        "pmid": "99999",
+        "title": "Heart failure study",
+        "abstract": "Abstract text.",
+        "url": "https://pubmed.ncbi.nlm.nih.gov/99999/",
+    }])
     responses = iter(["2", "heart failure treatment"])
     monkeypatch.setattr("builtins.input", lambda _: next(responses))
-    with pytest.raises(SystemExit):
-        m.run_search_mode(dry_run=True, ai_dir=ai_dir, reports_dir=tmp_path)
+    md_path = m.run_search_mode(dry_run=True, ai_dir=ai_dir, reports_dir=tmp_path)
+    assert md_path.exists()
+    assert md_path.stat().st_size > 0
+
 
 def test_run_search_mode_empty_topic_exits(tmp_path, monkeypatch):
     from src import main as m
@@ -2081,3 +2089,156 @@ class TestValidateApiKeys:
         from src.main import validate_api_keys
         with pytest.raises(ValueError, match="Unknown provider"):
             validate_api_keys("unknown_provider")
+
+# ---------------------------------------------------------------------------
+# Tests for interactive input() paths (Gap 83)
+# ---------------------------------------------------------------------------
+class TestInteractiveInputPaths:
+
+    # run_search_mode — interactive search type selection
+    def test_search_mode_interactive_paper_search(self, tmp_path):
+        """run_search_mode: interactive path, type=1 (paper search)."""
+        from src.main import run_search_mode
+        with patch("src.main._read_topic_file", return_value=""), \
+             patch("builtins.input", side_effect=["1", "metformin diabetes"]), \
+             patch("src.main.fetch_pubmed_articles", return_value=[{
+                 "pmid": "11111",
+                 "title": "Metformin paper",
+                 "abstract": "Abstract text.",
+                 "url": "https://pubmed.ncbi.nlm.nih.gov/11111/",
+             }]):
+            md_path = run_search_mode(
+                provider="ollama",
+                dry_run=True,
+                reports_dir=tmp_path,
+            )
+        assert md_path.exists()
+        content = md_path.read_text(encoding="utf-8")
+        assert "metformin" in content.lower()
+
+    def test_search_mode_interactive_clinical_topic(self, tmp_path):
+        """run_search_mode: interactive path, type=2 (clinical topic)."""
+        from src.main import run_search_mode
+        with patch("src.main._read_topic_file", return_value=""), \
+             patch("builtins.input", side_effect=["2", "hypertension treatment"]), \
+             patch("src.main.fetch_pubmed_articles", return_value=[{
+                 "pmid": "22222",
+                 "title": "Hypertension study",
+                 "abstract": "Abstract text.",
+                 "url": "https://pubmed.ncbi.nlm.nih.gov/22222/",
+             }]):
+            md_path = run_search_mode(
+                provider="ollama",
+                dry_run=True,
+                reports_dir=tmp_path,
+            )
+        assert md_path.exists()
+        content = md_path.read_text(encoding="utf-8")
+        assert "hypertension" in content.lower()
+
+    def test_search_mode_invalid_then_valid_type(self, tmp_path):
+        """run_search_mode: invalid input retries until valid."""
+        from src.main import run_search_mode
+        with patch("src.main._read_topic_file", return_value=""), \
+             patch("builtins.input", side_effect=["9", "x", "2", "diabetes"]), \
+             patch("src.main.fetch_pubmed_articles", return_value=[{
+                 "pmid": "33333",
+                 "title": "Diabetes study",
+                 "abstract": "Abstract text.",
+                 "url": "https://pubmed.ncbi.nlm.nih.gov/33333/",
+             }]):
+            md_path = run_search_mode(
+                provider="ollama",
+                dry_run=True,
+                reports_dir=tmp_path,
+            )
+        assert md_path.exists()
+
+    # generate_code_revision — task input
+    def test_code_revision_interactive_task_input(self, tmp_path):
+        """generate_code_revision: task entered interactively."""
+        from src.main import generate_code_revision
+        coding_dir = tmp_path / "coding"
+        coding_dir.mkdir()
+        (coding_dir / "example.py").write_text(
+            "def add(a, b):\n    return a + b\n",
+            encoding="utf-8",
+        )
+        with patch("builtins.input", return_value="Check for bugs"):
+            md_path = generate_code_revision(
+                start_role="Tester",
+                docs_dir=coding_dir,
+                reports_dir=tmp_path,
+                provider="ollama",
+                dry_run=True,
+            )
+        assert md_path.exists()
+        content = md_path.read_text(encoding="utf-8")
+        assert "Check for bugs" in content
+
+    def test_code_revision_empty_task_uses_default(self, tmp_path):
+        """generate_code_revision: empty task input falls back to default."""
+        from src.main import generate_code_revision
+        coding_dir = tmp_path / "coding"
+        coding_dir.mkdir()
+        (coding_dir / "example.py").write_text(
+            "def subtract(a, b):\n    return a - b\n",
+            encoding="utf-8",
+        )
+        with patch("builtins.input", return_value=""):
+            md_path = generate_code_revision(
+                start_role="Tester",
+                docs_dir=coding_dir,
+                reports_dir=tmp_path,
+                provider="ollama",
+                dry_run=True,
+            )
+        assert md_path.exists()
+        content = md_path.read_text(encoding="utf-8")
+        assert "Review and improve" in content
+
+    # rct_search — interactive topic input
+    def test_rct_search_interactive_topic_input(self, tmp_path):
+        """run_rct_search_pipeline: topic entered interactively when no file."""
+        from src.main import run_rct_search_pipeline
+        with patch("src.main._read_topic_file", return_value=""), \
+             patch("builtins.input", return_value="aspirin and cardiovascular disease"):
+            md_path = run_rct_search_pipeline(
+                provider="ollama",
+                reports_dir=tmp_path,
+                dry_run=True,
+            )
+        assert md_path.exists()
+        content = md_path.read_text(encoding="utf-8")
+        assert "aspirin" in content.lower()
+
+    # delete_session — input() confirmation paths already covered,
+    # but test the y/n boundary explicitly
+    def test_delete_session_confirms_y(self, tmp_path):
+        """delete_session: 'y' confirmation deletes the file."""
+        from src.main import delete_session
+        f = tmp_path / "session_del.md"
+        f.write_text("content", encoding="utf-8")
+        with patch("builtins.input", return_value="y"):
+            delete_session(filename="session_del.md", reports_dir=str(tmp_path))
+        assert not f.exists()
+
+    def test_delete_session_confirms_uppercase_n(self, tmp_path):
+        """delete_session: 'N' cancels deletion."""
+        from src.main import delete_session
+        f = tmp_path / "session_keep.md"
+        f.write_text("content", encoding="utf-8")
+        with patch("builtins.input", return_value="N"):
+            delete_session(filename="session_keep.md", reports_dir=str(tmp_path))
+        assert f.exists()
+
+    # rename_session — new name input
+    def test_rename_session_interactive_new_name(self, tmp_path):
+        """rename_session: new name entered interactively."""
+        from src.main import rename_session
+        f = tmp_path / "session_old.md"
+        f.write_text("content", encoding="utf-8")
+        with patch("builtins.input", return_value="session_new"):
+            rename_session(filename="session_old.md", reports_dir=str(tmp_path))
+        assert (tmp_path / "session_new.md").exists()
+        assert not f.exists()

@@ -1318,7 +1318,7 @@ def run_search_mode(
             topic = input("Clinical topic: ").strip()
         if not topic:
             print("No topic entered. Exiting.")
-        sys.exit(0)
+            sys.exit(0)
 
     print(f"\nSearching PubMed for: {topic}")
 
