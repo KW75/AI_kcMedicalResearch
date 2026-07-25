@@ -1713,6 +1713,9 @@ def parse_args(args: list[str] | None = None) -> argparse.Namespace:
             "  python src/main.py --list-roles --mode rct_search\n"
             "  python src/main.py --dry-run                 # simulate session\n"
             "  python src/main.py --version                 # show version\n"
+            "  python src/main.py --mode sr                               # SR UI mode\n"
+            "  python src/main.py --mode sr --pdf-dir sr/data/uploads     # SR CLI mode\n"
+            "  python src/main.py --mode sr --pdf-dir sr/data/uploads --effect-measure SMD\n"
         ),
     )
     parser.add_argument("--model",          type=str,  default=None)
@@ -1742,6 +1745,16 @@ def parse_args(args: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--list-roles",     action="store_true", default=False)
     parser.add_argument("--help-guide", action="store_true", default=False,
                         help="Open the interactive HTML help guide in your browser")
+    # SR pipeline flags
+    parser.add_argument("--pdf-dir",        type=str,  default=None,
+                        help="Path to PDF folder for SR pipeline (activates CLI mode)")
+    parser.add_argument("--effect-measure", type=str,  default=None,
+                        choices=["OR", "RR", "MD", "SMD"],
+                        help="Effect measure for SR meta-analysis")
+    parser.add_argument("--sr-config",      type=str,  default=None,
+                        help="Path to prisma_criteria.yaml (default: sr/config/prisma_criteria.yaml)")
+    return parser.parse_args(args)
+
     return parser.parse_args(args)
 
 
@@ -1808,7 +1821,22 @@ if __name__ == "__main__":
                 dry_run=args.dry_run,
             )
         elif args.mode == "sr":
-            run_sr_launcher()
+            if args.pdf_dir:
+                # CLI mode — run sr/main.py in the same terminal
+                import subprocess as _sp
+                sr_main = Path(__file__).resolve().parent.parent / "sr" / "main.py"
+                cmd = [sys.executable, str(sr_main),
+                       "--pdf-dir", args.pdf_dir,
+                       "--provider", args.provider]
+                if args.effect_measure:
+                    cmd += ["--effect-measure", args.effect_measure]
+                if args.sr_config:
+                    cmd += ["--config", args.sr_config]
+                if args.model:
+                    cmd += ["--model", args.model]
+                _sp.run(cmd, cwd=str(Path(__file__).resolve().parent.parent))
+            else:
+                run_sr_launcher()
         elif args.mode == "rct_search":
             run_rct_search_pipeline(
                 provider=args.provider,

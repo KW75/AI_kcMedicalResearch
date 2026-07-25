@@ -38,7 +38,11 @@ def main():
     ap.add_argument("--pdf-dir",    default=str(SR_DIR / "data" / "uploads"))
     ap.add_argument("--config",     default=None, help="Path to prisma_criteria.yaml")
     ap.add_argument("--effect-measure", default=None, choices=["OR","RR","MD","SMD"])
-    ap.add_argument("--model",      default="claude-opus-4-7")
+    ap.add_argument("--model",      default="qwen3.7-plus")
+    ap.add_argument("--provider",   default="qwen",
+                    choices=["ollama", "openai", "anthropic", "deepseek", "groq", "qwen"],
+                    help="AI provider for screening and extraction")
+
     args = ap.parse_args()
 
     cfg     = load_config(args.config)
