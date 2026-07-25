@@ -7,5 +7,6 @@ if not exist "%PROJECT_DIR%\.venv\Scripts\python.exe" (
     exit /b 1
 )
 title AI kcMedical Research
+cd /d "%PROJECT_DIR%"
 "%PROJECT_DIR%\.venv\Scripts\python.exe" "%PROJECT_DIR%\launcher.py"
 exit /b 0
