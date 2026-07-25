@@ -1,6 +1,5 @@
-$live = @'
-"""
-test_live_providers.py  –  Step 72 live provider smoke test
+﻿"""
+test_live_providers.py  -  Live provider smoke test
 Run manually:  python test_live_providers.py
 Requires:  .env with at least one real API key
 """
@@ -11,8 +10,6 @@ from dotenv import load_dotenv
 load_dotenv(Path(__file__).parent / ".env")
 
 PROMPT = "Reply with exactly: OK"
-
-results = {}
 
 # ── Ollama ────────────────────────────────────────────────────────────────
 def test_ollama():
@@ -36,7 +33,7 @@ def test_ollama():
 def test_openai():
     key = os.getenv("OPENAI_API_KEY", "")
     if not key or key.startswith("sk-placeholder"):
-        return None  # not configured
+        return None
     try:
         import openai
         client = openai.OpenAI(api_key=key)
@@ -60,15 +57,19 @@ def test_anthropic():
         import anthropic
         client = anthropic.Anthropic(api_key=key)
         msg = client.messages.create(
-            model="claude-haiku-3-5",
+            model="claude-haiku-4-5",
             max_tokens=10,
             messages=[{"role": "user", "content": PROMPT}],
         )
         text = msg.content[0].text if msg.content else ""
         return "OK" in text.upper()
+    except anthropic.PermissionDeniedError:
+        print(f"  [anthropic] geo-restricted (VPN required)")
+        return None
     except Exception as e:
         print(f"  [anthropic] {e}")
         return False
+
 
 # ── DeepSeek ──────────────────────────────────────────────────────────────
 def test_deepseek():
@@ -79,9 +80,10 @@ def test_deepseek():
         import openai
         client = openai.OpenAI(api_key=key, base_url="https://api.deepseek.com")
         resp = client.chat.completions.create(
-            model="deepseek-chat",
+            model="deepseek-v4-flash",
             messages=[{"role": "user", "content": PROMPT}],
-            max_tokens=10,
+            max_tokens=20,
+            extra_body={"thinking": {"type": "disabled"}},
         )
         text = resp.choices[0].message.content or ""
         return "OK" in text.upper()
@@ -108,15 +110,37 @@ def test_groq():
         print(f"  [groq] {e}")
         return False
 
+# ── Qwen/DashScope ────────────────────────────────────────────────────────
+def test_qwen():
+    key = os.getenv("DASHSCOPE_API_KEY", "")
+    base_url = os.getenv("DASHSCOPE_BASE_URL", "https://dashscope-intl.aliyuncs.com/compatible-mode/v1")
+    if not key or key.startswith("sk-placeholder"):
+        return None
+    try:
+        import openai
+        client = openai.OpenAI(api_key=key, base_url=base_url)
+        resp = client.chat.completions.create(
+            model="qwen3.7-plus",
+            messages=[{"role": "user", "content": PROMPT}],
+            max_tokens=20,
+            extra_body={"enable_thinking": False},
+        )
+        text = resp.choices[0].message.content or ""
+        return "OK" in text.upper()
+    except Exception as e:
+        print(f"  [qwen] {e}")
+        return False
+
 TESTS = [
     ("ollama",    test_ollama),
     ("openai",    test_openai),
     ("anthropic", test_anthropic),
     ("deepseek",  test_deepseek),
     ("groq",      test_groq),
+    ("qwen",      test_qwen),
 ]
 
-print("\n=== AI_kcMedicalResearch – Live Provider Smoke Test ===\n")
+print("\n=== AI_kcMedicalResearch - Live Provider Smoke Test ===\n")
 passed = skipped = failed = 0
 for name, fn in TESTS:
     print(f"  Testing {name}...", end=" ", flush=True)
@@ -136,6 +160,3 @@ for name, fn in TESTS:
 print(f"\nResults: {passed} passed, {skipped} skipped (no key), {failed} failed")
 if failed:
     sys.exit(1)
-'@
-$live | Set-Content "D:\AI_kcMedicalResearch\test_live_providers.py" -Encoding UTF8
-Write-Host "test_live_providers.py written."
