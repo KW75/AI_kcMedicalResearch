@@ -303,7 +303,8 @@ def call_deepseek_provider(
         "messages":   [{"role": "user", "content": prompt}],
         "max_tokens": max_tokens,
         "stream":     False,
-    }).encode()
+        "thinking":   {"type": "disabled"},
+    }).encode() 
     req = urllib.request.Request(
         url,
         data=payload,
@@ -317,9 +318,13 @@ def call_deepseek_provider(
         with urlopen(req, timeout=60) as resp:
             data = json.loads(resp.read())
         choices = data.get("choices", [])
-        if not choices or not choices[0].get("message", {}).get("content"):
+        if not choices:
             raise RuntimeError("DeepSeek returned an empty response.")
-        return choices[0]["message"]["content"]
+        msg = choices[0].get("message", {})
+        content = msg.get("content") or msg.get("reasoning_content", "")
+        if not content:
+            raise RuntimeError("DeepSeek returned an empty response.")
+        return content
     except urllib.error.HTTPError as exc:
         raise RuntimeError(f"DeepSeek HTTP error {exc.code}: {exc.reason}") from exc
     except urllib.error.URLError as exc:
