@@ -1,8 +1,8 @@
 ﻿"""
-main.py ??AI Automation Tool
-Supports three workflow modes: coding, writing, rct_search.
+main.py — AI Automation Tool
+Supports six workflow modes: coding, writing, rct_search, appraisal, search, sr.
 Supports six AI providers: ollama (default), openai, anthropic, deepseek, groq, qwen.
-RAG layer: per-session, mode-specific uploads/ folder indexing via rag.py.
+RAG layer: per-session, mode-specific input/ folder indexing via rag.py.
 """
 
 from __future__ import annotations
@@ -21,7 +21,6 @@ import uuid
 from datetime import datetime
 from pathlib import Path
 
-
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -32,37 +31,105 @@ if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
 
-# Ensure project root is on sys.path so 'from src import rag' works
-# regardless of how main.py is launched (batch file, subprocess, direct)
-_ROOT = Path(__file__).resolve().parent.parent
-if str(_ROOT) not in sys.path:
-    sys.path.insert(0, str(_ROOT))
-
-
 # ---------------------------------------------------------------------------
 # Version
 # ---------------------------------------------------------------------------
-VERSION = "2.1.0"
+VERSION = "2.2.0"
 
 # ---------------------------------------------------------------------------
 # Paths
 # ---------------------------------------------------------------------------
-BASE_DIR        = Path(__file__).parent.parent
-REPORTS_DIR     = BASE_DIR / "reports"
-DOCS_DIR        = BASE_DIR / "docs"
-DOCS_CODING     = DOCS_DIR / "coding"
-DOCS_WRITING    = DOCS_DIR / "writing"
-DOCS_RCT_SEARCH = DOCS_DIR / "rct_search"
-AI_DIR          = BASE_DIR / "ai"
-UPLOAD_DIR      = BASE_DIR / os.getenv("UPLOAD_DIR", "uploads")
-UPLOADS_CODING      = UPLOAD_DIR / "coding"
-UPLOADS_WRITING     = UPLOAD_DIR / "writing"
-UPLOADS_RCT_SEARCH  = UPLOAD_DIR / "rct_search"
-UPLOADS_APPRAISAL   = UPLOAD_DIR / "appraisal"
+BASE_DIR            = Path(__file__).resolve().parent.parent   # D:\AI_kcMedicalResearch
+
+# Docs folders (guidance .md files per mode)
+DOCS_DIR            = BASE_DIR / "docs"
+DOCS_CODING         = DOCS_DIR / "coding"
+DOCS_WRITING        = DOCS_DIR / "writing"
 DOCS_APPRAISAL      = DOCS_DIR / "appraisal"
+DOCS_RCT_SEARCH     = DOCS_DIR / "rct_search"
+DOCS_SEARCH         = DOCS_DIR / "search"
+DOCS_SR             = DOCS_DIR / "sr"
+
+# AI prompt files
+AI_DIR              = BASE_DIR / "ai"
+
+# Input folders (auto-loaded at startup per mode)
+INPUT_DIR           = BASE_DIR / "input"
+INPUT_CODING        = INPUT_DIR / "coding"
+INPUT_WRITING       = INPUT_DIR / "writing"
+INPUT_APPRAISAL     = INPUT_DIR / "appraisal"
+INPUT_RCT_SEARCH    = INPUT_DIR / "rct_search"
+INPUT_SEARCH        = INPUT_DIR / "search"
+INPUT_SR            = INPUT_DIR / "sr"
+
+# Output folders (deliverables — note: "output" not "outputs")
+OUTPUT_DIR          = BASE_DIR / "output"
+OUTPUT_CODING       = OUTPUT_DIR / "coding"
+OUTPUT_WRITING      = OUTPUT_DIR / "writing"
+OUTPUT_APPRAISAL    = OUTPUT_DIR / "appraisal"
+OUTPUT_RCT_SEARCH   = OUTPUT_DIR / "rct_search"
+OUTPUT_SEARCH       = OUTPUT_DIR / "search"
+OUTPUT_SR           = OUTPUT_DIR / "sr"
+
+# Reports folder (session transcripts / operation logs only)
+REPORTS_DIR         = BASE_DIR / "reports"
+
+# Ensure all directories exist at startup
+for _d in [
+    DOCS_CODING, DOCS_WRITING, DOCS_APPRAISAL,
+    DOCS_RCT_SEARCH, DOCS_SEARCH, DOCS_SR,
+    INPUT_CODING, INPUT_WRITING, INPUT_APPRAISAL,
+    INPUT_RCT_SEARCH, INPUT_SEARCH, INPUT_SR,
+    OUTPUT_CODING, OUTPUT_WRITING, OUTPUT_APPRAISAL,
+    OUTPUT_RCT_SEARCH, OUTPUT_SEARCH, OUTPUT_SR,
+    REPORTS_DIR,
+]:
+    _d.mkdir(parents=True, exist_ok=True)
 
 
-REPORTS_DIR.mkdir(parents=True, exist_ok=True)
+# ---------------------------------------------------------------------------
+# Auto-load input files
+# ---------------------------------------------------------------------------
+import mimetypes  # noqa: E402  (after path setup)
+
+_MODE_EXTENSIONS = {
+    "coding":     {".py", ".js", ".ts", ".html", ".css", ".java", ".c",
+                   ".cpp", ".cs", ".rb", ".go", ".rs", ".txt", ".md"},
+    "writing":    {".txt", ".md", ".docx", ".pdf"},
+    "appraisal":  {".pdf", ".txt", ".md", ".docx"},
+    "rct_search": {".txt", ".md", ".pdf", ".docx"},
+    "search":     {".txt", ".md"},
+    "sr":         {".pdf"},
+}
+
+
+def auto_load_input_files(mode: str) -> list[Path]:
+    """
+    Scan input/<mode>/ and return a sorted list of accepted files.
+    Prints what was found. Returns empty list if folder is empty.
+    """
+    folder_map = {
+        "coding":     INPUT_CODING,
+        "writing":    INPUT_WRITING,
+        "appraisal":  INPUT_APPRAISAL,
+        "rct_search": INPUT_RCT_SEARCH,
+        "search":     INPUT_SEARCH,
+        "sr":         INPUT_SR,
+    }
+    folder  = folder_map.get(mode, INPUT_DIR / mode)
+    allowed = _MODE_EXTENSIONS.get(mode, set())
+    files   = sorted(
+        p for p in folder.iterdir()
+        if p.is_file() and p.suffix.lower() in allowed
+    )
+    if files:
+        print(f"[auto-load] Found {len(files)} file(s) in input/{mode}/:")
+        for f in files:
+            print(f"  • {f.name}")
+    else:
+        print(f"[auto-load] No input files in input/{mode}/ — proceeding without pre-loaded context.")
+    return files
+
 
 # ---------------------------------------------------------------------------
 # Environment / provider config
@@ -72,19 +139,20 @@ OLLAMA_MODEL        = os.getenv("OLLAMA_MODEL",        "qwen2.5-coder:3b")
 OPENAI_API_KEY      = os.getenv("OPENAI_API_KEY",      "")
 OPENAI_MODEL        = os.getenv("OPENAI_MODEL",        "gpt-4o-mini")
 ANTHROPIC_API_KEY   = os.getenv("ANTHROPIC_API_KEY",   "")
-ANTHROPIC_MODEL     = os.getenv("ANTHROPIC_MODEL",     "claude-sonnet-4-6")
-DEEPSEEK_API_KEY    = os.getenv("DEEPSEEK_API_KEY",  "")
-DEEPSEEK_MODEL      = os.getenv("DEEPSEEK_MODEL",    "deepseek-v4-flash")
-GROQ_API_KEY        = os.getenv("GROQ_API_KEY",      "")
-GROQ_MODEL          = os.getenv("GROQ_MODEL",        "llama-3.3-70b-versatile")
-DASHSCOPE_API_KEY  = os.environ.get("DASHSCOPE_API_KEY", "")
-DASHSCOPE_BASE_URL = os.environ.get(
+ANTHROPIC_MODEL     = os.getenv("ANTHROPIC_MODEL",     "claude-sonnet-5")
+DEEPSEEK_API_KEY    = os.getenv("DEEPSEEK_API_KEY",    "")
+DEEPSEEK_MODEL      = os.getenv("DEEPSEEK_MODEL",      "deepseek-v4-flash")
+GROQ_API_KEY        = os.getenv("GROQ_API_KEY",        "")
+GROQ_MODEL          = os.getenv("GROQ_MODEL",          "llama-3.3-70b-versatile")
+DASHSCOPE_API_KEY   = os.environ.get("DASHSCOPE_API_KEY", "")
+DASHSCOPE_BASE_URL  = os.environ.get(
     "DASHSCOPE_BASE_URL",
-    "https://dashscope-intl.aliyuncs.com/compatible-mode/v1"
+    "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
 )
-QWEN_MODEL         = "qwen3.7-plus"
+QWEN_MODEL          = "qwen3.7-plus"
 EMBEDDING_PROVIDER  = os.getenv("EMBEDDING_PROVIDER",  "ollama")
 EMBEDDING_MODEL     = os.getenv("EMBEDDING_MODEL",     "nomic-embed-text")
+
 
 # ---------------------------------------------------------------------------
 # Role / mode definitions
@@ -129,8 +197,6 @@ ROLE_FILES_SEARCH = {
     },
 }
 
-
-
 ALL_MODES: dict[str, dict] = {
     "coding":     ROLE_FILES_CODING,
     "writing":    ROLE_FILES_WRITING,
@@ -164,12 +230,12 @@ DOC_FILES_BY_ROLE: dict[str, list[Path]] = {
                    DOCS_RCT_SEARCH / "database-guide.md"],
     "Validator":  [DOCS_RCT_SEARCH / "pico-framework.md",
                    DOCS_RCT_SEARCH / "validation-criteria.md"],
-    "Appraiser":     [],  # articles supplied via uploads/appraisal/ RAG only
-    "Methodologist": [],  # articles supplied via uploads/appraisal/ RAG only
-    "Summariser":    [],  # articles supplied via uploads/appraisal/ RAG only
+    "Appraiser":     [],  # articles supplied via input/appraisal/ RAG only
+    "Methodologist": [],  # articles supplied via input/appraisal/ RAG only
+    "Summariser":    [],  # articles supplied via input/appraisal/ RAG only
     "Researcher":    [],  # context built from live PubMed fetch only
-
 }
+
 
 # ---------------------------------------------------------------------------
 # Provider registry
@@ -182,8 +248,8 @@ def call_openai_provider(
     """Send a prompt to the OpenAI chat completions endpoint."""
     if not OPENAI_API_KEY:
         raise RuntimeError("OPENAI_API_KEY is not set. Add it to your .env file.")
-    model = model or OPENAI_MODEL
-    url   = "https://api.openai.com/v1/chat/completions"
+    model   = model or OPENAI_MODEL
+    url     = "https://api.openai.com/v1/chat/completions"
     payload = json.dumps({
         "model":      model,
         "messages":   [{"role": "user", "content": prompt}],
@@ -221,8 +287,8 @@ def call_anthropic_provider(
     """Send a prompt to the Anthropic messages endpoint."""
     if not ANTHROPIC_API_KEY:
         raise RuntimeError("ANTHROPIC_API_KEY is not set. Add it to your .env file.")
-    model = model or ANTHROPIC_MODEL
-    url   = "https://api.anthropic.com/v1/messages"
+    model   = model or ANTHROPIC_MODEL
+    url     = "https://api.anthropic.com/v1/messages"
     payload = json.dumps({
         "model":      model,
         "messages":   [{"role": "user", "content": prompt}],
@@ -259,8 +325,8 @@ def call_ollama_provider(
     max_tokens: int = 2048,
 ) -> str:
     """Send a prompt to the local Ollama generate endpoint."""
-    model = model or OLLAMA_MODEL
-    url   = f"{OLLAMA_HOST}/api/generate"
+    model   = model or OLLAMA_MODEL
+    url     = f"{OLLAMA_HOST}/api/generate"
     payload = json.dumps({
         "model":   model,
         "prompt":  prompt,
@@ -291,20 +357,18 @@ def call_deepseek_provider(
     model: str | None = None,
     max_tokens: int = 2048,
 ) -> str:
-    """Send a prompt to the DeepSeek chat completions endpoint.
-    Uses the OpenAI-compatible API at api.deepseek.com.
-    Globally reachable ??no geo-restrictions on the API."""
+    """Send a prompt to the DeepSeek chat completions endpoint."""
     if not DEEPSEEK_API_KEY:
         raise RuntimeError("DEEPSEEK_API_KEY is not set. Add it to your .env file.")
-    model = model or DEEPSEEK_MODEL
-    url   = "https://api.deepseek.com/chat/completions"
+    model   = model or DEEPSEEK_MODEL
+    url     = "https://api.deepseek.com/chat/completions"
     payload = json.dumps({
         "model":      model,
         "messages":   [{"role": "user", "content": prompt}],
         "max_tokens": max_tokens,
         "stream":     False,
         "thinking":   {"type": "disabled"},
-    }).encode() 
+    }).encode()
     req = urllib.request.Request(
         url,
         data=payload,
@@ -320,7 +384,7 @@ def call_deepseek_provider(
         choices = data.get("choices", [])
         if not choices:
             raise RuntimeError("DeepSeek returned an empty response.")
-        msg = choices[0].get("message", {})
+        msg     = choices[0].get("message", {})
         content = msg.get("content") or msg.get("reasoning_content", "")
         if not content:
             raise RuntimeError("DeepSeek returned an empty response.")
@@ -338,12 +402,11 @@ def call_groq_provider(
     model: str | None = None,
     max_tokens: int = 2048,
 ) -> str:
-    """Send a prompt to the Groq inference endpoint.
-    Groq is globally available, fast, and has a free developer tier."""
+    """Send a prompt to the Groq inference endpoint."""
     if not GROQ_API_KEY:
         raise RuntimeError("GROQ_API_KEY is not set. Add it to your .env file.")
-    model = model or GROQ_MODEL
-    url   = "https://api.groq.com/openai/v1/chat/completions"
+    model   = model or GROQ_MODEL
+    url     = "https://api.groq.com/openai/v1/chat/completions"
     payload = json.dumps({
         "model":      model,
         "messages":   [{"role": "user", "content": prompt}],
@@ -373,22 +436,22 @@ def call_groq_provider(
     except (KeyError, IndexError) as exc:
         raise RuntimeError(f"Groq unexpected response format: {exc}") from exc
 
+
 def call_qwen_provider(
     prompt: str,
     model: str | None = None,
     max_tokens: int = 2048,
 ) -> str:
-    """Send a prompt to Alibaba Cloud Model Studio (Qwen) via OpenAI-compatible API.
-    Geo-unrestricted; supports Singapore, Hong Kong, Tokyo, Frankfurt regions."""
+    """Send a prompt to Alibaba Cloud Model Studio (Qwen) via OpenAI-compatible API."""
     if not DASHSCOPE_API_KEY:
         raise RuntimeError("DASHSCOPE_API_KEY is not set. Add it to your .env file.")
-    model = model or QWEN_MODEL
-    url   = f"{DASHSCOPE_BASE_URL.rstrip('/')}/chat/completions"
+    model   = model or QWEN_MODEL
+    url     = f"{DASHSCOPE_BASE_URL.rstrip('/')}/chat/completions"
     payload = json.dumps({
-        "model":          model,
-        "messages":       [{"role": "user", "content": prompt}],
-        "max_tokens":     max_tokens,
-        "stream":         False,
+        "model":           model,
+        "messages":        [{"role": "user", "content": prompt}],
+        "max_tokens":      max_tokens,
+        "stream":          False,
         "enable_thinking": False,
     }).encode()
     req = urllib.request.Request(
@@ -413,7 +476,6 @@ def call_qwen_provider(
         raise RuntimeError(f"Qwen connection error: {exc.reason}") from exc
     except (KeyError, IndexError) as exc:
         raise RuntimeError(f"Qwen unexpected response format: {exc}") from exc
-
 
 
 PROVIDERS: dict[str, callable] = {
@@ -471,10 +533,7 @@ def build_project_context(
 
 
 def truncate_context(text: str, max_chars: int = 2000) -> str:
-    """
-    Return *text* unchanged if it fits within *max_chars*, otherwise
-    truncate and append an ellipsis character.
-    """
+    """Return text unchanged if within max_chars, otherwise truncate with ellipsis."""
     if len(text) <= max_chars:
         return text
     return text[:max_chars] + "\u2026"
@@ -511,10 +570,7 @@ def save_report(
 
 
 def start_session_transcript(reports_dir: Path) -> Path:
-    """
-    Create a new timestamped session transcript file with a header.
-    Returns the Path of the newly created file.
-    """
+    """Create a new timestamped session transcript file. Returns its Path."""
     reports_dir.mkdir(parents=True, exist_ok=True)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     path      = reports_dir / f"session_{timestamp}.md"
@@ -534,7 +590,7 @@ def append_to_transcript(
 ) -> None:
     """Append one interaction step to an existing transcript file."""
     entry = (
-        f"\n## Step {step} ??{role_name}\n"
+        f"\n## Step {step} — {role_name}\n"
         f"**Task:** {task}\n\n"
         f"**Response:**\n{response}\n"
     )
@@ -566,19 +622,19 @@ def print_session_summary(
 # Colour helpers
 # ---------------------------------------------------------------------------
 COLOURS = {
-    "Builder":    "\033[94m",
-    "Reviewer":   "\033[93m",
-    "Tester":     "\033[92m",
-    "Writer":     "\033[95m",
-    "Editor":     "\033[96m",
-    "QA":         "\033[91m",
-    "Formulator": "\033[94m",
-    "Searcher":   "\033[92m",
-    "Validator":  "\033[93m",
+    "Builder":       "\033[94m",
+    "Reviewer":      "\033[93m",
+    "Tester":        "\033[92m",
+    "Writer":        "\033[95m",
+    "Editor":        "\033[96m",
+    "QA":            "\033[91m",
+    "Formulator":    "\033[94m",
+    "Searcher":      "\033[92m",
+    "Validator":     "\033[93m",
     "Appraiser":     "\033[95m",
     "Methodologist": "\033[96m",
     "Summariser":    "\033[92m",
-    "Researcher": "\033[94m",
+    "Researcher":    "\033[94m",
 }
 RESET = "\033[0m"
 
@@ -645,20 +701,19 @@ def delete_session(filename: str, reports_dir: str = str(REPORTS_DIR)) -> None:
         path.unlink()
         print(f"Deleted: {filename}")
     else:
-        print("cancelled.")
+        print("Cancelled.")
 
 
 def export_session(filename: str, reports_dir: str = str(REPORTS_DIR)) -> None:
-    """Export a session transcript as a plain-text .txt file in the CWD."""
+    """Export a session transcript as a plain-text .txt file."""
     src = Path(reports_dir) / filename
     if not src.exists():
         print(f"File not found: {filename}. Use --list-sessions to see available files.")
         return
-    # Strip markdown and write as .txt
     raw     = src.read_text(encoding="utf-8")
-    cleaned = re.sub(r"#{1,6}\s*", "", raw)          # remove headings
-    cleaned = re.sub(r"\*\*(.+?)\*\*", r"\1", cleaned)  # remove bold
-    cleaned = re.sub(r"\*(.+?)\*",   r"\1", cleaned)    # remove italic
+    cleaned = re.sub(r"#{1,6}\s*", "", raw)
+    cleaned = re.sub(r"\*\*(.+?)\*\*", r"\1", cleaned)
+    cleaned = re.sub(r"\*(.+?)\*",    r"\1", cleaned)
     txt_name = Path(filename).stem + ".txt"
     dest     = Path(reports_dir) / txt_name
     dest.write_text(cleaned, encoding="utf-8")
@@ -715,6 +770,9 @@ def show_stats(reports_dir: str = str(REPORTS_DIR)) -> None:
         print(f"  {colour}{role:<14}{RESET}: {count} interaction(s)")
 
 
+# ---------------------------------------------------------------------------
+# File readers
+# ---------------------------------------------------------------------------
 def _read_docx(path: Path) -> str:
     """Extract plain text from a .docx file using python-docx."""
     try:
@@ -729,7 +787,7 @@ def _read_pdf_pymupdf(path: Path, max_chars: int = 30_000) -> str:
     """Extract plain text from a PDF using PyMuPDF (fitz)."""
     try:
         import fitz
-        doc = fitz.open(str(path))
+        doc  = fitz.open(str(path))
         text = "\n\n".join(page.get_text() for page in doc)
         doc.close()
         return text[:max_chars]
@@ -740,12 +798,9 @@ def _read_pdf_pymupdf(path: Path, max_chars: int = 30_000) -> str:
 def _md_to_docx(md_text: str, title: str, out_path: Path) -> None:
     """Convert a markdown report string to a .docx file using python-docx."""
     import docx as _docx
-    from docx.shared import Pt, RGBColor
     from docx.enum.text import WD_ALIGN_PARAGRAPH
 
-    document = _docx.Document()
-
-    # Title
+    document   = _docx.Document()
     title_para = document.add_heading(title, level=0)
     title_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
 
@@ -764,7 +819,7 @@ def _md_to_docx(md_text: str, title: str, out_path: Path) -> None:
         elif re.match(r"^\d+\. ", stripped):
             document.add_paragraph(re.sub(r"^\d+\. ", "", stripped), style="List Number")
         elif stripped.startswith("**") and stripped.endswith("**"):
-            p = document.add_paragraph()
+            p   = document.add_paragraph()
             run = p.add_run(stripped.strip("*"))
             run.bold = True
         else:
@@ -773,6 +828,9 @@ def _md_to_docx(md_text: str, title: str, out_path: Path) -> None:
     document.save(str(out_path))
 
 
+# ---------------------------------------------------------------------------
+# Writing report
+# ---------------------------------------------------------------------------
 def generate_writing_report(
     docs_dir: Path = DOCS_WRITING,
     reports_dir: Path = REPORTS_DIR,
@@ -780,25 +838,30 @@ def generate_writing_report(
     model: str | None = None,
 ) -> Path:
     """
-    Read all .txt, .md, .pdf, .docx files in docs_dir, send them to the AI
-    with the writing-report prompt, and save the result as both
-    reports/writing_report_{timestamp}.md and .docx.
+    Read input files, send to AI with writing-report prompt, save as
+    output/writing/writing_report_{ts}.md and .docx.
     Returns the path of the saved .md report.
     """
-    SUPPORTED = {".txt", ".md", ".pdf", ".docx"}
-    files = sorted(
-        f for f in docs_dir.iterdir()
-        if f.is_file() and f.suffix.lower() in SUPPORTED
-    ) if docs_dir.exists() else []
-
-    if not files:
-        print(f"No files found in {docs_dir}.")
-        print(f"Add .txt, .md, .pdf, or .docx files to: {docs_dir}")
-        return reports_dir / "writing_report_empty.md"
-
+    # Check prompt exists FIRST — before anything else
     prompt_path = AI_DIR / "writing-report-prompt.md"
     if not prompt_path.exists():
         raise FileNotFoundError(f"Writing report prompt not found: {prompt_path}")
+
+    # Primary: auto-load from input/writing/
+    files = auto_load_input_files("writing")
+
+    # Fallback: if input/writing/ is empty and a docs_dir was passed, read from there
+    if not files and docs_dir.exists():
+        SUPPORTED = {".txt", ".md", ".pdf", ".docx"}
+        files = sorted(
+            f for f in docs_dir.iterdir()
+            if f.is_file() and f.suffix.lower() in SUPPORTED
+        )
+
+    if not files:
+        print(f"No files found in input/writing/ or {docs_dir}.")
+        print("Add .txt, .md, .pdf, or .docx files to: input/writing/")
+        return OUTPUT_WRITING / "writing_report_empty.md"
 
     system_prompt = prompt_path.read_text(encoding="utf-8", errors="replace")
 
@@ -818,9 +881,9 @@ def generate_writing_report(
 
     if not sections:
         print("No readable content found in any file. Exiting.")
-        return reports_dir / "writing_report_empty.md"
+        return OUTPUT_WRITING / "writing_report_empty.md"
 
-    combined = "\n\n".join(sections)
+    combined    = "\n\n".join(sections)
     full_prompt = f"{system_prompt}\n\n## Documents to Summarise\n\n{combined}"
 
     print(f"Generating writing report from {len(sections)} file(s)...")
@@ -830,19 +893,17 @@ def generate_writing_report(
         response = f"[ERROR generating report: {exc}]"
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    reports_dir.mkdir(parents=True, exist_ok=True)
+    OUTPUT_WRITING.mkdir(parents=True, exist_ok=True)
 
-    # Save .md
-    md_path = reports_dir / f"writing_report_{timestamp}.md"
+    md_path    = OUTPUT_WRITING / f"writing_report_{timestamp}.md"
     md_content = f"# Writing Report\nGenerated: {timestamp}\n\n{response}\n"
     md_path.write_text(md_content, encoding="utf-8")
-    print(f"Markdown report saved : reports\\{md_path.name}")
+    print(f"Markdown report saved : output\\writing\\{md_path.name}")
 
-    # Save .docx
-    docx_path = reports_dir / f"writing_report_{timestamp}.docx"
+    docx_path = OUTPUT_WRITING / f"writing_report_{timestamp}.docx"
     try:
         _md_to_docx(response, f"Writing Report — {timestamp}", docx_path)
-        print(f"Word document saved   : reports\\{docx_path.name}")
+        print(f"Word document saved   : output\\writing\\{docx_path.name}")
     except Exception as exc:  # noqa: BLE001
         print(f"  Warning: could not generate .docx — {exc}")
 
@@ -853,8 +914,10 @@ def generate_writing_report(
 # Code revision pipeline (--revise flag)
 # ---------------------------------------------------------------------------
 CODE_EXTENSIONS = {".py", ".js", ".ts", ".cs", ".java", ".sql", ".html", ".css"}
-GUIDANCE_DOCS   = {"PRD.md", "architecture.md", "coding-standards.md",
-                   "decision-log.md", "test-strategy.md"}
+GUIDANCE_DOCS   = {
+    "PRD.md", "architecture.md", "coding-standards.md",
+    "decision-log.md", "test-strategy.md",
+}
 
 
 def _read_code_files(docs_coding: Path) -> list[dict]:
@@ -863,46 +926,14 @@ def _read_code_files(docs_coding: Path) -> list[dict]:
     if not docs_coding.exists():
         return results
     for f in sorted(docs_coding.iterdir()):
-        if f.is_file() and f.suffix.lower() in CODE_EXTENSIONS and f.name not in GUIDANCE_DOCS:
+        if (f.is_file()
+                and f.suffix.lower() in CODE_EXTENSIONS
+                and f.name not in GUIDANCE_DOCS):
             content = f.read_text(encoding="utf-8", errors="replace")
             if content.strip():
                 results.append({"name": f.name, "content": content})
     return results
 
-
-
-ARTICLE_EXTENSIONS = {".txt", ".md", ".pdf", ".docx"}
-ARTICLE_SIZE_LIMIT = 8000
-
-def _read_article_files(uploads_appraisal):
-    results = []
-    if not uploads_appraisal.exists():
-        return results
-    for f in sorted(uploads_appraisal.iterdir()):
-        if f.suffix.lower() not in ARTICLE_EXTENSIONS:
-            continue
-        try:
-            if f.suffix.lower() == ".pdf":
-                text = _read_pdf_pymupdf(f)
-            elif f.suffix.lower() == ".docx":
-                text = _read_docx(f)
-            else:
-                text = f.read_text(encoding="utf-8", errors="replace")
-            if not text.strip():
-                continue
-            if len(text) <= ARTICLE_SIZE_LIMIT:
-                results.append({"name": f.name, "content": text})
-            else:
-                print(f"[Appraisal] {f.name} exceeds {ARTICLE_SIZE_LIMIT} chars - passed to RAG.")
-        except Exception as exc:
-            print(f"[Appraisal] Could not read {f.name}: {exc}")
-    return results
-
-
-def _read_topic_file(topic_path):
-    if not topic_path.exists():
-        return ""
-    return topic_path.read_text(encoding="utf-8", errors="replace").strip()
 
 def generate_code_revision(
     start_role: str = "Builder",
@@ -914,18 +945,16 @@ def generate_code_revision(
 ) -> Path:
     """
     Single-pass code revision pipeline.
-    Builder  -> runs Build -> Review -> Test
-    Reviewer -> runs Review -> Test
-    Tester   -> runs Test only
-    Saves results as reports/code_revision_{timestamp}.md and .docx.
+    Builder  -> Build -> Review -> Test
+    Reviewer -> Review -> Test
+    Tester   -> Test only
+    Saves results as reports/code_revision_{ts}.md and .docx.
     Returns path of the .md report.
     """
-    # Determine pipeline stages
     all_stages = ["Builder", "Reviewer", "Tester"]
     start_idx  = all_stages.index(start_role) if start_role in all_stages else 0
     stages     = all_stages[start_idx:]
 
-    # Read code files
     code_files = _read_code_files(docs_dir)
     if not code_files:
         print(f"No code files found in {docs_dir}.")
@@ -939,19 +968,18 @@ def generate_code_revision(
     print(f"  Code files    : {len(code_files)}")
     print(f"{'='*55}\n")
 
-    # Build code context block
     code_context = "\n\n".join(
         f"### {cf['name']}\n`\n{cf['content']}\n`"
         for cf in code_files
     )
 
-    # Read guidance docs
     guidance_parts = []
     for doc_name in GUIDANCE_DOCS:
         doc_path = docs_dir / doc_name
         if doc_path.exists():
             guidance_parts.append(
-                f"### {doc_name}\n{doc_path.read_text(encoding='utf-8', errors='replace').strip()}"
+                f"### {doc_name}\n"
+                f"{doc_path.read_text(encoding='utf-8', errors='replace').strip()}"
             )
     guidance_context = "\n\n".join(guidance_parts)
 
@@ -960,12 +988,12 @@ def generate_code_revision(
         task = "Review and improve the code quality, readability, and correctness."
 
     reports_dir.mkdir(parents=True, exist_ok=True)
-    timestamp  = datetime.now().strftime("%Y%m%d_%H%M%S")
-    md_path    = reports_dir / f"code_revision_{timestamp}.md"
-    docx_path  = reports_dir / f"code_revision_{timestamp}.docx"
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    md_path   = reports_dir / f"code_revision_{timestamp}.md"
+    docx_path = reports_dir / f"code_revision_{timestamp}.docx"
 
     full_report_parts = [
-        f"# Code Revision Report",
+        "# Code Revision Report",
         f"Generated: {timestamp}",
         f"Pipeline: {' -> '.join(stages)}",
         f"Task: {task}",
@@ -976,9 +1004,9 @@ def generate_code_revision(
 
     for stage in stages:
         print(f"Running {stage}...")
-        role_cfg     = ALL_MODES["coding"][stage]
-        prompt_path  = Path(role_cfg["prompt"])
-        role_prompt  = prompt_path.read_text(encoding="utf-8", errors="replace")
+        role_cfg    = ALL_MODES["coding"][stage]
+        prompt_path = Path(role_cfg["prompt"])
+        role_prompt = prompt_path.read_text(encoding="utf-8", errors="replace")
 
         parts = [role_prompt]
         if guidance_context:
@@ -1001,12 +1029,10 @@ def generate_code_revision(
         full_report_parts.append(f"## {stage} Output\n\n{response}\n")
         print(f"{stage} complete.\n")
 
-    # Save .md
     md_content = "\n".join(full_report_parts)
     md_path.write_text(md_content, encoding="utf-8")
     print(f"Markdown report saved : reports\\{md_path.name}")
 
-    # Save .docx
     try:
         _md_to_docx(md_content, f"Code Revision Report — {timestamp}", docx_path)
         print(f"Word document saved   : reports\\{docx_path.name}")
@@ -1016,6 +1042,48 @@ def generate_code_revision(
     return md_path
 
 
+# ---------------------------------------------------------------------------
+# Article helpers (appraisal mode)
+# ---------------------------------------------------------------------------
+ARTICLE_EXTENSIONS = {".txt", ".md", ".pdf", ".docx"}
+ARTICLE_SIZE_LIMIT = 8000
+
+
+def _read_article_files(input_appraisal: Path) -> list[dict]:
+    """Read appraisal article files from input/appraisal/."""
+    results = []
+    if not input_appraisal.exists():
+        return results
+    for f in sorted(input_appraisal.iterdir()):
+        if f.suffix.lower() not in ARTICLE_EXTENSIONS:
+            continue
+        try:
+            if f.suffix.lower() == ".pdf":
+                text = _read_pdf_pymupdf(f)
+            elif f.suffix.lower() == ".docx":
+                text = _read_docx(f)
+            else:
+                text = f.read_text(encoding="utf-8", errors="replace")
+            if not text.strip():
+                continue
+            if len(text) <= ARTICLE_SIZE_LIMIT:
+                results.append({"name": f.name, "content": text})
+            else:
+                print(f"[Appraisal] {f.name} exceeds {ARTICLE_SIZE_LIMIT} chars — passed to RAG.")
+        except Exception as exc:  # noqa: BLE001
+            print(f"[Appraisal] Could not read {f.name}: {exc}")
+    return results
+
+
+def _read_topic_file(topic_path: Path) -> str:
+    if not topic_path.exists():
+        return ""
+    return topic_path.read_text(encoding="utf-8", errors="replace").strip()
+
+
+# ---------------------------------------------------------------------------
+# RCT Search pipeline
+# ---------------------------------------------------------------------------
 def run_rct_search_pipeline(
     provider: str = "ollama",
     model: str | None = None,
@@ -1025,9 +1093,9 @@ def run_rct_search_pipeline(
     """
     Single-pass RCT search pipeline:
       1. Formulator  — structures user topic into PICO question
-      2. Searcher    — builds full Boolean search strategy for all 7 databases
+      2. Searcher    — builds Boolean search strategy for all 7 databases
       3. Validator   — validates alignment and approves or requests refinement
-    Saves output as reports/rct_search_{timestamp}.md and .docx.
+    Saves output as output/rct_search/rct_search_{ts}.md and .docx.
     Returns path of the .md report.
     """
     print("\n" + "=" * 55)
@@ -1040,7 +1108,6 @@ def run_rct_search_pipeline(
     print("  No article appraisal — use --mode appraisal for that.")
     print("=" * 55 + "\n")
 
-    # Get research topic from user at runtime
     topic_file = DOCS_RCT_SEARCH / "topic.md"
     file_topic = _read_topic_file(topic_file)
     if file_topic:
@@ -1050,36 +1117,33 @@ def run_rct_search_pipeline(
         topic = input("Enter your research topic: ").strip()
     if not topic:
         print("No topic entered. Exiting.")
-        import sys; sys.exit(0)
+        sys.exit(0)
 
-    # Read pico-framework.md as shared context
-    pico_path = DOCS_RCT_SEARCH / "pico-framework.md"
-    pico_context = pico_path.read_text(encoding="utf-8", errors="replace") if pico_path.exists() else ""
-
-    # Read database-guide.md and validation-criteria.md if present
-    db_guide = (DOCS_RCT_SEARCH / "database-guide.md")
-    val_criteria = (DOCS_RCT_SEARCH / "validation-criteria.md")
-    db_guide_text = db_guide.read_text(encoding="utf-8", errors="replace") if db_guide.exists() else ""
-    val_criteria_text = val_criteria.read_text(encoding="utf-8", errors="replace") if val_criteria.exists() else ""
+    pico_path         = DOCS_RCT_SEARCH / "pico-framework.md"
+    db_guide          = DOCS_RCT_SEARCH / "database-guide.md"
+    val_criteria      = DOCS_RCT_SEARCH / "validation-criteria.md"
+    pico_context      = pico_path.read_text(encoding="utf-8", errors="replace")      if pico_path.exists()     else ""
+    db_guide_text     = db_guide.read_text(encoding="utf-8", errors="replace")       if db_guide.exists()      else ""
+    val_criteria_text = val_criteria.read_text(encoding="utf-8", errors="replace")   if val_criteria.exists()  else ""
 
     stages = [
         {
-            "role": "Formulator",
-            "prompt_file": AI_DIR / "formulator-prompt.md",
+            "role":          "Formulator",
+            "prompt_file":   AI_DIR / "formulator-prompt.md",
             "extra_context": pico_context,
-            "task": f"The user's research topic is: {topic}\n\nStructure this into a formal PICO question.",
+            "task":          f"The user's research topic is: {topic}\n\nStructure this into a formal PICO question.",
         },
         {
-            "role": "Searcher",
-            "prompt_file": AI_DIR / "searcher-prompt.md",
+            "role":          "Searcher",
+            "prompt_file":   AI_DIR / "searcher-prompt.md",
             "extra_context": db_guide_text,
-            "task": "Build a comprehensive Boolean search strategy for all 7 SR databases based on the PICO question above.",
+            "task":          "Build a comprehensive Boolean search strategy for all 7 SR databases based on the PICO question above.",
         },
         {
-            "role": "Validator",
-            "prompt_file": AI_DIR / "validator-prompt.md",
+            "role":          "Validator",
+            "prompt_file":   AI_DIR / "validator-prompt.md",
             "extra_context": val_criteria_text,
-            "task": "Validate the search strategy above. Check PICO alignment, database coverage, syntax, and RCT filters. Return APPROVED FOR DOWNLOAD or REQUIRES REFINEMENT with specific justification.",
+            "task":          "Validate the search strategy above. Check PICO alignment, database coverage, syntax, and RCT filters. Return APPROVED FOR DOWNLOAD or REQUIRES REFINEMENT with specific justification.",
         },
     ]
 
@@ -1098,9 +1162,9 @@ def run_rct_search_pipeline(
     previous_response = ""
 
     for stage in stages:
-        role = stage["role"]
-        print(f"Running {role}...")
+        role   = stage["role"]
         colour = role_color(role)
+        print(f"Running {role}...")
 
         prompt_file = Path(stage["prompt_file"])
         if not prompt_file.exists():
@@ -1108,7 +1172,6 @@ def run_rct_search_pipeline(
             continue
 
         role_prompt = prompt_file.read_text(encoding="utf-8", errors="replace")
-
         parts = [role_prompt]
         if pico_context:
             parts.append(f"## PICO Framework Reference\n{pico_context}")
@@ -1131,7 +1194,6 @@ def run_rct_search_pipeline(
         report_parts.append(f"## {role} Output\n\n{response}\n")
         print(f"{colour}{role} complete.{RESET}\n")
 
-    # Check validator decision
     validator_output = previous_response.upper()
     if "APPROVED FOR DOWNLOAD" in validator_output:
         status = "APPROVED FOR DOWNLOAD"
@@ -1149,19 +1211,23 @@ def run_rct_search_pipeline(
         "- Run python src/main.py --mode sr for full systematic review pipeline\n"
     )
 
-    # Save reports
-    reports_dir.mkdir(parents=True, exist_ok=True)
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    md_path   = reports_dir / f"rct_search_{timestamp}.md"
-    docx_path = reports_dir / f"rct_search_{timestamp}.docx"
+
+    # AFTER — uses reports_dir when explicitly passed, OUTPUT_RCT_SEARCH otherwise:
+    timestamp  = datetime.now().strftime("%Y%m%d_%H%M%S")
+    out_dir    = reports_dir if reports_dir != REPORTS_DIR else OUTPUT_RCT_SEARCH
+    out_dir.mkdir(parents=True, exist_ok=True)
+    md_path    = out_dir / f"rct_search_{timestamp}.md"
+    docx_path  = out_dir / f"rct_search_{timestamp}.docx"
 
     md_content = "\n".join(report_parts)
     md_path.write_text(md_content, encoding="utf-8")
-    print(f"Markdown report saved : reports\\{md_path.name}")
+    print(f"Markdown report saved : {out_dir.name}\\{md_path.name}")
+
 
     try:
         _md_to_docx(md_content, f"RCT Search Strategy — {timestamp}", docx_path)
-        print(f"Word document saved   : reports\\{docx_path.name}")
+        print(f"Word document saved   : {out_dir.name}\\{docx_path.name}")
+
     except Exception as exc:  # noqa: BLE001
         print(f"  Warning: could not generate .docx — {exc}")
 
@@ -1182,7 +1248,7 @@ def rct_search_reminder() -> None:
     print("  Comparison  : what is the control/comparator?")
     print("  Outcome     : what are you measuring?")
     print()
-    print("  Search links will be saved to the reports/ folder.")
+    print("  Search links will be saved to the output/rct_search/ folder.")
     print("=" * 55 + "\n")
     confirm = input("Have you edited your PICO file? [y/N]: ").strip().lower()
     if confirm != "y":
@@ -1195,13 +1261,10 @@ def save_rct_search_links(
     reports_dir: Path = REPORTS_DIR,
 ) -> Path:
     """
-    Extract URLs from an AI response and save them as a markdown link list
-    in reports/rct_search_{timestamp}.md. Returns the path of the saved file.
-    Reminds the user to download the file from the reports/ folder.
+    Extract URLs from an AI response and save them as a markdown link list.
+    Returns the path of the saved file.
     """
-    import re as _re
-    urls = _re.findall(r'https?://\S+', response)
-    # Clean trailing punctuation that may have been captured
+    urls = re.findall(r'https?://\S+', response)
     urls = [u.rstrip(".,);\"'") for u in urls]
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -1229,18 +1292,19 @@ def save_rct_search_links(
     return out_path
 
 
+# ---------------------------------------------------------------------------
+# PubMed fetch
+# ---------------------------------------------------------------------------
 def fetch_pubmed_articles(
     query: str,
     max_results: int = 10,
 ) -> list[dict]:
     """
-    Search PubMed using the NCBI E-utilities API (no API key required).
-    Returns a list of dicts with keys: pmid, title, abstract, url.
-    Returns an empty list on any network or parsing error.
+    Search PubMed via NCBI E-utilities (no API key required).
+    Returns list of dicts: pmid, title, abstract, url.
+    Returns empty list on any error.
     """
-    base = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils"
-
-    # Step 1 ??search for PMIDs
+    base       = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils"
     search_url = (
         f"{base}/esearch.fcgi?db=pubmed&term={urllib.parse.quote(query)}"
         f"&retmax={max_results}&retmode=json"
@@ -1255,7 +1319,6 @@ def fetch_pubmed_articles(
     if not pmids:
         return []
 
-    # Step 2 ??fetch abstracts for all PMIDs in one call
     ids_str   = ",".join(pmids)
     fetch_url = (
         f"{base}/efetch.fcgi?db=pubmed&id={ids_str}"
@@ -1267,7 +1330,6 @@ def fetch_pubmed_articles(
     except Exception:  # noqa: BLE001
         return []
 
-    # Parse XML with standard library only ??no lxml or bs4 needed
     import xml.etree.ElementTree as ET
     try:
         root = ET.fromstring(xml_data)
@@ -1276,15 +1338,14 @@ def fetch_pubmed_articles(
 
     articles = []
     for article in root.findall(".//PubmedArticle"):
-        pmid_el    = article.find(".//PMID")
-        title_el   = article.find(".//ArticleTitle")
+        pmid_el     = article.find(".//PMID")
+        title_el    = article.find(".//ArticleTitle")
         abstract_el = article.find(".//AbstractText")
 
         pmid     = pmid_el.text.strip()     if pmid_el     is not None else "unknown"
         title    = title_el.text.strip()    if title_el    is not None else "No title"
         abstract = abstract_el.text.strip() if abstract_el is not None else "No abstract available."
 
-        # Clean any XML character artefacts
         title    = re.sub(r"\s+", " ", title)
         abstract = re.sub(r"\s+", " ", abstract)
 
@@ -1298,11 +1359,14 @@ def fetch_pubmed_articles(
     return articles
 
 
+# ---------------------------------------------------------------------------
+# SR launcher
+# ---------------------------------------------------------------------------
 def run_sr_launcher() -> None:
     """Launch the SR Streamlit UI in a separate window."""
     import subprocess as _sp
-    sr_ui = Path(__file__).resolve().parent.parent / "sr" / "src" / "ui" / "app.py"
-    repo_root = Path(__file__).resolve().parent.parent
+    sr_ui     = BASE_DIR / "sr" / "src" / "ui" / "app.py"
+    repo_root = BASE_DIR
 
     print("\n" + "=" * 58)
     print("  SR Automation Pipeline")
@@ -1312,18 +1376,13 @@ def run_sr_launcher() -> None:
     print("  URL: http://localhost:8501")
     print("  Close the Streamlit window to stop the server.\n")
 
-
-    if os.name == 'nt':
-        # Open in a new visible cmd window — closing it stops Streamlit
+    if os.name == "nt":
         _sp.Popen(
-            [
-                'cmd', '/c', 'start', 'SR Pipeline UI',
-                sys.executable, '-m', 'streamlit', 'run', str(sr_ui),
-            ],
+            ["cmd", "/c", "start", "SR Pipeline UI",
+             sys.executable, "-m", "streamlit", "run", str(sr_ui)],
             cwd=str(repo_root),
         )
     else:
-        # macOS / Linux fallback
         _sp.Popen(
             [sys.executable, "-m", "streamlit", "run", str(sr_ui)],
             cwd=str(repo_root),
@@ -1332,19 +1391,22 @@ def run_sr_launcher() -> None:
     print("  SR UI launched. Returning to menu...\n")
 
 
+# ---------------------------------------------------------------------------
+# Search mode
+# ---------------------------------------------------------------------------
 def run_search_mode(
     provider: str = "ollama",
     model: str | None = None,
     dry_run: bool = False,
     ai_dir: Path | None = None,
     reports_dir: Path | None = None,
+    topic_dir: Path | None = None,
 ) -> Path:
-
 
     """
     Interactive single-pass medical topic search.
     Fetches PubMed abstracts, sends them to the AI Researcher role,
-    and saves a report to reports/search_{timestamp}.md.
+    and saves a report to output/search/search_{ts}.md.
     Returns the path of the saved report.
     """
     prompt_path = (ai_dir or AI_DIR) / "researcher-prompt.md"
@@ -1360,24 +1422,37 @@ def run_search_mode(
     print("  Enter a medical topic, condition, or question.")
     print("  PubMed will be searched for the top 10 articles.")
     print("  A summary report and article links will be saved")
-    print("  to the reports/ folder.")
+    print("  to the output/search/ folder.")
     print("=" * 55 + "\n")
 
-    # ── Runtime search type prompt ──────────────────────────────────
     print("What are you searching for?")
-    search_topic_file = BASE_DIR / "docs" / "search" / "topic.md"
-    file_lines = _read_topic_file(search_topic_file).splitlines()
-    loaded_from_file = False
+    search_topic_file = (topic_dir / "topic.md") if topic_dir \
+        else (BASE_DIR / "docs" / "search" / "topic.md")
+
+
+    file_lines        = _read_topic_file(search_topic_file).splitlines()
+    loaded_from_file  = False
+
+
+    # Handles both 1-line (plain query) and 2-line (type + query) formats:
     if len(file_lines) >= 2:
-        ftype = file_lines[0].strip().lower()
+        ftype  = file_lines[0].strip().lower()
         fquery = file_lines[1].strip()
         if ftype in ("paper", "topic") and fquery:
-            is_paper_search = ftype == "paper"
-            topic = fquery
-            search_type_label = "RESEARCH PAPER" if is_paper_search else "CLINICAL TOPIC"
-            label = "research paper" if is_paper_search else "clinical topic"
+            is_paper_search  = ftype == "paper"
+            topic            = fquery
+            label            = "research paper" if is_paper_search else "clinical topic"
             print(f"[Search] Loaded from docs/search/topic.md: {label} - {topic}")
             loaded_from_file = True
+    elif len(file_lines) == 1:
+        fquery = file_lines[0].strip()
+        if fquery:
+            is_paper_search  = False           # default to clinical topic
+            topic            = fquery
+            print(f"[Search] Loaded from docs/search/topic.md: clinical topic - {topic}")
+            loaded_from_file = True
+
+
     if not loaded_from_file:
         print("  [1] A research paper (generates critical appraisal report)")
         print("  [2] A clinical topic  (generates reviewer-format summary)")
@@ -1387,10 +1462,9 @@ def run_search_mode(
                 break
             print("  Please enter 1 or 2.")
         is_paper_search = search_type == "1"
-        if is_paper_search:
-            topic = input("Paper title, author, or PMID: ").strip()
-        else:
-            topic = input("Clinical topic: ").strip()
+        topic = input(
+            "Paper title, author, or PMID: " if is_paper_search else "Clinical topic: "
+        ).strip()
         if not topic:
             print("No topic entered. Exiting.")
             sys.exit(0)
@@ -1398,14 +1472,12 @@ def run_search_mode(
     print(f"\nSearching PubMed for: {topic}")
 
     if dry_run:
-        articles = [
-            {
-                "pmid":     "00000001",
-                "title":    "Dry run article title",
-                "abstract": "Dry run abstract content.",
-                "url":      "https://pubmed.ncbi.nlm.nih.gov/00000001/",
-            }
-        ]
+        articles = [{
+            "pmid":     "00000001",
+            "title":    "Dry run article title",
+            "abstract": "Dry run abstract content.",
+            "url":      "https://pubmed.ncbi.nlm.nih.gov/00000001/",
+        }]
     else:
         articles = fetch_pubmed_articles(topic)
 
@@ -1415,7 +1487,6 @@ def run_search_mode(
 
     print(f"Found {len(articles)} article(s). Generating report...\n")
 
-    # Build context from abstracts
     abstract_sections = []
     for i, art in enumerate(articles, start=1):
         abstract_sections.append(
@@ -1424,10 +1495,9 @@ def run_search_mode(
             f"URL: {art['url']}\n\n"
             f"{art['abstract']}"
         )
-    abstracts_text = "\n\n".join(abstract_sections)
-
-    search_type_label = "RESEARCH PAPER" if is_paper_search else "CLINICAL TOPIC"
-    full_prompt = (
+    abstracts_text     = "\n\n".join(abstract_sections)
+    search_type_label  = "RESEARCH PAPER" if is_paper_search else "CLINICAL TOPIC"
+    full_prompt        = (
         f"{researcher_prompt}\n\n"
         f"## Search Type\n{search_type_label}\n\n"
         f"## Search Topic\n{topic}\n\n"
@@ -1438,15 +1508,10 @@ def run_search_mode(
         ai_report = "[DRY RUN] Researcher would generate report here."
     else:
         try:
-            ai_report = call_ai(
-                prompt=full_prompt,
-                provider=provider,
-                model=model,
-            )
+            ai_report = call_ai(prompt=full_prompt, provider=provider, model=model)
         except RuntimeError as exc:
             ai_report = f"[ERROR generating report: {exc}]"
 
-    # Build link list
     link_lines = ["## Article Links\n"]
     for i, art in enumerate(articles, start=1):
         link_lines.append(
@@ -1455,13 +1520,14 @@ def run_search_mode(
         )
     links_section = "\n".join(link_lines)
 
-    # Save report
-    _reports_dir = reports_dir or REPORTS_DIR
+    # Save to output/search/
+    _out_dir  = OUTPUT_SEARCH
+    _out_dir.mkdir(parents=True, exist_ok=True)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    out_path  = _reports_dir / f"search_{timestamp}.md"
-    _reports_dir.mkdir(parents=True, exist_ok=True)
+    out_path  = _out_dir / f"search_{timestamp}.md"
     out_path.write_text(
-        f"# Medical Search Report — {'Research Paper' if is_paper_search else 'Clinical Topic'}\n"
+        f"# Medical Search Report — "
+        f"{'Research Paper' if is_paper_search else 'Clinical Topic'}\n"
         f"Topic: {topic}\n"
         f"Generated: {timestamp}\n\n"
         f"{links_section}\n\n"
@@ -1471,7 +1537,7 @@ def run_search_mode(
         encoding="utf-8",
     )
 
-    print(f"Report saved to: reports\\{out_path.name}")
+    print(f"Report saved to: output\\search\\{out_path.name}")
     print("Tip: copy any article URL above into --mode appraisal for deeper review.\n")
     return out_path
 
@@ -1497,7 +1563,7 @@ def list_roles(mode: str = "coding") -> None:
 
 
 # ---------------------------------------------------------------------------
-# Main session loop
+# Main interactive session loop
 # ---------------------------------------------------------------------------
 def main(
     model_override: str | None = None,
@@ -1506,9 +1572,9 @@ def main(
     provider: str = "ollama",
 ) -> None:
     """Run an interactive AI session."""
-    session_id   = uuid.uuid4().hex[:8]
-    transcript   = start_session_transcript(REPORTS_DIR)
-    step_count   = 0
+    session_id  = uuid.uuid4().hex[:8]
+    transcript  = start_session_transcript(REPORTS_DIR)
+    step_count  = 0
     role_counts: dict[str, int] = {
         r: 0 for mode_roles in ALL_MODES.values() for r in mode_roles
     }
@@ -1519,13 +1585,14 @@ def main(
     print(f"  Provider: {provider}")
     print(f"  Session : {session_id}")
     if dry_run:
-        print("  DRY RUN ??AI calls will be skipped")
+        print("  DRY RUN — AI calls will be skipped")
     print(f"{'='*55}\n")
 
-    # --- Index uploads (RAG) ------------------------------------------------
-    rag_enabled   = False
-    upload_folder = UPLOAD_DIR / mode
-    upload_folder.mkdir(parents=True, exist_ok=True)
+    # Auto-load input files and prepare RAG
+    input_files  = auto_load_input_files(mode)
+    rag_enabled  = False
+    input_folder = INPUT_DIR / mode
+    input_folder.mkdir(parents=True, exist_ok=True)
 
     if not dry_run:
         try:
@@ -1533,15 +1600,15 @@ def main(
             n_chunks = rag_module.index_uploads(
                 mode=mode,
                 session_id=session_id,
-                upload_base=str(UPLOAD_DIR),
+                upload_base=str(INPUT_DIR),
             )
             if n_chunks > 0:
                 rag_enabled = True
-                print(f"[RAG] Indexed {n_chunks} chunk(s) from uploads/{mode}/\n")
+                print(f"[RAG] Indexed {n_chunks} chunk(s) from input/{mode}/\n")
         except Exception as exc:  # noqa: BLE001
             print(f"[RAG] Indexing skipped: {exc}\n")
 
-    # --- Role selection ------------------------------------------------------
+    # Role selection
     role_name, role_cfg = choose_role(mode)
     colour      = role_color(role_name)
     prompt_path = Path(role_cfg["prompt"])
@@ -1556,19 +1623,19 @@ def main(
 
     previous_response = ""
 
+    # Appraisal: load articles directly into context
     article_context = ""
     if mode == "appraisal":
-        articles = _read_article_files(UPLOADS_APPRAISAL)
+        articles = _read_article_files(INPUT_APPRAISAL)
         if articles:
-            parts_art = []
-            for art in articles:
-                name_key = "name"
-                content_key = "content"
-                parts_art.append(f"### Article: {art[name_key]}\n{art[content_key]}")
+            parts_art = [
+                f"### Article: {art['name']}\n{art['content']}"
+                for art in articles
+            ]
             article_context = "\n\n".join(parts_art)
-            print(f"[Appraisal] {len(articles)} article(s) loaded directly into context.")
+            print(f"[Appraisal] {len(articles)} article(s) loaded from input/appraisal/.")
         else:
-            print("[Appraisal] No articles in uploads/appraisal/ - using RAG only.")
+            print("[Appraisal] No articles in input/appraisal/ — using RAG only.")
 
     try:
         while True:
@@ -1608,7 +1675,7 @@ def main(
                 except RuntimeError as exc:
                     response = f"[ERROR] {exc}"
 
-            elapsed = time.time() - start
+            elapsed     = time.time() - start
             step_count += 1
             role_counts[role_name] = role_counts.get(role_name, 0) + 1
 
@@ -1625,17 +1692,14 @@ def main(
             )
             previous_response = response
 
-            # Save search links to reports/ for rct_search mode
             if mode == "rct_search" and not dry_run:
                 save_rct_search_links(response=response, reports_dir=REPORTS_DIR)
-
 
     except KeyboardInterrupt:
         print(f"\n\n{colour}Session ended.{RESET}")
 
     finally:
         print_session_summary(transcript, step_count, role_counts)
-
         if rag_enabled and not dry_run:
             try:
                 from src import rag as rag_module
@@ -1645,8 +1709,9 @@ def main(
                 print(f"[RAG] Clear warning: {exc}")
 
 
-# ── API Key Validation ──────────────────────────────────────────────────────
-
+# ---------------------------------------------------------------------------
+# API key validation
+# ---------------------------------------------------------------------------
 PROVIDER_ENV_VARS = {
     "anthropic": "ANTHROPIC_API_KEY",
     "openai":    "OPENAI_API_KEY",
@@ -1656,11 +1721,11 @@ PROVIDER_ENV_VARS = {
     "ollama":    None,   # local — no key required
 }
 
+
 def validate_api_keys(provider: str) -> None:
     """
-    Validate that the required API key environment variable is set
-    for the selected provider. Raises EnvironmentError with a clear
-    message if the key is missing or empty. Ollama requires no key.
+    Validate the required API key is set for the selected provider.
+    Raises EnvironmentError if missing. Ollama requires no key.
     """
     provider = provider.lower().strip()
     if provider not in PROVIDER_ENV_VARS:
@@ -1670,7 +1735,7 @@ def validate_api_keys(provider: str) -> None:
         )
     env_var = PROVIDER_ENV_VARS[provider]
     if env_var is None:
-        return   # ollama — no key needed
+        return
     value = os.environ.get(env_var, "").strip()
     if not value:
         raise EnvironmentError(
@@ -1688,13 +1753,14 @@ def validate_api_keys(provider: str) -> None:
 def open_help_guide() -> None:
     """Open the HTML flashcard help guide in the default browser."""
     import webbrowser
-    guide_path = BASE_DIR / "docs" / "flashcard-help.html"
+    guide_path = DOCS_DIR / "flashcard-help.html"
     if not guide_path.exists():
         print(f"Help guide not found: {guide_path}")
         print("Expected location: docs/flashcard-help.html")
         sys.exit(1)
     webbrowser.open(guide_path.as_uri())
     print(f"Opening help guide in browser: {guide_path.name}")
+
 
 def parse_args(args: list[str] | None = None) -> argparse.Namespace:
     """Parse command-line arguments."""
@@ -1706,63 +1772,53 @@ def parse_args(args: list[str] | None = None) -> argparse.Namespace:
             "  python src/main.py                           # coding session\n"
             "  python src/main.py --mode writing            # writing mode\n"
             "  python src/main.py --mode rct_search         # RCT search mode\n"
+            "  python src/main.py --mode appraisal          # appraisal mode\n"
+            "  python src/main.py --mode search             # medical search\n"
+            "  python src/main.py --mode sr                 # SR pipeline (auto-loads input/sr/)\n"
             "  python src/main.py --model llama3.2:3b       # different model\n"
-            "  python src/main.py --provider openai         # use OpenAI\n"
+            "  python src/main.py --provider qwen           # use Qwen\n"
             "  python src/main.py --list-sessions           # list transcripts\n"
             "  python src/main.py --list-roles              # show roles/docs\n"
             "  python src/main.py --list-roles --mode rct_search\n"
             "  python src/main.py --dry-run                 # simulate session\n"
             "  python src/main.py --version                 # show version\n"
-            "  python src/main.py --mode sr                               # SR UI mode\n"
-            "  python src/main.py --mode sr --pdf-dir sr/data/uploads     # SR CLI mode\n"
-            "  python src/main.py --mode sr --pdf-dir sr/data/uploads --effect-measure SMD\n"
         ),
     )
-    parser.add_argument("--model",          type=str,  default=None)
-
-    parser.add_argument("--mode", type=str, default="coding",
+    parser.add_argument("--model",          type=str, default=None)
+    parser.add_argument("--mode",           type=str, default="coding",
                         choices=["coding", "writing", "rct_search",
                                  "appraisal", "search", "sr"])
-  
-    parser.add_argument("--report", action="store_true", default=False,
-                        help="Generate a summary report from docs/ files (writing mode only)")
-    parser.add_argument("--revise", action="store_true", default=False,
-                        help="Run single-pass code revision pipeline from docs/coding/ (coding mode only)")
-    parser.add_argument("--role", type=str, default="Builder",
+    parser.add_argument("--report",         action="store_true", default=False,
+                        help="Generate a writing report from input/writing/ files")
+    parser.add_argument("--revise",         action="store_true", default=False,
+                        help="Run code revision pipeline from docs/coding/ (coding mode only)")
+    parser.add_argument("--role",           type=str, default="Builder",
                         choices=["Builder", "Reviewer", "Tester"],
                         help="Starting role for --revise pipeline (default: Builder)")
-    parser.add_argument("--provider",       type=str,  default="ollama",
+    parser.add_argument("--provider",       type=str, default="ollama",
                         choices=["ollama", "openai", "anthropic", "deepseek", "groq", "qwen"])
     parser.add_argument("--list-sessions",  action="store_true", default=False)
-    parser.add_argument("--read-session",   type=str,  default=None, metavar="FILENAME")
-    parser.add_argument("--delete-session", type=str,  default=None, metavar="FILENAME")
-    parser.add_argument("--export-session", type=str,  default=None, metavar="FILENAME")
-    parser.add_argument("--rename-session", type=str,  default=None, metavar="FILENAME")
+    parser.add_argument("--read-session",   type=str, default=None, metavar="FILENAME")
+    parser.add_argument("--delete-session", type=str, default=None, metavar="FILENAME")
+    parser.add_argument("--export-session", type=str, default=None, metavar="FILENAME")
+    parser.add_argument("--rename-session", type=str, default=None, metavar="FILENAME")
     parser.add_argument("--stats",          action="store_true", default=False)
     parser.add_argument("--dry-run",        action="store_true", default=False)
     parser.add_argument("--version",        action="version",
                         version=f"AI Automation Tool v{VERSION}")
     parser.add_argument("--list-roles",     action="store_true", default=False)
-    parser.add_argument("--help-guide", action="store_true", default=False,
+    parser.add_argument("--help-guide",     action="store_true", default=False,
                         help="Open the interactive HTML help guide in your browser")
-    # SR pipeline flags
-    parser.add_argument("--pdf-dir",        type=str,  default=None,
-                        help="Path to PDF folder for SR pipeline (activates CLI mode)")
-    parser.add_argument("--effect-measure", type=str,  default=None,
-                        choices=["OR", "RR", "MD", "SMD"],
-                        help="Effect measure for SR meta-analysis")
-    parser.add_argument("--sr-config",      type=str,  default=None,
-                        help="Path to prisma_criteria.yaml (default: sr/config/prisma_criteria.yaml)")
-    return parser.parse_args(args)
-
     return parser.parse_args(args)
 
 
+# ---------------------------------------------------------------------------
+# Entry point
+# ---------------------------------------------------------------------------
 if __name__ == "__main__":
     try:
         args = parse_args()
 
-        # ── API key validation ─────────────────────────────────────────
         non_ai_flags = (
             args.list_sessions
             or args.read_session
@@ -1821,22 +1877,8 @@ if __name__ == "__main__":
                 dry_run=args.dry_run,
             )
         elif args.mode == "sr":
-            if args.pdf_dir:
-                # CLI mode — run sr/main.py in the same terminal
-                import subprocess as _sp
-                sr_main = Path(__file__).resolve().parent.parent / "sr" / "main.py"
-                cmd = [sys.executable, str(sr_main),
-                       "--pdf-dir", args.pdf_dir,
-                       "--provider", args.provider]
-                if args.effect_measure:
-                    cmd += ["--effect-measure", args.effect_measure]
-                if args.sr_config:
-                    cmd += ["--config", args.sr_config]
-                if args.model:
-                    cmd += ["--model", args.model]
-                _sp.run(cmd, cwd=str(Path(__file__).resolve().parent.parent))
-            else:
-                run_sr_launcher()
+            # SR auto-loads from input/sr/ — no --pdf-dir needed
+            run_sr_launcher()
         elif args.mode == "rct_search":
             run_rct_search_pipeline(
                 provider=args.provider,

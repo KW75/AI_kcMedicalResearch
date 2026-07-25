@@ -274,7 +274,7 @@ elif page == "▶️  Run Pipeline":
         "groq":      ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "qwen/qwen3.6-27b"],
         "deepseek":  ["deepseek-v4-flash", "deepseek-v4-pro"],
         "openai":    ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo"],
-        "anthropic": ["claude-sonnet-4-6", "claude-opus-4-6", "claude-sonnet-4-5"],
+        "anthropic": ["claude-sonnet-5", "claude-opus-5"],
         "ollama":    ["llama3.2", "llama3.1", "mistral", "phi3"],
     }
     model = st.selectbox("AI model", MODEL_OPTIONS[provider])
@@ -290,16 +290,17 @@ elif page == "▶️  Run Pipeline":
         )
 
     MODEL_OPTIONS = {
-        "anthropic": ["claude-sonnet-4-6", "claude-opus-4-6", "claude-sonnet-4-5"],
+        "qwen":      ["qwen3.7-plus", "qwen3.7-max", "qwen3.6-flash"],
+        "groq":      ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "qwen/qwen3.6-27b"],
+        "deepseek":  ["deepseek-v4-flash", "deepseek-v4-pro"],
         "openai":    ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo"],
-        "deepseek":  ["deepseek-chat", "deepseek-reasoner"],
-        "groq":      ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "mixtral-8x7b-32768"],
+        "anthropic": ["claude-sonnet-5", "claude-opus-5"],
         "ollama":    ["llama3.2", "llama3.1", "mistral", "phi3"],
     }
 
     model = st.selectbox(
         "AI model",
-        ["claude-sonnet-4-6", "claude-opus-4-6", "claude-sonnet-4-5"],
+        ["claude-sonnet-5", "claude-opus-5"],
         label_visibility="collapsed",
     )
 
