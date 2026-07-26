@@ -56,3 +56,13 @@ output/sr/*
 !output/search/.gitkeep
 !output/sr/.gitkeep
 
+
+# Output files ¡X regenerated locally, never committed
+output/
+reports/coding/
+reports/writing/
+reports/appraisal/
+reports/rct_search/
+reports/search/
+reports/systematic_review/
+reports/transcripts/
