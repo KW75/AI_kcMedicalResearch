@@ -1809,6 +1809,8 @@ def parse_args(args: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--list-roles",     action="store_true", default=False)
     parser.add_argument("--help-guide",     action="store_true", default=False,
                         help="Open the interactive HTML help guide in your browser")
+    parser.add_argument("--ui", action="store_true", default=False,
+                    help="Launch the main Streamlit UI")
     return parser.parse_args(args)
 
 
@@ -1818,6 +1820,21 @@ def parse_args(args: list[str] | None = None) -> argparse.Namespace:
 if __name__ == "__main__":
     try:
         args = parse_args()
+
+        if args.ui:
+            import subprocess as _sp
+            proc = _sp.Popen(
+                [sys.executable, "-m", "streamlit", "run",
+                 str(Path(__file__).resolve().parent / "ui" / "app.py")],
+                cwd=str(Path(__file__).resolve().parent.parent),
+            )
+            print("UI launched — open http://localhost:8501 in your browser.")
+            print("Press Ctrl+C to stop the UI server.")
+            try:
+                proc.wait()
+            except KeyboardInterrupt:
+                proc.terminate()
+            raise SystemExit(0)
 
         non_ai_flags = (
             args.list_sessions
