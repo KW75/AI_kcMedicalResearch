@@ -1,1 +1,4 @@
 *.toml text eol=lf
+
+# Normalise line endings for new source files
+src/modes/*.py text eol=lf
