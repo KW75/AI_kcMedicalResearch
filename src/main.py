@@ -1,8 +1,9 @@
 ﻿"""
-main.py — AI Automation Tool
+main.py — AI Automation Tool  v2.2.0
 Supports six workflow modes: coding, writing, rct_search, appraisal, search, sr.
 Supports six AI providers: ollama (default), openai, anthropic, deepseek, groq, qwen.
 RAG layer: per-session, mode-specific input/ folder indexing via rag.py.
+Coding mode: Builder (pipeline), Reviewer (standalone), Tester (standalone).
 """
 
 from __future__ import annotations
@@ -20,8 +21,24 @@ from urllib.request import urlopen  # bare name so tests can patch src.main.urlo
 import uuid
 from datetime import datetime
 from pathlib import Path
-
 from dotenv import load_dotenv
+try:
+    # When imported as a package by pytest: from src.main import ...
+    from src.modes.coding import (
+        run_builder,
+        run_reviewer,
+        run_tester,
+        parse_direct_instructions,
+    )
+except ModuleNotFoundError:
+    # When run directly: python src/main.py
+    from modes.coding import (
+        run_builder,
+        run_reviewer,
+        run_tester,
+        parse_direct_instructions,
+    )
+
 
 load_dotenv()
 
@@ -62,7 +79,7 @@ INPUT_RCT_SEARCH    = INPUT_DIR / "rct_search"
 INPUT_SEARCH        = INPUT_DIR / "search"
 INPUT_SR            = INPUT_DIR / "sr"
 
-# Output folders (deliverables — note: "output" not "outputs")
+# Output folders (deliverables)
 OUTPUT_DIR          = BASE_DIR / "output"
 OUTPUT_CODING       = OUTPUT_DIR / "coding"
 OUTPUT_WRITING      = OUTPUT_DIR / "writing"
@@ -71,7 +88,7 @@ OUTPUT_RCT_SEARCH   = OUTPUT_DIR / "rct_search"
 OUTPUT_SEARCH       = OUTPUT_DIR / "search"
 OUTPUT_SR           = OUTPUT_DIR / "sr"
 
-# Reports folder (session transcripts / operation logs only)
+# Reports folder (session transcripts / operation logs)
 REPORTS_DIR         = BASE_DIR / "reports"
 
 # Ensure all directories exist at startup
@@ -83,6 +100,14 @@ for _d in [
     OUTPUT_CODING, OUTPUT_WRITING, OUTPUT_APPRAISAL,
     OUTPUT_RCT_SEARCH, OUTPUT_SEARCH, OUTPUT_SR,
     REPORTS_DIR,
+    # reports/ subfolders — each mode writes here
+    REPORTS_DIR / "coding",
+    REPORTS_DIR / "writing",
+    REPORTS_DIR / "appraisal",
+    REPORTS_DIR / "rct_search",
+    REPORTS_DIR / "search",
+    REPORTS_DIR / "systematic_review",
+    REPORTS_DIR / "transcripts",
 ]:
     _d.mkdir(parents=True, exist_ok=True)
 
@@ -230,10 +255,10 @@ DOC_FILES_BY_ROLE: dict[str, list[Path]] = {
                    DOCS_RCT_SEARCH / "database-guide.md"],
     "Validator":  [DOCS_RCT_SEARCH / "pico-framework.md",
                    DOCS_RCT_SEARCH / "validation-criteria.md"],
-    "Appraiser":     [],  # articles supplied via input/appraisal/ RAG only
-    "Methodologist": [],  # articles supplied via input/appraisal/ RAG only
-    "Summariser":    [],  # articles supplied via input/appraisal/ RAG only
-    "Researcher":    [],  # context built from live PubMed fetch only
+    "Appraiser":     [],
+    "Methodologist": [],
+    "Summariser":    [],
+    "Researcher":    [],
 }
 
 
@@ -735,14 +760,10 @@ def rename_session(filename: str, reports_dir: str = str(REPORTS_DIR)) -> None:
         print(f"File not found: {filename}. Use --list-sessions to see available files.")
         return
     try:
-        try:
-            raw_name = input("New filename (without extension): ").strip()
-        except (EOFError, KeyboardInterrupt):
-            print()
-            raw_name = ""
+        raw_name = input("New filename (without extension): ").strip()
     except (EOFError, KeyboardInterrupt):
-        raw_name = ""
         print()
+        raw_name = ""
     if not raw_name:
         print("Name cannot be empty. Cancelled.")
         return
@@ -858,15 +879,12 @@ def generate_writing_report(
     output/writing/writing_report_{ts}.md and .docx.
     Returns the path of the saved .md report.
     """
-    # Check prompt exists FIRST — before anything else
     prompt_path = AI_DIR / "writing-report-prompt.md"
     if not prompt_path.exists():
         raise FileNotFoundError(f"Writing report prompt not found: {prompt_path}")
 
-    # Primary: auto-load from input/writing/
     files = auto_load_input_files("writing")
 
-    # Fallback: if input/writing/ is empty and a docs_dir was passed, read from there
     if not files and docs_dir.exists():
         SUPPORTED = {".txt", ".md", ".pdf", ".docx"}
         files = sorted(
@@ -960,10 +978,10 @@ def generate_code_revision(
     dry_run: bool = False,
 ) -> Path:
     """
-    Single-pass code revision pipeline.
-    Builder  -> Build -> Review -> Test
+    Single-pass code revision pipeline (legacy --revise flag).
+    Builder -> Build -> Review -> Test
     Reviewer -> Review -> Test
-    Tester   -> Test only
+    Tester -> Test only
     Saves results as reports/code_revision_{ts}.md and .docx.
     Returns path of the .md report.
     """
@@ -978,7 +996,7 @@ def generate_code_revision(
         return reports_dir / "code_revision_empty.md"
 
     print(f"\n{'='*55}")
-    print(f"  CODE REVISION PIPELINE")
+    print(f"  CODE REVISION PIPELINE (--revise)")
     print(f"  Starting role : {start_role}")
     print(f"  Pipeline      : {' -> '.join(stages)}")
     print(f"  Code files    : {len(code_files)}")
@@ -1000,14 +1018,10 @@ def generate_code_revision(
     guidance_context = "\n\n".join(guidance_parts)
 
     try:
-        try:
-            task = input("Describe the revision task (or press Enter for general review): ").strip()
-        except (EOFError, KeyboardInterrupt):
-            print()
-            task = ""
+        task = input("Describe the revision task (or press Enter for general review): ").strip()
     except (EOFError, KeyboardInterrupt):
-        task = ""
         print()
+        task = ""
     if not task:
         task = "Review and improve the code quality, readability, and correctness."
 
@@ -1139,18 +1153,10 @@ def run_rct_search_pipeline(
         print(f"[RCT Search] Topic loaded from docs/rct_search/topic.md: {topic}")
     else:
         try:
-            try:
-                try:
-                    topic = input("Enter your research topic: ").strip()
-                except (EOFError, KeyboardInterrupt):
-                    print()
-                    topic = ""
-            except (EOFError, KeyboardInterrupt):
-                topic = ""
-                print()
+            topic = input("Enter your research topic: ").strip()
         except (EOFError, KeyboardInterrupt):
-            topic = ""
             print()
+            topic = ""
     if not topic:
         print("No topic entered. Exiting.")
         sys.exit(0)
@@ -1158,9 +1164,9 @@ def run_rct_search_pipeline(
     pico_path         = DOCS_RCT_SEARCH / "pico-framework.md"
     db_guide          = DOCS_RCT_SEARCH / "database-guide.md"
     val_criteria      = DOCS_RCT_SEARCH / "validation-criteria.md"
-    pico_context      = pico_path.read_text(encoding="utf-8", errors="replace")      if pico_path.exists()     else ""
-    db_guide_text     = db_guide.read_text(encoding="utf-8", errors="replace")       if db_guide.exists()      else ""
-    val_criteria_text = val_criteria.read_text(encoding="utf-8", errors="replace")   if val_criteria.exists()  else ""
+    pico_context      = pico_path.read_text(encoding="utf-8", errors="replace")     if pico_path.exists()    else ""
+    db_guide_text     = db_guide.read_text(encoding="utf-8", errors="replace")      if db_guide.exists()     else ""
+    val_criteria_text = val_criteria.read_text(encoding="utf-8", errors="replace")  if val_criteria.exists() else ""
 
     stages = [
         {
@@ -1247,8 +1253,6 @@ def run_rct_search_pipeline(
         "- Run python src/main.py --mode sr for full systematic review pipeline\n"
     )
 
-
-    # AFTER — uses reports_dir when explicitly passed, OUTPUT_RCT_SEARCH otherwise:
     timestamp  = datetime.now().strftime("%Y%m%d_%H%M%S")
     out_dir    = reports_dir if reports_dir != REPORTS_DIR else OUTPUT_RCT_SEARCH
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -1259,11 +1263,9 @@ def run_rct_search_pipeline(
     md_path.write_text(md_content, encoding="utf-8")
     print(f"Markdown report saved : {out_dir.name}\\{md_path.name}")
 
-
     try:
         _md_to_docx(md_content, f"RCT Search Strategy — {timestamp}", docx_path)
         print(f"Word document saved   : {out_dir.name}\\{docx_path.name}")
-
     except Exception as exc:  # noqa: BLE001
         print(f"  Warning: could not generate .docx — {exc}")
 
@@ -1287,14 +1289,10 @@ def rct_search_reminder() -> None:
     print("  Search links will be saved to the output/rct_search/ folder.")
     print("=" * 55 + "\n")
     try:
-        try:
-            confirm = input("Have you edited your PICO file? [y/N]: ").strip().lower()
-        except (EOFError, KeyboardInterrupt):
-            print()
-            confirm = "n"
+        confirm = input("Have you edited your PICO file? [y/N]: ").strip().lower()
     except (EOFError, KeyboardInterrupt):
-        confirm = "n"
         print()
+        confirm = "n"
     if confirm != "y":
         print("Please edit the PICO file first, then re-run rct_search mode.")
         sys.exit(0)
@@ -1446,7 +1444,6 @@ def run_search_mode(
     reports_dir: Path | None = None,
     topic_dir: Path | None = None,
 ) -> Path:
-
     """
     Interactive single-pass medical topic search.
     Fetches PubMed abstracts, sends them to the AI Researcher role,
@@ -1473,12 +1470,9 @@ def run_search_mode(
     search_topic_file = (topic_dir / "topic.md") if topic_dir \
         else (BASE_DIR / "docs" / "search" / "topic.md")
 
+    file_lines       = _read_topic_file(search_topic_file).splitlines()
+    loaded_from_file = False
 
-    file_lines        = _read_topic_file(search_topic_file).splitlines()
-    loaded_from_file  = False
-
-
-    # Handles both 1-line (plain query) and 2-line (type + query) formats:
     if len(file_lines) >= 2:
         ftype  = file_lines[0].strip().lower()
         fquery = file_lines[1].strip()
@@ -1491,11 +1485,10 @@ def run_search_mode(
     elif len(file_lines) == 1:
         fquery = file_lines[0].strip()
         if fquery:
-            is_paper_search  = False           # default to clinical topic
+            is_paper_search  = False
             topic            = fquery
             print(f"[Search] Loaded from docs/search/topic.md: clinical topic - {topic}")
             loaded_from_file = True
-
 
     if not loaded_from_file:
         print("  [1] A research paper (generates critical appraisal report)")
@@ -1547,9 +1540,9 @@ def run_search_mode(
             f"URL: {art['url']}\n\n"
             f"{art['abstract']}"
         )
-    abstracts_text     = "\n\n".join(abstract_sections)
-    search_type_label  = "RESEARCH PAPER" if is_paper_search else "CLINICAL TOPIC"
-    full_prompt        = (
+    abstracts_text    = "\n\n".join(abstract_sections)
+    search_type_label = "RESEARCH PAPER" if is_paper_search else "CLINICAL TOPIC"
+    full_prompt       = (
         f"{researcher_prompt}\n\n"
         f"## Search Type\n{search_type_label}\n\n"
         f"## Search Topic\n{topic}\n\n"
@@ -1572,7 +1565,6 @@ def run_search_mode(
         )
     links_section = "\n".join(link_lines)
 
-    # Save to output/search/
     _out_dir  = OUTPUT_SEARCH
     _out_dir.mkdir(parents=True, exist_ok=True)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -1615,6 +1607,125 @@ def list_roles(mode: str = "coding") -> None:
 
 
 # ---------------------------------------------------------------------------
+# Coding mode dispatcher  (Builder pipeline / Reviewer / Tester standalone)
+# ---------------------------------------------------------------------------
+def handle_coding_mode(
+    provider: str = "ollama",
+    model: str | None = None,
+    dry_run: bool = False,
+) -> None:
+    """
+    Terminal entry point for Coding mode.
+    Presents Builder / Reviewer / Tester sub-mode menu, collects > direct
+    instructions from the user, then delegates to the coding.py engine.
+
+    The _call_llm_fn closure wraps call_ai() so the full provider / model
+    selection already configured in main.py is honoured transparently.
+    """
+
+    def _call_llm_fn(system_prompt: str, user_prompt: str) -> str:
+        """
+        Adapter: merges system + user prompt into one string for call_ai().
+        System instructions are prepended as a clearly labelled block so
+        the LLM treats them with highest priority.
+        """
+        if dry_run:
+            return "[DRY RUN] LLM would respond here."
+        combined = (
+            f"## System Instructions\n{system_prompt}\n\n"
+            f"## User Request\n{user_prompt}"
+        )
+        return call_ai(prompt=combined, provider=provider, model=model)
+
+    print("\n" + "=" * 60)
+    print("  CODING MODE")
+    print("=" * 60)
+    print(f"  {COLOURS['Builder']}1. Builder {RESET} "
+          f"— pipeline: build → review → test → output/coding/")
+    print(f"  {COLOURS['Reviewer']}2. Reviewer{RESET} "
+          f"— standalone: review code in input/coding/")
+    print(f"  {COLOURS['Tester']}3. Tester  {RESET} "
+          f"— standalone: test code in input/coding/")
+    print("  0. Back to menu")
+    print("=" * 60)
+
+    try:
+        choice = input("Select sub-mode [0-3]: ").strip()
+    except (EOFError, KeyboardInterrupt):
+        print()
+        choice = "0"
+
+    if choice == "0" or not choice:
+        print("Returning to menu.")
+        return
+
+    sub_mode_map = {"1": "Builder", "2": "Reviewer", "3": "Tester"}
+    if choice not in sub_mode_map:
+        print("Invalid choice — returning to menu.")
+        return
+
+    sub_mode = sub_mode_map[choice]
+    colour   = COLOURS.get(sub_mode, RESET)
+
+    print(f"\n{colour}[{sub_mode.upper()}]{RESET} Enter instructions below.")
+    print("  Lines starting with  >  are DIRECT TASK INSTRUCTIONS (highest priority).")
+    print("  All other lines are ignored.")
+    print("  Press ENTER twice on a blank line when done.\n")
+
+    lines: list[str] = []
+    try:
+        while True:
+            try:
+                line = input()
+            except (EOFError, KeyboardInterrupt):
+                break
+            # Two consecutive blank lines = end of input
+            if line == "" and lines and lines[-1] == "":
+                break
+            lines.append(line)
+    except (EOFError, KeyboardInterrupt):
+        pass
+
+    raw_input_text      = "\n".join(lines)
+    direct_instructions = parse_direct_instructions(raw_input_text)
+
+    if direct_instructions:
+        print(f"\n{colour}[{sub_mode.upper()}]{RESET} "
+              f"Direct instructions captured ({len(direct_instructions)}):")
+        for instr in direct_instructions:
+            print(f"  → {instr}")
+    else:
+        print(f"\n{colour}[{sub_mode.upper()}]{RESET} "
+              "No direct instructions found — using docs/coding/ guidelines only.")
+
+    # Show what input files are present before starting
+    auto_load_input_files("coding")
+    print()
+
+    if sub_mode == "Builder":
+        run_builder(
+            direct_instructions=direct_instructions,
+            call_llm_fn=_call_llm_fn,
+            verbose=True,
+        )
+    elif sub_mode == "Reviewer":
+        run_reviewer(
+            direct_instructions=direct_instructions,
+            call_llm_fn=_call_llm_fn,
+            verbose=True,
+        )
+    elif sub_mode == "Tester":
+        run_tester(
+            direct_instructions=direct_instructions,
+            call_llm_fn=_call_llm_fn,
+            verbose=True,
+        )
+
+    print(f"\n{colour}[{sub_mode.upper()}]{RESET} Done. "
+          "Check output/coding/ and reports/coding/ for results.\n")
+
+
+# ---------------------------------------------------------------------------
 # Main interactive session loop
 # ---------------------------------------------------------------------------
 def main(
@@ -1640,7 +1751,6 @@ def main(
         print("  DRY RUN — AI calls will be skipped")
     print(f"{'='*55}\n")
 
-    # Auto-load input files and prepare RAG
     input_files  = auto_load_input_files(mode)
     rag_enabled  = False
     input_folder = INPUT_DIR / mode
@@ -1660,7 +1770,6 @@ def main(
         except Exception as exc:  # noqa: BLE001
             print(f"[RAG] Indexing skipped: {exc}\n")
 
-    # Role selection
     role_name, role_cfg = choose_role(mode)
     colour      = role_color(role_name)
     prompt_path = Path(role_cfg["prompt"])
@@ -1675,7 +1784,6 @@ def main(
 
     previous_response = ""
 
-    # Appraisal: load articles directly into context
     article_context = ""
     if mode == "appraisal":
         articles = _read_article_files(INPUT_APPRAISAL)
@@ -1774,7 +1882,7 @@ PROVIDER_ENV_VARS = {
     "deepseek":  "DEEPSEEK_API_KEY",
     "groq":      "GROQ_API_KEY",
     "qwen":      "DASHSCOPE_API_KEY",
-    "ollama":    None,   # local — no key required
+    "ollama":    None,
 }
 
 
@@ -1830,7 +1938,7 @@ def parse_args(args: list[str] | None = None) -> argparse.Namespace:
             "  python src/main.py --mode rct_search         # RCT search mode\n"
             "  python src/main.py --mode appraisal          # appraisal mode\n"
             "  python src/main.py --mode search             # medical search\n"
-            "  python src/main.py --mode sr                 # SR pipeline (auto-loads input/sr/)\n"
+            "  python src/main.py --mode sr                 # SR pipeline\n"
             "  python src/main.py --model llama3.2:3b       # different model\n"
             "  python src/main.py --provider qwen           # use Qwen\n"
             "  python src/main.py --list-sessions           # list transcripts\n"
@@ -1847,7 +1955,7 @@ def parse_args(args: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--report",         action="store_true", default=False,
                         help="Generate a writing report from input/writing/ files")
     parser.add_argument("--revise",         action="store_true", default=False,
-                        help="Run code revision pipeline from docs/coding/ (coding mode only)")
+                        help="Run legacy code revision pipeline from docs/coding/")
     parser.add_argument("--role",           type=str, default="Builder",
                         choices=["Builder", "Reviewer", "Tester"],
                         help="Starting role for --revise pipeline (default: Builder)")
@@ -1865,8 +1973,8 @@ def parse_args(args: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--list-roles",     action="store_true", default=False)
     parser.add_argument("--help-guide",     action="store_true", default=False,
                         help="Open the interactive HTML help guide in your browser")
-    parser.add_argument("--ui", action="store_true", default=False,
-                    help="Launch the main Streamlit UI")
+    parser.add_argument("--ui",             action="store_true", default=False,
+                        help="Launch the main Streamlit UI")
     return parser.parse_args(args)
 
 
@@ -1950,10 +2058,16 @@ if __name__ == "__main__":
                 dry_run=args.dry_run,
             )
         elif args.mode == "sr":
-            # SR auto-loads from input/sr/ — no --pdf-dir needed
             run_sr_launcher()
         elif args.mode == "rct_search":
             run_rct_search_pipeline(
+                provider=args.provider,
+                model=args.model,
+                dry_run=args.dry_run,
+            )
+        elif args.mode == "coding":
+            # Coding mode: Builder pipeline / Reviewer / Tester standalone
+            handle_coding_mode(
                 provider=args.provider,
                 model=args.model,
                 dry_run=args.dry_run,
@@ -1965,8 +2079,7 @@ if __name__ == "__main__":
                 mode=args.mode,
                 provider=args.provider,
             )
+
     except KeyboardInterrupt:
         print("\n\nSession stopped. Returning to menu...\n")
         raise SystemExit(0)
-
-
