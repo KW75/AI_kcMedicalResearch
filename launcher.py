@@ -1,21 +1,20 @@
-
-import subprocess
+﻿import subprocess
 import sys
 import os
 from pathlib import Path
 
-BASE = Path(__file__).resolve().parent
+BASE   = Path(__file__).resolve().parent
 PYTHON = sys.executable
 os.system('')
 
 # ANSI colors
-RESET =     '\033[0m'
-FRAME =     '\033[94m'         # blue
-LOGO =      '\033[38;5;51m'    # bright teal
-LOGO_TXT =  '\033[32m'         # softer green
-TEXT =      '\033[97m'         # bright white
-DIM =       '\033[0;31;40m'    # red
-ACCENT =    '\033[38;5;121m'   # mint green
+RESET    = '\033[0m'
+FRAME    = '\033[94m'
+LOGO     = '\033[38;5;51m'
+LOGO_TXT = '\033[32m'
+TEXT     = '\033[97m'
+DIM      = '\033[0;31;40m'
+ACCENT   = '\033[38;5;121m'
 
 MODES = [
     ('1', 'Coding',      '--mode coding'),
@@ -25,10 +24,11 @@ MODES = [
     ('5', 'RCT Search',  '--mode rct_search'),
     ('6', 'SR Pipeline', '--mode sr'),
     ('7', 'Dry Run',     '--dry-run'),
+    ('8', 'Launch UI',   '--ui'),
 ]
 
 PROVIDERS = [
-    ('1', 'Ollama (local - default)',    ''),
+    ('1', 'Ollama (local - default)',     ''),
     ('2', 'Qwen (Alibaba - recommended)', '--provider qwen'),
     ('3', 'Groq',                         '--provider groq'),
     ('4', 'DeepSeek',                     '--provider deepseek'),
@@ -38,11 +38,13 @@ PROVIDERS = [
 
 
 def clear():
-    os.system('cls' if os.name == 'nt' else 'clear')
+    try:
+        os.system('cls' if os.name == 'nt' else 'clear')
+    except KeyboardInterrupt:
+        pass
 
 
 def safe_input(prompt, default=''):
-    """input() wrapper that handles EOFError and KeyboardInterrupt gracefully."""
     try:
         return input(prompt).strip()
     except (KeyboardInterrupt, EOFError):
@@ -63,7 +65,7 @@ def banner():
     print(f'  {FRAME}|{RESET}                                                         {FRAME}|{RESET}')
     print(f'  {FRAME}+=========================================================+{RESET}')
     print()
-    print(f'  {DIM}Modes:{RESET}      {ACCENT}coding  writing  appraisal  search  rct_search  sr{RESET}')
+    print(f'  {DIM}Modes:{RESET}      {ACCENT}coding  writing  appraisal  search  rct_search  sr  ui{RESET}')
     print(f'  {DIM}Providers:{RESET}  {ACCENT}ollama (default)  qwen  groq  deepseek  openai  anthropic{RESET}')
     print()
     print(f'  {DIM}For help:{RESET}   {ACCENT}python src/main.py --help-guide{RESET}')
@@ -78,23 +80,31 @@ def pick_mode():
         print(f'  {DIM}-----------{RESET}')
         for key, label, _ in MODES:
             print(f'  {TEXT}{key}{RESET}  {TEXT}{label}{RESET}')
-        print(f'  {TEXT}8{RESET}  {TEXT}Custom  (type your own flags){RESET}')
+        print(f'  {TEXT}9{RESET}  {TEXT}Custom  (type your own flags){RESET}')
         print(f'  {TEXT}H{RESET}  {TEXT}Help guide{RESET}')
         print(f'  {TEXT}X{RESET}  {TEXT}Exit{RESET}')
         print()
         print(f'  {DIM}TIP:{RESET} {TEXT}Press Ctrl+C inside a session to stop and return here.{RESET}')
         print()
-        choice = safe_input(f'  {ACCENT}Enter choice [1-8 H X]: {RESET}', default='X').upper()
-        if choice == 'X' or choice == '':
+        choice = safe_input(
+            f'  {ACCENT}Enter choice [1-9 / H / X]: {RESET}',
+            default='X'
+        ).upper()
+
+        if choice in ('X', '0', ''):
             return None, None, False, False
+
         if choice == 'H':
             return None, None, False, True
-        if choice == '8':
+
+        if choice == '9':
             return None, None, True, False
+
         for key, label, flag in MODES:
             if choice == key:
                 return label, flag, False, False
-        print(f'  {ACCENT}Invalid choice.{RESET}')
+
+        print(f'  {ACCENT}Invalid choice. Please enter 1-9, H, or X.{RESET}')
         safe_input(f'  {DIM}Press Enter to try again...{RESET}')
 
 
@@ -106,7 +116,10 @@ def pick_provider():
         for key, label, _ in PROVIDERS:
             print(f'  {TEXT}{key}{RESET}  {TEXT}{label}{RESET}')
         print()
-        choice = safe_input(f'  {ACCENT}Enter choice [1-6] or Enter for Ollama: {RESET}', default='')
+        choice = safe_input(
+            f'  {ACCENT}Enter choice [1-6] or Enter for Ollama: {RESET}',
+            default=''
+        )
         if choice == '':
             return ''
         for key, label, flag in PROVIDERS:
@@ -127,56 +140,83 @@ def run_custom():
     cmd = [PYTHON, str(BASE / 'src' / 'main.py')] + custom.split()
     print()
     try:
-        result = subprocess.run(cmd, cwd=str(BASE))
-        if result.returncode != 0:
-            print(f'\n  {DIM}[exit code {result.returncode}]{RESET}')
+        subprocess.run(cmd, cwd=str(BASE))
     except (KeyboardInterrupt, EOFError):
         print(f'\n\n{ACCENT}Session stopped. Returning to menu...{RESET}\n')
 
 
+def run_ui():
+    cmd = [PYTHON, str(BASE / 'src' / 'main.py'), '--ui']
+    print()
+    print(f'  {DIM}-------------------------------------------------------{RESET}')
+    print(f'  {ACCENT}Launching UI:{RESET} {TEXT}http://localhost:8501{RESET}')
+    print(f'  {DIM}Close the browser tab and press Ctrl+C here to stop.{RESET}')
+    print(f'  {DIM}-------------------------------------------------------{RESET}')
+    print()
+    try:
+        proc = subprocess.Popen(cmd, cwd=str(BASE))
+        proc.wait()
+    except (KeyboardInterrupt, EOFError):
+        proc.terminate()
+        print(f'\n\n{ACCENT}UI stopped. Returning to menu...{RESET}\n')
+
+
 def main():
     _cflags = subprocess.CREATE_NEW_PROCESS_GROUP if os.name == 'nt' else 0
+
     while True:
-        label, mode_flag, is_custom, is_help = pick_mode()
-
-        if is_help:
-            import webbrowser
-            webbrowser.open(str(BASE / 'docs' / 'flashcard-help.html'))
-            safe_input(f'  {DIM}Press Enter to return to menu...{RESET}')
-            continue
-
-        if label is None and not is_custom:
-            # Exit chosen
+        try:
+            label, mode_flag, is_custom, is_help = pick_mode()
+        except (KeyboardInterrupt, EOFError):
             clear()
             print(f'\n  {ACCENT}Goodbye!{RESET}\n')
             break
 
-        if is_custom:
-            run_custom()
-            continue
-
-        prov_flag = pick_provider()
-        flags = [f for f in [mode_flag, prov_flag] if f]
-        cmd = [PYTHON, str(BASE / 'src' / 'main.py')] + ' '.join(flags).split()
-        print()
-        print(f'  {DIM}-------------------------------------------------------{RESET}')
-        print(f'  {ACCENT}Running:{RESET} {TEXT}python src/main.py {" ".join(flags)}{RESET}')
-        print(f'  {DIM}Ctrl+C stops the session and returns here.{RESET}')
-        print(f'  {DIM}-------------------------------------------------------{RESET}')
-        print()
         try:
-            result = subprocess.run(
-                cmd,
-                cwd=str(BASE),
-                creationflags=_cflags,
-            )
-            if result.returncode not in (0, 1):
-                print(f'\n  {DIM}[exit code {result.returncode}]{RESET}')
+            if is_help:
+                import webbrowser
+                webbrowser.open(str(BASE / 'docs' / 'flashcard-help.html'))
+                safe_input(f'  {DIM}Press Enter to return to menu...{RESET}')
+                continue
+
+            if label is None and not is_custom:
+                clear()
+                print(f'\n  {ACCENT}Goodbye!{RESET}\n')
+                break
+
+            if is_custom:
+                run_custom()
+                safe_input(f'  {DIM}Press Enter to return to menu...{RESET}')
+                continue
+
+            if mode_flag == '--ui':
+                run_ui()
+                safe_input(f'  {DIM}Press Enter to return to menu...{RESET}')
+                continue
+
+            prov_flag = pick_provider()
+            flags = [f for f in [mode_flag, prov_flag] if f]
+            cmd   = [PYTHON, str(BASE / 'src' / 'main.py')] + ' '.join(flags).split()
+
+            print()
+            print(f'  {DIM}-------------------------------------------------------{RESET}')
+            print(f'  {ACCENT}Running:{RESET} {TEXT}python src/main.py {" ".join(flags)}{RESET}')
+            print(f'  {DIM}Ctrl+C stops the session and returns here.{RESET}')
+            print(f'  {DIM}-------------------------------------------------------{RESET}')
+            print()
+
+            try:
+                subprocess.run(cmd, cwd=str(BASE), creationflags=_cflags)
+            except (KeyboardInterrupt, EOFError):
+                print(f'\n\n{ACCENT}Session stopped. Returning to menu...{RESET}\n')
+
+            safe_input(f'  {DIM}Press Enter to return to menu...{RESET}')
+
         except (KeyboardInterrupt, EOFError):
             print(f'\n\n{ACCENT}Session stopped. Returning to menu...{RESET}\n')
-        safe_input(f'  {DIM}Press Enter to return to menu...{RESET}')
+            safe_input(f'  {DIM}Press Enter to return to menu...{RESET}')
+            continue
 
 
 if __name__ == '__main__':
     main()
-

@@ -654,7 +654,11 @@ def choose_role(mode: str = "coding") -> tuple[str, dict]:
         print(f"  {colour}{i}. {name}{RESET}")
 
     while True:
-        choice = input("Enter number: ").strip()
+        try:
+            choice = input("Enter number: ").strip()
+        except (EOFError, KeyboardInterrupt):
+            choice = "1"
+            print("[no input detected - defaulting to role 1]")
         if choice.isdigit() and 1 <= int(choice) <= len(role_names):
             name = role_names[int(choice) - 1]
             return name, roles[name]
@@ -696,7 +700,11 @@ def delete_session(filename: str, reports_dir: str = str(REPORTS_DIR)) -> None:
     if not path.exists():
         print(f"File not found: {filename}. Use --list-sessions to see available files.")
         return
-    confirm = input(f"Delete '{filename}'? [y/N]: ").strip().lower()
+    try:
+        confirm = input(f"Delete '{filename}'? [y/N]: ").strip().lower()
+    except (EOFError, KeyboardInterrupt):
+        print()
+        confirm = "n"
     if confirm == "y":
         path.unlink()
         print(f"Deleted: {filename}")
@@ -726,7 +734,15 @@ def rename_session(filename: str, reports_dir: str = str(REPORTS_DIR)) -> None:
     if not src.exists():
         print(f"File not found: {filename}. Use --list-sessions to see available files.")
         return
-    raw_name = input("New filename (without extension): ").strip()
+    try:
+        try:
+            raw_name = input("New filename (without extension): ").strip()
+        except (EOFError, KeyboardInterrupt):
+            print()
+            raw_name = ""
+    except (EOFError, KeyboardInterrupt):
+        raw_name = ""
+        print()
     if not raw_name:
         print("Name cannot be empty. Cancelled.")
         return
@@ -983,7 +999,15 @@ def generate_code_revision(
             )
     guidance_context = "\n\n".join(guidance_parts)
 
-    task = input("Describe the revision task (or press Enter for general review): ").strip()
+    try:
+        try:
+            task = input("Describe the revision task (or press Enter for general review): ").strip()
+        except (EOFError, KeyboardInterrupt):
+            print()
+            task = ""
+    except (EOFError, KeyboardInterrupt):
+        task = ""
+        print()
     if not task:
         task = "Review and improve the code quality, readability, and correctness."
 
@@ -1114,7 +1138,19 @@ def run_rct_search_pipeline(
         topic = file_topic
         print(f"[RCT Search] Topic loaded from docs/rct_search/topic.md: {topic}")
     else:
-        topic = input("Enter your research topic: ").strip()
+        try:
+            try:
+                try:
+                    topic = input("Enter your research topic: ").strip()
+                except (EOFError, KeyboardInterrupt):
+                    print()
+                    topic = ""
+            except (EOFError, KeyboardInterrupt):
+                topic = ""
+                print()
+        except (EOFError, KeyboardInterrupt):
+            topic = ""
+            print()
     if not topic:
         print("No topic entered. Exiting.")
         sys.exit(0)
@@ -1250,7 +1286,15 @@ def rct_search_reminder() -> None:
     print()
     print("  Search links will be saved to the output/rct_search/ folder.")
     print("=" * 55 + "\n")
-    confirm = input("Have you edited your PICO file? [y/N]: ").strip().lower()
+    try:
+        try:
+            confirm = input("Have you edited your PICO file? [y/N]: ").strip().lower()
+        except (EOFError, KeyboardInterrupt):
+            print()
+            confirm = "n"
+    except (EOFError, KeyboardInterrupt):
+        confirm = "n"
+        print()
     if confirm != "y":
         print("Please edit the PICO file first, then re-run rct_search mode.")
         sys.exit(0)
@@ -1457,14 +1501,22 @@ def run_search_mode(
         print("  [1] A research paper (generates critical appraisal report)")
         print("  [2] A clinical topic  (generates reviewer-format summary)")
         while True:
-            search_type = input("Enter 1 or 2: ").strip()
+            try:
+                search_type = input("Enter 1 or 2: ").strip()
+            except (EOFError, KeyboardInterrupt):
+                print()
+                search_type = "1"
             if search_type in ("1", "2"):
                 break
             print("  Please enter 1 or 2.")
         is_paper_search = search_type == "1"
-        topic = input(
-            "Paper title, author, or PMID: " if is_paper_search else "Clinical topic: "
-        ).strip()
+        try:
+            topic = input(
+                "Paper title, author, or PMID: " if is_paper_search else "Clinical topic: "
+            ).strip()
+        except (EOFError, KeyboardInterrupt):
+            print()
+            topic = ""
         if not topic:
             print("No topic entered. Exiting.")
             sys.exit(0)
@@ -1639,7 +1691,11 @@ def main(
 
     try:
         while True:
-            task = input(f"{colour}{role_name} >{RESET} ").strip()
+            try:
+                task = input(f"{colour}{role_name} >{RESET} ").strip()
+            except (EOFError, KeyboardInterrupt):
+                print()
+                break
             if not task:
                 continue
 
@@ -1912,3 +1968,5 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         print("\n\nSession stopped. Returning to menu...\n")
         raise SystemExit(0)
+
+
