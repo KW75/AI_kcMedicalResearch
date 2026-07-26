@@ -129,37 +129,24 @@ PROVIDERS = ["ollama", "openai", "anthropic", "deepseek", "groq", "qwen"]
 # -- helpers -------------------------------------------------------------------
 
 def _icon_b64(path: Path) -> str | None:
-    """Resize icon to 96x96, flatten transparency to white, return base64 data-URI."""
+    """Resize icon to 96x96, preserve transparency, return base64 data-URI."""
     if not path.exists():
         return None
     try:
         from PIL import Image
-        img = Image.open(path)
-        # flatten any transparency onto a white background
-        if img.mode in ("RGBA", "LA", "P"):
-            img = img.convert("RGBA")
-            bg  = Image.new("RGB", img.size, (255, 255, 255))
-            bg.paste(img, mask=img.getchannel("A"))
-            rgb = bg
-        else:
-            rgb = img.convert("RGB")
-        rgb.thumbnail((96, 96), Image.LANCZOS)
+        img = Image.open(path).convert("RGBA")
+        img.thumbnail((96, 96), Image.LANCZOS)
         buf = io.BytesIO()
-        rgb.save(buf, format="PNG", optimize=True)
+        img.save(buf, format="PNG", optimize=True)
         data = base64.b64encode(buf.getvalue()).decode()
-        return f"data:image/png;base64,{data}"
+        return "data:image/png;base64," + data
     except Exception:
-        # fallback: embed raw bytes without resize
         try:
             ext  = path.suffix.lower().lstrip(".")
             mime = "jpeg" if ext in ("jpg", "jpeg") else "png"
-            return (
-                f"data:image/{mime};base64,"
-                f"{base64.b64encode(path.read_bytes()).decode()}"
-            )
+            return "data:image/" + mime + ";base64," + base64.b64encode(path.read_bytes()).decode()
         except Exception:
             return None
-
 
 def _logo_b64() -> str | None:
     for name in ("logo_AI_kcMedicalResearch.png", "logo_AI_kcMedicalResearch.jpg"):
@@ -305,6 +292,10 @@ def _inject_css() -> None:
     st.markdown(
         """
         <style>
+        /* ── root font size: makes all rem units behave as expected ── */
+        :root { font-size: 16px !important; }
+        html, body { font-size: 16px !important; }
+        .main .block-container { font-size: 16px !important; }
         /* global */
         body { font-family: "Segoe UI", sans-serif; }
         .block-container {
@@ -465,6 +456,27 @@ def _render_header(subtitle: str = "") -> None:
 def _home_page() -> None:
     _render_header("Select a mode to begin")
 
+    st.markdown(
+        '''
+        <div style="background:#e8f4fd;border-left:5px solid #1a73e8;
+        padding:1rem 1.4rem;border-radius:8px;margin-bottom:.5rem;">
+        <p style="margin:0;font-size:1.2rem;font-weight:700;color:#1a1a2e;">
+        📂  Files uploaded to <strong>Input</strong> are automatically transferred to their respective input folder.</p>
+        </div>
+        ''',
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        '''
+        <div style="background:#e8f9f0;border-left:5px solid #34a853;
+        padding:1rem 1.4rem;border-radius:8px;margin-bottom:1.2rem;">
+        <p style="margin:0;font-size:1.2rem;font-weight:700;color:#1a1a2e;">
+        📤  Processed results are placed in their respective <strong>Output</strong> folder and available for download.</p>
+        </div>
+        ''',
+        unsafe_allow_html=True,
+    )
+
     cols = st.columns(6, gap="small")
 
     for col, (key, cfg) in zip(cols, MODES.items()):
@@ -539,6 +551,7 @@ def _home_page() -> None:
                         f"\u2705 Saved {len(saved)} file(s): "
                         + ", ".join(f"`{n}`" for n in saved)
                     )
+                    st.rerun()
                 # explicit close so user can reach buttons below
                 if st.button("\u2716 Close", key=f"close_inp_{key}",
                              use_container_width=True):
@@ -617,7 +630,7 @@ def _mode_page(mode: str) -> None:
     _render_header(f"Mode: {cfg['label']}")
 
     # top nav — both buttons return to home
-    nav_l, nav_r = st.columns([1, 5])
+    nav_l, nav_r, nav_spacer = st.columns([2, 2, 8])
     with nav_l:
         if st.button("\U0001f3e0 Home", use_container_width=True):
             st.session_state["page"] = "home"
@@ -626,7 +639,8 @@ def _mode_page(mode: str) -> None:
         if st.button("\U0001f6aa Exit", use_container_width=True):
             st.session_state["page"] = "home"
             st.rerun()
-
+    with nav_spacer:
+        pass
     st.divider()
 
     # instructions
@@ -695,6 +709,7 @@ def _mode_page(mode: str) -> None:
                 f"\u2705 Saved {len(saved)} file(s) to `input/{mode}/`: "
                 + ", ".join(f"`{n}`" for n in saved)
             )
+            st.rerun()
 
     st.divider()
 
@@ -774,6 +789,38 @@ def main() -> None:
         initial_sidebar_state="collapsed",
     )
     _inject_css()
+    import streamlit.components.v1 as _components
+    _components.html("""
+        <script>
+        (function() {
+            const FONT_RULES = [
+                ['button', '20px'],
+                ['p', '18px'],
+                ['li', '18px'],
+                ['label', '18px'],
+                ['input', '17px'],
+                ['textarea', '17px'],
+            ];
+            function applyFonts() {
+                FONT_RULES.forEach(([sel, size]) => {
+                    try {
+                        parent.document.querySelectorAll(sel).forEach(el => {
+                            el.style.setProperty('font-size', size, 'important');
+                        });
+                    } catch(e) {}
+                });
+            }
+            // Run once immediately
+            applyFonts();
+            // Re-run whenever DOM changes (Streamlit rerenders)
+            const observer = new MutationObserver(applyFonts);
+            observer.observe(parent.document.body, {
+                childList: true,
+                subtree: true
+            });
+        })();
+        </script>
+    """, height=0)
 
     if "page" not in st.session_state:
         st.session_state["page"] = "home"
