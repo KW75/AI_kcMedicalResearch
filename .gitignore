@@ -39,3 +39,20 @@ sr/outputs/
 # ChromaDB vector store
 chroma_db/
 *.sqlite3
+
+# Generated output files (deliverables — not source)
+output/coding/*
+output/writing/*
+output/appraisal/*
+output/rct_search/*
+output/search/*
+output/sr/*
+
+# Keep the folders themselves
+!output/coding/.gitkeep
+!output/writing/.gitkeep
+!output/appraisal/.gitkeep
+!output/rct_search/.gitkeep
+!output/search/.gitkeep
+!output/sr/.gitkeep
+
