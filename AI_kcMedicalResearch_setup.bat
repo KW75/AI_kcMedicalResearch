@@ -2,7 +2,7 @@
 setlocal EnableDelayedExpansion
 title AI kcMedical Research - First-Run Setup
 
-:: ── locate the folder this bat lives in (works from any drive/path) ──────────
+:: ── locate the folder this bat lives in ──────────────────────────────────────
 set "PROJECT_DIR=%~dp0"
 if "%PROJECT_DIR:~-1%"=="\" set "PROJECT_DIR=%PROJECT_DIR:~0,-1%"
 
@@ -14,7 +14,7 @@ echo  ================================================
 echo.
 
 :: ── 1. Check Python ───────────────────────────────────────────────────────────
-echo [1/5] Checking Python...
+echo [1/6] Checking Python...
 python --version >nul 2>&1
 if errorlevel 1 (
     echo  ERROR: Python not found on PATH.
@@ -25,9 +25,9 @@ if errorlevel 1 (
 )
 for /f "tokens=*" %%v in ('python --version 2^>^&1') do echo  Found: %%v
 
-:: ── 2. Check pip ─────────────────────────────────────────────────────────────
+:: ── 2. Check pip ──────────────────────────────────────────────────────────────
 echo.
-echo [2/5] Checking pip...
+echo [2/6] Checking pip...
 python -m pip --version >nul 2>&1
 if errorlevel 1 (
     echo  ERROR: pip not available. Run: python -m ensurepip --upgrade
@@ -36,9 +36,9 @@ if errorlevel 1 (
 )
 echo  pip OK.
 
-:: ── 3. Create virtual environment if missing ─────────────────────────────────
+:: ── 3. Create virtual environment if missing ──────────────────────────────────
 echo.
-echo [3/5] Virtual environment...
+echo [3/6] Virtual environment...
 if exist "%PROJECT_DIR%\.venv\Scripts\activate.bat" (
     echo  .venv already exists - skipping creation.
 ) else (
@@ -52,9 +52,9 @@ if exist "%PROJECT_DIR%\.venv\Scripts\activate.bat" (
     echo  .venv created.
 )
 
-:: ── 4. Install / upgrade dependencies ────────────────────────────────────────
+:: ── 4. Install / upgrade dependencies ─────────────────────────────────────────
 echo.
-echo [4/5] Installing dependencies from requirements.txt...
+echo [4/6] Installing dependencies from requirements.txt...
 call "%PROJECT_DIR%\.venv\Scripts\activate.bat"
 python -m pip install --upgrade pip --quiet
 python -m pip install -r "%PROJECT_DIR%\requirements.txt"
@@ -65,9 +65,23 @@ if errorlevel 1 (
 )
 echo  Dependencies installed.
 
-:: ── 5. Check .env ─────────────────────────────────────────────────────────────
+:: ── 5. Create .streamlit/config.toml if missing ───────────────────────────────
 echo.
-echo [5/5] Checking .env file...
+echo [5/6] Checking Streamlit config...
+if not exist "%PROJECT_DIR%\.streamlit" (
+    mkdir "%PROJECT_DIR%\.streamlit"
+)
+if not exist "%PROJECT_DIR%\.streamlit\config.toml" (
+    echo [theme]> "%PROJECT_DIR%\.streamlit\config.toml"
+    echo baseFontSize = 18>> "%PROJECT_DIR%\.streamlit\config.toml"
+    echo  Created .streamlit\config.toml with baseFontSize = 18.
+) else (
+    echo  .streamlit\config.toml already exists.
+)
+
+:: ── 6. Check .env ─────────────────────────────────────────────────────────────
+echo.
+echo [6/6] Checking .env file...
 if exist "%PROJECT_DIR%\.env" (
     echo  .env found.
 ) else (
@@ -76,6 +90,13 @@ if exist "%PROJECT_DIR%\.env" (
     echo  Minimum required for Ollama (local):
     echo    OLLAMA_URL=http://localhost:11434
     echo    OLLAMA_MODEL=llama3
+    echo.
+    echo  For cloud providers add the relevant API keys:
+    echo    OPENAI_API_KEY=sk-...
+    echo    ANTHROPIC_API_KEY=sk-ant-...
+    echo    DEEPSEEK_API_KEY=...
+    echo    GROQ_API_KEY=...
+    echo    QWEN_API_KEY=...
 )
 
 :: ── Done ──────────────────────────────────────────────────────────────────────
