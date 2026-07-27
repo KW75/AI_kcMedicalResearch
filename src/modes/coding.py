@@ -35,7 +35,7 @@ def _stem(filepath: str | Path) -> str:
 def _paths(root: Path) -> dict[str, Path]:
     """Return the standard paths dictionary for coding mode."""
     return {
-        "doc":     root / "doc"     / "coding",
+        "doc":     root / "docs"     / "coding",
         "input":   root / "input"   / "coding",
         "output":  root / "output"  / "coding",
         "reports": root / "reports" / "coding",
