@@ -57,7 +57,7 @@ output/sr/*
 !output/sr/.gitkeep
 
 
-# Output files ¡X regenerated locally, never committed
+# Output files ï¿½X regenerated locally, never committed
 output/
 reports/coding/
 reports/writing/
@@ -67,7 +67,7 @@ reports/search/
 reports/systematic_review/
 reports/transcripts/
 
-# Output files ¡X regenerated locally, never committed
+# Output files ï¿½X regenerated locally, never committed
 output/
 reports/coding/
 reports/writing/
@@ -76,3 +76,8 @@ reports/rct_search/
 reports/search/
 reports/systematic_review/
 reports/transcripts/
+
+# Keep empty folder placeholders even inside ignored folders
+!output/**/.gitkeep
+!reports/**/.gitkeep
+
