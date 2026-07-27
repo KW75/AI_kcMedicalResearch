@@ -7,7 +7,8 @@ from __future__ import annotations
 
 import os
 import re
-import glob
+import sys
+import threading
 import datetime
 from pathlib import Path
 from typing import Optional
@@ -33,9 +34,15 @@ def _stem(filepath: str | Path) -> str:
 
 
 def _paths(root: Path) -> dict[str, Path]:
-    """Return the standard paths dictionary for coding mode."""
+    """Return the standard paths dictionary for coding mode.
+    Matches the folder conventions already established in src/main.py:
+      docs/coding/   <- guidance .md files  (DOCS_CODING in main.py)
+      input/coding/  <- code files to process
+      output/coding/ <- final built code
+      reports/coding/<- all reports and iteration logs
+    """
     return {
-        "doc":     root / "docs"     / "coding",
+        "doc":     root / "docs"    / "coding",
         "input":   root / "input"   / "coding",
         "output":  root / "output"  / "coding",
         "reports": root / "reports" / "coding",
@@ -48,7 +55,7 @@ def _paths(root: Path) -> dict[str, Path]:
 
 def _load_md_guidelines(doc_path: Path) -> str:
     """
-    Load all .md files from doc/coding/ and concatenate them as background
+    Load all .md files from docs/coding/ and concatenate them as background
     guidelines context. Returns empty string if folder is empty or missing.
     """
     if not doc_path.exists():
@@ -74,15 +81,19 @@ def _load_code_files(input_path: Path) -> list[tuple[str, str, str]]:
     """
     if not input_path.exists():
         return []
-    extensions = {".py", ".js", ".ts", ".java", ".c", ".cpp", ".cs", ".go",
-                  ".rb", ".php", ".rs", ".swift", ".kt", ".r", ".sh", ".sql",
-                  ".html", ".css", ".svg"}
+    
+    extensions = {".py", ".js", ".ts", ".html", ".css", ".java", ".c",
+                  ".cpp", ".cs", ".rb", ".go", ".rs", ".txt", ".md",
+                  ".php", ".swift", ".kt", ".r", ".sh", ".sql", ".svg"}
+
     files = sorted([
         f for f in input_path.iterdir()
         if f.is_file() and f.suffix.lower() in extensions
     ])
     return [
-        (f.stem.replace(" ", "_"), f.read_text(encoding="utf-8", errors="ignore"), f.suffix.lower())
+        (f.stem.replace(" ", "_"),
+         f.read_text(encoding="utf-8", errors="ignore"),
+         f.suffix.lower())
         for f in files
     ]
 
@@ -92,6 +103,45 @@ def _write_file(path: Path, content: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(content, encoding="utf-8")
     print(f"  [WRITTEN] {path}")
+
+
+# ---------------------------------------------------------------------------
+# Spinner — visible feedback during LLM calls
+# ---------------------------------------------------------------------------
+
+class _Spinner:
+    """
+    Simple terminal spinner that runs on a background thread.
+    Shows the user the LLM is working and has not hung.
+    Usage:
+        with _Spinner("Reviewer agent thinking"):
+            response = call_llm(...)
+    """
+    def __init__(self, message: str = "Processing"):
+        self._message = message
+        self._stop_event = threading.Event()
+        self._thread = threading.Thread(target=self._spin, daemon=True)
+
+    def _spin(self) -> None:
+        frames = ["|", "/", "-", "\\"]
+        idx = 0
+        while not self._stop_event.is_set():
+            frame = frames[idx % len(frames)]
+            sys.stdout.write(f"\r  {frame}  {self._message}... ")
+            sys.stdout.flush()
+            self._stop_event.wait(0.15)
+            idx += 1
+        # Clear the spinner line
+        sys.stdout.write(f"\r  ✓  {self._message} — done.          \n")
+        sys.stdout.flush()
+
+    def __enter__(self):
+        self._thread.start()
+        return self
+
+    def __exit__(self, *_):
+        self._stop_event.set()
+        self._thread.join()
 
 
 # ---------------------------------------------------------------------------
@@ -247,16 +297,49 @@ def _build_tester_user_prompt(
 
 
 # ---------------------------------------------------------------------------
-# LLM call — thin wrapper (plugs into existing call_llm in src/main.py)
+# LLM call — thin wrapper with spinner feedback
 # ---------------------------------------------------------------------------
 
-def _call_llm(system_prompt: str, user_prompt: str, call_llm_fn) -> str:
+def _call_llm(
+    system_prompt: str,
+    user_prompt: str,
+    call_llm_fn,
+    spinner_message: str = "LLM processing",
+) -> str:
     """
     Thin wrapper around the project's existing call_llm function.
+    Shows a spinner so the user knows the LLM is working.
     call_llm_fn is injected from src/main.py to keep this module decoupled
     from the LLM provider selection logic.
     """
-    return call_llm_fn(system_prompt=system_prompt, user_prompt=user_prompt)
+    result_holder: list[str] = []
+    error_holder:  list[Exception] = []
+
+    def _run():
+        try:
+            result_holder.append(call_llm_fn(
+                system_prompt=system_prompt,
+                user_prompt=user_prompt,
+            ))
+        except Exception as exc:  # noqa: BLE001
+            error_holder.append(exc)
+
+    with _Spinner(spinner_message):
+        t = threading.Thread(target=_run, daemon=True)
+        t.start()
+        t.join(timeout=300)  # 5-minute hard timeout per LLM call
+
+    if t.is_alive():
+        return (
+            "[ERROR] LLM call timed out after 5 minutes. "
+            "Check that Ollama is running and the model is pulled, "
+            "or switch to a cloud provider with --provider."
+        )
+    if error_holder:
+        return f"[ERROR] LLM call failed: {error_holder[0]}"
+    if not result_holder:
+        return "[ERROR] LLM returned no response."
+    return result_holder[0]
 
 
 # ---------------------------------------------------------------------------
@@ -295,7 +378,7 @@ def _build_iteration_report(
         f"**Status:** {status}  \n"
         f"**Timestamp:** {datetime.datetime.now().isoformat()}  \n\n"
         f"---\n\n"
-        f"## Code Submitted\n\n```python\n{code}\n```\n\n"
+        f"## Code Submitted\n\n```\n{code}\n```\n\n"
         f"---\n\n"
         f"## {agent} Feedback\n\n{feedback}\n"
     )
@@ -317,7 +400,7 @@ def _build_final_summary(
         f"**Tester iterations used:** {tester_iters}  \n"
         f"**Timestamp:** {datetime.datetime.now().isoformat()}  \n\n"
         f"---\n\n"
-        f"## Final Code\n\n```python\n{final_code}\n```\n"
+        f"## Final Code\n\n```\n{final_code}\n```\n"
     )
 
 
@@ -356,7 +439,7 @@ def _build_standalone_report(
         f"**Subproject:** {stem}  \n"
         f"**Timestamp:** {datetime.datetime.now().isoformat()}  \n\n"
         f"---\n\n"
-        f"## Code Reviewed\n\n```python\n{code_content}\n```\n\n"
+        f"## Code Reviewed\n\n```\n{code_content}\n```\n\n"
         f"---\n\n"
         f"## {sub_mode} Output\n\n{feedback}\n"
     )
@@ -367,6 +450,51 @@ def _build_standalone_report(
 # ---------------------------------------------------------------------------
 
 MAX_ITERATIONS = 5
+
+
+# ---------------------------------------------------------------------------
+# Extension detection
+# ---------------------------------------------------------------------------
+
+def _detect_extension(
+    stem: str,
+    code: str,
+    original_files: list[tuple[str, str, str]] | None = None,
+) -> str:
+    """
+    Detect the correct file extension for the output code file.
+
+    Priority order:
+    1. If the subproject came from an input file, preserve its original extension
+    2. Detect from content markers (<!DOCTYPE, <html, SELECT, CREATE TABLE etc.)
+    3. Fall back to .py
+    """
+    # Priority 2 — content-based detection
+    sample = code.strip()[:500].lower()
+
+    if "<!doctype html" in sample or "<html" in sample:
+        return ".html"
+    if "<svg" in sample:
+        return ".svg"
+    if "select " in sample and ("from " in sample or "where " in sample):
+        return ".sql"
+    if "create table" in sample or "insert into" in sample:
+        return ".sql"
+    if "function " in sample and ("{" in sample or "=>" in sample):
+        if ": string" in sample or ": number" in sample or "interface " in sample:
+            return ".ts"
+        return ".js"
+    if "package main" in sample or "func main()" in sample:
+        return ".go"
+    if "#include" in sample:
+        return ".c"
+    if "public class" in sample or "import java" in sample:
+        return ".java"
+    if "using system" in sample or "namespace " in sample:
+        return ".cs"
+
+    # Priority 3 — default
+    return ".py"
 
 
 # ---------------------------------------------------------------------------
@@ -385,7 +513,7 @@ def run_builder(
     call_llm_fn: the project's call_llm function, injected from src/main.py
     verbose: print progress to stdout
     """
-    root = _project_root()
+    root  = _project_root()
     paths = _paths(root)
     ts_session = _ts()
 
@@ -393,7 +521,7 @@ def run_builder(
         print("\n[BUILDER] Starting...")
 
     # --- Load guidelines ---
-    guidelines = _load_md_guidelines(paths["doc"])
+    guidelines    = _load_md_guidelines(paths["doc"])
     system_prompt = _build_system_prompt(guidelines)
 
     # --- Determine subprojects ---
@@ -401,55 +529,59 @@ def run_builder(
     is_scratch = len(code_files) == 0
 
     if is_scratch:
-        # (stem, initial_code, original_ext)
         subprojects = [("new_app", None, None)]
         if verbose:
             print("[BUILDER] No input files found — building new app from scratch.")
     else:
-        subprojects = code_files  # now (stem, content, suffix) tuples
+        subprojects = code_files
         if verbose:
             print(f"[BUILDER] Found {len(subprojects)} subproject(s) to process.")
-    
+
+    session_results = []
+
     # --- Process each subproject sequentially ---
     for idx, (stem, initial_code, original_ext) in enumerate(subprojects, start=1):
-
         ts = _ts()
         if verbose:
             print(f"\n[BUILDER] Subproject {idx}/{len(subprojects)}: {stem}")
 
-        current_code = initial_code  # None if scratch
+        current_code = initial_code
         reviewer_iters_used = 0
-        tester_iters_used = 0
-        error_feedback = None
-        outcome = "UNKNOWN"
+        tester_iters_used   = 0
+        error_feedback      = None
+        outcome             = "UNKNOWN"
 
         # ---- REVIEWER LOOP ----
         reviewer_passed_flag = False
         for rev_iter in range(1, MAX_ITERATIONS + 1):
             reviewer_iters_used = rev_iter
             if verbose:
-                print(f"  [REVIEWER LOOP] Iteration {rev_iter}/{MAX_ITERATIONS}")
+                print(f"\n  [REVIEWER LOOP] Iteration {rev_iter}/{MAX_ITERATIONS}")
 
-            # Build and call Builder to generate/regenerate code
-            user_prompt = _build_builder_user_prompt(
+            # Build code via Builder agent
+            user_prompt  = _build_builder_user_prompt(
                 direct_instructions=direct_instructions,
                 code_context=current_code,
                 error_feedback=error_feedback,
                 is_scratch=is_scratch,
                 iteration=rev_iter,
             )
-            current_code = _call_llm(system_prompt, user_prompt, call_llm_fn)
-
-            # Strip markdown code fences if LLM wraps output
+            current_code = _call_llm(
+                system_prompt, user_prompt, call_llm_fn,
+                spinner_message=f"Builder generating code (iter {rev_iter})",
+            )
             current_code = _strip_code_fences(current_code)
 
             # Pass to Reviewer agent
-            reviewer_prompt = _build_reviewer_user_prompt(
+            reviewer_prompt   = _build_reviewer_user_prompt(
                 direct_instructions=direct_instructions,
                 code_content=current_code,
                 stem=stem,
             )
-            reviewer_response = _call_llm(system_prompt, reviewer_prompt, call_llm_fn)
+            reviewer_response = _call_llm(
+                system_prompt, reviewer_prompt, call_llm_fn,
+                spinner_message=f"Reviewer checking code (iter {rev_iter})",
+            )
 
             passed = _reviewer_passed(reviewer_response)
 
@@ -479,31 +611,37 @@ def run_builder(
 
         # ---- TESTER LOOP ----
         tester_passed_flag = False
-        error_feedback = None
+        error_feedback     = None
         for test_iter in range(1, MAX_ITERATIONS + 1):
             tester_iters_used = test_iter
             if verbose:
-                print(f"  [TESTER LOOP] Iteration {test_iter}/{MAX_ITERATIONS}")
+                print(f"\n  [TESTER LOOP] Iteration {test_iter}/{MAX_ITERATIONS}")
 
-            # Regenerate if there was tester feedback (not first iteration)
+            # Regenerate if there was tester feedback
             if error_feedback:
-                user_prompt = _build_builder_user_prompt(
+                user_prompt  = _build_builder_user_prompt(
                     direct_instructions=direct_instructions,
                     code_context=current_code,
                     error_feedback=error_feedback,
                     is_scratch=False,
                     iteration=test_iter,
                 )
-                current_code = _call_llm(system_prompt, user_prompt, call_llm_fn)
+                current_code = _call_llm(
+                    system_prompt, user_prompt, call_llm_fn,
+                    spinner_message=f"Builder fixing code (iter {test_iter})",
+                )
                 current_code = _strip_code_fences(current_code)
 
             # Pass to Tester agent
-            tester_prompt = _build_tester_user_prompt(
+            tester_prompt   = _build_tester_user_prompt(
                 direct_instructions=direct_instructions,
                 code_content=current_code,
                 stem=stem,
             )
-            tester_response = _call_llm(system_prompt, tester_prompt, call_llm_fn)
+            tester_response = _call_llm(
+                system_prompt, tester_prompt, call_llm_fn,
+                spinner_message=f"Tester checking code (iter {test_iter})",
+            )
 
             passed = _tester_passed(tester_response)
 
@@ -524,7 +662,7 @@ def run_builder(
                 if verbose:
                     print(f"  [TESTER LOOP] PASSED at iteration {test_iter}")
                 tester_passed_flag = True
-                error_feedback = None
+                error_feedback     = None
                 break
             else:
                 error_feedback = tester_response
@@ -541,17 +679,17 @@ def run_builder(
             ext = _detect_extension(stem=stem, code=current_code)
 
         if fully_passed:
-            outcome = "FINAL"
-            out_name = f"BUILDER_{stem}_{ts}_FINAL{ext}"
+            outcome      = "FINAL"
+            out_name     = f"BUILDER_{stem}_{ts}_FINAL{ext}"
             summary_name = f"BUILDER_{stem}_{ts}_FINAL_SUMMARY.md"
             if verbose:
-                print(f"  [BUILDER] Subproject {stem} PASSED — writing final output.")
+                print(f"\n  [BUILDER] Subproject {stem} PASSED — writing final output.")
         else:
-            outcome = "MAXITER_WARNING"
-            out_name = f"BUILDER_{stem}_{ts}_MAXITER_WARNING{ext}"
+            outcome      = "MAXITER_WARNING"
+            out_name     = f"BUILDER_{stem}_{ts}_MAXITER_WARNING{ext}"
             summary_name = f"BUILDER_{stem}_{ts}_MAXITER_SUMMARY.md"
             if verbose:
-                print(f"  [BUILDER] WARNING: {stem} hit max iterations — writing best available output.")
+                print(f"\n  [BUILDER] WARNING: {stem} hit max iterations — writing best available output.")
 
         _write_file(paths["output"] / out_name, current_code)
 
@@ -565,15 +703,15 @@ def run_builder(
         _write_file(paths["reports"] / summary_name, summary_content)
 
         session_results.append({
-            "stem": stem,
-            "outcome": outcome,
+            "stem":           stem,
+            "outcome":        outcome,
             "reviewer_iters": reviewer_iters_used,
-            "tester_iters": tester_iters_used,
+            "tester_iters":   tester_iters_used,
         })
 
     # ---- Write session summary ----
     session_summary = _build_session_summary("Builder", session_results)
-    session_name = f"BUILDER_SESSION_{ts_session}_SUMMARY.md"
+    session_name    = f"BUILDER_SESSION_{ts_session}_SUMMARY.md"
     _write_file(paths["reports"] / session_name, session_summary)
 
     if verbose:
@@ -593,16 +731,16 @@ def run_reviewer(
     Run the Reviewer standalone sub-mode.
     Reviews each file in input/coding/ independently. No pipeline looping.
     """
-    root = _project_root()
-    paths = _paths(root)
+    root       = _project_root()
+    paths      = _paths(root)
     ts_session = _ts()
 
     if verbose:
         print("\n[REVIEWER] Starting...")
 
-    guidelines = _load_md_guidelines(paths["doc"])
+    guidelines    = _load_md_guidelines(paths["doc"])
     system_prompt = _build_system_prompt(guidelines)
-    code_files = _load_code_files(paths["input"])
+    code_files    = _load_code_files(paths["input"])
 
     if not code_files:
         print("[REVIEWER] No code files found in input/coding/ — nothing to review.")
@@ -613,7 +751,7 @@ def run_reviewer(
 
     session_results = []
 
-    for idx, (stem, code_content) in enumerate(code_files, start=1):
+    for idx, (stem, code_content, _ext) in enumerate(code_files, start=1):
         ts = _ts()
         if verbose:
             print(f"\n[REVIEWER] File {idx}/{len(code_files)}: {stem}")
@@ -623,9 +761,12 @@ def run_reviewer(
             code_content=code_content,
             stem=stem,
         )
-        response = _call_llm(system_prompt, user_prompt, call_llm_fn)
+        response = _call_llm(
+            system_prompt, user_prompt, call_llm_fn,
+            spinner_message=f"Reviewer analysing {stem}",
+        )
 
-        passed = _reviewer_passed(response)
+        passed  = _reviewer_passed(response)
         outcome = "REVIEW_PASS" if passed else "REVIEW_FAIL"
 
         report_content = _build_standalone_report(
@@ -643,7 +784,7 @@ def run_reviewer(
             print(f"  [REVIEWER] {stem} → {outcome}")
 
     session_summary = _build_session_summary("Reviewer", session_results)
-    session_name = f"REVIEWER_SESSION_{ts_session}_SUMMARY.md"
+    session_name    = f"REVIEWER_SESSION_{ts_session}_SUMMARY.md"
     _write_file(paths["reports"] / session_name, session_summary)
 
     if verbose:
@@ -663,16 +804,16 @@ def run_tester(
     Run the Tester standalone sub-mode.
     Tests each file in input/coding/ independently. No pipeline looping.
     """
-    root = _project_root()
-    paths = _paths(root)
+    root       = _project_root()
+    paths      = _paths(root)
     ts_session = _ts()
 
     if verbose:
         print("\n[TESTER] Starting...")
 
-    guidelines = _load_md_guidelines(paths["doc"])
+    guidelines    = _load_md_guidelines(paths["doc"])
     system_prompt = _build_system_prompt(guidelines)
-    code_files = _load_code_files(paths["input"])
+    code_files    = _load_code_files(paths["input"])
 
     if not code_files:
         print("[TESTER] No code files found in input/coding/ — nothing to test.")
@@ -683,7 +824,7 @@ def run_tester(
 
     session_results = []
 
-    for idx, (stem, code_content) in enumerate(code_files, start=1):
+    for idx, (stem, code_content, _ext) in enumerate(code_files, start=1):
         ts = _ts()
         if verbose:
             print(f"\n[TESTER] File {idx}/{len(code_files)}: {stem}")
@@ -693,9 +834,12 @@ def run_tester(
             code_content=code_content,
             stem=stem,
         )
-        response = _call_llm(system_prompt, user_prompt, call_llm_fn)
+        response = _call_llm(
+            system_prompt, user_prompt, call_llm_fn,
+            spinner_message=f"Tester analysing {stem}",
+        )
 
-        passed = _tester_passed(response)
+        passed  = _tester_passed(response)
         outcome = "TEST_PASS" if passed else "TEST_FAIL"
 
         report_content = _build_standalone_report(
@@ -713,7 +857,7 @@ def run_tester(
             print(f"  [TESTER] {stem} → {outcome}")
 
     session_summary = _build_session_summary("Tester", session_results)
-    session_name = f"TESTER_SESSION_{ts_session}_SUMMARY.md"
+    session_name    = f"TESTER_SESSION_{ts_session}_SUMMARY.md"
     _write_file(paths["reports"] / session_name, session_summary)
 
     if verbose:
@@ -721,7 +865,7 @@ def run_tester(
 
 
 # ---------------------------------------------------------------------------
-# CLI instruction parser — strips leading > from user input lines
+# CLI instruction parser
 # ---------------------------------------------------------------------------
 
 def parse_direct_instructions(raw_input: str) -> list[str]:
@@ -732,7 +876,7 @@ def parse_direct_instructions(raw_input: str) -> list[str]:
 
     Example:
         raw = "> Build a CSV parser\n> Add error handling\nSome other note"
-        → ["Build a CSV parser", "Add error handling"]
+        -> ["Build a CSV parser", "Add error handling"]
     """
     instructions = []
     for line in raw_input.splitlines():
@@ -745,7 +889,7 @@ def parse_direct_instructions(raw_input: str) -> list[str]:
 
 
 # ---------------------------------------------------------------------------
-# Code fence stripper — removes ```python ... ``` wrapping from LLM output
+# Code fence stripper
 # ---------------------------------------------------------------------------
 
 def _strip_code_fences(text: str) -> str:
@@ -754,55 +898,6 @@ def _strip_code_fences(text: str) -> str:
     Handles ```python, ```py, ``` and similar variants.
     """
     text = text.strip()
-    # Remove opening fence with optional language tag
     text = re.sub(r"^```[a-zA-Z]*\n?", "", text)
-    # Remove closing fence
     text = re.sub(r"\n?```$", "", text)
     return text.strip()
-
-def _detect_extension(
-    stem: str,
-    code: str,
-    original_files: list[tuple[str, str]] | None = None,
-) -> str:
-    """
-    Detect the correct file extension for the output code file.
-
-    Priority order:
-    1. If the subproject came from an input file, preserve its original extension
-    2. Detect from content markers (<!DOCTYPE, <html, SELECT, CREATE TABLE etc.)
-    3. Fall back to .py
-    """
-    # Priority 1 — match against original input filenames
-    if original_files:
-        for fname, _ in original_files:
-            # fname is the stem; check the actual input folder for the full name
-            pass  # handled by passing ext directly — see run_builder()
-
-    # Priority 2 — content-based detection
-    sample = code.strip()[:500].lower()
-
-    if "<!doctype html" in sample or "<html" in sample:
-        return ".html"
-    if "<svg" in sample:
-        return ".svg"
-    if "select " in sample and ("from " in sample or "where " in sample):
-        return ".sql"
-    if "create table" in sample or "insert into" in sample:
-        return ".sql"
-    if "function " in sample and ("{" in sample or "=>" in sample):
-        # Could be JS or TS — check for type annotations
-        if ": string" in sample or ": number" in sample or "interface " in sample:
-            return ".ts"
-        return ".js"
-    if "package main" in sample or "func main()" in sample:
-        return ".go"
-    if "#include" in sample:
-        return ".c"
-    if "public class" in sample or "import java" in sample:
-        return ".java"
-    if "using system" in sample or "namespace " in sample:
-        return ".cs"
-
-    # Priority 3 — default
-    return ".py"

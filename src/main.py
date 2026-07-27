@@ -119,7 +119,8 @@ import mimetypes  # noqa: E402  (after path setup)
 
 _MODE_EXTENSIONS = {
     "coding":     {".py", ".js", ".ts", ".html", ".css", ".java", ".c",
-                   ".cpp", ".cs", ".rb", ".go", ".rs", ".txt", ".md"},
+                   ".cpp", ".cs", ".rb", ".go", ".rs", ".txt", ".md",
+                   ".php", ".swift", ".kt", ".r", ".sh", ".sql", ".svg"},
     "writing":    {".txt", ".md", ".docx", ".pdf"},
     "appraisal":  {".pdf", ".txt", ".md", ".docx"},
     "rct_search": {".txt", ".md", ".pdf", ".docx"},
@@ -1679,8 +1680,8 @@ def handle_coding_mode(
                 line = input()
             except (EOFError, KeyboardInterrupt):
                 break
-            # Two consecutive blank lines = end of input
-            if line == "" and lines and lines[-1] == "":
+            # Single blank line = end of input
+            if line == "":
                 break
             lines.append(line)
     except (EOFError, KeyboardInterrupt):
