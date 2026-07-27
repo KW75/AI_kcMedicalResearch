@@ -2,3 +2,5 @@
 
 # Normalise line endings for new source files
 src/modes/*.py text eol=lf
+
+src/**/*.py  text eol=lf
