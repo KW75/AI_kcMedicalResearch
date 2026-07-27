@@ -1615,6 +1615,78 @@ def handle_coding_mode(
     model: str | None = None,
     dry_run: bool = False,
 ) -> None:
+
+# ---------------------------------------------------------------------------
+# Writing mode dispatcher  (Writer pipeline / Editor / QA standalone)
+# ---------------------------------------------------------------------------
+def handle_writing_mode(provider: str = "ollama", model: str | None = None,
+                        dry_run: bool = False) -> None:
+    try:
+        from src.modes.writing import run_writer, run_editor, run_qa, parse_direct_instructions as _pdi
+    except ModuleNotFoundError:
+        from modes.writing import run_writer, run_editor, run_qa, parse_direct_instructions as _pdi
+
+    def _call_llm_fn(system_prompt: str, user_prompt: str) -> str:
+        if dry_run:
+            return "[DRY RUN] LLM would respond here."
+        combined = (
+            f"## System Instructions\n{system_prompt}\n\n"
+            f"## User Request\n{user_prompt}"
+        )
+        return call_ai(prompt=combined, provider=provider, model=model)
+
+    print("\n" + "=" * 60)
+    print("  WRITING MODE")
+    print("=" * 60)
+    print("  1. Writer  — full pipeline: Writer → Editor → QA")
+    print("  2. Editor  — standalone: edit documents in input/writing/")
+    print("  3. QA      — standalone: review documents in input/writing/")
+    print("  0. Back to menu")
+    print("=" * 60)
+    try:
+        choice = input("Select sub-mode [0-3]: ").strip()
+    except (EOFError, KeyboardInterrupt):
+        print()
+        return
+
+    if choice == "0" or not choice:
+        print("Returning to menu.")
+        return
+
+    sub_mode_map = {"1": "Writer", "2": "Editor", "3": "QA"}
+    if choice not in sub_mode_map:
+        print("Invalid choice — returning to menu.")
+        return
+
+    sub_mode = sub_mode_map[choice]
+    print(f"\n  [{sub_mode.upper()}] Enter instructions below.")
+    print("  Lines starting with > are DIRECT TASK INSTRUCTIONS (highest priority).")
+    print("  Press ENTER on a blank line when done.\n")
+
+    lines = []
+    while True:
+        try:
+            line = input("  instruction> ")
+        except (EOFError, KeyboardInterrupt):
+            break
+        if line.strip() == "":
+            print("\n  ✓ Instructions received — starting processing...\n")
+            break
+        if not line.strip().startswith(">"):
+            line = "> " + line.strip()
+        lines.append(line)
+
+    direct_instructions = _pdi("\n".join(lines))
+
+    if sub_mode == "Writer":
+        run_writer(direct_instructions=direct_instructions, call_llm_fn=_call_llm_fn, verbose=True)
+    elif sub_mode == "Editor":
+        run_editor(direct_instructions=direct_instructions, call_llm_fn=_call_llm_fn, verbose=True)
+    elif sub_mode == "QA":
+        run_qa(direct_instructions=direct_instructions, call_llm_fn=_call_llm_fn, verbose=True)
+
+    print(f"\n  [{sub_mode.upper()}] Done. Check output/writing/ and reports/writing/ for results.\n")
+
     """
     Terminal entry point for Coding mode.
     Presents Builder / Reviewer / Tester sub-mode menu, collects > direct
@@ -2076,6 +2148,12 @@ if __name__ == "__main__":
         elif args.mode == "coding":
             # Coding mode: Builder pipeline / Reviewer / Tester standalone
             handle_coding_mode(
+                provider=args.provider,
+                model=args.model,
+                dry_run=args.dry_run,
+            )
+        elif args.mode == "writing":
+            handle_writing_mode(
                 provider=args.provider,
                 model=args.model,
                 dry_run=args.dry_run,
