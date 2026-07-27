@@ -81,3 +81,6 @@ reports/transcripts/
 !output/**/.gitkeep
 !reports/**/.gitkeep
 
+
+# Do not track user input files
+input/
