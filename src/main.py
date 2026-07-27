@@ -1,4 +1,4 @@
-﻿"""
+"""
 main.py — AI Automation Tool  v2.2.0
 Supports six workflow modes: coding, writing, rct_search, appraisal, search, sr.
 Supports six AI providers: ollama (default), openai, anthropic, deepseek, groq, qwen.
@@ -1606,7 +1606,6 @@ def list_roles(mode: str = "coding") -> None:
         print(f"  Docs   : {', '.join(doc_names) if doc_names else 'none'}")
     print(f"\n{'='*55}\n")
 
-
 # ---------------------------------------------------------------------------
 # Coding mode dispatcher  (Builder pipeline / Reviewer / Tester standalone)
 # ---------------------------------------------------------------------------
@@ -1615,93 +1614,13 @@ def handle_coding_mode(
     model: str | None = None,
     dry_run: bool = False,
 ) -> None:
-
-# ---------------------------------------------------------------------------
-# Writing mode dispatcher  (Writer pipeline / Editor / QA standalone)
-# ---------------------------------------------------------------------------
-def handle_writing_mode(provider: str = "ollama", model: str | None = None,
-                        dry_run: bool = False) -> None:
-    try:
-        from src.modes.writing import run_writer, run_editor, run_qa, parse_direct_instructions as _pdi
-    except ModuleNotFoundError:
-        from modes.writing import run_writer, run_editor, run_qa, parse_direct_instructions as _pdi
-
-    def _call_llm_fn(system_prompt: str, user_prompt: str) -> str:
-        if dry_run:
-            return "[DRY RUN] LLM would respond here."
-        combined = (
-            f"## System Instructions\n{system_prompt}\n\n"
-            f"## User Request\n{user_prompt}"
-        )
-        return call_ai(prompt=combined, provider=provider, model=model)
-
-    print("\n" + "=" * 60)
-    print("  WRITING MODE")
-    print("=" * 60)
-    print("  1. Writer  — full pipeline: Writer → Editor → QA")
-    print("  2. Editor  — standalone: edit documents in input/writing/")
-    print("  3. QA      — standalone: review documents in input/writing/")
-    print("  0. Back to menu")
-    print("=" * 60)
-    try:
-        choice = input("Select sub-mode [0-3]: ").strip()
-    except (EOFError, KeyboardInterrupt):
-        print()
-        return
-
-    if choice == "0" or not choice:
-        print("Returning to menu.")
-        return
-
-    sub_mode_map = {"1": "Writer", "2": "Editor", "3": "QA"}
-    if choice not in sub_mode_map:
-        print("Invalid choice — returning to menu.")
-        return
-
-    sub_mode = sub_mode_map[choice]
-    print(f"\n  [{sub_mode.upper()}] Enter instructions below.")
-    print("  Lines starting with > are DIRECT TASK INSTRUCTIONS (highest priority).")
-    print("  Press ENTER on a blank line when done.\n")
-
-    lines = []
-    while True:
-        try:
-            line = input("  instruction> ")
-        except (EOFError, KeyboardInterrupt):
-            break
-        if line.strip() == "":
-            print("\n  ✓ Instructions received — starting processing...\n")
-            break
-        if not line.strip().startswith(">"):
-            line = "> " + line.strip()
-        lines.append(line)
-
-    direct_instructions = _pdi("\n".join(lines))
-
-    if sub_mode == "Writer":
-        run_writer(direct_instructions=direct_instructions, call_llm_fn=_call_llm_fn, verbose=True)
-    elif sub_mode == "Editor":
-        run_editor(direct_instructions=direct_instructions, call_llm_fn=_call_llm_fn, verbose=True)
-    elif sub_mode == "QA":
-        run_qa(direct_instructions=direct_instructions, call_llm_fn=_call_llm_fn, verbose=True)
-
-    print(f"\n  [{sub_mode.upper()}] Done. Check output/writing/ and reports/writing/ for results.\n")
-
     """
     Terminal entry point for Coding mode.
     Presents Builder / Reviewer / Tester sub-mode menu, collects > direct
     instructions from the user, then delegates to the coding.py engine.
-
-    The _call_llm_fn closure wraps call_ai() so the full provider / model
-    selection already configured in main.py is honoured transparently.
     """
 
     def _call_llm_fn(system_prompt: str, user_prompt: str) -> str:
-        """
-        Adapter: merges system + user prompt into one string for call_ai().
-        System instructions are prepended as a clearly labelled block so
-        the LLM treats them with highest priority.
-        """
         if dry_run:
             return "[DRY RUN] LLM would respond here."
         combined = (
@@ -1741,30 +1660,21 @@ def handle_writing_mode(provider: str = "ollama", model: str | None = None,
     colour   = COLOURS.get(sub_mode, RESET)
 
     print(f"\n{colour}[{sub_mode.upper()}]{RESET} Enter instructions below.")
-    print("  Lines starting with  >  are DIRECT TASK INSTRUCTIONS (highest priority).")
-    print("  All other lines are ignored.")
-    print("  Press ENTER twice on a blank line when done.\n")
-
-    print("  (Press ENTER on a blank line when finished)\n")
+    print("  Lines starting with > are DIRECT TASK INSTRUCTIONS (highest priority).")
+    print("  Press ENTER on a blank line when done.\n")
 
     lines: list[str] = []
-    try:
-        while True:
-            try:
-                line = input("  instruction> ")
-            except (EOFError, KeyboardInterrupt):
-                break
-            # Single blank line = end of input
-            if line.strip() == "":
-                print("\n  ✓ Instructions received — starting processing...\n")
-                break
-            # Auto-prefix with > if user forgot it
-            if not line.strip().startswith(">"):
-                line = "> " + line.strip()
-            lines.append(line)
-    except (EOFError, KeyboardInterrupt):
-        pass
-
+    while True:
+        try:
+            line = input("  instruction> ")
+        except (EOFError, KeyboardInterrupt):
+            break
+        if line.strip() == "":
+            print("\n  ✓ Instructions received — starting processing...\n")
+            break
+        if not line.strip().startswith(">"):
+            line = "> " + line.strip()
+        lines.append(line)
 
     raw_input_text      = "\n".join(lines)
     direct_instructions = parse_direct_instructions(raw_input_text)
@@ -1778,7 +1688,6 @@ def handle_writing_mode(provider: str = "ollama", model: str | None = None,
         print(f"\n{colour}[{sub_mode.upper()}]{RESET} "
               "No direct instructions found — using docs/coding/ guidelines only.")
 
-    # Show what input files are present before starting
     auto_load_input_files("coding")
     print()
 
@@ -1806,6 +1715,113 @@ def handle_writing_mode(provider: str = "ollama", model: str | None = None,
 
 
 # ---------------------------------------------------------------------------
+# Writing mode dispatcher  (Writer pipeline / Editor / QA standalone)
+# ---------------------------------------------------------------------------
+def handle_writing_mode(
+    provider: str = "ollama",
+    model: str | None = None,
+    dry_run: bool = False,
+) -> None:
+    """
+    Terminal entry point for Writing mode.
+    Presents Writer pipeline / Editor standalone / QA standalone menu.
+    """
+    try:
+        from src.modes.writing import (
+            run_writer,
+            run_editor,
+            run_qa,
+            parse_direct_instructions as _pdi,
+        )
+    except ModuleNotFoundError:
+        from modes.writing import (
+            run_writer,
+            run_editor,
+            run_qa,
+            parse_direct_instructions as _pdi,
+        )
+
+    def _call_llm_fn(system_prompt: str, user_prompt: str) -> str:
+        if dry_run:
+            return "[DRY RUN] LLM would respond here."
+        combined = (
+            f"## System Instructions\n{system_prompt}\n\n"
+            f"## User Request\n{user_prompt}"
+        )
+        return call_ai(prompt=combined, provider=provider, model=model)
+
+    print("\n" + "=" * 60)
+    print("  WRITING MODE")
+    print("=" * 60)
+    print("  1. Writer  — full pipeline: Writer → Editor → QA")
+    print("  2. Editor  — standalone: edit documents in input/writing/")
+    print("  3. QA      — standalone: review documents in input/writing/")
+    print("  0. Back to menu")
+    print("=" * 60)
+
+    try:
+        choice = input("Select sub-mode [0-3]: ").strip()
+    except (EOFError, KeyboardInterrupt):
+        print()
+        return
+
+    if choice == "0" or not choice:
+        print("Returning to menu.")
+        return
+
+    sub_mode_map = {"1": "Writer", "2": "Editor", "3": "QA"}
+    if choice not in sub_mode_map:
+        print("Invalid choice — returning to menu.")
+        return
+
+    sub_mode = sub_mode_map[choice]
+
+    print(f"\n  [{sub_mode.upper()}] Enter instructions below.")
+    print("  Lines starting with > are DIRECT TASK INSTRUCTIONS (highest priority).")
+    print("  Press ENTER on a blank line when done.\n")
+
+    lines: list[str] = []
+    while True:
+        try:
+            line = input("  instruction> ")
+        except (EOFError, KeyboardInterrupt):
+            break
+        if line.strip() == "":
+            print("\n  ✓ Instructions received — starting processing...\n")
+            break
+        if not line.strip().startswith(">"):
+            line = "> " + line.strip()
+        lines.append(line)
+
+    direct_instructions = _pdi("\n".join(lines))
+
+    auto_load_input_files("writing")
+    print()
+
+    if sub_mode == "Writer":
+        run_writer(
+            direct_instructions=direct_instructions,
+            call_llm_fn=_call_llm_fn,
+            verbose=True,
+        )
+    elif sub_mode == "Editor":
+        run_editor(
+            direct_instructions=direct_instructions,
+            call_llm_fn=_call_llm_fn,
+            verbose=True,
+        )
+    elif sub_mode == "QA":
+        run_qa(
+            direct_instructions=direct_instructions,
+            call_llm_fn=_call_llm_fn,
+            verbose=True,
+        )
+
+    print(f"\n  [{sub_mode.upper()}] Done. "
+          "Check output/writing/ and reports/writing/ for results.\n")
+
+
+# ---------------------------------------------------------------------------
 # Main interactive session loop
 # ---------------------------------------------------------------------------
 def main(
@@ -1828,7 +1844,7 @@ def main(
     print(f"  Provider: {provider}")
     print(f"  Session : {session_id}")
     if dry_run:
-        print("  DRY RUN — AI calls will be skipped")
+        print("  DRY RUN -- AI calls will be skipped")
     print(f"{'='*55}\n")
 
     input_files  = auto_load_input_files(mode)
@@ -1875,7 +1891,7 @@ def main(
             article_context = "\n\n".join(parts_art)
             print(f"[Appraisal] {len(articles)} article(s) loaded from input/appraisal/.")
         else:
-            print("[Appraisal] No articles in input/appraisal/ — using RAG only.")
+            print("[Appraisal] No articles in input/appraisal/ -- using RAG only.")
 
     try:
         while True:
@@ -2072,7 +2088,7 @@ if __name__ == "__main__":
                  str(Path(__file__).resolve().parent / "ui" / "app.py")],
                 cwd=str(Path(__file__).resolve().parent.parent),
             )
-            print("UI launched — open http://localhost:8501 in your browser.")
+            print("UI launched -- open http://localhost:8501 in your browser.")
             print("Press Ctrl+C to stop the UI server.")
             try:
                 proc.wait()
@@ -2146,7 +2162,6 @@ if __name__ == "__main__":
                 dry_run=args.dry_run,
             )
         elif args.mode == "coding":
-            # Coding mode: Builder pipeline / Reviewer / Tester standalone
             handle_coding_mode(
                 provider=args.provider,
                 model=args.model,
