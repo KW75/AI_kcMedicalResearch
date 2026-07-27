@@ -64,22 +64,27 @@ def _load_md_guidelines(doc_path: Path) -> str:
     return "\n\n---\n\n".join(sections)
 
 
-def _load_code_files(input_path: Path) -> list[tuple[str, str]]:
+def _load_code_files(input_path: Path) -> list[tuple[str, str, str]]:
     """
     Load all code files from input/coding/.
-    Returns list of (filename_stem, file_content) tuples, sorted alphabetically.
+    Returns list of (filename_stem, file_content, original_suffix) tuples,
+    sorted alphabetically.
     Returns empty list if folder is empty or missing.
+    The original_suffix is preserved so Builder output uses the correct extension.
     """
     if not input_path.exists():
         return []
     extensions = {".py", ".js", ".ts", ".java", ".c", ".cpp", ".cs", ".go",
-                  ".rb", ".php", ".rs", ".swift", ".kt", ".r", ".sh", ".sql"}
+                  ".rb", ".php", ".rs", ".swift", ".kt", ".r", ".sh", ".sql",
+                  ".html", ".css", ".svg"}
     files = sorted([
         f for f in input_path.iterdir()
         if f.is_file() and f.suffix.lower() in extensions
     ])
-    return [(f.stem.replace(" ", "_"), f.read_text(encoding="utf-8", errors="ignore"))
-            for f in files]
+    return [
+        (f.stem.replace(" ", "_"), f.read_text(encoding="utf-8", errors="ignore"), f.suffix.lower())
+        for f in files
+    ]
 
 
 def _write_file(path: Path, content: str) -> None:
@@ -396,18 +401,18 @@ def run_builder(
     is_scratch = len(code_files) == 0
 
     if is_scratch:
-        subprojects = [("new_app", None)]
+        # (stem, initial_code, original_ext)
+        subprojects = [("new_app", None, None)]
         if verbose:
             print("[BUILDER] No input files found — building new app from scratch.")
     else:
-        subprojects = code_files
+        subprojects = code_files  # now (stem, content, suffix) tuples
         if verbose:
             print(f"[BUILDER] Found {len(subprojects)} subproject(s) to process.")
-
-    session_results = []
-
+    
     # --- Process each subproject sequentially ---
-    for idx, (stem, initial_code) in enumerate(subprojects, start=1):
+    for idx, (stem, initial_code, original_ext) in enumerate(subprojects, start=1):
+
         ts = _ts()
         if verbose:
             print(f"\n[BUILDER] Subproject {idx}/{len(subprojects)}: {stem}")
@@ -529,15 +534,21 @@ def run_builder(
         # ---- Write final output ----
         fully_passed = reviewer_passed_flag and tester_passed_flag
 
+        # Determine correct output extension
+        if original_ext:
+            ext = original_ext
+        else:
+            ext = _detect_extension(stem=stem, code=current_code)
+
         if fully_passed:
             outcome = "FINAL"
-            out_name = f"BUILDER_{stem}_{ts}_FINAL.py"
+            out_name = f"BUILDER_{stem}_{ts}_FINAL{ext}"
             summary_name = f"BUILDER_{stem}_{ts}_FINAL_SUMMARY.md"
             if verbose:
                 print(f"  [BUILDER] Subproject {stem} PASSED — writing final output.")
         else:
             outcome = "MAXITER_WARNING"
-            out_name = f"BUILDER_{stem}_{ts}_MAXITER_WARNING.py"
+            out_name = f"BUILDER_{stem}_{ts}_MAXITER_WARNING{ext}"
             summary_name = f"BUILDER_{stem}_{ts}_MAXITER_SUMMARY.md"
             if verbose:
                 print(f"  [BUILDER] WARNING: {stem} hit max iterations — writing best available output.")
@@ -748,3 +759,50 @@ def _strip_code_fences(text: str) -> str:
     # Remove closing fence
     text = re.sub(r"\n?```$", "", text)
     return text.strip()
+
+def _detect_extension(
+    stem: str,
+    code: str,
+    original_files: list[tuple[str, str]] | None = None,
+) -> str:
+    """
+    Detect the correct file extension for the output code file.
+
+    Priority order:
+    1. If the subproject came from an input file, preserve its original extension
+    2. Detect from content markers (<!DOCTYPE, <html, SELECT, CREATE TABLE etc.)
+    3. Fall back to .py
+    """
+    # Priority 1 — match against original input filenames
+    if original_files:
+        for fname, _ in original_files:
+            # fname is the stem; check the actual input folder for the full name
+            pass  # handled by passing ext directly — see run_builder()
+
+    # Priority 2 — content-based detection
+    sample = code.strip()[:500].lower()
+
+    if "<!doctype html" in sample or "<html" in sample:
+        return ".html"
+    if "<svg" in sample:
+        return ".svg"
+    if "select " in sample and ("from " in sample or "where " in sample):
+        return ".sql"
+    if "create table" in sample or "insert into" in sample:
+        return ".sql"
+    if "function " in sample and ("{" in sample or "=>" in sample):
+        # Could be JS or TS — check for type annotations
+        if ": string" in sample or ": number" in sample or "interface " in sample:
+            return ".ts"
+        return ".js"
+    if "package main" in sample or "func main()" in sample:
+        return ".go"
+    if "#include" in sample:
+        return ".c"
+    if "public class" in sample or "import java" in sample:
+        return ".java"
+    if "using system" in sample or "namespace " in sample:
+        return ".cs"
+
+    # Priority 3 — default
+    return ".py"
