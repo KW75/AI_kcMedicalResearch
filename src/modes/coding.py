@@ -5,14 +5,12 @@ Provides three sub-modes: Builder (pipeline), Reviewer (standalone), Tester (sta
 
 from __future__ import annotations
 
-import os
 import re
 import sys
 import threading
 import datetime
 from pathlib import Path
 from typing import Optional
-
 
 # ---------------------------------------------------------------------------
 # Path helpers
@@ -26,11 +24,6 @@ def _project_root() -> Path:
 def _ts() -> str:
     """Return a filesystem-safe timestamp string: YYYYMMDD_HHMMSS."""
     return datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-
-
-def _stem(filepath: str | Path) -> str:
-    """Return the filename stem (no extension, spaces replaced with underscores)."""
-    return Path(filepath).stem.replace(" ", "_")
 
 
 def _paths(root: Path) -> dict[str, Path]:
@@ -193,7 +186,8 @@ def _build_builder_user_prompt(
             "instructions above and the background guidelines in the system prompt.\n"
             "Each instruction represents a feature, function, or component of ONE "
             "single application. Produce the complete application as a single coherent "
-            "Python file unless the guidelines specify otherwise."
+            "file. Use the most appropriate language and file format for the task "
+            "described in the instructions above."
         )
     else:
         parts.append("## Code Under Development\n")
@@ -459,41 +453,99 @@ MAX_ITERATIONS = 5
 def _detect_extension(
     stem: str,
     code: str,
-    original_files: list[tuple[str, str, str]] | None = None,
 ) -> str:
     """
-    Detect the correct file extension for the output code file.
+    Detect the correct file extension for Builder scratch output.
+    Only called when input/coding/ was empty (no original_ext available).
 
-    Priority order:
-    1. If the subproject came from an input file, preserve its original extension
-    2. Detect from content markers (<!DOCTYPE, <html, SELECT, CREATE TABLE etc.)
-    3. Fall back to .py
+    Detection is done by scanning the full content for reliable file-type
+    signatures rather than just the first 500 chars, because LLMs sometimes
+    add preamble text before the actual code.
+
+    Priority order — most specific signatures checked first.
+    Falls back to .py if nothing matches.
     """
-    # Priority 2 — content-based detection
-    sample = code.strip()[:500].lower()
+    # Normalise for case-insensitive matching
+    text = code.strip()
+    text_lower = text.lower()
 
-    if "<!doctype html" in sample or "<html" in sample:
+    # ---- HTML ----
+    # <!DOCTYPE html> is the canonical HTML5 opening declaration.
+    # Also catch files that open directly with <html without a doctype.
+    if "<!doctype html" in text_lower or text_lower.lstrip().startswith("<html"):
         return ".html"
-    if "<svg" in sample:
+
+    # ---- SVG ----
+    if "<svg" in text_lower and "xmlns" in text_lower:
         return ".svg"
-    if "select " in sample and ("from " in sample or "where " in sample):
+
+    # ---- CSS ----
+    # CSS files typically start with a selector or @import / @charset
+    # and contain { } blocks but NO HTML tags
+    if (
+        "<" not in text_lower
+        and "}" in text_lower
+        and "{" in text_lower
+        and (
+            text_lower.lstrip().startswith("@")
+            or text_lower.lstrip().startswith("/*")
+            or re.match(r"^\s*[a-z#.\[*]", text_lower)
+        )
+    ):
+        return ".css"
+
+    # ---- SQL ----
+    if re.search(r"\b(select|insert|update|delete|create\s+table|drop\s+table)\b",
+                 text_lower):
         return ".sql"
-    if "create table" in sample or "insert into" in sample:
-        return ".sql"
-    if "function " in sample and ("{" in sample or "=>" in sample):
-        if ": string" in sample or ": number" in sample or "interface " in sample:
-            return ".ts"
+
+    # ---- TypeScript (check before JS — TS is a superset) ----
+    if re.search(r":\s*(string|number|boolean|void|any)\b", text) or \
+       re.search(r"\binterface\s+\w+", text) or \
+       re.search(r"\btype\s+\w+\s*=", text):
+        return ".ts"
+
+    # ---- JavaScript ----
+    if re.search(r"\b(const|let|var)\s+\w+\s*=", text) and \
+       "def " not in text and "import java" not in text_lower:
         return ".js"
-    if "package main" in sample or "func main()" in sample:
-        return ".go"
-    if "#include" in sample:
-        return ".c"
-    if "public class" in sample or "import java" in sample:
+
+    # ---- Java ----
+    if re.search(r"\bpublic\s+class\s+\w+", text) or \
+       re.search(r"\bimport\s+java\.", text):
         return ".java"
-    if "using system" in sample or "namespace " in sample:
+
+    # ---- C# ----
+    if re.search(r"\busing\s+System", text) or \
+       re.search(r"\bnamespace\s+\w+", text):
         return ".cs"
 
-    # Priority 3 — default
+    # ---- Go ----
+    if re.search(r"\bpackage\s+main\b", text) or \
+       re.search(r"\bfunc\s+main\s*\(\s*\)", text):
+        return ".go"
+
+    # ---- C/C++ ----
+    if re.search(r"#include\s*[<\"]", text):
+        if "class " in text and "::" in text:
+            return ".cpp"
+        return ".c"
+
+    # ---- Shell script ----
+    if text.lstrip().startswith("#!/bin/bash") or \
+       text.lstrip().startswith("#!/bin/sh"):
+        return ".sh"
+
+    # ---- Python signatures ----
+    # def, class, import, if __name__ == "__main__" are all strong Python signals
+    if re.search(r"^def\s+\w+\s*\(", text, re.MULTILINE) or \
+       re.search(r"^class\s+\w+", text, re.MULTILINE) or \
+       re.search(r"^import\s+\w+", text, re.MULTILINE) or \
+       re.search(r"^from\s+\w+\s+import", text, re.MULTILINE) or \
+       '__name__' in text:
+        return ".py"
+
+    # ---- Default fallback ----
     return ".py"
 
 
@@ -675,8 +727,10 @@ def run_builder(
         # Determine correct output extension
         if original_ext:
             ext = original_ext
+            print(f"  [EXT] Preserving original extension: {ext}")
         else:
             ext = _detect_extension(stem=stem, code=current_code)
+            print(f"  [EXT] Detected extension from content: {ext}")
 
         if fully_passed:
             outcome      = "FINAL"

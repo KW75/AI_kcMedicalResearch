@@ -1,30 +1,35 @@
 # Coding Standards
 
-# Coding Standards
+## General Rules
+- Write clean, readable, self-documenting code.
+- Use clear descriptive names for variables, functions, and classes.
+- Keep functions small — one function, one responsibility.
+- Add comments only to explain WHY, not WHAT.
+- Handle all errors explicitly — never silently swallow exceptions.
+- Do not hardcode secrets, API keys, or passwords. Use environment variables.
+- Prefer standard library tools over third-party dependencies where practical.
 
-> **Scope note:** This document applies to coding mode only.
-> It is injected into AI prompts when --mode coding is active.
-> It is not injected in writing, finance, or legal modes.
-
+## HTML / CSS / JavaScript Rules
+- Always include <!DOCTYPE html> as the very first line of HTML files.
+- Use semantic HTML5 elements (header, main, section, article, footer).
+- Keep CSS in a <style> block or separate .css file — not inline styles.
+- Use const and let — never var.
+- Handle all button click events with addEventListener, not onclick attributes.
+- Validate all user inputs before processing.
 
 ## Python Rules
-- Use clear names for variables and functions.
-- Keep functions small and readable.
-- Add comments only when they help explain why something is done.
-- Avoid unnecessary complexity.
-- Handle errors clearly.
-- Do not hardcode secrets, API keys, or passwords.
-- Use environment variables for secrets.
-- Prefer standard library tools when possible.
+- Follow PEP 8 style conventions.
+- Use type hints on all function signatures.
+- Use dataclasses or named tuples for structured data.
+- Never use bare except: — always catch specific exception types.
+- Use pathlib.Path for all file system operations.
 
-## AI Agent Rules
-- Make small changes.
-- Explain what changed.
-- Do not edit unrelated files.
-- Do not create hidden behavior.
-- Do not remove safety checks.
+## SQL Rules
+- Use parameterised queries — never string concatenation for SQL.
+- Include CREATE TABLE IF NOT EXISTS rather than CREATE TABLE.
+- Add appropriate indexes on foreign keys and frequently queried columns.
 
-## Testing Rules
-- Add tests for important logic.
-- Tests should be easy to run.
-- Failed tests must be fixed before deployment.
+## Output Quality
+- The code must be complete and runnable as delivered.
+- Do not include placeholder comments like # TODO or # implement this.
+- Do not truncate the output — always deliver the full file.

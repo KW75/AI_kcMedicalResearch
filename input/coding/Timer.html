@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Countdown Timer</title>
+    <style>
+        #clock {
+            font-size: 40px;
+            text-align: center;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+
+<div id="clock"></div>
+<button onclick="startTimer(60)">Start Timer</button>
+
+<script>
+    function updateClock() {
+        const now = new Date();
+        let hours = String(now.getHours()).padStart(2, '0');
+        let minutes = String(now.getMinutes()).padStart(2, '0');
+        let seconds = String(now.getSeconds()).padStart(2, '0');
+
+        document.getElementById('clock').textContent = `${hours}:${minutes}:${seconds}`;
+    }
+
+    function startTimer(seconds) {
+        if (!seconds || isNaN(seconds)) return;
+
+        const intervalId = setInterval(updateClock, 1000);
+        updateClock(); // Initial call to display the current time
+
+        let remainingSeconds = seconds;
+        document.getElementById('clock').textContent = `${remainingSeconds} secs`;
+
+        function decrementTimer() {
+            if (remainingSeconds > 0) {
+                remainingSeconds--;
+                document.getElementById('clock').textContent = `${remainingSeconds} secs`;
+            } else {
+                clearInterval(intervalId); // Reset the timer
+            }
+        }
+
+        setInterval(decrementTimer, 1000);
+    }
+
+    startTimer(60); // Start a countdown of 60 seconds
+</script>
+
+</body>
+</html>

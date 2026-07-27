@@ -1673,19 +1673,26 @@ def handle_coding_mode(
     print("  All other lines are ignored.")
     print("  Press ENTER twice on a blank line when done.\n")
 
+    print("  (Press ENTER on a blank line when finished)\n")
+
     lines: list[str] = []
     try:
         while True:
             try:
-                line = input()
+                line = input("  instruction> ")
             except (EOFError, KeyboardInterrupt):
                 break
             # Single blank line = end of input
-            if line == "":
+            if line.strip() == "":
+                print("\n  ✓ Instructions received — starting processing...\n")
                 break
+            # Auto-prefix with > if user forgot it
+            if not line.strip().startswith(">"):
+                line = "> " + line.strip()
             lines.append(line)
     except (EOFError, KeyboardInterrupt):
         pass
+
 
     raw_input_text      = "\n".join(lines)
     direct_instructions = parse_direct_instructions(raw_input_text)
