@@ -1553,11 +1553,28 @@ def run_search_mode(
         )
     abstracts_text    = "\n\n".join(abstract_sections)
     search_type_label = "RESEARCH PAPER" if is_paper_search else "CLINICAL TOPIC"
+
+    # Build links_section first so it can be injected into the AI prompt
+    link_lines = ["## Article Links\n"]
+    for i, art in enumerate(articles, start=1):
+        title = art["title"]
+        url   = art["url"]
+        pmid  = art["pmid"]
+        link_lines.append(
+            f"{i}. [{title}]({url})  \n"
+            f"   PMID: {pmid}"
+        )
+    links_section = "\n".join(link_lines)
+
     full_prompt       = (
         f"{researcher_prompt}\n\n"
         f"## Search Type\n{search_type_label}\n\n"
         f"## Search Topic\n{topic}\n\n"
-        f"## PubMed Abstracts\n\n{abstracts_text}"
+        f"## Article Reference Links\n\n{links_section}\n\n"
+        f"## PubMed Abstracts\n\n{abstracts_text}\n\n"
+        f"IMPORTANT: In your References section, list each article using "
+        f"the exact numbered links provided in ## Article Reference Links above. "
+        f"Do NOT write placeholder text."
     )
 
     if dry_run:
@@ -1568,19 +1585,14 @@ def run_search_mode(
         except RuntimeError as exc:
             ai_report = f"[ERROR generating report: {exc}]"
 
-    link_lines = ["## Article Links\n"]
-    for i, art in enumerate(articles, start=1):
-        link_lines.append(
-            f"{i}. [{art['title']}]({art['url']})  \n"
-            f"   PMID: {art['pmid']}"
-        )
-    links_section = "\n".join(link_lines)
-
     _out_dir  = OUTPUT_SEARCH
     _out_dir.mkdir(parents=True, exist_ok=True)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    out_path  = _out_dir / f"search_{timestamp}.md"
-    out_path.write_text(
+    slug      = re.sub(r"[^\w]+", "_", topic.lower())[:40].strip("_")
+    prefix    = "ARTICLE" if is_paper_search else "TOPIC"
+    out_path  = _out_dir / f"{prefix}_{slug}_{timestamp}.md"
+    docx_path = _out_dir / f"{prefix}_{slug}_{timestamp}.docx"
+    md_content = (
         f"# Medical Search Report — "
         f"{'Research Paper' if is_paper_search else 'Clinical Topic'}\n"
         f"Topic: {topic}\n"
@@ -1588,9 +1600,37 @@ def run_search_mode(
         f"{links_section}\n\n"
         f"---\n\n"
         f"## AI Research Summary\n\n"
-        f"{ai_report}\n",
-        encoding="utf-8",
+        f"{ai_report}\n"
     )
+    out_path.write_text(md_content, encoding="utf-8")
+
+    # Save DOCX alongside MD
+    try:
+        from docx import Document
+        from docx.shared import Pt, RGBColor
+        doc = Document()
+        report_title = f"Medical Search Report — {'Research Paper' if is_paper_search else 'Clinical Topic'}"
+        h = doc.add_heading(report_title, level=1)
+        h.runs[0].font.color.rgb = RGBColor(0x1F, 0x49, 0x7D)
+        doc.add_paragraph(f"Topic: {topic}")
+        doc.add_paragraph(f"Generated: {timestamp}")
+        doc.add_paragraph("")
+        for raw_line in md_content.splitlines():
+            line = raw_line.strip()
+            if line.startswith("## "):
+                doc.add_heading(line[3:], level=2)
+            elif line.startswith("### "):
+                doc.add_heading(line[4:], level=3)
+            elif line.startswith("#### "):
+                doc.add_heading(line[5:], level=4)
+            elif line == "---":
+                doc.add_paragraph("—" * 20)
+            elif line:
+                doc.add_paragraph(line)
+        doc.save(str(docx_path))
+        print(f"DOCX saved to: output\\search\\{docx_path.name}")
+    except Exception as exc:
+        print(f"[WARN] DOCX save failed: {exc}")
 
     print(f"Report saved to: output\\search\\{out_path.name}")
     print("Tip: copy any article URL above into --mode appraisal for deeper review.\n")
