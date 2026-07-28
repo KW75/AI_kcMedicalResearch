@@ -25,7 +25,7 @@ MODES = [
     ('5', 'RCT Search',  '--mode rct_search'),
     ('6', 'SR Pipeline', '--mode sr'),
     ('7', 'Dry Run',     '--dry-run'),
-    ('8', 'Launch UI',   '--ui'),
+    ('8', 'Pipeline UI',   '--ui'),
 ]
 
 PROVIDERS = [
