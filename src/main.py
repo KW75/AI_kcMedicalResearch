@@ -1840,11 +1840,11 @@ def handle_search_mode(provider: str, model: str) -> None:
                 direct_instructions.append(instr)
 
     def call_llm_fn(system_prompt: str, user_prompt: str) -> str:
+        combined = f"{system_prompt}\n\n{user_prompt}" if system_prompt else user_prompt
         return call_ai(
+            prompt=combined,
             provider=provider,
             model=model,
-            system_prompt=system_prompt,
-            user_prompt=user_prompt,
         )
 
     if sub == "1":
@@ -2326,10 +2326,9 @@ if __name__ == "__main__":
                 sys.exit(1)
             generate_writing_report(provider=args.provider, model=args.model)
         elif args.mode == "search":
-            run_search_mode(
+            handle_search_mode(
                 provider=args.provider,
                 model=args.model,
-                dry_run=args.dry_run,
             )
         elif args.mode == "sr":
             run_sr_launcher()
