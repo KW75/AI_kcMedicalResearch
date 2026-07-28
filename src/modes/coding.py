@@ -649,6 +649,9 @@ def run_builder(
                 spinner_message=f"Builder generating code (iter {rev_iter})",
             )
             current_code = _strip_code_fences(current_code)
+            current_code = _ensure_complete(
+                current_code, system_prompt, call_llm_fn
+            )
 
             # Pass to Reviewer agent
             reviewer_prompt   = _build_reviewer_user_prompt(
@@ -972,6 +975,66 @@ def parse_direct_instructions(raw_input: str) -> list[str]:
 # Code fence stripper
 # ---------------------------------------------------------------------------
 
+
+
+def _is_truncated(code: str) -> bool:
+    """
+    Detect whether the LLM output was cut off before the file was complete.
+    Checks for missing closing tags/braces based on content type.
+    """
+    stripped = code.strip()
+    if not stripped:
+        return True
+    # HTML files must end with </html>
+    if stripped.lower().startswith("<!doctype") or stripped.lower().startswith("<html"):
+        return not stripped.lower().endswith("</html>")
+    # Python files: last non-empty line should not be mid-expression
+    last_line = stripped.splitlines()[-1].strip()
+    bad_endings = (",", "(", "[", "{", "\\", "->", ":",  "=", "+")
+    if any(last_line.endswith(e) for e in bad_endings):
+        return True
+    # Generic JS/CSS: check for unclosed braces
+    if stripped.startswith("{") or "function " in stripped or "const " in stripped:
+        open_b  = stripped.count("{")
+        close_b = stripped.count("}")
+        if open_b > close_b + 2:
+            return True
+    return False
+
+
+def _ensure_complete(
+    code: str,
+    system_prompt: str,
+    call_llm_fn,
+    max_continuations: int = 3,
+) -> str:
+    """
+    If the Builder output appears truncated, fire continuation calls
+    asking the LLM to complete the file from where it stopped.
+    Repeats up to max_continuations times.
+    """
+    for attempt in range(1, max_continuations + 1):
+        if not _is_truncated(code):
+            break
+        print(f"  [BUILDER] Output truncated — requesting continuation {attempt}/{max_continuations}...")
+        continuation_prompt = (
+            "The previous response was cut off before the file was complete.\n"
+            "Continue EXACTLY from where you stopped. "
+            "Do NOT repeat any code already written. "
+            "Do NOT start from the beginning. "
+            "Write only the remaining lines needed to complete the file. "
+            "End with the final closing line (e.g. </html> or the last closing brace).\n\n"
+            "## Code so far (last 200 characters):\n"
+            f"{code[-200:]}"
+        )
+        continuation = _call_llm(
+            system_prompt, continuation_prompt, call_llm_fn,
+            spinner_message=f"Builder continuing output (attempt {attempt})",
+        )
+        continuation = _strip_code_fences(continuation)
+        if continuation and not continuation.startswith("[ERROR]"):
+            code = code.rstrip() + "\n" + continuation.lstrip()
+    return code
 def _strip_code_fences(text: str) -> str:
     """
     Remove markdown code fences that some LLMs wrap around their output.
