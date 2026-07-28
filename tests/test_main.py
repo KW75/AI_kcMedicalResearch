@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import json
 import urllib.error
@@ -1230,9 +1230,12 @@ def test_parse_args_provider_groq():
 
 def test_generate_writing_report_no_files(tmp_path):
     from src.main import generate_writing_report
+    empty_input = tmp_path / "empty_input"
+    empty_input.mkdir()
     result = generate_writing_report(
         docs_dir=tmp_path / "empty",
         reports_dir=tmp_path / "reports",
+        input_dir=empty_input,
     )
     assert result.name == "writing_report_empty.md"
 

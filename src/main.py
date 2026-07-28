@@ -869,12 +869,15 @@ def _md_to_docx(md_text: str, title: str, out_path: Path) -> None:
 # ---------------------------------------------------------------------------
 # Writing report
 # ---------------------------------------------------------------------------
+
 def generate_writing_report(
     docs_dir: Path = DOCS_WRITING,
     reports_dir: Path = REPORTS_DIR,
     provider: str = "ollama",
     model: str | None = None,
+    input_dir: Path | None = None,
 ) -> Path:
+
     """
     Read input files, send to AI with writing-report prompt, save as
     output/writing/writing_report_{ts}.md and .docx.
@@ -884,7 +887,14 @@ def generate_writing_report(
     if not prompt_path.exists():
         raise FileNotFoundError(f"Writing report prompt not found: {prompt_path}")
 
-    files = auto_load_input_files("writing")
+    if input_dir is not None:
+        _SUPPORTED = {".txt", ".md", ".pdf", ".docx"}
+        files = sorted(
+            p for p in input_dir.iterdir()
+            if p.is_file() and p.suffix.lower() in _SUPPORTED
+        ) if input_dir.exists() else []
+    else:
+        files = auto_load_input_files("writing")
 
     if not files and docs_dir.exists():
         SUPPORTED = {".txt", ".md", ".pdf", ".docx"}
