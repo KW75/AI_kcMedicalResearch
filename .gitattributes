@@ -8,3 +8,6 @@ src/**/*.py  text eol=lf
 docs/writing/**/*.md  text eol=lf
 
 src/modes/*.py  text eol=lf
+
+docs/**/*.md  text eol=lf
+launcher.py   text eol=lf
