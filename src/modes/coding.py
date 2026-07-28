@@ -985,28 +985,43 @@ def _is_truncated(code: str) -> bool:
     stripped = code.strip()
     if not stripped:
         return True
-    # HTML files must end with </html>
-    # HTML files must end with </html>
-    if stripped.lower().startswith("<!doctype") or "<html" in stripped.lower()[:200]:
-        has_script = "<script" in stripped.lower()
-        ends_html  = stripped.lower().endswith("</html>")
-        ends_script = stripped.lower().endswith("</script>") or stripped.lower().endswith("</script></body></html>")
-        if has_script and not ends_html:
+
+    is_html = stripped.lower().startswith("<!doctype") or "<html" in stripped.lower()[:200]
+
+    if is_html:
+        low = stripped.lower()
+        # Must end with </html> as the very last non-empty content
+        last_nonempty = stripped.rstrip().splitlines()[-1].strip().lower()
+        if last_nonempty != "</html>":
             return True
-        if not ends_html:
-            return True
+        # If file has a <script> block, check braces are balanced inside it
+        if "<script" in low:
+            # Extract everything between first <script> and last </script>
+            import re as _re
+            script_blocks = _re.findall(r"<script[^>]*>(.*?)</script>", stripped, _re.DOTALL | _re.IGNORECASE)
+            if not script_blocks:
+                # <script> opened but </script> never closed
+                return True
+            for block in script_blocks:
+                open_b  = block.count("{")
+                close_b = block.count("}")
+                if open_b > close_b + 2:
+                    return True
         return False
+
     # Python files: last non-empty line should not be mid-expression
     last_line = stripped.splitlines()[-1].strip()
-    bad_endings = (",", "(", "[", "{", "\\", "->", ":",  "=", "+")
+    bad_endings = (",", "(", "[", "{", "\\", "->", ":", "=", "+")
     if any(last_line.endswith(e) for e in bad_endings):
         return True
+
     # Generic JS/CSS: check for unclosed braces
     if stripped.startswith("{") or "function " in stripped or "const " in stripped:
         open_b  = stripped.count("{")
         close_b = stripped.count("}")
         if open_b > close_b + 2:
             return True
+
     return False
 
 
