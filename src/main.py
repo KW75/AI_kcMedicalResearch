@@ -366,7 +366,7 @@ def call_ollama_provider(
         method="POST",
     )
     try:
-        with urlopen(req, timeout=120) as resp:
+        with urlopen(req, timeout=300) as resp:
             data = json.loads(resp.read())
         response_text = data.get("response", "")
         if not response_text:
@@ -1360,7 +1360,7 @@ def fetch_pubmed_articles(
     base       = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils"
     search_url = (
         f"{base}/esearch.fcgi?db=pubmed&term={urllib.parse.quote(query)}"
-        f"&retmax={max_results}&retmode=json"
+        f"&retmax=5&retmode=json"
     )
     try:
         with urlopen(search_url, timeout=15) as resp:
