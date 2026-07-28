@@ -151,6 +151,12 @@ def _build_system_prompt(guidelines: str) -> str:
         "You write clean, well-documented, production-quality code.\n"
         "You follow all coding standards and guidelines provided.\n"
         "When reviewing or testing code, you provide precise, actionable feedback.\n"
+        "\n"
+        "CRITICAL OUTPUT RULE: Never truncate, abbreviate, or summarise your code output.\n"
+        "Never use placeholders such as '// ... rest of code', '# TODO', '[rest unchanged]',\n"
+        "or any other shorthand. Always write every line of every function in full.\n"
+        "If the file is long, keep writing until the final closing tag or brace.\n"
+        "A response that ends mid-function or mid-file is considered a critical failure.\n"
     )
     if guidelines:
         return base + "\n\n## Background Guidelines and Standards\n\n" + guidelines
@@ -185,6 +191,15 @@ def _build_builder_user_prompt(
             "Build a complete, well-structured application based on the direct task "
             "instructions above and the background guidelines in the system prompt.\n"
             "Each instruction represents a feature, function, or component of ONE "
+            "single application. Produce the COMPLETE application as a single coherent "
+            "file. Use the most appropriate language and file format for the task "
+            "described in the instructions above.\n"
+            "IMPORTANT: Write the ENTIRE file from first line to last. "
+            "Do NOT stop early. Do NOT use placeholders. "
+            "The output must be a complete, immediately runnable file. "
+            "For HTML files, the last line must be </html>. "
+            "For Python files, the last line must close all functions and classes. "
+            "If you are running out of space, prioritise completing the logic over adding comments."
             "single application. Produce the complete application as a single coherent "
             "file. Use the most appropriate language and file format for the task "
             "described in the instructions above."
@@ -249,7 +264,16 @@ def _build_reviewer_user_prompt(
         "If there are issues, begin your response with exactly:\n"
         "REVIEW_FAIL\n\n"
         "Then list every issue with its line number (if applicable) and a clear "
-        "description. Be specific and actionable."
+        "Then list every issue with its line number (if applicable) and a clear "
+        "description. Be specific and actionable.\n\n"
+        "TRUNCATION RULE: If the code submitted appears incomplete (ends mid-function, "
+        "mid-string, or without a closing tag/brace), do NOT issue a REVIEW_FAIL for "
+        "functional issues that cannot be verified. Instead begin your response with:\n"
+        "REVIEW_FAIL\n\n"
+        "## Issues Found\n"
+        "### TRUNCATED OUTPUT\n"
+        "- The code was cut off before completion. Request the Builder to continue "
+        "from where it stopped and complete the file without rewriting from scratch."
     )
     return "\n".join(parts)
 
