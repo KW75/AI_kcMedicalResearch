@@ -161,7 +161,7 @@ def auto_load_input_files(mode: str) -> list[Path]:
 # Environment / provider config
 # ---------------------------------------------------------------------------
 OLLAMA_HOST         = os.getenv("OLLAMA_HOST",         "http://localhost:11434")
-OLLAMA_MODEL        = os.getenv("OLLAMA_MODEL",        "qwen2.5-coder:3b")
+OLLAMA_MODEL        = os.getenv("OLLAMA_MODEL",        "llama3.2")
 OPENAI_API_KEY      = os.getenv("OPENAI_API_KEY",      "")
 OPENAI_MODEL        = os.getenv("OPENAI_MODEL",        "gpt-4o-mini")
 ANTHROPIC_API_KEY   = os.getenv("ANTHROPIC_API_KEY",   "")
