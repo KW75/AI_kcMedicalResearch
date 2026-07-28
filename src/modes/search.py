@@ -51,8 +51,8 @@ DISCLOSURE = (
     "Always verify search results against primary sources."
 )
 
-MAX_RESULTS_TOPIC   = 10
-MAX_RESULTS_ARTICLE = 15
+MAX_RESULTS_TOPIC   = 5
+MAX_RESULTS_ARTICLE = 8
 
 # ---------------------------------------------------------------------------
 # Path helpers
@@ -288,10 +288,10 @@ def _call_llm(
     with _Spinner(spinner_message):
         t = threading.Thread(target=_run, daemon=True)
         t.start()
-        t.join(timeout=300)
+        t.join(timeout=180)
 
     if t.is_alive():
-        return "[ERROR] LLM call timed out after 5 minutes."
+        return "[ERROR] LLM call timed out after 3 minutes. Try a shorter query or use a cloud provider."
     if error_holder:
         return f"[ERROR] {error_holder[0]}"
     return result_holder[0] if result_holder else "[ERROR] No response."
