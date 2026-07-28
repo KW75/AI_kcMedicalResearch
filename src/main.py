@@ -1772,6 +1772,55 @@ def handle_appraisal_mode(
 # ---------------------------------------------------------------------------
 # Writing mode dispatcher  (Writer pipeline / Editor / QA standalone)
 # ---------------------------------------------------------------------------
+
+def handle_search_mode(provider: str, model: str) -> None:
+    """Dispatcher for Search mode (Topic Search and Article Search)."""
+    from src.modes.search import run_topic_search, run_article_search
+
+    print("\n=== SEARCH MODE ===")
+    print("  1. Topic Search  (web synopsis with reference links)")
+    print("  2. Article Search (PubMed by article type + comparison)")
+    sub = input("  Select sub-mode: ").strip()
+
+    if sub not in ("1", "2"):
+        print("  Invalid selection. Returning to menu.")
+        return
+
+    # Collect direct instructions
+    print("  Enter search instructions (prefix each line with >).")
+    print("  Press Enter on a blank line when done.")
+    direct_instructions: list[str] = []
+    while True:
+        line = input("  ").strip()
+        if not line:
+            break
+        if line.startswith(">"):
+            instr = line[1:].strip()
+            if instr:
+                direct_instructions.append(instr)
+
+    def call_llm_fn(system_prompt: str, user_prompt: str) -> str:
+        return call_ai(
+            provider=provider,
+            model=model,
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
+        )
+
+    if sub == "1":
+        run_topic_search(
+            direct_instructions=direct_instructions,
+            call_llm_fn=call_llm_fn,
+            verbose=True,
+        )
+    else:
+        run_article_search(
+            direct_instructions=direct_instructions,
+            call_llm_fn=call_llm_fn,
+            verbose=True,
+        )
+
+
 def handle_writing_mode(
     provider: str = "ollama",
     model: str | None = None,
