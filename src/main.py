@@ -1846,7 +1846,7 @@ def handle_search_mode(provider: str, model: str) -> None:
         l[1:].strip() for l in raw_lines if l.strip().startswith(">") and l[1:].strip()
     ]
 
-    def call_llm_fn(system_prompt: str, user_prompt: str) -> str:
+    def call_llm_fn(system_prompt: str = "", user_prompt: str = "") -> str:
         combined = f"{system_prompt}\n\n{user_prompt}" if system_prompt else user_prompt
         return call_ai(
             prompt=combined,

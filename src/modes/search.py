@@ -300,25 +300,6 @@ def _call_llm(
         print(f"\r  ✗  {spinner_message} — error.")
         return f"[ERROR] {exc}"
 
-    def _run():
-        try:
-            result_holder.append(call_llm_fn(
-                system_prompt=system_prompt,
-                user_prompt=user_prompt,
-            ))
-        except Exception as exc:
-            error_holder.append(exc)
-
-    with _Spinner(spinner_message):
-        t = threading.Thread(target=_run, daemon=True)
-        t.start()
-        t.join(timeout=180)
-
-    if t.is_alive():
-        return "[ERROR] LLM call timed out after 3 minutes. Try a shorter query or use a cloud provider."
-    if error_holder:
-        return f"[ERROR] {error_holder[0]}"
-    return result_holder[0] if result_holder else "[ERROR] No response."
 
 # ---------------------------------------------------------------------------
 # Output writers
@@ -399,9 +380,14 @@ def _write_report(
 def _topic_system_prompt(guidelines: str) -> str:
     base = (
         "You are an expert medical research librarian and science communicator.\n"
-        "You synthesise web search results into clear, accurate research synopses.\n"
-        "You always include reference links and flag unreliable sources.\n"
-        "You write in plain English suitable for a medical professional audience.\n"
+        "You synthesise search results into clear, accurate research synopses.\n"
+        "You write in plain English suitable for a medical professional audience.\n\n"
+        "CRITICAL RULES:\n"
+        "1. ONLY cite articles that appear in the ## Search Results section provided.\n"
+        "2. Do NOT invent, fabricate, or hallucinate any article, author, or URL.\n"
+        "3. Copy every URL exactly as given in the ## Search Results list.\n"
+        "4. If a result has no URL, omit it from References entirely.\n"
+        "5. Your References section must contain ONLY the articles listed below.\n"
     )
     if guidelines:
         return base + "\n\n## Guidelines\n\n" + guidelines
@@ -509,9 +495,9 @@ def run_topic_search(
     print(f"\n  [TOPIC SEARCH] Query: {query}")
 
     # Web search
+    topic_limit, _ = _result_limits(model)
     with _Spinner("Searching Europe PMC"):
-        topic_limit, _ = _result_limits(model)
-    results = _europepmc_search(query, max_results=topic_limit)
+        results = _europepmc_search(query, max_results=topic_limit)
 
     print(f"  [SEARCH] Found {len(results)} web results.")
 
