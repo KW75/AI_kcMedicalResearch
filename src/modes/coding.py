@@ -986,8 +986,16 @@ def _is_truncated(code: str) -> bool:
     if not stripped:
         return True
     # HTML files must end with </html>
-    if stripped.lower().startswith("<!doctype") or stripped.lower().startswith("<html"):
-        return not stripped.lower().endswith("</html>")
+    # HTML files must end with </html>
+    if stripped.lower().startswith("<!doctype") or "<html" in stripped.lower()[:200]:
+        has_script = "<script" in stripped.lower()
+        ends_html  = stripped.lower().endswith("</html>")
+        ends_script = stripped.lower().endswith("</script>") or stripped.lower().endswith("</script></body></html>")
+        if has_script and not ends_html:
+            return True
+        if not ends_html:
+            return True
+        return False
     # Python files: last non-empty line should not be mid-expression
     last_line = stripped.splitlines()[-1].strip()
     bad_endings = (",", "(", "[", "{", "\\", "->", ":",  "=", "+")
