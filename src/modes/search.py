@@ -139,7 +139,6 @@ def _europepmc_search(query: str, max_results: int = MAX_RESULTS_TOPIC) -> list[
             "format":   "json",
             "pageSize": str(max_results),
             "resultType": "core",
-            "sort":     "CITED desc",
         }
         r = requests.get(EUROPEPMC_SEARCH, params=params, timeout=15)
         if r.status_code == 200:
@@ -184,7 +183,6 @@ def _pubmed_search(
         "term":    search_term,
         "retmax":  max_results,
         "retmode": "json",
-        "sort":    "relevance",
     }
     if api_key:
         params["api_key"] = api_key
