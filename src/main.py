@@ -1723,6 +1723,51 @@ def handle_coding_mode(
     print(f"\n{colour}[{sub_mode.upper()}]{RESET} Done. "
           "Check output/coding/ and reports/coding/ for results.\n")
 
+# ---------------------------------------------------------------------------
+# Appraisal mode dispatcher
+# ---------------------------------------------------------------------------
+def handle_appraisal_mode(
+    provider: str = "ollama",
+    model: str | None = None,
+    dry_run: bool = False,
+) -> None:
+    """Terminal entry point for Appraisal mode."""
+    from src.modes.appraisal import run_appraisal, parse_direct_instructions as _pdi
+
+    def _call_llm_fn(system_prompt: str, user_prompt: str) -> str:
+        if dry_run:
+            return "[DRY RUN] LLM would respond here."
+        return call_ai(
+            prompt=f"## System Instructions\n{system_prompt}\n\n## User Request\n{user_prompt}",
+            provider=provider,
+            model=model,
+        )
+
+    print("\n" + "=" * 60)
+    print("  APPRAISAL MODE")
+    print("=" * 60)
+    print("  Place article(s) in input/appraisal/ before starting.")
+    print("  Supported formats: PDF, DOCX, MD, TXT")
+    print("  Output  → output/appraisal/")
+    print("  Reports → reports/appraisal/")
+    print("=" * 60)
+
+    lines: list[str] = []
+    print("\n  Enter optional direct instructions below.")
+    print("  Lines starting with > are highest priority.")
+    print("  Press ENTER on a blank line to start.\n")
+    while True:
+        line = input("  instruction> ").strip()
+        if not line:
+            print("\n  Instructions received -- starting appraisal...\n")
+            break
+        if not line.startswith(">"):
+            line = "> " + line
+        lines.append(line)
+
+    direct = _pdi("\n".join(lines))
+    run_appraisal(direct, _call_llm_fn, verbose=True)
+
 
 # ---------------------------------------------------------------------------
 # Writing mode dispatcher  (Writer pipeline / Editor / QA standalone)
@@ -2213,6 +2258,12 @@ if __name__ == "__main__":
             )
         elif args.mode == "writing":
             handle_writing_mode(
+                provider=args.provider,
+                model=args.model,
+                dry_run=args.dry_run,
+            )
+        elif args.mode == "appraisal":
+            handle_appraisal_mode(
                 provider=args.provider,
                 model=args.model,
                 dry_run=args.dry_run,
