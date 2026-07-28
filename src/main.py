@@ -889,7 +889,7 @@ def generate_writing_report(
     if not files and docs_dir.exists():
         SUPPORTED = {".txt", ".md", ".pdf", ".docx"}
         files = sorted(
-            f for f in docs_dir.iterdir()
+            f for f in docs_dir.rglob("*")
             if f.is_file() and f.suffix.lower() in SUPPORTED
         )
 
