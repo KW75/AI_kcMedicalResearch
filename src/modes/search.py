@@ -111,68 +111,53 @@ def _load_guidelines(docs_path: Path) -> str:
 # ---------------------------------------------------------------------------
 # DuckDuckGo web search
 # ---------------------------------------------------------------------------
-def _ddg_search(query: str, max_results: int = MAX_RESULTS_TOPIC) -> list[dict]:
+# ---------------------------------------------------------------------------
+# Europe PMC search (replaces DuckDuckGo for Topic Search)
+# ---------------------------------------------------------------------------
+EUROPEPMC_SEARCH = "https://www.ebi.ac.uk/europepmc/webservices/rest/search"
+
+def _europepmc_search(query: str, max_results: int = MAX_RESULTS_TOPIC) -> list[dict]:
     """
-    Search DuckDuckGo and return list of {title, url, snippet} dicts.
-    Uses the HTML endpoint as fallback when instant-answer API returns no results.
+    Search Europe PMC and return list of {title, url, snippet} dicts.
+    Covers PubMed, PubMed Central, bioRxiv, WHO, and clinical guidelines.
+    No API key required.
     """
     results = []
-
-    # Try instant answer API first
     try:
         params = {
-            "q": query, "format": "json",
-            "no_html": "1", "skip_disambig": "1",
+            "query":    query,
+            "format":   "json",
+            "pageSize": str(max_results),
+            "resultType": "core",
+            "sort":     "CITED desc",
         }
-        r = requests.get(DDG_API, params=params, timeout=15)
+        r = requests.get(EUROPEPMC_SEARCH, params=params, timeout=15)
         if r.status_code == 200:
             data = r.json()
-            # Related topics
-            for item in data.get("RelatedTopics", []):
+            for item in data.get("resultList", {}).get("result", []):
+                pmid  = item.get("pmid", "")
+                pmcid = item.get("pmcid", "")
+                title = item.get("title", "").strip()
+                abstract = item.get("abstractText", "").strip()
+                snippet  = abstract[:300] if abstract else title
+                if pmid:
+                    url = f"https://pubmed.ncbi.nlm.nih.gov/{pmid}/"
+                elif pmcid:
+                    url = f"https://europepmc.org/article/PMC/{pmcid}"
+                else:
+                    url = f"https://europepmc.org/search?query={urllib.parse.quote(title)}"
+                if title and url:
+                    results.append({
+                        "title":   title,
+                        "url":     url,
+                        "snippet": snippet,
+                    })
                 if len(results) >= max_results:
                     break
-                if isinstance(item, dict) and "FirstURL" in item:
-                    results.append({
-                        "title":   item.get("Text", "")[:120],
-                        "url":     item.get("FirstURL", ""),
-                        "snippet": item.get("Text", ""),
-                    })
-    except Exception:
-        pass
-
-    # Fallback: HTML scrape
-    if len(results) < 3:
-        try:
-            headers = {"User-Agent": "Mozilla/5.0 (compatible; research-bot/1.0)"}
-            params  = {"q": query, "kl": "us-en"}
-            r = requests.get(DDG_HTML, params=params, headers=headers, timeout=15)
-            if r.status_code == 200:
-                # Simple regex extraction of result links and snippets
-                links    = re.findall(
-                    r'<a rel="nofollow" class="result__a" href="([^"]+)">([^<]+)</a>',
-                    r.text,
-                )
-                snippets = re.findall(
-                    r'<a class="result__snippet"[^>]*>([^<]+)</a>',
-                    r.text,
-                )
-                for i, (url, title) in enumerate(links):
-                    if len(results) >= max_results:
-                        break
-                    snippet = snippets[i] if i < len(snippets) else ""
-                    results.append({
-                        "title":   title.strip(),
-                        "url":     url.strip(),
-                        "snippet": snippet.strip(),
-                    })
-        except Exception:
-            pass
-
+    except Exception as exc:
+        print(f"  [SEARCH] Europe PMC error: {exc}")
     return results[:max_results]
 
-# ---------------------------------------------------------------------------
-# PubMed search
-# ---------------------------------------------------------------------------
 def _pubmed_search(
     query: str,
     article_filter: str,
@@ -499,8 +484,8 @@ def run_topic_search(
     print(f"\n  [TOPIC SEARCH] Query: {query}")
 
     # Web search
-    with _Spinner("Searching DuckDuckGo"):
-        results = _ddg_search(query, max_results=MAX_RESULTS_TOPIC)
+    with _Spinner("Searching Europe PMC"):
+        results = _europepmc_search(query, max_results=MAX_RESULTS_TOPIC)
 
     print(f"  [SEARCH] Found {len(results)} web results.")
 
