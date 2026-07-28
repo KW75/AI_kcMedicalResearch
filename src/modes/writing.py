@@ -1,22 +1,21 @@
 """
-writing.py — Writing Mode engine for AI_kcMedicalResearch
-Pipeline: Writer → Editor → QA (linear, no feedback loops)
-Standalone: Editor, QA
-All docs/writing/ .md files loaded as background for every role.
-Writer and Editor outputs: .docx (primary) + .md (companion)
-QA output: .md report only
+writing.py — Writing Mode engine (v1.2 two-track system)
+Tracks:
+  topic   — newspaper/editorial style, default 800 words
+  article — medical journal style, default 3500 words
+Pipeline: Writer → Editor → QA (linear)
+Standalone: Editor, QA (require input/writing/ files)
 """
 
 import sys
 import threading
 import datetime
 from pathlib import Path
-from typing import Optional, Callable
+from typing import Callable
 
 try:
     from docx import Document
     from docx.shared import Pt
-    from docx.enum.text import WD_ALIGN_PARAGRAPH
     _DOCX_AVAILABLE = True
 except ImportError:
     _DOCX_AVAILABLE = False
@@ -24,6 +23,14 @@ except ImportError:
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
+TRACK_TOPIC   = "topic"
+TRACK_ARTICLE = "article"
+
+DEFAULT_WORDS = {
+    TRACK_TOPIC:   800,
+    TRACK_ARTICLE: 3500,
+}
+
 DISCLOSURE = (
     "AI Involvement Disclosure: This document was produced with the assistance "
     "of an AI language model. All factual claims should be independently verified "
@@ -43,15 +50,19 @@ def _ts() -> str:
 
 def _paths(root: Path) -> dict:
     return {
-        "doc":     root / "docs"    / "writing",
-        "input":   root / "input"   / "writing",
-        "output":  root / "output"  / "writing",
-        "reports": root / "reports" / "writing",
+        "doc_root": root / "docs"    / "writing",
+        "input":    root / "input"   / "writing",
+        "output":   root / "output"  / "writing",
+        "reports":  root / "reports" / "writing",
     }
 
 
+def _track_doc_path(root: Path, track: str) -> Path:
+    return root / "docs" / "writing" / track
+
+
 # ---------------------------------------------------------------------------
-# Spinner (identical pattern to coding.py)
+# Spinner
 # ---------------------------------------------------------------------------
 class _Spinner:
     def __init__(self, message: str = "Processing"):
@@ -67,7 +78,7 @@ class _Spinner:
             sys.stdout.flush()
             self._stop_event.wait(0.15)
             idx += 1
-        sys.stdout.write(f"\r  ✓  {self._message} — done.          \n")
+        sys.stdout.write(f"\r  OK  {self._message} -- done.          \n")
         sys.stdout.flush()
 
     def __enter__(self):
@@ -80,7 +91,7 @@ class _Spinner:
 
 
 # ---------------------------------------------------------------------------
-# LLM wrapper with spinner + 5-minute timeout
+# LLM wrapper
 # ---------------------------------------------------------------------------
 def _call_llm(
     system_prompt: str,
@@ -89,7 +100,7 @@ def _call_llm(
     spinner_message: str = "LLM processing",
 ) -> str:
     result_holder: list = []
-    error_holder: list = []
+    error_holder: list  = []
 
     def _run() -> None:
         try:
@@ -105,7 +116,7 @@ def _call_llm(
         t.join(timeout=300)
 
     if t.is_alive():
-        return "[ERROR] LLM call timed out after 5 minutes. Check Ollama or switch provider."
+        return "[ERROR] LLM call timed out after 5 minutes."
     if error_holder:
         return f"[ERROR] LLM call failed: {error_holder[0]}"
     if not result_holder:
@@ -116,25 +127,28 @@ def _call_llm(
 # ---------------------------------------------------------------------------
 # I/O helpers
 # ---------------------------------------------------------------------------
-def _load_guidelines(doc_path: Path) -> str:
-    """Load all .md files from docs/writing/ as a single string."""
-    if not doc_path.exists():
-        return ""
+def _load_guidelines(track_doc_path: Path, shared_doc_path: Path) -> str:
+    """
+    Load all .md files from the track subfolder plus project-brief.md
+    from the shared root if present.
+    """
     parts = []
-    for f in sorted(doc_path.glob("*.md")):
-        parts.append(f"### {f.name}\n{f.read_text(encoding='utf-8')}")
+
+    # Shared root: project-brief.md only (if still at root)
+    brief = shared_doc_path / "project-brief.md"
+    if brief.exists():
+        parts.append(f"### project-brief.md\n{brief.read_text(encoding='utf-8')}")
+
+    # Track-specific docs
+    if track_doc_path.exists():
+        for f in sorted(track_doc_path.glob("*.md")):
+            parts.append(f"### {f.name}\n{f.read_text(encoding='utf-8')}")
+
     return "\n\n".join(parts)
 
 
 def _load_input_files(input_path: Path) -> list:
-    """
-    Return list of (stem, content, suffix) tuples for every file in input/writing/.
-    Supported text extensions only.
-    """
-    extensions = {
-        ".md", ".txt", ".docx", ".html", ".tex", ".rst",
-        ".csv", ".json", ".xml",
-    }
+    extensions = {".md", ".txt", ".docx", ".html", ".tex", ".rst"}
     if not input_path.exists():
         return []
     results = []
@@ -153,112 +167,129 @@ def _load_input_files(input_path: Path) -> list:
     return results
 
 
-def _write_text_file(path: Path, content: str) -> None:
+def _write_text(path: Path, content: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(content, encoding="utf-8")
 
 
-def _write_docx_file(path: Path, content: str, title: str = "") -> None:
-    """Convert markdown-flavoured text to a .docx file using python-docx."""
-    if not _DOCX_AVAILABLE:
-        print("  [WARN] python-docx not available — skipping .docx export.")
-        return
-    path.parent.mkdir(parents=True, exist_ok=True)
-    doc = Document()
-
-    if title:
-        doc.add_heading(title, level=0)
-
-    for line in content.splitlines():
-        stripped = line.rstrip()
-
-        # Headings
-        if stripped.startswith("#### "):
-            doc.add_heading(stripped[5:], level=4)
-        elif stripped.startswith("### "):
-            doc.add_heading(stripped[4:], level=3)
-        elif stripped.startswith("## "):
-            doc.add_heading(stripped[3:], level=2)
-        elif stripped.startswith("# "):
-            doc.add_heading(stripped[2:], level=1)
-
-        # Bullet list items
-        elif stripped.startswith("- ") or stripped.startswith("* "):
-            doc.add_paragraph(stripped[2:], style="List Bullet")
-
-        # Numbered list items
-        elif len(stripped) > 2 and stripped[0].isdigit() and stripped[1] in ".)" :
-            doc.add_paragraph(stripped[2:].strip(), style="List Number")
-
-        # Horizontal rule — skip
-        elif stripped.startswith("---"):
-            doc.add_paragraph("")
-
-        # Normal paragraph
-        else:
-            p = doc.add_paragraph()
-            # Inline bold/italic (simple pass)
-            _add_inline_runs(p, stripped)
-
-    # Disclosure statement
-    doc.add_paragraph("")
-    disc = doc.add_paragraph()
-    run = disc.add_run(DISCLOSURE)
-    run.italic = True
-    run.font.size = Pt(9)
-
-    doc.save(str(path))
-    print(f"  [DOCX] Saved: {path.name}")
-
-
 def _add_inline_runs(paragraph, text: str) -> None:
-    """Very lightweight bold/italic inline parser for python-docx paragraphs."""
     import re
-    # Pattern captures **bold**, *italic*, and plain text segments
     pattern = re.compile(r"(\*\*(.+?)\*\*|\*(.+?)\*|([^*]+))")
     for match in pattern.finditer(text):
         if match.group(2):
-            run = paragraph.add_run(match.group(2))
-            run.bold = True
+            paragraph.add_run(match.group(2)).bold = True
         elif match.group(3):
-            run = paragraph.add_run(match.group(3))
-            run.italic = True
+            paragraph.add_run(match.group(3)).italic = True
         elif match.group(4):
             paragraph.add_run(match.group(4))
+
+
+def _write_docx(path: Path, content: str, title: str = "") -> None:
+    if not _DOCX_AVAILABLE:
+        print("  [WARN] python-docx not available -- skipping .docx export.")
+        return
+    path.parent.mkdir(parents=True, exist_ok=True)
+    doc = Document()
+    if title:
+        doc.add_heading(title, level=0)
+    for line in content.splitlines():
+        s = line.rstrip()
+        if s.startswith("#### "):
+            doc.add_heading(s[5:], level=4)
+        elif s.startswith("### "):
+            doc.add_heading(s[4:], level=3)
+        elif s.startswith("## "):
+            doc.add_heading(s[3:], level=2)
+        elif s.startswith("# "):
+            doc.add_heading(s[2:], level=1)
+        elif s.startswith("- ") or s.startswith("* "):
+            doc.add_paragraph(s[2:], style="List Bullet")
+        elif len(s) > 2 and s[0].isdigit() and s[1] in ".)":
+            doc.add_paragraph(s[2:].strip(), style="List Number")
+        elif s.startswith("---"):
+            doc.add_paragraph("")
+        else:
+            _add_inline_runs(doc.add_paragraph(), s)
+    disc = doc.add_paragraph()
+    run  = disc.add_run(DISCLOSURE)
+    run.italic = True
+    run.font.size = Pt(9)
+    doc.save(str(path))
+    print(f"  [DOCX] {path.name}")
+
+
+def _strip_fences(text: str) -> str:
+    import re
+    text = re.sub(r"^```[a-zA-Z]*\n", "", text.strip())
+    text = re.sub(r"\n```$", "", text.strip())
+    return text.strip()
 
 
 # ---------------------------------------------------------------------------
 # Prompt builders
 # ---------------------------------------------------------------------------
-def _system_prompt(guidelines: str, role: str) -> str:
-    role_descriptions = {
-        "Writer": (
-            "You are an expert medical writer. Your task is to produce clear, "
-            "accurate, well-structured written content according to the project brief "
-            "and style guidelines provided. Always cite sources when making clinical claims. "
-            "Produce complete documents — never truncate or use placeholder text."
-        ),
-        "Editor": (
-            "You are a professional medical editor. Your task is to improve the draft "
-            "provided to you: enhance clarity, fix structure, ensure consistency, correct "
-            "errors, and verify it meets editorial standards. Return the full improved document. "
-            "Do not summarise or truncate — output the complete revised text."
-        ),
-        "QA": (
-            "You are a quality assurance reviewer for medical writing. Your task is to "
-            "systematically review the document provided against the QA checklist and "
-            "editorial standards. Produce a structured QA report listing: (1) items that "
-            "PASS, (2) items that FAIL with specific line references, (3) a recommendation "
-            "(APPROVE / REVISE MINOR / REVISE MAJOR). Be specific and actionable."
-        ),
+_WRITER_PERSONA = {
+    TRACK_TOPIC: (
+        "You are a senior newspaper columnist and editorial writer with 20 years of "
+        "experience writing for national broadsheets. You write with authority, clarity, "
+        "and wit. You take clear positions, use plain English, and never hide behind "
+        "jargon. Your pieces have a strong hook, a clear argument, and a memorable close."
+    ),
+    TRACK_ARTICLE: (
+        "You are an experienced medical academic writer and researcher. You produce "
+        "rigorous, clearly structured journal articles following IMRAD format. You cite "
+        "evidence precisely, report effect sizes and confidence intervals, name study "
+        "designs correctly, and write in formal academic prose suitable for peer review."
+    ),
+}
+
+_EDITOR_PERSONA = {
+    TRACK_TOPIC: (
+        "You are a senior newspaper and magazine editor. You sharpen arguments, improve "
+        "sentence rhythm, cut padding, strengthen hooks, and ensure every paragraph "
+        "earns its place. You preserve the writer's voice while making the piece tighter, "
+        "clearer, and more engaging. You apply newspaper editorial standards rigorously."
+    ),
+    TRACK_ARTICLE: (
+        "You are a medical journal editor and peer reviewer with expertise across clinical "
+        "medicine and research methodology. You check structure (IMRAD), verify that "
+        "claims are supported by cited evidence, ensure statistical reporting is complete "
+        "(effect sizes, CIs, p-values), flag unsupported assertions, and improve academic "
+        "prose without altering the scientific content."
+    ),
+}
+
+_QA_PERSONA = {
+    TRACK_TOPIC: (
+        "You are a quality assurance reviewer for editorial and opinion writing. You "
+        "review documents against the editorial QA checklist: hook quality, argument "
+        "clarity, logical flow, plain language, word count, accuracy, and ethics. "
+        "Produce a structured QA report with PASS items, FAIL items with specific "
+        "references, and a RECOMMENDATION: APPROVE / REVISE MINOR / REVISE MAJOR."
+    ),
+    TRACK_ARTICLE: (
+        "You are a quality assurance reviewer for medical journal articles. You "
+        "systematically review the document against the medical article QA checklist: "
+        "IMRAD structure, citation completeness, statistical reporting, word count, "
+        "ethical compliance, and formatting. Produce a structured QA report with "
+        "PASS items, FAIL items with specific section references, and a "
+        "RECOMMENDATION: APPROVE / REVISE MINOR / REVISE MAJOR."
+    ),
+}
+
+
+def _system_prompt(guidelines: str, role: str, track: str) -> str:
+    personas = {
+        "Writer": _WRITER_PERSONA,
+        "Editor": _EDITOR_PERSONA,
+        "QA":     _QA_PERSONA,
     }
-    base = role_descriptions.get(role, "You are a professional writing assistant.")
+    base = personas[role][track]
     if guidelines:
         return (
             f"{base}\n\n"
-            "## Background Guidelines\n"
-            "The following guidelines govern all writing in this project. "
-            "Apply them throughout your work.\n\n"
+            "## Guidelines\n"
+            "Apply the following guidelines throughout your work.\n\n"
             f"{guidelines}"
         )
     return base
@@ -268,38 +299,37 @@ def _writer_user_prompt(
     direct_instructions: list,
     original_content: str,
     is_scratch: bool,
+    track: str,
+    word_limit: int,
 ) -> str:
+    track_label = "newspaper editorial / opinion piece" if track == TRACK_TOPIC \
+        else "medical journal article"
     parts = []
-
     if direct_instructions:
-        parts.append("## DIRECT TASK INSTRUCTIONS (highest priority — follow exactly)")
+        parts.append("## DIRECT TASK INSTRUCTIONS (highest priority)")
         for inst in direct_instructions:
-            clean = inst.lstrip(">").strip()
-            parts.append(f"- {clean}")
+            parts.append(f"- {inst.lstrip('>').strip()}")
         parts.append("")
-
     if is_scratch:
         parts.append(
-            "## Task\n"
-            "No input document was provided. Using the direct instructions above, "
-            "produce a complete, well-structured document. Include all required sections, "
-            "citations, and formatting as specified in the style guide."
+            f"## Task\n"
+            f"No input document was provided. Using the instructions above, produce a "
+            f"complete {track_label}. Target word count: {word_limit} words. "
+            f"Follow all style and editorial guidelines provided."
         )
     else:
-        parts.append("## Source Document (use as reference and starting point)")
+        parts.append("## Source Document")
         parts.append(original_content)
-        parts.append("")
         parts.append(
-            "## Task\n"
-            "Using the source document above and the direct instructions, produce a "
-            "complete, polished written output that meets all style and editorial guidelines."
+            f"\n## Task\n"
+            f"Using the source document above and the instructions, produce a complete "
+            f"{track_label}. Target word count: {word_limit} words. "
+            f"Follow all style and editorial guidelines."
         )
-
     parts.append(
         "\n## Output Format\n"
-        "Return the complete document in Markdown. Use ## for main section headings "
-        "and ### for subsections. Do not truncate. Do not add meta-commentary — "
-        "output only the document itself."
+        "Return the complete document in Markdown. Do not truncate. "
+        "Do not add meta-commentary -- output only the document itself."
     )
     return "\n".join(parts)
 
@@ -308,99 +338,102 @@ def _editor_user_prompt(
     direct_instructions: list,
     writer_output: str,
     original_content: str,
+    track: str,
+    word_limit: int,
 ) -> str:
+    track_label = "editorial/opinion piece" if track == TRACK_TOPIC \
+        else "medical journal article"
     parts = []
-
     if direct_instructions:
-        parts.append("## DIRECT TASK INSTRUCTIONS (highest priority — follow exactly)")
+        parts.append("## DIRECT TASK INSTRUCTIONS (highest priority)")
         for inst in direct_instructions:
-            clean = inst.lstrip(">").strip()
-            parts.append(f"- {clean}")
+            parts.append(f"- {inst.lstrip('>').strip()}")
         parts.append("")
-
-    parts.append("## Original Source Document (for reference)")
-    parts.append(original_content if original_content else "(No original source provided.)")
+    parts.append("## Original Source (for reference)")
+    parts.append(original_content if original_content else "(No original source.)")
     parts.append("")
-    parts.append("## Writer Draft (edit this document)")
+    parts.append("## Writer Draft (edit this)")
     parts.append(writer_output)
     parts.append(
-        "\n## Task\n"
-        "Edit the Writer Draft above. Improve clarity, structure, and accuracy. "
-        "Ensure it meets all editorial standards and style guidelines. "
-        "Return the complete edited document in Markdown. Do not truncate."
+        f"\n## Task\n"
+        f"Edit the Writer Draft above as a {track_label} editor. "
+        f"Target word count: {word_limit} words. "
+        f"Return the complete edited document in Markdown. Do not truncate."
     )
     return "\n".join(parts)
 
 
-def _qa_user_prompt(editor_output: str) -> str:
+def _qa_user_prompt(editor_output: str, track: str) -> str:
+    track_label = "editorial/opinion" if track == TRACK_TOPIC else "medical journal article"
     return (
-        "## Document to Review\n\n"
+        f"## Document to Review ({track_label})\n\n"
         f"{editor_output}\n\n"
         "## Task\n"
-        "Review the document above against the QA checklist and editorial standards "
-        "provided in your guidelines. Produce a structured QA report with three sections:\n\n"
-        "### PASS\nList every checklist item that is satisfied.\n\n"
-        "### FAIL\nList every checklist item that is NOT satisfied, with a specific "
-        "description of the issue and the relevant section or line.\n\n"
-        "### RECOMMENDATION\nState one of: APPROVE / REVISE MINOR / REVISE MAJOR. "
-        "Provide a one-paragraph justification."
+        "Review the document against the QA checklist in your guidelines. "
+        "Produce a structured report:\n\n"
+        "### PASS\nList every checklist item satisfied.\n\n"
+        "### FAIL\nList every unsatisfied item with specific section or line reference.\n\n"
+        "### RECOMMENDATION\nState: APPROVE / REVISE MINOR / REVISE MAJOR "
+        "with a one-paragraph justification."
     )
 
 
 # ---------------------------------------------------------------------------
-# Report builders
+# Report helpers
 # ---------------------------------------------------------------------------
-def _write_role_report(
+def _write_report(
     reports_path: Path,
     role: str,
+    track: str,
     stem: str,
     timestamp: str,
     content: str,
     extra_meta: str = "",
 ) -> Path:
-    filename = f"{role.upper()}_{stem}_{timestamp}.md"
-    report_path = reports_path / filename
+    track_upper = track.upper()
+    filename    = f"{role.upper()}_{track_upper}_{stem}_{timestamp}.md"
     header = (
-        f"# {role} Report — {stem}\n"
+        f"# {role} Report ({track_upper}) -- {stem}\n"
         f"**Timestamp:** {timestamp}\n"
-        f"**Role:** {role}\n"
+        f"**Track:** {track_upper}\n"
     )
     if extra_meta:
         header += f"{extra_meta}\n"
     header += "\n---\n\n"
-    _write_text_file(report_path, header + content)
+    path = reports_path / filename
+    _write_text(path, header + content)
     print(f"  [REPORT] {filename}")
-    return report_path
+    return path
 
 
 def _write_session_summary(
     reports_path: Path,
     timestamp: str,
+    track: str,
     subprojects: list,
-    mode: str = "WRITER",
 ) -> None:
-    filename = f"{mode}_SESSION_{timestamp}_SUMMARY.md"
+    filename = f"WRITER_SESSION_{track.upper()}_{timestamp}_SUMMARY.md"
     lines = [
-        f"# Writing Mode Session Summary\n",
-        f"**Session timestamp:** {timestamp}  ",
-        f"**Sub-projects processed:** {len(subprojects)}\n",
+        f"# Writing Session Summary ({track.upper()})\n",
+        f"**Timestamp:** {timestamp}  ",
+        f"**Track:** {track.upper()}  ",
+        f"**Sub-projects:** {len(subprojects)}\n",
         "---\n",
     ]
     for sp in subprojects:
         lines.append(f"## {sp['stem']}")
-        lines.append(f"- Writer output: `{sp.get('writer_out', 'N/A')}`")
-        lines.append(f"- Editor output: `{sp.get('editor_out', 'N/A')}`")
-        lines.append(f"- QA report:     `{sp.get('qa_report', 'N/A')}`")
-        lines.append(f"- Status:        {sp.get('status', 'unknown')}\n")
-    _write_text_file(reports_path / filename, "\n".join(lines))
-    print(f"\n  [SESSION SUMMARY] {filename}")
+        lines.append(f"- Writer:  `{sp.get('writer_docx', 'N/A')}`")
+        lines.append(f"- Editor:  `{sp.get('editor_docx', 'N/A')}`")
+        lines.append(f"- QA:      `{sp.get('qa_report',   'N/A')}`")
+        lines.append(f"- Status:  {sp.get('status', 'unknown')}\n")
+    _write_text(reports_path / filename, "\n".join(lines))
+    print(f"\n  [SESSION] {filename}")
 
 
 # ---------------------------------------------------------------------------
 # Utility
 # ---------------------------------------------------------------------------
 def parse_direct_instructions(raw_text: str) -> list:
-    """Return lines that start with > (direct task instructions)."""
     return [
         line.strip()
         for line in raw_text.splitlines()
@@ -408,209 +441,199 @@ def parse_direct_instructions(raw_text: str) -> list:
     ]
 
 
-def _strip_fences(text: str) -> str:
-    """Remove markdown code fences if the LLM wrapped output in them."""
-    import re
-    text = re.sub(r"^```[a-zA-Z]*\n", "", text.strip())
-    text = re.sub(r"\n```$", "", text.strip())
-    return text.strip()
+def _prompt_word_limit(track: str) -> int:
+    default = DEFAULT_WORDS[track]
+    try:
+        raw = input(
+            f"  Word limit [{default}]: "
+        ).strip()
+    except (EOFError, KeyboardInterrupt):
+        return default
+    if raw.isdigit() and int(raw) > 0:
+        return int(raw)
+    return default
 
 
 # ---------------------------------------------------------------------------
-# Main pipeline: Writer → Editor → QA
+# Pipeline: Writer → Editor → QA
 # ---------------------------------------------------------------------------
 def run_writer(
     direct_instructions: list,
     call_llm_fn: Callable,
+    track: str = TRACK_TOPIC,
+    word_limit: int | None = None,
     verbose: bool = True,
 ) -> None:
-    root = _project_root()
-    paths = _paths(root)
+    root      = _project_root()
+    paths     = _paths(root)
     timestamp = _ts()
 
-    for p in paths.values():
+    for p in [paths["input"], paths["output"], paths["reports"]]:
         p.mkdir(parents=True, exist_ok=True)
 
-    guidelines = _load_guidelines(paths["doc"])
-    input_files = _load_input_files(paths["input"])
-    is_scratch = len(input_files) == 0
+    if word_limit is None:
+        word_limit = DEFAULT_WORDS[track]
 
-    if is_scratch:
-        subprojects = [("new_doc", "", ".md")]
-    else:
-        subprojects = [(stem, content, suffix) for stem, content, suffix in input_files]
-
-    session_log = []
+    guidelines   = _load_guidelines(_track_doc_path(root, track), paths["doc_root"])
+    input_files  = _load_input_files(paths["input"])
+    is_scratch   = len(input_files) == 0
+    subprojects  = [("new_doc", "", ".md")] if is_scratch else input_files
+    session_log  = []
 
     for stem, original_content, original_suffix in subprojects:
         if verbose:
             print(f"\n{'='*60}")
-            print(f"  [WRITER PIPELINE] Sub-project: {stem}")
+            print(f"  [WRITER PIPELINE | {track.upper()}] {stem}")
+            print(f"  Word limit: {word_limit}")
             print(f"{'='*60}")
 
-        sp_log = {"stem": stem, "status": "started"}
+        sp = {"stem": stem, "status": "started"}
 
         # ── WRITER ──────────────────────────────────────────────
         if verbose:
             print(f"\n  [WRITER] Generating draft...")
-
-        sys_prompt = _system_prompt(guidelines, "Writer")
-        usr_prompt = _writer_user_prompt(
-            direct_instructions=direct_instructions,
-            original_content=original_content,
-            is_scratch=is_scratch,
+        writer_out = _call_llm(
+            _system_prompt(guidelines, "Writer", track),
+            _writer_user_prompt(direct_instructions, original_content,
+                                is_scratch, track, word_limit),
+            call_llm_fn, "Writer generating",
         )
-        writer_output = _call_llm(sys_prompt, usr_prompt, call_llm_fn, "Writer generating")
-        writer_output = _strip_fences(writer_output)
+        writer_out = _strip_fences(writer_out)
 
-        # Write Writer report
-        _write_role_report(
-            paths["reports"], "WRITER", stem, timestamp,
-            writer_output,
-            extra_meta=f"**Source:** {'scratch' if is_scratch else stem + original_suffix}",
-        )
+        _write_report(paths["reports"], "WRITER", track, stem, timestamp,
+                      writer_out,
+                      extra_meta=f"**Source:** {'scratch' if is_scratch else stem}")
 
-        # Save Writer outputs
-        writer_md_path = paths["output"] / f"WRITER_{stem}_{timestamp}.md"
-        _write_text_file(writer_md_path, writer_output)
-        print(f"  [MD]   Saved: {writer_md_path.name}")
-        sp_log["writer_out"] = writer_md_path.name
-
-        writer_docx_path = paths["output"] / f"WRITER_{stem}_{timestamp}.docx"
-        _write_docx_file(writer_docx_path, writer_output, title=f"Writer Draft — {stem}")
-        sp_log["writer_docx"] = writer_docx_path.name
+        w_md   = paths["output"] / f"WRITER_{track.upper()}_{stem}_{timestamp}.md"
+        w_docx = paths["output"] / f"WRITER_{track.upper()}_{stem}_{timestamp}.docx"
+        _write_text(w_md, writer_out)
+        print(f"  [MD]   {w_md.name}")
+        _write_docx(w_docx, writer_out, title=f"Writer Draft ({track.upper()}) -- {stem}")
+        sp["writer_docx"] = w_docx.name
 
         # ── EDITOR ──────────────────────────────────────────────
         if verbose:
             print(f"\n  [EDITOR] Editing draft...")
-
-        sys_prompt = _system_prompt(guidelines, "Editor")
-        usr_prompt = _editor_user_prompt(
-            direct_instructions=direct_instructions,
-            writer_output=writer_output,
-            original_content=original_content,
+        editor_out = _call_llm(
+            _system_prompt(guidelines, "Editor", track),
+            _editor_user_prompt(direct_instructions, writer_out,
+                                original_content, track, word_limit),
+            call_llm_fn, "Editor revising",
         )
-        editor_output = _call_llm(sys_prompt, usr_prompt, call_llm_fn, "Editor revising")
-        editor_output = _strip_fences(editor_output)
+        editor_out = _strip_fences(editor_out)
 
-        # Write Editor report
-        _write_role_report(
-            paths["reports"], "EDITOR", stem, timestamp,
-            editor_output,
-        )
+        _write_report(paths["reports"], "EDITOR", track, stem, timestamp, editor_out)
 
-        # Save Editor outputs
-        editor_md_path = paths["output"] / f"EDITOR_{stem}_{timestamp}.md"
-        _write_text_file(editor_md_path, editor_output)
-        print(f"  [MD]   Saved: {editor_md_path.name}")
-        sp_log["editor_out"] = editor_md_path.name
-
-        editor_docx_path = paths["output"] / f"EDITOR_{stem}_{timestamp}.docx"
-        _write_docx_file(editor_docx_path, editor_output, title=f"Edited Document — {stem}")
-        sp_log["editor_docx"] = editor_docx_path.name
+        e_md   = paths["output"] / f"EDITOR_{track.upper()}_{stem}_{timestamp}.md"
+        e_docx = paths["output"] / f"EDITOR_{track.upper()}_{stem}_{timestamp}.docx"
+        _write_text(e_md, editor_out)
+        print(f"  [MD]   {e_md.name}")
+        _write_docx(e_docx, editor_out,
+                    title=f"Edited Document ({track.upper()}) -- {stem}")
+        sp["editor_docx"] = e_docx.name
 
         # ── QA ──────────────────────────────────────────────────
         if verbose:
             print(f"\n  [QA] Running quality check...")
-
-        sys_prompt = _system_prompt(guidelines, "QA")
-        usr_prompt = _qa_user_prompt(editor_output)
-        qa_output = _call_llm(sys_prompt, usr_prompt, call_llm_fn, "QA reviewing")
-        qa_output = _strip_fences(qa_output)
-
-        qa_report_path = _write_role_report(
-            paths["reports"], "QA", stem, timestamp,
-            qa_output,
+        qa_out = _call_llm(
+            _system_prompt(guidelines, "QA", track),
+            _qa_user_prompt(editor_out, track),
+            call_llm_fn, "QA reviewing",
         )
-        sp_log["qa_report"] = qa_report_path.name
-        sp_log["status"] = "complete"
+        qa_out = _strip_fences(qa_out)
+
+        qa_path = _write_report(paths["reports"], "QA", track, stem, timestamp, qa_out)
+        sp["qa_report"] = qa_path.name
+        sp["status"]    = "complete"
 
         if verbose:
-            print(f"\n  ✓ Sub-project '{stem}' complete.")
-            print(f"    Writer:  output/writing/WRITER_{stem}_{timestamp}.docx")
-            print(f"    Editor:  output/writing/EDITOR_{stem}_{timestamp}.docx")
-            print(f"    QA:      reports/writing/QA_{stem}_{timestamp}.md")
+            print(f"\n  Done: {stem}")
+            print(f"    Writer:  output/writing/{w_docx.name}")
+            print(f"    Editor:  output/writing/{e_docx.name}")
+            print(f"    QA:      reports/writing/{qa_path.name}")
 
-        session_log.append(sp_log)
+        session_log.append(sp)
 
-    _write_session_summary(paths["reports"], timestamp, session_log, mode="WRITER")
+    _write_session_summary(paths["reports"], timestamp, track, session_log)
 
 
 # ---------------------------------------------------------------------------
-# Standalone: Editor only
+# Standalone: Editor
 # ---------------------------------------------------------------------------
 def run_editor(
     direct_instructions: list,
     call_llm_fn: Callable,
+    track: str = TRACK_TOPIC,
+    word_limit: int | None = None,
     verbose: bool = True,
 ) -> None:
-    root = _project_root()
+    root  = _project_root()
     paths = _paths(root)
     timestamp = _ts()
 
-    for p in paths.values():
+    for p in [paths["input"], paths["output"], paths["reports"]]:
         p.mkdir(parents=True, exist_ok=True)
 
-    guidelines = _load_guidelines(paths["doc"])
-    input_files = _load_input_files(paths["input"])
+    if word_limit is None:
+        word_limit = DEFAULT_WORDS[track]
 
+    input_files = _load_input_files(paths["input"])
     if not input_files:
-        print("  [EDITOR] No files found in input/writing/. Place documents there first.")
+        print("  [EDITOR] No files in input/writing/ -- place documents there first.")
         return
+
+    guidelines = _load_guidelines(_track_doc_path(root, track), paths["doc_root"])
 
     for stem, content, suffix in input_files:
         if verbose:
-            print(f"\n  [EDITOR STANDALONE] Processing: {stem}{suffix}")
-
-        sys_prompt = _system_prompt(guidelines, "Editor")
-        usr_prompt = _editor_user_prompt(
-            direct_instructions=direct_instructions,
-            writer_output=content,
-            original_content=content,
+            print(f"\n  [EDITOR STANDALONE | {track.upper()}] {stem}{suffix}")
+        editor_out = _call_llm(
+            _system_prompt(guidelines, "Editor", track),
+            _editor_user_prompt(direct_instructions, content, content,
+                                track, word_limit),
+            call_llm_fn, "Editor processing",
         )
-        editor_output = _call_llm(sys_prompt, usr_prompt, call_llm_fn, "Editor processing")
-        editor_output = _strip_fences(editor_output)
+        editor_out = _strip_fences(editor_out)
 
-        _write_role_report(paths["reports"], "EDITOR", stem, timestamp, editor_output)
+        _write_report(paths["reports"], "EDITOR", track, stem, timestamp, editor_out)
 
-        md_path = paths["output"] / f"EDITOR_{stem}_{timestamp}.md"
-        _write_text_file(md_path, editor_output)
-        print(f"  [MD]   Saved: {md_path.name}")
-
-        docx_path = paths["output"] / f"EDITOR_{stem}_{timestamp}.docx"
-        _write_docx_file(docx_path, editor_output, title=f"Edited — {stem}")
+        e_md   = paths["output"] / f"EDITOR_{track.upper()}_{stem}_{timestamp}.md"
+        e_docx = paths["output"] / f"EDITOR_{track.upper()}_{stem}_{timestamp}.docx"
+        _write_text(e_md, editor_out)
+        _write_docx(e_docx, editor_out,
+                    title=f"Edited ({track.upper()}) -- {stem}")
 
 
 # ---------------------------------------------------------------------------
-# Standalone: QA only
+# Standalone: QA
 # ---------------------------------------------------------------------------
 def run_qa(
     direct_instructions: list,
     call_llm_fn: Callable,
+    track: str = TRACK_TOPIC,
     verbose: bool = True,
 ) -> None:
-    root = _project_root()
+    root  = _project_root()
     paths = _paths(root)
     timestamp = _ts()
 
-    for p in paths.values():
+    for p in [paths["input"], paths["reports"]]:
         p.mkdir(parents=True, exist_ok=True)
 
-    guidelines = _load_guidelines(paths["doc"])
     input_files = _load_input_files(paths["input"])
-
     if not input_files:
-        print("  [QA] No files found in input/writing/. Place documents there first.")
+        print("  [QA] No files in input/writing/ -- place documents there first.")
         return
+
+    guidelines = _load_guidelines(_track_doc_path(root, track), paths["doc_root"])
 
     for stem, content, suffix in input_files:
         if verbose:
-            print(f"\n  [QA STANDALONE] Reviewing: {stem}{suffix}")
-
-        sys_prompt = _system_prompt(guidelines, "QA")
-        usr_prompt = _qa_user_prompt(content)
-        qa_output = _call_llm(sys_prompt, usr_prompt, call_llm_fn, "QA reviewing")
-        qa_output = _strip_fences(qa_output)
-
-        _write_role_report(paths["reports"], "QA", stem, timestamp, qa_output)
-        print(f"  [QA STANDALONE] Report saved to reports/writing/")
+            print(f"\n  [QA STANDALONE | {track.upper()}] {stem}{suffix}")
+        qa_out = _call_llm(
+            _system_prompt(guidelines, "QA", track),
+            _qa_user_prompt(content, track),
+            call_llm_fn, "QA reviewing",
+        )
+        qa_out = _strip_fences(qa_out)
+        _write_report(paths["reports"], "QA", track, stem, timestamp, qa_out)
