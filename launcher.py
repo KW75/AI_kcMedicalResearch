@@ -1,6 +1,7 @@
 ﻿import subprocess
 import sys
 import os
+import shutil
 from pathlib import Path
 
 BASE   = Path(__file__).resolve().parent
@@ -36,6 +37,13 @@ PROVIDERS = [
     ('6', 'Anthropic',                    '--provider anthropic'),
 ]
 
+# Fallback destinations for input file overflow (tried in order)
+_MOVE_DESTINATIONS = [
+    Path('C:/temp'),
+    Path.home() / 'Downloads',
+    Path.home() / 'Documents',
+]
+
 
 def clear():
     try:
@@ -69,6 +77,73 @@ def banner():
     print(f'  {DIM}Providers:{RESET}  {ACCENT}ollama (default)  qwen  groq  deepseek  openai  anthropic{RESET}')
     print()
     print(f'  {DIM}For help:{RESET}   {ACCENT}python src/main.py --help-guide{RESET}')
+    print()
+
+
+def _find_move_destination(mode: str) -> Path:
+    """Return the first available destination folder for displaced input files."""
+    for dest in _MOVE_DESTINATIONS:
+        try:
+            dest.mkdir(parents=True, exist_ok=True)
+            return dest / f'AI_kcMedicalResearch_input_{mode}'
+        except (PermissionError, OSError):
+            continue
+    # Last resort: user home
+    fallback = Path.home() / f'AI_kcMedicalResearch_input_{mode}'
+    fallback.mkdir(parents=True, exist_ok=True)
+    return fallback
+
+
+def check_input_folder(mode: str) -> None:
+    """
+    Check if input/<mode>/ has files.
+    If yes, ask the user whether they were intentionally placed there.
+    If no (or no answer), move them to C:/temp or Downloads.
+    """
+    input_dir = BASE / 'input' / mode
+    if not input_dir.exists():
+        return
+
+    files = [f for f in input_dir.iterdir() if f.is_file()]
+    if not files:
+        return
+
+    print()
+    print(f'  {ACCENT}[INPUT CHECK]{RESET} Found {len(files)} file(s) in input/{mode}/:')
+    for f in files:
+        print(f'    {DIM}•{RESET} {TEXT}{f.name}{RESET}')
+    print()
+    print(f'  {TEXT}Were these files intentionally placed here for this session?{RESET}')
+    answer = safe_input(
+        f'  {ACCENT}Keep them? [Y = yes, keep / N = move them out]: {RESET}',
+        default='N'
+    ).upper()
+
+    if answer == 'Y':
+        print(f'  {LOGO_TXT}Files kept in input/{mode}/. They will be used in this session.{RESET}')
+        return
+
+    # Move files out
+    dest = _find_move_destination(mode)
+    dest.mkdir(parents=True, exist_ok=True)
+    moved = []
+    failed = []
+    for f in files:
+        try:
+            shutil.move(str(f), str(dest / f.name))
+            moved.append(f.name)
+        except Exception as exc:
+            failed.append(f'{f.name} ({exc})')
+
+    if moved:
+        print(f'  {LOGO_TXT}Moved {len(moved)} file(s) to:{RESET}')
+        print(f'    {ACCENT}{dest}{RESET}')
+        for name in moved:
+            print(f'    {DIM}•{RESET} {TEXT}{name}{RESET}')
+    if failed:
+        print(f'  {ACCENT}Could not move:{RESET}')
+        for name in failed:
+            print(f'    {DIM}•{RESET} {TEXT}{name}{RESET}')
     print()
 
 
@@ -161,6 +236,17 @@ def run_ui():
         print(f'\n\n{ACCENT}UI stopped. Returning to menu...{RESET}\n')
 
 
+# Map mode flags to input folder names
+_MODE_INPUT_MAP = {
+    '--mode coding':     'coding',
+    '--mode writing':    'writing',
+    '--mode appraisal':  'appraisal',
+    '--mode search':     'search',
+    '--mode rct_search': 'rct_search',
+    '--mode sr':         'sr',
+}
+
+
 def main():
     _cflags = subprocess.CREATE_NEW_PROCESS_GROUP if os.name == 'nt' else 0
 
@@ -193,6 +279,11 @@ def main():
                 run_ui()
                 safe_input(f'  {DIM}Press Enter to return to menu...{RESET}')
                 continue
+
+            # --- Input folder check before provider selection ---
+            input_mode = _MODE_INPUT_MAP.get(mode_flag)
+            if input_mode:
+                check_input_folder(input_mode)
 
             prov_flag = pick_provider()
             flags = [f for f in [mode_flag, prov_flag] if f]
