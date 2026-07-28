@@ -1835,7 +1835,6 @@ def handle_writing_mode(
         lines.append(line)
 
     direct_instructions = _pdi("\n".join(lines))
-    auto_load_input_files("writing")
     print()
 
     if sub_mode == "Writer":
