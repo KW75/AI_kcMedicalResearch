@@ -395,6 +395,7 @@ def _topic_system_prompt(guidelines: str) -> str:
 
 def _topic_user_prompt(query: str, results: list[dict]) -> str:
     results_text = ""
+    ref_list = ""
     for i, r in enumerate(results, 1):
         results_text += (
             f"### Result {i}\n"
@@ -402,17 +403,24 @@ def _topic_user_prompt(query: str, results: list[dict]) -> str:
             f"**URL:** {r['url']}\n"
             f"**Snippet:** {r['snippet']}\n\n"
         )
+        ref_list += f"{i}. [{r['title']}]({r['url']})\n"
     return (
         f"## Search Query\n{query}\n\n"
-        f"## Search Results\n{results_text}\n"
+        f"## Source Articles (AUTHORITATIVE — do NOT modify or add to this list)\n"
+        f"{ref_list}\n"
+        f"## Full Search Results\n{results_text}\n"
         "## Task\n"
         "Write a comprehensive synopsis of these search results.\n"
-        "Structure your response with:\n"
+        "Structure your response with EXACTLY these four sections:\n"
         "1. ## Overview (2-3 paragraph summary of the topic)\n"
-        "2. ## Key Findings (thematic bullet points)\n"
-        "3. ## Source Quality Notes (flag any unreliable sources)\n"
-        "4. ## References (numbered list with markdown links)\n"
-        "Include ALL reference URLs as clickable markdown links."
+        "2. ## Key Findings (thematic bullet points from the articles above)\n"
+        "3. ## Clinical Relevance (practical implications for clinicians)\n"
+        "4. ## References\n"
+        "IMPORTANT for section 4:\n"
+        "- Copy the numbered list from ## Source Articles above VERBATIM.\n"
+        "- Do NOT add any article not listed in ## Source Articles.\n"
+        "- Do NOT invent authors, journals, PMIDs, or URLs.\n"
+        "- The References section must be identical to ## Source Articles."
     )
 
 def _article_system_prompt(guidelines: str) -> str:
