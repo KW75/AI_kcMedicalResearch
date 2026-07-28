@@ -416,18 +416,43 @@ def _write_report(
     content: str,
     extra_meta: str = "",
 ) -> Path:
+    """
+    Write a process log to reports/writing/.
+    For Writer and Editor: logs word count and first 300 chars as preview.
+    For QA: logs the full QA report (it has no output/ deliverable).
+    """
     track_upper = track.upper()
     filename    = f"{role.upper()}_{track_upper}_{stem}_{timestamp}.md"
+    word_count  = len(content.split())
+
     header = (
-        f"# {role} Report ({track_upper}) -- {stem}\n"
-        f"**Timestamp:** {timestamp}\n"
-        f"**Track:** {track_upper}\n"
+        f"# {role} Process Log ({track_upper}) -- {stem}\n"
+        f"**Timestamp:** {timestamp}  \n"
+        f"**Track:** {track_upper}  \n"
+        f"**Role:** {role}  \n"
+        f"**Word count:** {word_count}  \n"
     )
     if extra_meta:
-        header += f"{extra_meta}\n"
+        header += f"{extra_meta}  \n"
     header += "\n---\n\n"
+
+    if role.upper() == "QA":
+        # QA has no output/ file — write full report here
+        body = content
+    else:
+        # Writer and Editor — write preview only; full doc is in output/writing/
+        preview = content[:300].replace("\n", " ").strip()
+        if len(content) > 300:
+            preview += "..."
+        body = (
+            f"## Preview (first 300 characters)\n\n"
+            f"{preview}\n\n"
+            f"---\n\n"
+            f"*Full document saved to output/writing/{role.upper()}_{track_upper}_{stem}_{timestamp}.docx*\n"
+        )
+
     path = reports_path / filename
-    _write_text(path, header + content)
+    _write_text(path, header + body)
     print(f"  [REPORT] {filename}")
     return path
 
