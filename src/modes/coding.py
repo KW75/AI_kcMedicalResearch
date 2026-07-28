@@ -200,9 +200,6 @@ def _build_builder_user_prompt(
             "For HTML files, the last line must be </html>. "
             "For Python files, the last line must close all functions and classes. "
             "If you are running out of space, prioritise completing the logic over adding comments."
-            "single application. Produce the complete application as a single coherent "
-            "file. Use the most appropriate language and file format for the task "
-            "described in the instructions above."
         )
     else:
         parts.append("## Code Under Development\n")
@@ -226,8 +223,13 @@ def _build_builder_user_prompt(
 
     parts.append(
         "\n## Output Format\n"
-        "Return ONLY the complete code. Do not include explanations outside of "
-        "code comments. Begin your response with the first line of code."
+        "Return ONLY the complete code for ONE single file. "
+        "Do not include explanations, markdown prose, or commentary outside of code comments. "
+        "Do not generate multiple files or multiple code blocks. "
+        "Do not write a Python file AND an HTML file — pick the single best format. "
+        "Begin your response with the very first line of the file (e.g. <!DOCTYPE html> or import ...). "
+        "End your response with the very last line of the file (e.g. </html> or the last closing brace). "
+        "Do not add any text after the closing line."
     )
 
     return "\n".join(parts)
