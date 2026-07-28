@@ -147,7 +147,17 @@ def _load_guidelines(track_doc_path: Path, shared_doc_path: Path) -> str:
     return "\n\n".join(parts)
 
 
-    if f.suffix.lower() == ".docx":
+
+def _load_input_files(input_dir: Path) -> str:
+    """Load all supported files from input_dir and return combined text."""
+    extensions = {".md", ".txt", ".docx", ".html", ".tex", ".rst", ".pdf"}
+    parts: list[str] = []
+    if not input_dir.exists():
+        return ""
+    for f in sorted(input_dir.iterdir()):
+        if not f.is_file() or f.suffix.lower() not in extensions:
+            continue
+        if f.suffix.lower() == ".docx":
             try:
                 doc = Document(str(f))
                 content = "\n".join(p.text for p in doc.paragraphs)
@@ -155,7 +165,7 @@ def _load_guidelines(track_doc_path: Path, shared_doc_path: Path) -> str:
                 content = f"[Could not read {f.name}]"
         elif f.suffix.lower() == ".pdf":
             try:
-                import fitz  # PyMuPDF
+                import fitz
                 pdf = fitz.open(str(f))
                 content = "\n\n".join(page.get_text() for page in pdf)
                 pdf.close()
@@ -167,6 +177,8 @@ def _load_guidelines(track_doc_path: Path, shared_doc_path: Path) -> str:
                 content = f"[Could not read PDF {f.name}: {exc}]"
         else:
             content = f.read_text(encoding="utf-8", errors="replace")
+        parts.append(f"### {f.name}\n{content}")
+    return "\n\n".join(parts)
 
 
 def _write_text(path: Path, content: str) -> None:
