@@ -491,7 +491,7 @@ def run_topic_search(
 
     # Get query from direct instructions or prompt user
     if direct_instructions:
-        query = " ".join(direct_instructions)
+        query = " ".join(direct_instructions).lstrip("0123456789. ").strip()
     else:
         query = input("  Enter search topic: ").strip()
         if not query:

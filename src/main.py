@@ -1814,6 +1814,7 @@ def handle_appraisal_mode(
 # ---------------------------------------------------------------------------
 
 def handle_search_mode(provider: str, model: str) -> None:
+    model = model or OLLAMA_MODEL
     """Dispatcher for Search mode (Topic Search and Article Search)."""
     from src.modes.search import run_topic_search, run_article_search
 
