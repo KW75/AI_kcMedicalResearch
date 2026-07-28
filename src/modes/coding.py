@@ -650,7 +650,7 @@ def run_builder(
             )
             current_code = _strip_code_fences(current_code)
             current_code = _ensure_complete(
-                current_code, system_prompt, call_llm_fn
+                current_code, system_prompt, call_llm_fn, max_continuations=5
             )
 
             # Pass to Reviewer agent
@@ -1006,7 +1006,7 @@ def _ensure_complete(
     code: str,
     system_prompt: str,
     call_llm_fn,
-    max_continuations: int = 3,
+    max_continuations: int = 5,
 ) -> str:
     """
     If the Builder output appears truncated, fire continuation calls
@@ -1019,13 +1019,23 @@ def _ensure_complete(
         print(f"  [BUILDER] Output truncated — requesting continuation {attempt}/{max_continuations}...")
         continuation_prompt = (
             "The previous response was cut off before the file was complete.\n"
-            "Continue EXACTLY from where you stopped. "
-            "Do NOT repeat any code already written. "
-            "Do NOT start from the beginning. "
-            "Write only the remaining lines needed to complete the file. "
-            "End with the final closing line (e.g. </html> or the last closing brace).\n\n"
-            "## Code so far (last 200 characters):\n"
-            f"{code[-200:]}"
+            "Continue EXACTLY from where you stopped.\n"
+            "Rules:\n"
+            "1. Do NOT repeat any code already written.\n"
+            "2. Do NOT start from the beginning.\n"
+            "3. Do NOT add any explanation or prose.\n"
+            "4. Write ONLY the remaining lines needed to finish the file.\n"
+            "5. The very last line of your response must be the closing line:\n"
+            "   - For HTML: </html>\n"
+            "   - For Python: the last closing statement\n"
+            "   - For JS standalone: the last closing brace\n\n"
+            "## File type context:\n"
+            f"{('HTML' if '<!doctype' in code[:50].lower() else 'code')}\n\n"
+            "## Last 800 characters of code written so far:\n"
+            "```\n"
+            f"{code[-800:]}\n"
+            "```\n\n"
+            "Now continue from exactly where the above ends:"
         )
         continuation = _call_llm(
             system_prompt, continuation_prompt, call_llm_fn,
