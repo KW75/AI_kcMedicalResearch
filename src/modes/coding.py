@@ -1034,8 +1034,25 @@ def _ensure_complete(
     """
     If the Builder output appears truncated, fire continuation calls
     asking the LLM to complete the file from where it stopped.
-    Repeats up to max_continuations times.
+    Rule 5 (close the file) is intentionally removed from the continuation
+    prompt — the LLM must write ONLY the missing middle code; closing tags
+    are appended by this function after all continuations finish.
     """
+    is_html = "<!doctype" in code[:50].lower() or "<html" in code.lower()[:200]
+
+    def _strip_closing_tags(text: str) -> str:
+        """Remove closing wrapper tags the LLM may append to a continuation."""
+        import re as _re
+        # Strip </script></body></html> and variants from the end
+        text = text.rstrip()
+        for pattern in (
+            r"(?i)</html>\s*$",
+            r"(?i)</body>\s*$",
+            r"(?i)</script>\s*$",
+        ):
+            text = _re.sub(pattern, "", text).rstrip()
+        return text
+
     for attempt in range(1, max_continuations + 1):
         if not _is_truncated(code):
             break
@@ -1047,18 +1064,15 @@ def _ensure_complete(
             "1. Do NOT repeat any code already written.\n"
             "2. Do NOT start from the beginning.\n"
             "3. Do NOT add any explanation or prose.\n"
-            "4. Write ONLY the remaining lines needed to finish the file.\n"
-            "5. The very last line of your response must be the closing line:\n"
-            "   - For HTML: </html>\n"
-            "   - For Python: the last closing statement\n"
-            "   - For JS standalone: the last closing brace\n\n"
-            "## File type context:\n"
-            f"{('HTML' if '<!doctype' in code[:50].lower() else 'code')}\n\n"
+            "4. Write ONLY the remaining lines of code needed — "
+            "do NOT close the file, do NOT add </script>, </body>, or </html>.\n"
+            "   Those closing tags will be added automatically after you finish.\n\n"
+            f"## File type: {'HTML' if is_html else 'code'}\n\n"
             "## Last 800 characters of code written so far:\n"
             "```\n"
             f"{code[-800:]}\n"
             "```\n\n"
-            "Now continue from exactly where the above ends:"
+            "Now write ONLY the next lines of code (no closing tags):"
         )
         continuation = _call_llm(
             system_prompt, continuation_prompt, call_llm_fn,
@@ -1066,7 +1080,24 @@ def _ensure_complete(
         )
         continuation = _strip_code_fences(continuation)
         if continuation and not continuation.startswith("[ERROR]"):
+            # Strip any closing tags the LLM added despite instructions
+            continuation = _strip_closing_tags(continuation)
             code = code.rstrip() + "\n" + continuation.lstrip()
+
+    # After all continuations, append correct closing sequence if still missing
+    if is_html:
+        low = code.rstrip().lower()
+        if not low.endswith("</html>"):
+            # Check what closing tags are needed
+            needs_script_close = "<script" in low and not low.endswith("</script>") and "</script>" not in low.split("<script")[-1]
+            tail = ""
+            if needs_script_close:
+                tail += "\n    </script>"
+            if not low.rstrip().endswith("</body>"):
+                tail += "\n</body>"
+            tail += "\n</html>"
+            code = code.rstrip() + tail
+
     return code
 def _strip_code_fences(text: str) -> str:
     """
