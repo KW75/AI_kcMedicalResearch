@@ -148,22 +148,26 @@ def _load_guidelines(track_doc_path: Path, shared_doc_path: Path) -> str:
 
 
 
-def _load_input_files(input_dir: Path) -> str:
-    """Load all supported files from input_dir and return combined text."""
+def _load_input_files(input_dir: Path) -> list:
+    """Load all supported files from input_dir.
+    Returns list of (stem, content, suffix) tuples.
+    """
     extensions = {".md", ".txt", ".docx", ".html", ".tex", ".rst", ".pdf"}
-    parts: list[str] = []
+    results: list = []
     if not input_dir.exists():
-        return ""
+        return results
     for f in sorted(input_dir.iterdir()):
         if not f.is_file() or f.suffix.lower() not in extensions:
             continue
-        if f.suffix.lower() == ".docx":
+        suffix = f.suffix.lower()
+        stem   = f.stem
+        if suffix == ".docx":
             try:
                 doc = Document(str(f))
                 content = "\n".join(p.text for p in doc.paragraphs)
             except Exception:
                 content = f"[Could not read {f.name}]"
-        elif f.suffix.lower() == ".pdf":
+        elif suffix == ".pdf":
             try:
                 import fitz
                 pdf = fitz.open(str(f))
@@ -177,8 +181,8 @@ def _load_input_files(input_dir: Path) -> str:
                 content = f"[Could not read PDF {f.name}: {exc}]"
         else:
             content = f.read_text(encoding="utf-8", errors="replace")
-        parts.append(f"### {f.name}\n{content}")
-    return "\n\n".join(parts)
+        results.append((stem, content, suffix))
+    return results
 
 
 def _write_text(path: Path, content: str) -> None:
