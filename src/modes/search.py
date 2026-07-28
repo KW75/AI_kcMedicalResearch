@@ -513,6 +513,15 @@ def run_topic_search(
         print("  [SEARCH] No results found. Try a different query.")
         return
 
+
+    # Build ground-truth references from fetched results (used to overwrite LLM refs)
+    ref_lines = []
+    for i, r in enumerate(results, 1):
+        title = r['title']
+        url   = r['url']
+        ref_lines.append(f"{i}. [{title}]({url})")
+    ground_truth_refs = "## References\n\n" + "\n".join(ref_lines) + "\n"
+
     # LLM synopsis
     system_prompt = _topic_system_prompt(guidelines)
     user_prompt   = _topic_user_prompt(query, results)
@@ -520,6 +529,16 @@ def run_topic_search(
         system_prompt, user_prompt, call_llm_fn,
         spinner_message="Generating synopsis",
     )
+
+    # Strip LLM-generated References section and replace with ground-truth URLs
+    synopsis = re.sub(
+        r'##\s*References[\s\S]*',
+        '',
+        synopsis,
+        flags=re.IGNORECASE,
+    ).rstrip()
+    synopsis = synopsis + "\n\n" + ground_truth_refs
+
 
     # Sanitise stem for filename
     stem = re.sub(r"[^\w\-]", "_", query[:50]).strip("_")
