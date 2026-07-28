@@ -277,14 +277,28 @@ def _pubmed_fetch_abstracts(
 # ---------------------------------------------------------------------------
 # LLM call wrapper
 # ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# LLM call wrapper  (direct call – no threading, Ctrl+C works on Windows)
+# ---------------------------------------------------------------------------
 def _call_llm(
     system_prompt: str,
     user_prompt: str,
     call_llm_fn,
     spinner_message: str = "LLM processing",
 ) -> str:
-    result_holder: list[str] = []
-    error_holder:  list[Exception] = []
+    """Call the LLM directly. Spinner is shown but does not block interrupts."""
+    combined = f"{system_prompt}\n\n{user_prompt}" if system_prompt else user_prompt
+    print(f"  / {spinner_message}...", end="", flush=True)
+    try:
+        result = call_llm_fn(system_prompt=system_prompt, user_prompt=user_prompt)
+        print(f"\r  ✓  {spinner_message} — done.      ")
+        return result
+    except KeyboardInterrupt:
+        print(f"\r  ✗  {spinner_message} — interrupted.")
+        raise
+    except Exception as exc:
+        print(f"\r  ✗  {spinner_message} — error.")
+        return f"[ERROR] {exc}"
 
     def _run():
         try:
