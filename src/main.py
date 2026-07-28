@@ -1826,18 +1826,25 @@ def handle_search_mode(provider: str, model: str) -> None:
         print("  Invalid selection. Returning to menu.")
         return
 
-    # Collect direct instructions
-    print("  Enter search instructions (prefix each line with >).")
-    print("  Press Enter on a blank line when done.")
-    direct_instructions: list[str] = []
+    # Collect direct instructions  (same pattern as Coding / Writing modes)
+    print("  Enter your search query below.")
+    print("  Lines starting with > are instructions (auto-prefixed if omitted).")
+    print("  Press ENTER on a blank line to start.\n")
+    raw_lines: list[str] = []
     while True:
-        line = input("  ").strip()
-        if not line:
+        try:
+            line = input("  > ")
+        except (EOFError, KeyboardInterrupt):
             break
-        if line.startswith(">"):
-            instr = line[1:].strip()
-            if instr:
-                direct_instructions.append(instr)
+        if line.strip() == "":
+            print("\n  Instructions received — starting search...\n")
+            break
+        if not line.strip().startswith(">"):
+            line = "> " + line.strip()
+        raw_lines.append(line)
+    direct_instructions: list[str] = [
+        l[1:].strip() for l in raw_lines if l.strip().startswith(">") and l[1:].strip()
+    ]
 
     def call_llm_fn(system_prompt: str, user_prompt: str) -> str:
         combined = f"{system_prompt}\n\n{user_prompt}" if system_prompt else user_prompt
