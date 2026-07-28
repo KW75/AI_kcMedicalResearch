@@ -1859,12 +1859,14 @@ def handle_search_mode(provider: str, model: str) -> None:
             direct_instructions=direct_instructions,
             call_llm_fn=call_llm_fn,
             verbose=True,
+            model=model,
         )
     else:
         run_article_search(
             direct_instructions=direct_instructions,
             call_llm_fn=call_llm_fn,
             verbose=True,
+            model=model,
         )
 
 

@@ -51,8 +51,18 @@ DISCLOSURE = (
     "Always verify search results against primary sources."
 )
 
-MAX_RESULTS_TOPIC   = 5
-MAX_RESULTS_ARTICLE = 8
+MAX_RESULTS_TOPIC   = 10
+MAX_RESULTS_ARTICLE = 15
+
+# Models known to be small/slow — use reduced result counts
+_SMALL_MODELS = {"llama3.2", "llama3.2:latest", "qwen2.5-coder:3b", "qwen2.5-coder:3b:latest", "llama3.1:8b"}
+
+def _result_limits(model: str | None) -> tuple[int, int]:
+    """Return (topic_limit, article_limit) based on model capability."""
+    m = (model or "").lower().strip()
+    if any(m == s or m.startswith(s.split(":")[0]) for s in _SMALL_MODELS):
+        return 5, 8
+    return MAX_RESULTS_TOPIC, MAX_RESULTS_ARTICLE
 
 # ---------------------------------------------------------------------------
 # Path helpers
@@ -461,6 +471,7 @@ def run_topic_search(
     direct_instructions: list[str],
     call_llm_fn,
     verbose: bool = True,
+    model: str | None = None,
 ) -> None:
     """Run Topic Search sub-mode."""
     root  = _project_root()
@@ -485,7 +496,8 @@ def run_topic_search(
 
     # Web search
     with _Spinner("Searching Europe PMC"):
-        results = _europepmc_search(query, max_results=MAX_RESULTS_TOPIC)
+        topic_limit, _ = _result_limits(model)
+    results = _europepmc_search(query, max_results=topic_limit)
 
     print(f"  [SEARCH] Found {len(results)} web results.")
 
@@ -525,6 +537,7 @@ def run_article_search(
     direct_instructions: list[str],
     call_llm_fn,
     verbose: bool = True,
+    model: str | None = None,
 ) -> None:
     """Run Article Search sub-mode."""
     root  = _project_root()
