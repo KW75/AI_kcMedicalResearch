@@ -147,24 +147,26 @@ def _load_guidelines(track_doc_path: Path, shared_doc_path: Path) -> str:
     return "\n\n".join(parts)
 
 
-def _load_input_files(input_path: Path) -> list:
-    extensions = {".md", ".txt", ".docx", ".html", ".tex", ".rst"}
-    if not input_path.exists():
-        return []
-    results = []
-    for f in sorted(input_path.iterdir()):
-        if f.suffix.lower() not in extensions:
-            continue
-        if f.suffix.lower() == ".docx":
+    if f.suffix.lower() == ".docx":
             try:
                 doc = Document(str(f))
                 content = "\n".join(p.text for p in doc.paragraphs)
             except Exception:
                 content = f"[Could not read {f.name}]"
+        elif f.suffix.lower() == ".pdf":
+            try:
+                import fitz  # PyMuPDF
+                pdf = fitz.open(str(f))
+                content = "\n\n".join(page.get_text() for page in pdf)
+                pdf.close()
+                if not content.strip():
+                    content = f"[PDF {f.name} contained no extractable text]"
+            except ImportError:
+                content = "[PDF reading requires PyMuPDF: pip install pymupdf]"
+            except Exception as exc:
+                content = f"[Could not read PDF {f.name}: {exc}]"
         else:
             content = f.read_text(encoding="utf-8", errors="replace")
-        results.append((f.stem, content, f.suffix.lower()))
-    return results
 
 
 def _write_text(path: Path, content: str) -> None:
