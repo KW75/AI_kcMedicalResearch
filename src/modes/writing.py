@@ -224,6 +224,32 @@ def _strip_fences(text: str) -> str:
     text = re.sub(r"\n```$", "", text.strip())
     return text.strip()
 
+# Markers that indicate the LLM has started copying guideline boilerplate
+_BOILERPLATE_MARKERS = [
+    "## QA Checklist",
+    "## Checklist Before Submission",
+    "## Footnotes",
+    "## Language and Style",
+    "## Accuracy and Ethics",
+    "## Supporting Points\n\n1.",  # only if repeated verbatim
+    "[ ] Opening sentence",
+    "[ ] Single clear position",
+    "[ ] Plain English",
+]
+
+
+def _strip_boilerplate(text: str) -> str:
+    """
+    Remove guideline boilerplate that the LLM copied into the document output.
+    Truncates at the first occurrence of any known boundary marker.
+    """
+    for marker in _BOILERPLATE_MARKERS:
+        idx = text.find(marker)
+        if idx != -1:
+            text = text[:idx].rstrip()
+            break
+    return text
+
 
 # ---------------------------------------------------------------------------
 # Prompt builders
@@ -498,7 +524,8 @@ def run_writer(
                                 is_scratch, track, word_limit),
             call_llm_fn, "Writer generating",
         )
-        writer_out = _strip_fences(writer_out)
+        writer_out = _strip_boilerplate(_strip_fences(writer_out))
+
 
         _write_report(paths["reports"], "WRITER", track, stem, timestamp,
                       writer_out,
@@ -520,7 +547,8 @@ def run_writer(
                                 original_content, track, word_limit),
             call_llm_fn, "Editor revising",
         )
-        editor_out = _strip_fences(editor_out)
+        editor_out = _strip_boilerplate(_strip_fences(editor_out))
+
 
         _write_report(paths["reports"], "EDITOR", track, stem, timestamp, editor_out)
 
