@@ -712,6 +712,9 @@ def run_builder(
                     spinner_message=f"Builder fixing code (iter {test_iter})",
                 )
                 current_code = _strip_code_fences(current_code)
+                current_code = _ensure_complete(
+                    current_code, system_prompt, call_llm_fn, max_continuations=5
+                )
 
             # Pass to Tester agent
             tester_prompt   = _build_tester_user_prompt(
@@ -774,6 +777,10 @@ def run_builder(
             if verbose:
                 print(f"\n  [BUILDER] WARNING: {stem} hit max iterations — writing best available output.")
 
+        # Final truncation safety net before writing output
+        current_code = _ensure_complete(
+            current_code, system_prompt, call_llm_fn, max_continuations=5
+        )
         _write_file(paths["output"] / out_name, current_code)
 
         summary_content = _build_final_summary(
