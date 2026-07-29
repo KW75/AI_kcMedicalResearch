@@ -1656,9 +1656,31 @@ def run_rct_search_pipeline(
     except Exception as exc:  # noqa: BLE001
         print(f"  Warning: could not generate .docx — {exc}")
 
+    # -- Auto-copy PICO JSON to input/sr/ -------------------------------------
+    if not dry_run:
+        pico_files = sorted(OUTPUT_RCT_SEARCH.glob("pico_*.json"), reverse=True)
+        if pico_files:
+            latest_pico = pico_files[0]
+            print()
+            print(f"[RCT Search] Latest PICO JSON: {latest_pico.name}")
+            try:
+                copy_choice = input(
+                    "[RCT Search] Copy pico_*.json to input/sr/ for SR pipeline? [Y/N]: "
+                ).strip().upper()
+            except (EOFError, KeyboardInterrupt):
+                copy_choice = "N"
+            if copy_choice == "Y":
+                import shutil as _shutil
+                INPUT_SR.mkdir(parents=True, exist_ok=True)
+                dest = INPUT_SR / latest_pico.name
+                _shutil.copy2(str(latest_pico), str(dest))
+                print(f"[RCT Search] PICO JSON copied to input/sr/{latest_pico.name}")
+            else:
+                print("[RCT Search] PICO JSON not copied — you can copy it manually later.")
+    # -------------------------------------------------------------------------
+
     return md_path
-
-
+    
 
 def rct_search_reminder() -> None:
     """Print a reminder to edit the PICO framework before starting a search."""
