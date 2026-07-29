@@ -1376,7 +1376,7 @@ def run_rct_search_pipeline(
     _pubmed_query = " AND ".join(_pico_terms) if _pico_terms else topic
     print("[RCT Search] Searching PubMed for relevant articles...")
     print(f"[RCT Search] PubMed query: {_pubmed_query}")
-    articles = fetch_pubmed_articles(_pubmed_query, max_results=10) if not dry_run else [
+    articles = fetch_pubmed_articles(_pubmed_query, max_results=20) if not dry_run else [
 
         {"pmid": "00000001", "title": "[DRY RUN] Test Article",
          "abstract": "Dry run abstract.",
@@ -1434,8 +1434,11 @@ def run_rct_search_pipeline(
                     "url":   m.group(5),
                 })
         ranked.sort(key=lambda x: x["score"], reverse=True)
+        for new_rank, r in enumerate(ranked, 1):
+            r["rank"] = new_rank
         table_lines = [
             "## Ranked Article List\n",
+            f"_All {len(ranked)} articles retrieved from PubMed, ordered by relevance score (1 = most relevant)._\n",
             "| Rank | Score | Title | PMID | Link |",
             "|------|-------|-------|------|------|",
         ]
@@ -1449,6 +1452,7 @@ def run_rct_search_pipeline(
             "\n> Select your top articles, download PDFs "
             "and place them in input/sr/ to run the SR pipeline."
         )
+        
         report_parts.append("\n".join(table_lines))
         top = ranked[0]["title"] if ranked else "N/A"
         print("[RCT Search] Ranking complete. Top article: " + top)
@@ -1489,12 +1493,15 @@ def run_rct_search_pipeline(
     final_parts = [p for p in report_parts if "Ranked Article List" in p or "Final Status" in p]
     if final_parts and final_dir != out_dir:
         final_md_path = final_dir / f"rct_search_{timestamp}.md"
-        final_md_content = "\n".join(final_parts)
+        final_md_content = (
+            "\n".join(final_parts)
+            + "\n\n---\n\n> For explanation on ranking, please refer to the full report in the reports folder."
+        )
         final_md_path.write_text(final_md_content, encoding="utf-8")
         print(f"Final report saved    : output/rct_search/{final_md_path.name}")
         final_docx_path = final_dir / f"rct_search_{timestamp}.docx"
         try:
-            _md_to_docx(final_md_content, f"RCT Search Results — {timestamp}", final_docx_path)
+            _md_to_docx(final_md_content, f"RCT Search Results — {timestamp}", final_docx_path)       
             print(f"Results DOCX saved    : output/rct_search/{final_docx_path.name}")
         except Exception as exc:  # noqa: BLE001
             print(f"  Warning: could not generate results .docx — {exc}")
