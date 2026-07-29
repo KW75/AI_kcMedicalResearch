@@ -1489,10 +1489,15 @@ def run_rct_search_pipeline(
     final_parts = [p for p in report_parts if "Ranked Article List" in p or "Final Status" in p]
     if final_parts and final_dir != out_dir:
         final_md_path = final_dir / f"rct_search_{timestamp}.md"
-        final_md_path.write_text("\n".join(final_parts), encoding="utf-8")
+        final_md_content = "\n".join(final_parts)
+        final_md_path.write_text(final_md_content, encoding="utf-8")
         print(f"Final report saved    : output/rct_search/{final_md_path.name}")
-
-
+        final_docx_path = final_dir / f"rct_search_{timestamp}.docx"
+        try:
+            _md_to_docx(final_md_content, f"RCT Search Results — {timestamp}", final_docx_path)
+            print(f"Results DOCX saved    : output/rct_search/{final_docx_path.name}")
+        except Exception as exc:  # noqa: BLE001
+            print(f"  Warning: could not generate results .docx — {exc}")
 
     try:
         _md_to_docx(md_content, f"RCT Search Strategy — {timestamp}", docx_path)
