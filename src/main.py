@@ -2104,7 +2104,8 @@ if __name__ == "__main__":
             import subprocess as _sp
             proc = _sp.Popen(
                 [sys.executable, "-m", "streamlit", "run",
-                 str(Path(__file__).resolve().parent / "ui" / "app.py")],
+                 str(Path(__file__).resolve().parent / "ui" / "app.py"),
+                 "--server.runOnSave", "false"],
                 cwd=str(Path(__file__).resolve().parent.parent),
             )
             print("UI launched -- open http://localhost:8501 in your browser.")
