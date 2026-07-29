@@ -1173,11 +1173,20 @@ def run_rct_search_pipeline(
         sys.exit(0)
 
     # ── PICO input: offer to import saved JSON or prompt manually ──────────────
+
+    _pico_input_dir = INPUT_DIR / "rct_search"
     pico_json_files = sorted(
-        (OUTPUT_RCT_SEARCH).glob("pico_*.json"),
+        _pico_input_dir.glob("pico_*.json"),
         key=lambda p: p.stat().st_mtime,
         reverse=True,
-    ) if OUTPUT_RCT_SEARCH.exists() else []
+    ) if _pico_input_dir.exists() else []
+    if not pico_json_files and OUTPUT_RCT_SEARCH.exists():
+        pico_json_files = sorted(
+            OUTPUT_RCT_SEARCH.glob("pico_*.json"),
+            key=lambda p: p.stat().st_mtime,
+            reverse=True,
+        )
+    _pico_source = "input/rct_search" if (_pico_input_dir.exists() and list(_pico_input_dir.glob("pico_*.json"))) else "output/rct_search"
 
     pico_population   = ""
     pico_intervention = ""
@@ -1186,7 +1195,8 @@ def run_rct_search_pipeline(
 
     if pico_json_files and not dry_run:
         print()
-        print("[RCT Search] Saved PICO files found in output/rct_search/:")
+        print(f"[RCT Search] Saved PICO files found in {_pico_source}:")
+
         for idx, pf in enumerate(pico_json_files[:5], 1):
             print(f"  {idx}. {pf.name}")
         print("  0. Enter new PICO manually")
@@ -1324,11 +1334,23 @@ def run_rct_search_pipeline(
                 "effect_measure":    "SMD",
                 "source_mode":       "rct_search",
             }
+            import re as _re
+            def _extract_pico_field(text, labels):
+                for lbl in labels:
+                    m = _re.search(r"(?i)" + lbl + r"[^:]*:\s*(.+)", text)
+                    if m:
+                        return m.group(1).strip()
+                return ""
+            pico_data["population"]   = pico_population or _extract_pico_field(response, [r"P\s*\(Population\)", r"Population"])
+            pico_data["intervention"] = pico_intervention or _extract_pico_field(response, [r"I\s*\(Intervention\)", r"Intervention"])
+            pico_data["comparator"]   = pico_comparator or _extract_pico_field(response, [r"C\s*\(Comp\w+\)", r"Compar"])
+            pico_data["outcome"]      = pico_outcome or _extract_pico_field(response, [r"O\s*\(Outcome\)", r"Outcome"])
             pico_json_path.write_text(
                 json.dumps(pico_data, indent=2, ensure_ascii=False),
                 encoding="utf-8",
             )
             print(f"[RCT Search] PICO saved to: {pico_json_path.name}")
+
         # ----------------------------------------------------------------------
 
 
@@ -1350,8 +1372,12 @@ def run_rct_search_pipeline(
     )
 
     # -- Stage 4: PubMed Fetch + AI Ranking ----------------------------------
+    _pico_terms = [t for t in [pico_population, pico_intervention, pico_outcome] if t]
+    _pubmed_query = " AND ".join(_pico_terms) if _pico_terms else topic
     print("[RCT Search] Searching PubMed for relevant articles...")
-    articles = fetch_pubmed_articles(topic, max_results=10) if not dry_run else [
+    print(f"[RCT Search] PubMed query: {_pubmed_query}")
+    articles = fetch_pubmed_articles(_pubmed_query, max_results=10) if not dry_run else [
+
         {"pmid": "00000001", "title": "[DRY RUN] Test Article",
          "abstract": "Dry run abstract.",
          "url": "https://pubmed.ncbi.nlm.nih.gov/00000001/"}
@@ -1441,17 +1467,32 @@ def run_rct_search_pipeline(
         report_parts.append(
             "## Ranked Article List\n\n_No articles retrieved from PubMed._\n"
         )
+
     # -- End Stage 4 ----------------------------------------------------------
 
     timestamp  = datetime.now().strftime("%Y%m%d_%H%M%S")
-    out_dir    = reports_dir if reports_dir != REPORTS_DIR else OUTPUT_RCT_SEARCH
+    if reports_dir != REPORTS_DIR:
+        out_dir   = reports_dir
+        final_dir = reports_dir
+    else:
+        out_dir   = REPORTS_DIR / "rct_search"
+        final_dir = OUTPUT_RCT_SEARCH
     out_dir.mkdir(parents=True, exist_ok=True)
+    final_dir.mkdir(parents=True, exist_ok=True)
     md_path    = out_dir / f"rct_search_{timestamp}.md"
     docx_path  = out_dir / f"rct_search_{timestamp}.docx"
 
     md_content = "\n".join(report_parts)
     md_path.write_text(md_content, encoding="utf-8")
-    print(f"Markdown report saved : {out_dir.name}\\{md_path.name}")
+    print(f"Intermediate report   : reports/rct_search/{md_path.name}")
+
+    final_parts = [p for p in report_parts if "Ranked Article List" in p or "Final Status" in p]
+    if final_parts and final_dir != out_dir:
+        final_md_path = final_dir / f"rct_search_{timestamp}.md"
+        final_md_path.write_text("\n".join(final_parts), encoding="utf-8")
+        print(f"Final report saved    : output/rct_search/{final_md_path.name}")
+
+
 
     try:
         _md_to_docx(md_content, f"RCT Search Strategy — {timestamp}", docx_path)
@@ -1460,6 +1501,7 @@ def run_rct_search_pipeline(
         print(f"  Warning: could not generate .docx — {exc}")
 
     return md_path
+
 
 
 def rct_search_reminder() -> None:
