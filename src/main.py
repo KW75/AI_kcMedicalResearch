@@ -1374,10 +1374,15 @@ def run_rct_search_pipeline(
     # -- Stage 4: PubMed Fetch + AI Ranking ----------------------------------
     import re as _re2
     def _clean_pico_term(t: str) -> str:
-        t = _re2.sub(r"\([^)]*\)", "", t)          # remove parenthetical qualifiers e.g. (>=18 years)
-        t = _re2.sub(r"[^\w\s\-]", " ", t)         # remove special chars except hyphen
-        t = _re2.sub(r"\s+", " ", t).strip()        # collapse whitespace
-        return t
+        t = _re2.sub(r"\([^)]*\)", "", t)           # remove parenthetical qualifiers e.g. (>=18 years)
+        t = _re2.sub(r"\b(at\s+)?(post[\s\-]intervention|post[\s\-]treatment|"
+                     r"follow[\s\-]up|immediately after|baseline|"
+                     r"at\s+\d+\s+weeks?|at\s+\d+\s+months?)\b", "", t, flags=_re2.IGNORECASE)
+        t = _re2.sub(r"[^\w\s\-]", " ", t)          # remove special chars except hyphen
+        t = _re2.sub(r"\s+", " ", t).strip()         # collapse whitespace
+        # keep only first 4 words to avoid over-specific phrases
+        words = t.split()
+        return " ".join(words[:4]) if len(words) > 4 else t
     _pico_terms = [_clean_pico_term(t) for t in [pico_population, pico_intervention, pico_outcome] if t]
     _pico_terms = [t for t in _pico_terms if t]     # drop any that became empty after cleaning
     _pubmed_query = " AND ".join(_pico_terms) if _pico_terms else topic
