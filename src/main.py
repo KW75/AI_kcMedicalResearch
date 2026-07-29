@@ -1381,6 +1381,7 @@ def run_rct_search_pipeline(
     _pico_terms = [_clean_pico_term(t) for t in [pico_population, pico_intervention, pico_outcome] if t]
     _pico_terms = [t for t in _pico_terms if t]     # drop any that became empty after cleaning
     _pubmed_query = " AND ".join(_pico_terms) if _pico_terms else topic
+    _pubmed_query = _pubmed_query + " AND randomized controlled trial[pt]"
     print(f"[RCT Search] PubMed query (cleaned): {_pubmed_query}")
     print("[RCT Search] Searching PubMed for relevant articles...")
     articles = fetch_pubmed_articles(_pubmed_query, max_results=20) if not dry_run else [
