@@ -865,6 +865,118 @@ def _md_to_docx(md_text: str, title: str, out_path: Path) -> None:
 
     document.save(str(out_path))
 
+def _add_hyperlink(paragraph, text: str, url: str):
+    """Add a clickable hyperlink run to an existing paragraph."""
+    import docx as _docx
+    from docx.oxml.ns import qn
+    from docx.oxml import OxmlElement
+
+    part = paragraph.part
+    r_id = part.relate_to(url, "http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink", is_external=True)
+
+    hyperlink = OxmlElement("w:hyperlink")
+    hyperlink.set(qn("r:id"), r_id)
+
+    new_run = OxmlElement("w:r")
+    rPr = OxmlElement("w:rPr")
+    rStyle = OxmlElement("w:rStyle")
+    rStyle.set(qn("w:val"), "Hyperlink")
+    rPr.append(rStyle)
+    new_run.append(rPr)
+
+    new_t = OxmlElement("w:t")
+    new_t.text = text
+    new_run.append(new_t)
+    hyperlink.append(new_run)
+    paragraph._p.append(hyperlink)
+    return hyperlink
+
+
+def _ranked_articles_to_docx(
+    ranked: list[dict],
+    title: str,
+    out_path: Path,
+    topic: str = "",
+) -> None:
+    """
+    Write a ranked article list as a proper Word table with clickable
+    PubMed hyperlinks. Each row: Rank | Score | Title | PMID | Link.
+    """
+    import docx as _docx
+    from docx.enum.text import WD_ALIGN_PARAGRAPH
+    from docx.shared import Pt, RGBColor, Cm
+    from docx.oxml.ns import qn
+
+    doc = _docx.Document()
+
+    # Title
+    title_para = doc.add_heading(title, level=0)
+    title_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+
+    if topic:
+        p = doc.add_paragraph()
+        run = p.add_run(f"Topic: {topic}")
+        run.italic = True
+
+    doc.add_paragraph("")
+
+    if not ranked:
+        doc.add_paragraph("No articles retrieved from PubMed.")
+        doc.save(str(out_path))
+        return
+
+    # Caption
+    cap = doc.add_paragraph()
+    cap.add_run(
+        f"All {len(ranked)} RCT articles retrieved from PubMed, "
+        "ordered by PICO relevance score (10 = most relevant)."
+    ).italic = True
+
+    doc.add_paragraph("")
+
+    # Table: Rank | Score | Title | PMID | Link
+    table = doc.add_table(rows=1, cols=5)
+    table.style = "Table Grid"
+
+    # Header row
+    hdr = table.rows[0].cells
+    for i, label in enumerate(["Rank", "Score", "Title", "PMID", "PubMed Link"]):
+        hdr[i].text = label
+        run = hdr[i].paragraphs[0].runs[0]
+        run.bold = True
+
+    # Set column widths
+    widths = [Cm(1.2), Cm(1.5), Cm(9.0), Cm(2.2), Cm(2.8)]
+    for row in table.rows:
+        for idx, cell in enumerate(row.cells):
+            cell.width = widths[idx]
+
+    # Data rows
+    for r in ranked:
+        row = table.add_row()
+        row.cells[0].text = str(r["rank"])
+        row.cells[1].text = f"{r['score']}/10"
+        row.cells[2].text = r["title"]
+        row.cells[3].text = r["pmid"]
+        # Clickable hyperlink in Link cell
+        cell_para = row.cells[4].paragraphs[0]
+        _add_hyperlink(cell_para, "PubMed", r["url"])
+
+    doc.add_paragraph("")
+    note = doc.add_paragraph()
+    note.add_run(
+        "Select your top articles, download PDFs and place them in "
+        "input/sr/ to run the SR pipeline."
+    ).italic = True
+
+    doc.add_paragraph("")
+    ref = doc.add_paragraph()
+    ref.add_run(
+        "For explanation on ranking, please refer to the full report "
+        "in the reports folder."
+    ).italic = True
+
+    doc.save(str(out_path))
 
 # ---------------------------------------------------------------------------
 # Writing report
@@ -1533,10 +1645,10 @@ def run_rct_search_pipeline(
         print(f"Final report saved    : output/rct_search/{final_md_path.name}")
         final_docx_path = final_dir / f"rct_search_{timestamp}.docx"
         try:
-            _md_to_docx(final_md_content, f"RCT Search Results — {timestamp}", final_docx_path)       
+            _ranked_articles_to_docx(ranked, f"RCT Search Results — {timestamp}", final_docx_path, topic=topic)
             print(f"Results DOCX saved    : output/rct_search/{final_docx_path.name}")
         except Exception as exc:  # noqa: BLE001
-            print(f"  Warning: could not generate results .docx — {exc}")
+            print(f"  Warning: could not generate results .docx — {exc}")        
 
     try:
         _md_to_docx(md_content, f"RCT Search Strategy — {timestamp}", docx_path)
