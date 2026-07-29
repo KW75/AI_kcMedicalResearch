@@ -1172,6 +1172,66 @@ def run_rct_search_pipeline(
         print("No topic entered. Exiting.")
         sys.exit(0)
 
+    # ── PICO input: offer to import saved JSON or prompt manually ──────────────
+    pico_json_files = sorted(
+        (OUTPUT_RCT_SEARCH).glob("pico_*.json"),
+        key=lambda p: p.stat().st_mtime,
+        reverse=True,
+    ) if OUTPUT_RCT_SEARCH.exists() else []
+
+    pico_population   = ""
+    pico_intervention = ""
+    pico_comparator   = ""
+    pico_outcome      = ""
+
+    if pico_json_files and not dry_run:
+        print()
+        print("[RCT Search] Saved PICO files found in output/rct_search/:")
+        for idx, pf in enumerate(pico_json_files[:5], 1):
+            print(f"  {idx}. {pf.name}")
+        print("  0. Enter new PICO manually")
+        print()
+        try:
+            choice = input("Import a saved PICO? Enter number or 0 for new: ").strip()
+        except (EOFError, KeyboardInterrupt):
+            choice = "0"
+        if choice.isdigit() and 1 <= int(choice) <= len(pico_json_files[:5]):
+            chosen = pico_json_files[int(choice) - 1]
+            try:
+                import json as _json
+                pico_data = _json.loads(chosen.read_text(encoding="utf-8"))
+                pico_population   = pico_data.get("population", "")
+                pico_intervention = pico_data.get("intervention", "")
+                pico_comparator   = pico_data.get("comparator", "")
+                pico_outcome      = pico_data.get("outcome", "")
+                if not topic:
+                    topic = pico_data.get("topic", topic)
+                print(f"[RCT Search] PICO imported from {chosen.name}")
+            except Exception as _e:
+                print(f"[RCT Search] Could not load PICO JSON: {_e}")
+
+    if not any([pico_population, pico_intervention, pico_comparator, pico_outcome]) and not dry_run:
+        print()
+        print("[RCT Search] Enter PICO components (press Enter to skip any field):")
+        try:
+            pico_population   = input("  Population   (P): ").strip()
+            pico_intervention = input("  Intervention (I): ").strip()
+            pico_comparator   = input("  Comparator   (C): ").strip()
+            pico_outcome      = input("  Outcome      (O): ").strip()
+        except (EOFError, KeyboardInterrupt):
+            print()
+
+    pico_manual_context = ""
+    if any([pico_population, pico_intervention, pico_comparator, pico_outcome]):
+        pico_manual_context = (
+            "\n\nUser-provided PICO components:\n"
+            f"  Population:   {pico_population or '(not specified)'}\n"
+            f"  Intervention: {pico_intervention or '(not specified)'}\n"
+            f"  Comparator:   {pico_comparator or '(not specified)'}\n"
+            f"  Outcome:      {pico_outcome or '(not specified)'}"
+        )
+    # ── end PICO input ─────────────────────────────────────────────────────────
+
     pico_path         = DOCS_RCT_SEARCH / "pico-framework.md"
     db_guide          = DOCS_RCT_SEARCH / "database-guide.md"
     val_criteria      = DOCS_RCT_SEARCH / "validation-criteria.md"
@@ -1184,7 +1244,7 @@ def run_rct_search_pipeline(
             "role":          "Formulator",
             "prompt_file":   AI_DIR / "formulator-prompt.md",
             "extra_context": pico_context,
-            "task":          f"The user's research topic is: {topic}\n\nStructure this into a formal PICO question.",
+            "task":          f"The user's research topic is: {topic}{pico_manual_context}\n\nStructure this into a formal PICO question.",
         },
         {
             "role":          "Searcher",
@@ -1549,19 +1609,15 @@ def run_sr_launcher() -> None:
     print("  Navigate to Systematic Review in the sidebar.")
     print("  Close the browser window to stop the server.\n")
 
+    _launch_kw: dict = {"cwd": str(repo_root)}
     if os.name == "nt":
-        _sp.Popen(
-            ["cmd", "/c", "start", "Pipeline UI",
-             sys.executable, "-m", "streamlit", "run", str(unified_ui),
-             "--server.runOnSave", "false"],
-            cwd=str(repo_root),
-        )
-    else:
-        _sp.Popen(
-            [sys.executable, "-m", "streamlit", "run", str(unified_ui),
-             "--server.runOnSave", "false"],
-            cwd=str(repo_root),
-        )
+        import subprocess as _sub
+        _launch_kw["creationflags"] = _sub.CREATE_NEW_CONSOLE
+    _sp.Popen(
+        [sys.executable, "-m", "streamlit", "run", str(unified_ui),
+         "--server.runOnSave", "false"],
+        **_launch_kw,
+    )
 
     print("  Pipeline UI launched. Returning to menu...\n")
 
