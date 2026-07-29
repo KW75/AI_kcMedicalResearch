@@ -1372,8 +1372,16 @@ def run_rct_search_pipeline(
     )
 
     # -- Stage 4: PubMed Fetch + AI Ranking ----------------------------------
-    _pico_terms = [t for t in [pico_population, pico_intervention, pico_outcome] if t]
+    import re as _re2
+    def _clean_pico_term(t: str) -> str:
+        t = _re2.sub(r"\([^)]*\)", "", t)          # remove parenthetical qualifiers e.g. (>=18 years)
+        t = _re2.sub(r"[^\w\s\-]", " ", t)         # remove special chars except hyphen
+        t = _re2.sub(r"\s+", " ", t).strip()        # collapse whitespace
+        return t
+    _pico_terms = [_clean_pico_term(t) for t in [pico_population, pico_intervention, pico_outcome] if t]
+    _pico_terms = [t for t in _pico_terms if t]     # drop any that became empty after cleaning
     _pubmed_query = " AND ".join(_pico_terms) if _pico_terms else topic
+    print(f"[RCT Search] PubMed query (cleaned): {_pubmed_query}")
     print("[RCT Search] Searching PubMed for relevant articles...")
     print(f"[RCT Search] PubMed query: {_pubmed_query}")
     articles = fetch_pubmed_articles(_pubmed_query, max_results=20) if not dry_run else [
