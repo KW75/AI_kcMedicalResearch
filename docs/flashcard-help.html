@@ -50,7 +50,7 @@ footer{text-align:center;margin-top:48px;font-size:.76rem;color:#475569}
 </head>
 <body>
 <h1>&#129302; AI kcMedical Research</h1>
-<p class="subtitle">Interactive Help Guide &nbsp;&middot;&nbsp; 258 tests &nbsp;&middot;&nbsp; 87% coverage &nbsp;&middot;&nbsp; 6 modes &nbsp;&middot;&nbsp; 5 providers</p>
+<p class="subtitle">Interactive Help Guide &nbsp;&middot;&nbsp; 291 tests &nbsp;&middot;&nbsp; 65% coverage (main.py) &nbsp;&middot;&nbsp; 6 modes &nbsp;&middot;&nbsp; 6 providers</p>
 <button class="toggle-all" onclick="toggleAll()">Expand All</button>
 <div class="grid">
 
@@ -72,10 +72,10 @@ footer{text-align:center;margin-top:48px;font-size:.76rem;color:#475569}
     <tr><td>Reviewer</td><td>Reviews code quality, security, and best practices</td></tr>
     <tr><td>Tester</td><td>Generates pytest test cases for your code</td></tr>
   </table>
-  <div class="section-label">Input - place files here before starting</div>
+  <div class="section-label">Input — place files here before starting</div>
   <table>
     <tr><th>Folder</th><th>File types</th></tr>
-    <tr><td><code>uploads/coding/</code></td><td>.py .js .ts .json .yaml .md .txt</td></tr>
+    <tr><td><code>input/coding/</code></td><td>.py .js .ts .json .yaml .md .txt</td></tr>
     <tr><td><code>docs/coding/</code></td><td>PRD.md, architecture.md, coding-standards.md</td></tr>
   </table>
   <div class="section-label">Run</div>
@@ -86,6 +86,7 @@ python src\main.py --dry-run</pre>
   <div class="section-label">Output</div>
   <table>
     <tr><td>Session transcript</td><td><code>reports/session_YYYYMMDD_HHMMSS.md</code></td></tr>
+    <tr><td>Code output</td><td><code>output/coding/</code></td></tr>
   </table>
 </div></div>
 
@@ -100,6 +101,12 @@ python src\main.py --dry-run</pre>
   <span class="pill pill-green">&#9997; Writer</span>
   <span class="pill pill-green">&#128196; Editor</span>
   <span class="pill pill-green">&#9989; QA</span>
+  <div class="section-label">Tracks</div>
+  <table>
+    <tr><th>Track</th><th>Purpose</th></tr>
+    <tr><td>Topic Track</td><td>Editorial / opinion (newspaper style)</td></tr>
+    <tr><td>Article Track</td><td>Medical journal article</td></tr>
+  </table>
   <div class="section-label">What it does</div>
   <table>
     <tr><th>Role</th><th>Purpose</th></tr>
@@ -110,7 +117,7 @@ python src\main.py --dry-run</pre>
   <div class="section-label">Input</div>
   <table>
     <tr><th>Folder</th><th>File types</th></tr>
-    <tr><td><code>uploads/writing/</code></td><td>.txt .md .pdf - also bare URLs (fetched automatically)</td></tr>
+    <tr><td><code>input/writing/</code></td><td>.txt .md .pdf .docx</td></tr>
     <tr><td><code>docs/writing/</code></td><td>project-brief.md, style-guide.md, editorial-standards.md</td></tr>
   </table>
   <div class="section-label">Run</div>
@@ -120,7 +127,7 @@ python src\main.py --mode writing --provider openai</pre>
   <div class="section-label">Output</div>
   <table>
     <tr><td>Session transcript</td><td><code>reports/session_*.md</code></td></tr>
-    <tr><td>Summary report (--report)</td><td><code>reports/writing_report_*.md</code></td></tr>
+    <tr><td>Summary report (--report)</td><td><code>output/writing/writing_report_*.md + .docx</code></td></tr>
   </table>
 </div></div>
 
@@ -135,28 +142,43 @@ python src\main.py --mode writing --provider openai</pre>
   <span class="pill pill-purple">&#128196; Formulator</span>
   <span class="pill pill-purple">&#128269; Searcher</span>
   <span class="pill pill-purple">&#9989; Validator</span>
-  <div class="section-label">What it does</div>
+  <div class="section-label">Pipeline Stages</div>
   <table>
-    <tr><th>Role</th><th>Purpose</th></tr>
-    <tr><td>Formulator</td><td>Builds PICO-based search strategy from your framework</td></tr>
-    <tr><td>Searcher</td><td>Generates database-specific search strings (PubMed, Embase, etc.)</td></tr>
-    <tr><td>Validator</td><td>Validates strategy against inclusion/exclusion criteria</td></tr>
+    <tr><th>#</th><th>Stage</th><th>What happens</th></tr>
+    <tr><td>1</td><td>Formulator</td><td>Structures topic into formal PICO question</td></tr>
+    <tr><td>2</td><td>Searcher</td><td>Builds Boolean search strings for 7 SR databases</td></tr>
+    <tr><td>3</td><td>Validator</td><td>Validates PICO alignment, syntax, RCT filters — APPROVED or REQUIRES REFINEMENT</td></tr>
+    <tr><td>4</td><td>PubMed Fetch + AI Ranking</td><td>Fetches up to 20 articles from PubMed, AI scores each 1–10 for PICO relevance</td></tr>
   </table>
-  <div class="section-label">Input - edit before running</div>
+  <div class="section-label">PICO Input Options</div>
   <table>
-    <tr><th>File</th><th>Action required</th></tr>
-    <tr><td><code>docs/rct_search/pico-framework.md</code></td><td>&#9888; Edit with your PICO before running</td></tr>
-    <tr><td><code>docs/rct_search/database-guide.md</code></td><td>Database-specific syntax guide</td></tr>
-    <tr><td><code>docs/rct_search/validation-criteria.md</code></td><td>Inclusion/exclusion criteria</td></tr>
+    <tr><th>Option</th><th>How</th></tr>
+    <tr><td>Import saved PICO</td><td>Place <code>pico_*.json</code> in <code>input/rct_search/</code> — offered at startup</td></tr>
+    <tr><td>Enter manually</td><td>Interactive prompts for P, I, C, O at startup</td></tr>
+    <tr><td>Topic file</td><td>Place topic in <code>docs/rct_search/topic.md</code></td></tr>
   </table>
-  <div class="warn">&#9888; Edit pico-framework.md before every new review - the tool will remind you at startup.</div>
+  <div class="section-label">Input files</div>
+  <table>
+    <tr><th>File / Folder</th><th>Purpose</th></tr>
+    <tr><td><code>input/rct_search/pico_*.json</code></td><td>Previously saved PICO — imported at startup</td></tr>
+    <tr><td><code>docs/rct_search/pico-framework.md</code></td><td>PICO framework reference for Formulator</td></tr>
+    <tr><td><code>docs/rct_search/database-guide.md</code></td><td>Database-specific syntax guide for Searcher</td></tr>
+    <tr><td><code>docs/rct_search/validation-criteria.md</code></td><td>Inclusion/exclusion criteria for Validator</td></tr>
+  </table>
   <div class="section-label">Run</div>
   <pre>python src\main.py --mode rct_search
+python src\main.py --mode rct_search --provider qwen
 python src\main.py --mode rct_search --provider deepseek</pre>
   <div class="section-label">Output</div>
   <table>
-    <tr><td>Article links report</td><td><code>reports/rct_search_*.md</code></td></tr>
+    <tr><th>File</th><th>Location</th><th>Contents</th></tr>
+    <tr><td><code>rct_search_*.md</code></td><td><code>reports/rct_search/</code></td><td>Full transcript — Formulator, Searcher, Validator, Next Steps</td></tr>
+    <tr><td><code>rct_search_*.docx</code></td><td><code>reports/rct_search/</code></td><td>Full Word report</td></tr>
+    <tr><td><code>rct_search_*.md</code></td><td><code>output/rct_search/</code></td><td>Lean ranked article list + Final Status only</td></tr>
+    <tr><td><code>rct_search_*.docx</code></td><td><code>output/rct_search/</code></td><td>Ranked article list Word doc (easy review)</td></tr>
+    <tr><td><code>pico_*.json</code></td><td><code>output/rct_search/</code></td><td>PICO fields + ranked_articles list with scores</td></tr>
   </table>
+  <div class="info">&#128161; After ranking: pick top articles, download PDFs, place in <code>input/sr/</code> to run the SR pipeline.</div>
 </div></div>
 
 <!-- MEDICAL SEARCH -->
@@ -171,19 +193,16 @@ python src\main.py --mode rct_search --provider deepseek</pre>
   <div class="section-label">Two search types</div>
   <table>
     <tr><th>Type</th><th>Use when</th><th>Output sections</th></tr>
-    <tr><td><strong>1 - Research Paper</strong></td><td>You have a title, author, or PMID</td><td>Identification, Best Match, Relevance Assessment, Further Results</td></tr>
-    <tr><td><strong>2 - Clinical Topic</strong></td><td>You want a summary of current evidence</td><td>Search Strategy, Evidence Summary, Clinical Implications, Reference List</td></tr>
+    <tr><td><strong>1 — Topic Search</strong></td><td>You want a summary of current evidence</td><td>Search Strategy, Evidence Summary, Clinical Implications, Reference List</td></tr>
+    <tr><td><strong>2 — Article Search</strong></td><td>You have a title, author, or PMID</td><td>Identification, Best Match, Relevance Assessment, Further Results</td></tr>
   </table>
-  <div class="section-label">How to choose</div>
-  <p style="font-size:.82rem;color:#cbd5e1;margin-bottom:12px;">At startup the tool asks:<br><em>What are you searching for?<br>[1] A research paper &nbsp; [2] A clinical topic</em><br>Enter 1 or 2. Or pre-load via file (see below).</p>
-  <div class="section-label">File-based input (optional - skips interactive prompt)</div>
+  <div class="section-label">File-based input (optional — skips interactive prompt)</div>
   <p style="font-size:.82rem;color:#cbd5e1;margin-bottom:6px;">Create <code>docs/search/topic.md</code> with exactly two lines:</p>
-  <pre>paper
-Aspirin low dose myocardial infarction prevention</pre>
-  <p style="font-size:.82rem;color:#cbd5e1;margin-top:-8px;margin-bottom:6px;">Or for a clinical topic:</p>
   <pre>topic
 Effect of metformin on HbA1c in type 2 diabetes</pre>
-  <p style="font-size:.82rem;color:#cbd5e1;margin-bottom:12px;">Line 1 must be exactly <code>paper</code> or <code>topic</code>. Line 2 is your query.</p>
+  <p style="font-size:.82rem;color:#cbd5e1;margin-top:-8px;margin-bottom:6px;">Or for a paper search:</p>
+  <pre>paper
+Aspirin low dose myocardial infarction prevention</pre>
   <div class="section-label">Quality standards</div>
   <span class="pill pill-blue">No fabricated citations</span>
   <span class="pill pill-blue">Exact effect sizes and p-values</span>
@@ -196,7 +215,7 @@ python src\main.py --mode search --provider groq</pre>
   <table>
     <tr><td>Evidence report</td><td><code>reports/search_*.md</code></td></tr>
   </table>
-  <div class="info">&#128161; Use article links with Appraisal mode: download PDFs, place in <code>uploads/appraisal/</code>, then run <code>--mode appraisal</code>.</div>
+  <div class="info">&#128161; Use article links with Appraisal mode: download PDFs, place in <code>input/appraisal/</code>, then run <code>--mode appraisal</code>.</div>
 </div></div>
 
 <!-- APPRAISAL -->
@@ -229,23 +248,24 @@ python src\main.py --mode search --provider groq</pre>
     <tr><td>7</td><td>Overall Judgement</td><td>150</td></tr>
   </table>
   <div class="section-label">Scoring Tools</div>
-  <span class="pill pill-orange">RoB 2 - RCTs</span>
-  <span class="pill pill-orange">CASP - Observational</span>
-  <span class="pill pill-orange">AMSTAR 2 - Systematic Reviews</span>
-  <span class="pill pill-orange">GRADE - Evidence Quality</span>
-  <div class="section-label" style="margin-top:12px">Input - place articles here before starting</div>
+  <span class="pill pill-orange">RoB 2 — RCTs</span>
+  <span class="pill pill-orange">CASP — Observational</span>
+  <span class="pill pill-orange">AMSTAR 2 — Systematic Reviews</span>
+  <span class="pill pill-orange">GRADE — Evidence Quality</span>
+  <div class="section-label" style="margin-top:12px">Input — place articles here before starting</div>
   <table>
     <tr><th>Folder</th><th>File types</th></tr>
-    <tr><td><code>uploads/appraisal/</code></td><td>.pdf .txt .md - also bare URLs</td></tr>
+    <tr><td><code>input/appraisal/</code></td><td>.pdf .txt .md .docx</td></tr>
     <tr><td><code>docs/appraisal/</code></td><td>appraisal-guide.md, scoring-criteria.md</td></tr>
   </table>
-  <div class="info">&#128161; Works best with PDF articles from Search mode. Download PDFs, place in uploads/appraisal/, then run appraisal.</div>
+  <div class="info">&#128161; Works best with PDF articles from RCT Search or Medical Search mode. Download PDFs, place in <code>input/appraisal/</code>, then run appraisal.</div>
   <div class="section-label">Run</div>
   <pre>python src\main.py --mode appraisal
 python src\main.py --mode appraisal --provider anthropic</pre>
   <div class="section-label">Output</div>
   <table>
-    <tr><td>Appraisal transcript</td><td><code>reports/session_*.md</code></td></tr>
+    <tr><td>Appraisal report</td><td><code>output/appraisal/</code></td></tr>
+    <tr><td>Session transcript</td><td><code>reports/appraisal/</code></td></tr>
   </table>
 </div></div>
 
@@ -268,25 +288,14 @@ python src\main.py --mode appraisal --provider anthropic</pre>
     <tr><td>5</td><td>Forest plot (weight-scaled)</td><td><code>outputs/figures/forest_plot.png</code></td></tr>
     <tr><td>6</td><td>Reports (DOCX + HTML + PDF)</td><td><code>outputs/reports/</code></td></tr>
   </table>
-  <div class="section-label">Setup - before every new review</div>
+  <div class="section-label">Recommended workflow with RCT Search</div>
   <table>
     <tr><th>Step</th><th>Action</th></tr>
-    <tr><td>1</td><td>Edit <code>sr\config\prisma_criteria.yaml</code> - set PICO, effect_measure, criteria</td></tr>
-    <tr><td>2</td><td>Place RCT PDFs in <code>sr\data\uploads\</code></td></tr>
-    <tr><td>3</td><td>Set <code>ANTHROPIC_API_KEY</code> environment variable</td></tr>
-  </table>
-  <div class="section-label">Run</div>
-  <pre>python src\main.py --mode sr              # shows instructions
-cd D:\AI_kcMedicalResearch
-python sr\main.py --pdf-dir sr\data\uploads
-python sr\main.py --pdf-dir sr\data\uploads --effect-measure SMD
-python sr\main.py --pdf-dir sr\data\uploads --model claude-opus-4-7</pre>
-  <div class="section-label">Effect Measure Guide</div>
-  <table>
-    <tr><th>Outcome type</th><th>Use</th><th>Notes</th></tr>
-    <tr><td>Continuous, same scale</td><td><code>MD</code></td><td>e.g. all studies use VAS 0-10</td></tr>
-    <tr><td>Continuous, mixed scales</td><td><code>SMD</code></td><td>Hedges g - safe default for mixed instruments</td></tr>
-    <tr><td>Binary / event</td><td><code>OR</code> or <code>RR</code></td><td>needs event counts</td></tr>
+    <tr><td>1</td><td>Run <code>--mode rct_search</code> — get ranked PubMed articles</td></tr>
+    <tr><td>2</td><td>Review <code>output/rct_search/rct_search_*.docx</code> — pick top articles</td></tr>
+    <tr><td>3</td><td>Download PDFs, place in <code>input/sr/</code></td></tr>
+    <tr><td>4</td><td>Edit <code>sr/config/prisma_criteria.yaml</code> with your PICO</td></tr>
+    <tr><td>5</td><td>Run SR pipeline via launcher menu option 6</td></tr>
   </table>
   <div class="section-label">Key Config Fields (prisma_criteria.yaml)</div>
   <pre>pico:
@@ -300,6 +309,13 @@ inclusion_criteria:
   - "RCT study design"
 exclusion_criteria:
   - "Non-randomised designs"</pre>
+  <div class="section-label">Effect Measure Guide</div>
+  <table>
+    <tr><th>Outcome type</th><th>Use</th><th>Notes</th></tr>
+    <tr><td>Continuous, same scale</td><td><code>MD</code></td><td>e.g. all studies use VAS 0–10</td></tr>
+    <tr><td>Continuous, mixed scales</td><td><code>SMD</code></td><td>Hedges g — safe default for mixed instruments</td></tr>
+    <tr><td>Binary / event</td><td><code>OR</code> or <code>RR</code></td><td>needs event counts</td></tr>
+  </table>
 </div></div>
 
 <!-- PROVIDERS -->
@@ -311,14 +327,15 @@ exclusion_criteria:
 <div class="card-body">
   <table>
     <tr><th>Provider</th><th>Flag</th><th>Env var (.env)</th><th>Notes</th></tr>
-    <tr><td>Ollama</td><td><code>--provider ollama</code></td><td>none</td><td>Default - runs locally</td></tr>
+    <tr><td>Ollama</td><td><code>--provider ollama</code></td><td>none</td><td>Default — runs locally, no API key needed</td></tr>
     <tr><td>OpenAI</td><td><code>--provider openai</code></td><td><code>OPENAI_API_KEY</code></td><td>GPT-4o etc.</td></tr>
     <tr><td>Anthropic</td><td><code>--provider anthropic</code></td><td><code>ANTHROPIC_API_KEY</code></td><td>Claude models</td></tr>
     <tr><td>DeepSeek</td><td><code>--provider deepseek</code></td><td><code>DEEPSEEK_API_KEY</code></td><td>Geo-unrestricted</td></tr>
     <tr><td>Groq</td><td><code>--provider groq</code></td><td><code>GROQ_API_KEY</code></td><td>Fast inference</td></tr>
+    <tr><td>Qwen</td><td><code>--provider qwen</code></td><td><code>DASHSCOPE_API_KEY</code></td><td>Alibaba Cloud Model Studio</td></tr>
   </table>
   <div class="section-label">.env file</div>
-  <pre>OLLAMA_URL=http://localhost:11434
+  <pre>OLLAMA_HOST=http://localhost:11434
 OLLAMA_MODEL=llama3.2
 OPENAI_API_KEY=sk-...
 OPENAI_MODEL=gpt-4o
@@ -327,17 +344,20 @@ ANTHROPIC_MODEL=claude-sonnet-4-6
 DEEPSEEK_API_KEY=sk-...
 DEEPSEEK_MODEL=deepseek-chat
 GROQ_API_KEY=gsk_...
-GROQ_MODEL=llama-3.3-70b-versatile</pre>
+GROQ_MODEL=llama-3.3-70b-versatile
+DASHSCOPE_API_KEY=sk-...
+QWEN_MODEL=qwen3.7-plus</pre>
   <div class="section-label">Common CLI flags</div>
   <table>
     <tr><th>Flag</th><th>Effect</th></tr>
     <tr><td><code>--provider &lt;name&gt;</code></td><td>Select AI provider</td></tr>
-    <tr><td><code>--model &lt;name&gt;</code></td><td>Override default model</td></tr>
-    <tr><td><code>--dry-run</code></td><td>Run without AI calls (testing)</td></tr>
+    <tr><td><code>--model &lt;name&gt;</code></td><td>Override default model for this session</td></tr>
+    <tr><td><code>--dry-run</code></td><td>Run without AI calls (testing/offline)</td></tr>
     <tr><td><code>--list-roles</code></td><td>Show roles and prompt files for current mode</td></tr>
-    <tr><td><code>--list-sessions</code></td><td>List saved transcripts</td></tr>
+    <tr><td><code>--list-sessions</code></td><td>List saved transcripts in reports/</td></tr>
     <tr><td><code>--help-guide</code></td><td>Open this HTML guide in browser</td></tr>
     <tr><td><code>--report</code></td><td>Generate writing report (writing mode only)</td></tr>
+    <tr><td><code>--revise</code></td><td>Legacy code revision pipeline (coding mode only)</td></tr>
   </table>
 </div></div>
 
@@ -345,10 +365,10 @@ GROQ_MODEL=llama-3.3-70b-versatile</pre>
 <div class="card" onclick="toggle(this)">
 <div class="card-header h-rag">
   <div class="card-icon" style="background:#312e81">&#128190;</div>
-  <div><div class="card-title">RAG - File &amp; URL Indexing</div><div class="card-badge">Automatic at session start</div></div>
+  <div><div class="card-title">RAG — File &amp; URL Indexing</div><div class="card-badge">Automatic at session start</div></div>
 </div>
 <div class="card-body">
-  <p style="font-size:.82rem;color:#cbd5e1;margin-bottom:12px;">Files placed in the uploads folder are automatically chunked, embedded, and stored in a per-session ChromaDB collection. Content is retrieved and injected into the AI context at each step.</p>
+  <p style="font-size:.82rem;color:#cbd5e1;margin-bottom:12px;">Files placed in the input folder are automatically chunked, embedded, and stored in a per-session ChromaDB collection. Content is retrieved and injected into the AI context at each step.</p>
   <div class="section-label">Supported file types</div>
   <span class="pill pill-purple">.txt</span>
   <span class="pill pill-purple">.md</span>
@@ -360,19 +380,15 @@ GROQ_MODEL=llama-3.3-70b-versatile</pre>
   <span class="pill pill-purple">.yaml</span>
   <span class="pill pill-purple">.sql</span>
   <span class="pill pill-purple">.sh</span>
-  <div class="section-label" style="margin-top:12px">URL fetching</div>
-  <p style="font-size:.82rem;color:#cbd5e1;margin-bottom:10px;">Place a .txt or .md file with bare URLs (one per line) in the uploads folder. Each URL is fetched, HTML stripped, and indexed automatically.</p>
-  <pre># reading-list.md
-https://pubmed.ncbi.nlm.nih.gov/12345678/
-https://www.example.com/article</pre>
-  <div class="section-label">Upload folders by mode</div>
+  <div class="section-label" style="margin-top:12px">Input folders by mode</div>
   <table>
-    <tr><th>Mode</th><th>Upload folder</th></tr>
-    <tr><td>coding</td><td><code>uploads/coding/</code></td></tr>
-    <tr><td>writing</td><td><code>uploads/writing/</code></td></tr>
-    <tr><td>rct_search</td><td><code>uploads/rct_search/</code></td></tr>
-    <tr><td>appraisal</td><td><code>uploads/appraisal/</code></td></tr>
-    <tr><td>search</td><td><code>uploads/search/</code></td></tr>
+    <tr><th>Mode</th><th>Input folder</th></tr>
+    <tr><td>coding</td><td><code>input/coding/</code></td></tr>
+    <tr><td>writing</td><td><code>input/writing/</code></td></tr>
+    <tr><td>rct_search</td><td><code>input/rct_search/</code> (also accepts <code>pico_*.json</code>)</td></tr>
+    <tr><td>appraisal</td><td><code>input/appraisal/</code></td></tr>
+    <tr><td>search</td><td><code>input/search/</code></td></tr>
+    <tr><td>sr</td><td><code>input/sr/</code> (PDF articles for SR pipeline)</td></tr>
   </table>
   <div class="section-label">Embedding setup (.env)</div>
   <pre>EMBEDDING_PROVIDER=ollama
@@ -381,7 +397,7 @@ EMBEDDING_MODEL=nomic-embed-text</pre>
 </div></div>
 
 </div><!-- end grid -->
-<footer>AI kcMedical Research &nbsp;&middot;&nbsp; PRISMA 2020 / Cochrane Handbook v6.5 &nbsp;&middot;&nbsp; 258 tests &nbsp;&middot;&nbsp; 87% coverage &nbsp;&middot;&nbsp; All SR outputs require human verification.</footer>
+<footer>AI kcMedical Research &nbsp;&middot;&nbsp; PRISMA 2020 / Cochrane Handbook v6.5 &nbsp;&middot;&nbsp; 291 tests &nbsp;&middot;&nbsp; 65% coverage (main.py) &nbsp;&middot;&nbsp; All SR outputs require human verification.</footer>
 <script>
 function toggle(card){card.classList.toggle("open")}
 function toggleAll(){
