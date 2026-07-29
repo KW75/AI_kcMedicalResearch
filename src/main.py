@@ -1289,6 +1289,100 @@ def run_rct_search_pipeline(
         "- Run python src/main.py --mode sr for full systematic review pipeline\n"
     )
 
+    # -- Stage 4: PubMed Fetch + AI Ranking ----------------------------------
+    print("[RCT Search] Searching PubMed for relevant articles...")
+    articles = fetch_pubmed_articles(topic, max_results=10) if not dry_run else [
+        {"pmid": "00000001", "title": "[DRY RUN] Test Article",
+         "abstract": "Dry run abstract.",
+         "url": "https://pubmed.ncbi.nlm.nih.gov/00000001/"}
+    ]
+
+    if articles:
+        print(f"[RCT Search] Found {len(articles)} article(s). Ranking by PICO relevance...")
+        abstracts_block = ""
+        for idx, art in enumerate(articles, 1):
+            abstracts_block += (
+                "\n### Article " + str(idx) + "\n"
+                + "Title: " + art["title"] + "\n"
+                + "PMID: " + art["pmid"] + "\n"
+                + "URL: " + art["url"] + "\n"
+                + "Abstract: " + art["abstract"] + "\n"
+            )
+        rank_prompt = (
+            "You are a systematic review expert.\n\n"
+            "PICO Question:\n" + previous_response + "\n\n"
+            "Rate each article below for relevance to the PICO question "
+            "on a scale of 1-10 (10 = highly relevant RCT).\n"
+            "For each article output EXACTLY this format on one line:\n"
+            "ARTICLE_RANK: <number> | SCORE: <1-10> | "
+            "PMID: <pmid> | TITLE: <title> | URL: <url>\n\n"
+            + abstracts_block
+        )
+        if dry_run:
+            rank_response = "\n".join(
+                "ARTICLE_RANK: " + str(i) + " | SCORE: " + str(10 - i) + " | "
+                + "PMID: " + art["pmid"] + " | TITLE: " + art["title"]
+                + " | URL: " + art["url"]
+                for i, art in enumerate(articles, 1)
+            )
+        else:
+            try:
+                rank_response = call_ai(
+                    prompt=rank_prompt, provider=provider, model=model
+                )
+            except RuntimeError as exc:
+                rank_response = "[ERROR ranking articles: " + str(exc) + "]"
+        ranked = []
+        for ln in rank_response.splitlines():
+            m = re.match(
+                r"ARTICLE_RANK:\s*(\d+)\s*\|\s*SCORE:\s*(\d+)\s*\|"
+                r"\s*PMID:\s*(\S+)\s*\|\s*TITLE:\s*(.+?)\s*\|\s*URL:\s*(\S+)",
+                ln.strip()
+            )
+            if m:
+                ranked.append({
+                    "rank":  int(m.group(1)),
+                    "score": int(m.group(2)),
+                    "pmid":  m.group(3),
+                    "title": m.group(4),
+                    "url":   m.group(5),
+                })
+        ranked.sort(key=lambda x: x["score"], reverse=True)
+        table_lines = [
+            "## Ranked Article List\n",
+            "| Rank | Score | Title | PMID | Link |",
+            "|------|-------|-------|------|------|",
+        ]
+        for r in ranked:
+            table_lines.append(
+                "| " + str(r["rank"]) + " | " + str(r["score"]) + "/10 | "
+                + r["title"] + " | " + r["pmid"]
+                + " | [PubMed](" + r["url"] + ") |"
+            )
+        table_lines.append(
+            "\n> Select your top articles, download PDFs "
+            "and place them in input/sr/ to run the SR pipeline."
+        )
+        report_parts.append("\n".join(table_lines))
+        top = ranked[0]["title"] if ranked else "N/A"
+        print("[RCT Search] Ranking complete. Top article: " + top)
+        pico_files = sorted(OUTPUT_RCT_SEARCH.glob("pico_*.json"), reverse=True)
+        if pico_files:
+            pico_data = json.loads(pico_files[0].read_text(encoding="utf-8"))
+            pico_data["ranked_articles"] = ranked
+            pico_files[0].write_text(
+                json.dumps(pico_data, indent=2, ensure_ascii=False),
+                encoding="utf-8",
+            )
+            print("[RCT Search] PICO JSON updated with "
+                  + str(len(ranked)) + " ranked article(s).")
+    else:
+        print("[RCT Search] No articles found on PubMed for this topic.")
+        report_parts.append(
+            "## Ranked Article List\n\n_No articles retrieved from PubMed._\n"
+        )
+    # -- End Stage 4 ----------------------------------------------------------
+
     timestamp  = datetime.now().strftime("%Y%m%d_%H%M%S")
     out_dir    = reports_dir if reports_dir != REPORTS_DIR else OUTPUT_RCT_SEARCH
     out_dir.mkdir(parents=True, exist_ok=True)
