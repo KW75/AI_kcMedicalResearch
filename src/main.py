@@ -1383,7 +1383,6 @@ def run_rct_search_pipeline(
     _pubmed_query = " AND ".join(_pico_terms) if _pico_terms else topic
     print(f"[RCT Search] PubMed query (cleaned): {_pubmed_query}")
     print("[RCT Search] Searching PubMed for relevant articles...")
-    print(f"[RCT Search] PubMed query: {_pubmed_query}")
     articles = fetch_pubmed_articles(_pubmed_query, max_results=20) if not dry_run else [
 
         {"pmid": "00000001", "title": "[DRY RUN] Test Article",
@@ -1433,7 +1432,6 @@ def run_rct_search_pipeline(
                 )
             except RuntimeError as exc:
                 rank_response = "[ERROR ranking articles: " + str(exc) + "]"
-            print(f"[RCT Search] Raw rank_response (first 800 chars):\n{rank_response[:800]}")
         ranked = []
         if rank_response.startswith("[ERROR"):
             print(f"[RCT Search] Ranking error: {rank_response}")
