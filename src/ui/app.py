@@ -1,4 +1,4 @@
-﻿
+
 """
 src/ui/app.py  -  Main Streamlit UI for AI kcMedicalResearch v2.2.0
 Landing page: six mode cards in a single row
@@ -115,10 +115,13 @@ MODES: dict[str, dict] = {
         "extensions":  [".pdf"],
         "instructions": (
             "**How to use Systematic Review mode**\n\n"
-            "1. Drop article PDFs into `input/sr/`.\n"
-            "2. Edit `docs/sr/prisma_criteria.md` with your inclusion/exclusion criteria.\n"
-            "3. Click **Run Systematic Review** \u2014 a new terminal window opens.\n"
-            "4. Results are saved to `output/sr/`."
+            "**Phase 1 — Discovery (optional):**\n"
+            "1. Run RCT Search mode first to generate a ranked article list.\n"
+            "2. Use **Import PICO from RCT Search** below to pre-fill your PICO fields.\n\n"
+            "**Phase 2 — Synthesis:**\n"
+            "3. Upload your chosen article PDFs to `input/sr/`.\n"
+            "4. Review or edit the imported PICO fields.\n"
+            "5. Click **Run Systematic Review** — results saved to `output/sr/`."
         ),
     },
 }
@@ -443,6 +446,7 @@ def _render_header(subtitle: str = "") -> None:
             {logo_html}
             <div>
                 <h1>AI kcMedicalResearch</h1>
+                <p style="margin:0;font-size:0.95rem;color:#555;letter-spacing:.05em;">Pipeline User Interface</p>
                 {sub_html}
             </div>
         </div>
@@ -685,8 +689,108 @@ def _mode_page(mode: str) -> None:
             key=f"topic_{mode}",
         )
 
-    # file uploader — single widget, sr mode has no uploader (uses input/sr/)
-    if mode != "sr":
+    # file uploader — sr mode gets its own uploader + PICO import widget
+    if mode == "sr":
+        st.markdown(
+            "**Upload article PDFs to** `input/sr/`  \u2014  Accepted: .pdf"
+        )
+        uploaded_sr = st.file_uploader(
+            "Choose PDF files",
+            accept_multiple_files=True,
+            type=["pdf"],
+            key="upload_sr",
+        )
+        if uploaded_sr:
+            dest_sr = INPUT_DIR / "sr"
+            dest_sr.mkdir(parents=True, exist_ok=True)
+            saved_sr = []
+            for uf in uploaded_sr:
+                fp = dest_sr / uf.name
+                fp.write_bytes(uf.read())
+                saved_sr.append(uf.name)
+            st.success(
+                f"\u2705 Saved {len(saved_sr)} PDF(s) to `input/sr/`: "
+                + ", ".join(f"`{n}`" for n in saved_sr)
+            )
+            st.rerun()
+
+        # ── PICO import from RCT Search ──────────────────────────────────
+        pico_dir = OUTPUT_DIR / "rct_search"
+        pico_files = sorted(
+            pico_dir.glob("pico_*.json"), reverse=True
+        ) if pico_dir.exists() else []
+
+        with st.expander("\U0001f4e5 Import PICO from RCT Search", expanded=bool(pico_files)):
+            if not pico_files:
+                st.info(
+                    "No PICO files found in `output/rct_search/`. "
+                    "Run RCT Search mode first to generate one, "
+                    "or fill in the PICO fields manually in "
+                    "`sr/config/prisma_criteria.yaml`."
+                )
+            else:
+                pico_names = [p.name for p in pico_files]
+                chosen = st.selectbox(
+                    "Select a saved PICO file",
+                    pico_names,
+                    key="pico_select_sr",
+                )
+                chosen_path = pico_dir / chosen
+                import json as _json
+                pico_data = _json.loads(chosen_path.read_text(encoding="utf-8"))
+
+                # show editable fields pre-filled from JSON
+                st.markdown("**Review / edit PICO fields before importing:**")
+                col_a, col_b = st.columns(2)
+                with col_a:
+                    p_pop   = st.text_input("Population",    pico_data.get("population",    ""), key="pico_pop")
+                    p_int   = st.text_input("Intervention",  pico_data.get("intervention",  ""), key="pico_int")
+                    p_com   = st.text_input("Comparator",    pico_data.get("comparator",    ""), key="pico_com")
+                with col_b:
+                    p_out   = st.text_input("Outcome",       pico_data.get("outcome",       ""), key="pico_out")
+                    p_des   = st.text_input("Study design",  pico_data.get("study_design",  "RCT"), key="pico_des")
+                    p_eff   = st.selectbox("Effect measure", ["SMD","MD","OR","RR"],
+                                           index=["SMD","MD","OR","RR"].index(
+                                               pico_data.get("effect_measure", "SMD")
+                                           ) if pico_data.get("effect_measure","SMD") in ["SMD","MD","OR","RR"] else 0,
+                                           key="pico_eff")
+
+                st.markdown("**Formulator output (topic summary):**")
+                st.text_area(
+                    "Formulator output",
+                    pico_data.get("formulator_output", ""),
+                    height=120,
+                    disabled=True,
+                    key="pico_formulator_preview",
+                    label_visibility="collapsed",
+                )
+
+                if st.button("\u2705 Apply PICO to SR config", key="pico_apply"):
+                    import yaml as _yaml
+                    yaml_path = BASE_DIR / "sr" / "config" / "prisma_criteria.yaml"
+                    if yaml_path.exists():
+                        cfg_yaml = _yaml.safe_load(yaml_path.read_text(encoding="utf-8")) or {}
+                    else:
+                        cfg_yaml = {}
+                    cfg_yaml.setdefault("pico", {})
+                    cfg_yaml["pico"]["population"]    = p_pop
+                    cfg_yaml["pico"]["intervention"]  = p_int
+                    cfg_yaml["pico"]["comparator"]    = p_com
+                    cfg_yaml["pico"]["outcome"]       = p_out
+                    cfg_yaml["pico"]["study_design"]  = p_des
+                    cfg_yaml["effect_measure"]        = p_eff
+                    yaml_path.parent.mkdir(parents=True, exist_ok=True)
+                    yaml_path.write_text(
+                        _yaml.dump(cfg_yaml, allow_unicode=True, sort_keys=False),
+                        encoding="utf-8",
+                    )
+                    st.success(
+                        f"\u2705 PICO written to `sr/config/prisma_criteria.yaml` "
+                        f"from `{chosen}`. You can now run Systematic Review."
+                    )
+                    st.rerun()
+
+    elif mode != "sr":
         st.markdown(
             f"**Upload files to** `input/{mode}/`  \u2014  "
             f"Accepted: {', '.join(cfg['extensions'])}"

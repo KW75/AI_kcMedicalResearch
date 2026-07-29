@@ -238,6 +238,6 @@ class TestSRLauncher:
             run_sr_launcher()
         out = capsys.readouterr().out
         assert "SR Automation Pipeline" in out
-        assert "Streamlit" in out
-        assert "SR UI launched" in out
+        assert "Pipeline UI" in out
+        assert "Pipeline UI launched" in out
 

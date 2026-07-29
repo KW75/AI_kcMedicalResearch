@@ -1247,6 +1247,31 @@ def run_rct_search_pipeline(
         report_parts.append(f"## {role} Output\n\n{response}\n")
         print(f"{colour}{role} complete.{RESET}\n")
 
+        # -- save PICO JSON after Formulator completes -------------------------
+        if role == "Formulator" and not dry_run:
+            pico_json_dir = OUTPUT_RCT_SEARCH
+            pico_json_dir.mkdir(parents=True, exist_ok=True)
+            pico_json_path = pico_json_dir / f"pico_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+            pico_data = {
+                "timestamp":         datetime.now().strftime("%Y%m%d_%H%M%S"),
+                "topic":             topic,
+                "formulator_output": response,
+                "population":        "",
+                "intervention":      "",
+                "comparator":        "",
+                "outcome":           "",
+                "study_design":      "RCT",
+                "effect_measure":    "SMD",
+                "source_mode":       "rct_search",
+            }
+            pico_json_path.write_text(
+                json.dumps(pico_data, indent=2, ensure_ascii=False),
+                encoding="utf-8",
+            )
+            print(f"[RCT Search] PICO saved to: {pico_json_path.name}")
+        # ----------------------------------------------------------------------
+
+
     validator_output = previous_response.upper()
     if "APPROVED FOR DOWNLOAD" in validator_output:
         status = "APPROVED FOR DOWNLOAD"
@@ -1416,35 +1441,36 @@ def fetch_pubmed_articles(
 # SR launcher
 # ---------------------------------------------------------------------------
 def run_sr_launcher() -> None:
-    """Launch the SR Streamlit UI in a separate window."""
+    """Launch the unified Pipeline UI (SR mode uses src/ui/app.py)."""
     import subprocess as _sp
-    sr_ui     = BASE_DIR / "sr" / "src" / "ui" / "app.py"
-    repo_root = BASE_DIR
+    unified_ui = BASE_DIR / "src" / "ui" / "app.py"
+    repo_root  = BASE_DIR
 
     print("\n" + "=" * 58)
     print("  SR Automation Pipeline")
     print("  PRISMA 2020  |  Cochrane Handbook v6.5")
     print("=" * 58)
-    print("\n  Launching Streamlit UI in a new window...")
+    print("\n  Launching Pipeline UI (SR mode) in a new window...")
     print("  URL: http://localhost:8501")
-    print("  Close the Streamlit window to stop the server.\n")
+    print("  Navigate to Systematic Review in the sidebar.")
+    print("  Close the browser window to stop the server.\n")
 
     if os.name == "nt":
         _sp.Popen(
-            ["cmd", "/c", "start", "SR Pipeline UI",
-             sys.executable, "-m", "streamlit", "run", str(sr_ui)],
+            ["cmd", "/c", "start", "Pipeline UI",
+             sys.executable, "-m", "streamlit", "run", str(unified_ui),
+             "--server.runOnSave", "false"],
             cwd=str(repo_root),
         )
     else:
         _sp.Popen(
-            [sys.executable, "-m", "streamlit", "run", str(sr_ui)],
+            [sys.executable, "-m", "streamlit", "run", str(unified_ui),
+             "--server.runOnSave", "false"],
             cwd=str(repo_root),
         )
 
-    print("  SR UI launched. Returning to menu...\n")
+    print("  Pipeline UI launched. Returning to menu...\n")
 
-
-# ---------------------------------------------------------------------------
 def list_roles(mode: str = "coding") -> None:
     """Print each role's prompt file and injected documentation for a mode."""
     roles = ALL_MODES.get(mode, {})
