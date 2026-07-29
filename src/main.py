@@ -1403,13 +1403,20 @@ def run_rct_search_pipeline(
                 + "Abstract: " + art["abstract"] + "\n"
             )
         rank_prompt = (
-            "You are a systematic review expert.\n\n"
+            "You are a systematic review expert. Your ONLY task is to rate articles.\n\n"
             "PICO Question:\n" + previous_response + "\n\n"
-            "Rate each article below for relevance to the PICO question "
-            "on a scale of 1-10 (10 = highly relevant RCT).\n"
-            "For each article output EXACTLY this format on one line:\n"
-            "ARTICLE_RANK: <number> | SCORE: <1-10> | "
-            "PMID: <pmid> | TITLE: <title> | URL: <url>\n\n"
+            "INSTRUCTIONS:\n"
+            "- Rate each article for relevance to the PICO question on a scale of 1-10.\n"
+            "- 10 = highly relevant RCT directly matching the PICO.\n"
+            "- 1 = not relevant.\n"
+            "- Output ONLY the rating lines. No summaries, no headers, no extra text.\n"
+            "- Each line MUST follow this EXACT format:\n"
+            "ARTICLE_RANK: 1 | SCORE: 9 | PMID: 12345678 | TITLE: Example title here | URL: https://pubmed.ncbi.nlm.nih.gov/12345678/\n\n"
+            "EXAMPLE OUTPUT (do not copy — use real values):\n"
+            "ARTICLE_RANK: 1 | SCORE: 9 | PMID: 11111111 | TITLE: CBT for fibromyalgia RCT | URL: https://pubmed.ncbi.nlm.nih.gov/11111111/\n"
+            "ARTICLE_RANK: 2 | SCORE: 7 | PMID: 22222222 | TITLE: Mindfulness for chronic pain | URL: https://pubmed.ncbi.nlm.nih.gov/22222222/\n"
+            "ARTICLE_RANK: 3 | SCORE: 3 | PMID: 33333333 | TITLE: Ketamine infusion study | URL: https://pubmed.ncbi.nlm.nih.gov/33333333/\n\n"
+            "NOW RATE THESE ARTICLES — output rating lines ONLY:\n\n"
             + abstracts_block
         )
         if dry_run:
@@ -1426,6 +1433,7 @@ def run_rct_search_pipeline(
                 )
             except RuntimeError as exc:
                 rank_response = "[ERROR ranking articles: " + str(exc) + "]"
+            print(f"[RCT Search] Raw rank_response (first 800 chars):\n{rank_response[:800]}")
         ranked = []
         if rank_response.startswith("[ERROR"):
             print(f"[RCT Search] Ranking error: {rank_response}")
