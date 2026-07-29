@@ -1649,6 +1649,7 @@ def test_fetch_pubmed_parses_xml_correctly():
 # run_search_mode tests
 # ---------------------------------------------------------------------------
 
+@pytest.mark.skip(reason="run_search_mode removed — superseded by handle_search_mode")
 def test_run_search_mode_dry_run_creates_report(tmp_path, monkeypatch):
     from src import main as m
     from pathlib import Path
@@ -1669,6 +1670,7 @@ def test_run_search_mode_dry_run_creates_report(tmp_path, monkeypatch):
     assert md_path.stat().st_size > 0
 
 
+@pytest.mark.skip(reason="run_search_mode removed — superseded by handle_search_mode")
 def test_run_search_mode_empty_topic_exits(tmp_path, monkeypatch):
     from src import main as m
     monkeypatch.setattr(m, "BASE_DIR", tmp_path)
@@ -1678,6 +1680,7 @@ def test_run_search_mode_empty_topic_exits(tmp_path, monkeypatch):
         m.run_search_mode(dry_run=True)
 
 
+@pytest.mark.skip(reason="run_search_mode removed — superseded by handle_search_mode")
 def test_run_search_mode_no_articles_exits(monkeypatch, tmp_path):
     from src import main as m
     monkeypatch.setattr(m, "BASE_DIR", tmp_path)
@@ -2025,6 +2028,7 @@ def test_rct_search_uses_topic_file(tmp_path, monkeypatch):
     content = Path(result).read_text(encoding="utf-8")
     assert "metformin diabetes" in content
 
+@pytest.mark.skip(reason="run_search_mode removed")
 def test_search_uses_topic_file(tmp_path, monkeypatch):
     from src import main as m
     ai_dir = tmp_path / "ai"
@@ -2099,6 +2103,7 @@ class TestValidateApiKeys:
 class TestInteractiveInputPaths:
 
     # run_search_mode — interactive search type selection
+    @pytest.mark.skip(reason="run_search_mode removed — superseded by handle_search_mode")
     def test_search_mode_interactive_paper_search(self, tmp_path):
         """run_search_mode: interactive path, type=1 (paper search)."""
         from src.main import run_search_mode
@@ -2119,6 +2124,7 @@ class TestInteractiveInputPaths:
         content = md_path.read_text(encoding="utf-8")
         assert "metformin" in content.lower()
 
+    @pytest.mark.skip(reason="run_search_mode removed — superseded by handle_search_mode")
     def test_search_mode_interactive_clinical_topic(self, tmp_path):
         """run_search_mode: interactive path, type=2 (clinical topic)."""
         from src.main import run_search_mode
@@ -2139,6 +2145,7 @@ class TestInteractiveInputPaths:
         content = md_path.read_text(encoding="utf-8")
         assert "hypertension" in content.lower()
 
+    @pytest.mark.skip(reason="run_search_mode removed — superseded by handle_search_mode")
     def test_search_mode_invalid_then_valid_type(self, tmp_path):
         """run_search_mode: invalid input retries until valid."""
         from src.main import run_search_mode

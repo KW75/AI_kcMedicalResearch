@@ -337,8 +337,8 @@ def _write_docx(path: Path, content: str, title: str = "") -> None:
             doc.add_heading(s[2:], level=1)
         elif s.startswith("- ") or s.startswith("* "):
             doc.add_paragraph(s[2:], style="List Bullet")
-        elif len(s) > 2 and s[0].isdigit() and s[1] in ".)":
-            doc.add_paragraph(s[2:].strip(), style="List Number")
+        elif re.match(r"^\d+[.)]\s", s):
+            doc.add_paragraph(re.sub(r"^\d+[.)]\s*", "", s).strip(), style="List Number")
         elif s.startswith("---"):
             doc.add_paragraph("")
         else:
