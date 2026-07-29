@@ -1419,6 +1419,8 @@ def run_rct_search_pipeline(
             except RuntimeError as exc:
                 rank_response = "[ERROR ranking articles: " + str(exc) + "]"
         ranked = []
+        if rank_response.startswith("[ERROR"):
+            print(f"[RCT Search] Ranking error: {rank_response}")
         for ln in rank_response.splitlines():
             m = re.match(
                 r"ARTICLE_RANK:\s*(\d+)\s*\|\s*SCORE:\s*(\d+)\s*\|"
@@ -1436,6 +1438,16 @@ def run_rct_search_pipeline(
         ranked.sort(key=lambda x: x["score"], reverse=True)
         for new_rank, r in enumerate(ranked, 1):
             r["rank"] = new_rank
+        if not ranked:
+            print("[RCT Search] Warning: AI ranking returned no parseable results.")
+            print("[RCT Search] Raw ranking response (first 500 chars):")
+            print(rank_response[:500])
+            # fallback: use fetch order, score descending by position
+            ranked = [
+                {"rank": i, "score": len(articles) - i + 1,
+                 "pmid": a["pmid"], "title": a["title"], "url": a["url"]}
+                for i, a in enumerate(articles, 1)
+    ]
         table_lines = [
             "## Ranked Article List\n",
             f"_All {len(ranked)} articles retrieved from PubMed, ordered by relevance score (1 = most relevant)._\n",
@@ -1593,7 +1605,7 @@ def fetch_pubmed_articles(
     base       = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils"
     search_url = (
         f"{base}/esearch.fcgi?db=pubmed&term={urllib.parse.quote(query)}"
-        f"&retmax=5&retmode=json"
+        f"&retmax={max_results}&retmode=json"
     )
     try:
         with urlopen(search_url, timeout=15) as resp:
