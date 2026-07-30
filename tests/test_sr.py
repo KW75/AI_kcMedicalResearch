@@ -214,30 +214,164 @@ class TestHTMLReportGenerator:
 # ---------------------------------------------------------------------------
 
 class TestSRLauncher:
-    def test_sr_in_parse_args(self):
-        from src.main import parse_args
-        args = parse_args(["--mode", "sr"])
-        assert args.mode == "sr"
+    """Tests for run_sr_launcher() — mocks subprocess.run and filesystem."""
 
-    def test_launcher_prints_pipeline_header(self, capsys):
-        from src.main import run_sr_launcher
-        run_sr_launcher()
+    # ------------------------------------------------------------------
+    # Helpers
+    # ------------------------------------------------------------------
+    def _make_input_sr(self, tmp_path: Path) -> Path:
+        """Create a minimal input/sr/ directory with one dummy PDF and a PICO JSON."""
+        import json as _json
+        sr_dir = tmp_path / "input" / "sr"
+        sr_dir.mkdir(parents=True, exist_ok=True)
+
+        (sr_dir / "dummy.pdf").write_bytes(b"%PDF-1.4 dummy")
+
+        pico = {
+            "timestamp":            "2026-07-30 09:00:00",
+            "topic":                "CBT for fibromyalgia",
+            "formulator_output":    "",
+            "population":           "Adults with fibromyalgia",
+            "intervention":         "Cognitive-Behavioral Therapy",
+            "comparator":           "Standard care",
+            "outcome":              "Pain intensity",
+            "study_design":         "RCT",
+            "effect_measure":       "SMD",
+            "source_mode":          "rct_search",
+            "pubmed_query_raw":     "Adults with fibromyalgia AND CBT AND Pain intensity",
+            "pubmed_query_cleaned": (
+                "Adults with fibromyalgia AND CBT AND Pain intensity "
+                "AND randomized controlled trial[pt]"
+            ),
+            "ranked_articles": [],
+        }
+        (sr_dir / "pico_test.json").write_text(
+            _json.dumps(pico, indent=2), encoding="utf-8"
+        )
+        return sr_dir
+
+    def _mock_env(self, tmp_path: Path):
+        """
+        Return a context manager that patches INPUT_SR, BASE_DIR, and
+        subprocess.run with a successful (returncode=0) mock result.
+        """
+        import src.main as _m
+
+        mock_result = unittest.mock.MagicMock()
+        mock_result.returncode = 0
+
+        sr_dir = tmp_path / "sr"
+        (sr_dir / "data" / "uploads").mkdir(parents=True, exist_ok=True)
+        (sr_dir / "config").mkdir(parents=True, exist_ok=True)
+        (sr_dir / "main.py").write_text("# stub", encoding="utf-8")
+
+        return unittest.mock.patch.multiple(
+            _m,
+            INPUT_SR=tmp_path / "input" / "sr",
+            BASE_DIR=tmp_path,
+            **{"subprocess": unittest.mock.MagicMock(
+                run=unittest.mock.MagicMock(return_value=mock_result)
+            )},
+        )
+
+    # ------------------------------------------------------------------
+    # Tests
+    # ------------------------------------------------------------------
+    def test_launcher_prints_pipeline_header(self, tmp_path, capsys):
+        import src.main as _m
+        self._make_input_sr(tmp_path)
+
+        mock_result = unittest.mock.MagicMock()
+        mock_result.returncode = 0
+
+        (tmp_path / "sr" / "data" / "uploads").mkdir(parents=True, exist_ok=True)
+        (tmp_path / "sr" / "config").mkdir(parents=True, exist_ok=True)
+        (tmp_path / "sr" / "main.py").write_text("# stub", encoding="utf-8")
+
+        with (
+            unittest.mock.patch.object(_m, "INPUT_SR", tmp_path / "input" / "sr"),
+            unittest.mock.patch.object(_m, "BASE_DIR", tmp_path),
+            unittest.mock.patch("subprocess.run", return_value=mock_result),
+        ):
+            _m.run_sr_launcher()
+
         out = capsys.readouterr().out
         assert "SR Automation Pipeline" in out
 
-    def test_launcher_prints_prisma_yaml(self, capsys):
-        from src.main import run_sr_launcher
-        with unittest.mock.patch("subprocess.Popen"):
-            run_sr_launcher()
-        out = capsys.readouterr().out
-        assert "localhost:8501" in out
+    def test_launcher_copies_pdfs(self, tmp_path, capsys):
+        import src.main as _m
+        self._make_input_sr(tmp_path)
 
-    def test_launcher_prints_output_files(self, capsys):
-        from src.main import run_sr_launcher
-        with unittest.mock.patch("subprocess.Popen"):
-            run_sr_launcher()
+        mock_result = unittest.mock.MagicMock()
+        mock_result.returncode = 0
+
+        uploads_dir = tmp_path / "sr" / "data" / "uploads"
+        uploads_dir.mkdir(parents=True, exist_ok=True)
+        (tmp_path / "sr" / "config").mkdir(parents=True, exist_ok=True)
+        (tmp_path / "sr" / "main.py").write_text("# stub", encoding="utf-8")
+
+        with (
+            unittest.mock.patch.object(_m, "INPUT_SR", tmp_path / "input" / "sr"),
+            unittest.mock.patch.object(_m, "BASE_DIR", tmp_path),
+            unittest.mock.patch("subprocess.run", return_value=mock_result),
+        ):
+            _m.run_sr_launcher()
+
         out = capsys.readouterr().out
-        assert "SR Automation Pipeline" in out
-        assert "Pipeline UI" in out
-        assert "Pipeline UI launched" in out
+        assert "Copied" in out or "Already present" in out
+        assert (uploads_dir / "dummy.pdf").exists()
+
+    def test_launcher_loads_pico_json(self, tmp_path, capsys):
+        import src.main as _m
+        self._make_input_sr(tmp_path)
+
+        mock_result = unittest.mock.MagicMock()
+        mock_result.returncode = 0
+
+        (tmp_path / "sr" / "data" / "uploads").mkdir(parents=True, exist_ok=True)
+        (tmp_path / "sr" / "config").mkdir(parents=True, exist_ok=True)
+        (tmp_path / "sr" / "main.py").write_text("# stub", encoding="utf-8")
+
+        with (
+            unittest.mock.patch.object(_m, "INPUT_SR", tmp_path / "input" / "sr"),
+            unittest.mock.patch.object(_m, "BASE_DIR", tmp_path),
+            unittest.mock.patch("subprocess.run", return_value=mock_result),
+        ):
+            _m.run_sr_launcher()
+
+        out = capsys.readouterr().out
+        assert "PICO loaded from pico_test.json" in out
+        assert "prisma_criteria.yaml updated" in out
+
+    def test_launcher_no_pdfs_returns_early(self, tmp_path, capsys):
+        import src.main as _m
+        empty_sr = tmp_path / "input" / "sr"
+        empty_sr.mkdir(parents=True, exist_ok=True)   # exists but has no PDFs
+
+        with unittest.mock.patch.object(_m, "INPUT_SR", empty_sr):
+            _m.run_sr_launcher()
+
+        out = capsys.readouterr().out
+        assert "No PDF files found" in out
+
+    def test_launcher_pipeline_complete_message(self, tmp_path, capsys):
+        import src.main as _m
+        self._make_input_sr(tmp_path)
+
+        mock_result = unittest.mock.MagicMock()
+        mock_result.returncode = 0
+
+        (tmp_path / "sr" / "data" / "uploads").mkdir(parents=True, exist_ok=True)
+        (tmp_path / "sr" / "config").mkdir(parents=True, exist_ok=True)
+        (tmp_path / "sr" / "main.py").write_text("# stub", encoding="utf-8")
+
+        with (
+            unittest.mock.patch.object(_m, "INPUT_SR", tmp_path / "input" / "sr"),
+            unittest.mock.patch.object(_m, "BASE_DIR", tmp_path),
+            unittest.mock.patch("subprocess.run", return_value=mock_result),
+        ):
+            _m.run_sr_launcher()
+
+        out = capsys.readouterr().out
+        assert "Pipeline complete" in out
 

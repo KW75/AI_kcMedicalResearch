@@ -1820,32 +1820,104 @@ def fetch_pubmed_articles(
 # ---------------------------------------------------------------------------
 # SR launcher
 # ---------------------------------------------------------------------------
-def run_sr_launcher() -> None:
-    """Launch the unified Pipeline UI (SR mode uses src/ui/app.py)."""
+def run_sr_launcher(provider: str = "", model: str = "") -> None:
+    """Run the SR automation pipeline (CLI mode — no Streamlit)."""
+    import shutil
     import subprocess as _sp
-    unified_ui = BASE_DIR / "src" / "ui" / "app.py"
-    repo_root  = BASE_DIR
+    import json as _json
+    import yaml as _yaml
 
     print("\n" + "=" * 58)
     print("  SR Automation Pipeline")
     print("  PRISMA 2020  |  Cochrane Handbook v6.5")
-    print("=" * 58)
-    print("\n  Launching Pipeline UI (SR mode) in a new window...")
-    print("  URL: http://localhost:8501")
-    print("  Navigate to Systematic Review in the sidebar.")
-    print("  Close the browser window to stop the server.\n")
+    print("=" * 58 + "\n")
 
-    _launch_kw: dict = {"cwd": str(repo_root)}
-    if os.name == "nt":
-        import subprocess as _sub
-        _launch_kw["creationflags"] = _sub.CREATE_NEW_CONSOLE
-    _sp.Popen(
-        [sys.executable, "-m", "streamlit", "run", str(unified_ui),
-         "--server.runOnSave", "false"],
-        **_launch_kw,
-    )
+    # -- Step 1: find PDFs in input/sr/ ---------------------------------------
+    pdf_files = sorted(INPUT_SR.glob("*.pdf"))
+    if not pdf_files:
+        print("[SR] No PDF files found in input/sr/. Aborting.")
+        return
 
-    print("  Pipeline UI launched. Returning to menu...\n")
+    print(f"[SR] Found {len(pdf_files)} PDF(s) in input/sr/:")
+    for p in pdf_files:
+        print(f"     {p.name}")
+
+    # -- Step 2: copy PDFs to sr/data/uploads/ --------------------------------
+    uploads_dir = BASE_DIR / "sr" / "data" / "uploads"
+    uploads_dir.mkdir(parents=True, exist_ok=True)
+    for p in pdf_files:
+        dest = uploads_dir / p.name
+        if dest.exists():
+            print(f"[SR] Already present: sr/data/uploads/{p.name}")
+        else:
+            shutil.copy2(p, dest)
+            print(f"[SR] Copied: {p.name} -> sr/data/uploads/")
+
+    # -- Step 3: load PICO JSON and update prisma_criteria.yaml --------------
+    pico_files = sorted(INPUT_SR.glob("pico_*.json"),
+                        key=lambda f: f.stat().st_mtime, reverse=True)
+    cfg_yaml: dict = {}
+    if pico_files:
+        pico_path = pico_files[0]
+        try:
+            pico_data = _json.loads(pico_path.read_text(encoding="utf-8"))
+            print(f"[SR] PICO loaded from {pico_path.name}")
+
+            cfg_yaml = {
+                "review_title":       pico_data.get("topic", ""),
+                "effect_measure":     pico_data.get("effect_measure", "SMD"),
+                "pico": {
+                    "population":     pico_data.get("population", ""),
+                    "intervention":   pico_data.get("intervention", ""),
+                    "comparator":     pico_data.get("comparator", ""),
+                    "outcome":        pico_data.get("outcome", ""),
+                },
+                "pubmed_query_cleaned": pico_data.get("pubmed_query_cleaned", ""),
+                "inclusion_criteria": ["RCT", "Adult participants"],
+                "exclusion_criteria": ["Non-RCT", "Animal studies"],
+            }
+
+            prisma_path = BASE_DIR / "sr" / "config" / "prisma_criteria.yaml"
+            prisma_path.parent.mkdir(parents=True, exist_ok=True)
+            prisma_path.write_text(
+                _yaml.dump(cfg_yaml, allow_unicode=True, sort_keys=False),
+                encoding="utf-8",
+            )
+            print(f"[SR] prisma_criteria.yaml updated")
+            print(f"[SR] PubMed query : {cfg_yaml.get('pubmed_query_cleaned', 'n/a')}")
+        except Exception as _e:
+            print(f"[SR] Warning: could not load PICO JSON: {_e}")
+    else:
+        print("[SR] No pico_*.json found in input/sr/ — using existing config.")
+
+    # -- Step 4: resolve model ------------------------------------------------
+    _model    = model    or "qwen3.7-plus"
+    _provider = provider or "qwen"
+    print(f"\n[SR] Provider: {_provider}  Model: {_model}")
+    print("[SR] Starting pipeline — this may take several minutes...\n")
+
+    # -- Step 5: run sr/main.py -----------------------------------------------
+    sr_main = BASE_DIR / "sr" / "main.py"
+    cmd = [
+        sys.executable, str(sr_main),
+        "--pdf-dir",        str(uploads_dir),
+        "--provider",       _provider,
+        "--model",          _model,
+        "--effect-measure", cfg_yaml.get("effect_measure", "SMD")
+                            if pico_files else "SMD",
+    ]
+    print(f"[SR] Running: {' '.join(cmd)}\n")
+    result = _sp.run(cmd, cwd=str(BASE_DIR))
+
+    if result.returncode == 0:
+        out_base = BASE_DIR / "sr" / "outputs"
+        print("\n[SR] Pipeline complete.")
+        print(f"[SR] DOCX   -> {out_base / 'reports' / 'systematic_review.docx'}")
+        print(f"[SR] PDF    -> {out_base / 'reports' / 'systematic_review.pdf'}")
+        print(f"[SR] Plot   -> {out_base / 'figures' / 'forest_plot.png'}")
+    else:
+        print(f"\n[SR] Pipeline exited with code {result.returncode}.")
+        print("[SR] Check the output above for errors.")
 
 def list_roles(mode: str = "coding") -> None:
     """Print each role's prompt file and injected documentation for a mode."""
@@ -2549,7 +2621,10 @@ if __name__ == "__main__":
                 model=args.model,
             )
         elif args.mode == "sr":
-            run_sr_launcher()
+            run_sr_launcher(
+                provider=args.provider,
+                model=args.model,
+            )
         elif args.mode == "rct_search":
             run_rct_search_pipeline(
                 provider=args.provider,

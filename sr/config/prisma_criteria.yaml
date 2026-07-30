@@ -17,9 +17,9 @@ inclusion_criteria:
 pico:
   comparator: Placebo or active comparator
   intervention: Cognitive-Behavioral Therapy
-  outcome: Pain intensity at post intervention timepoint
-  population: Adults (>=18 years) with fibromyalgia
-  study_design: Randomised controlled trials (RCTs)
+  outcome: Pain intensity at post intervention
+  population: Adults with fibromyalgia
+  study_design: RCT
 review_title: 'Effect of Cognitive-Behavioral Therapy on Pain intensity: A Systematic
   Review and Meta-Analysis
 
