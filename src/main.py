@@ -1584,7 +1584,7 @@ def run_rct_search_pipeline(
     ]
         table_lines = [
             "## Ranked Article List\n",
-            f"_All {len(ranked)} articles retrieved from PubMed, ordered by relevance score (1 = most relevant)._\n",
+            f"_All {len(ranked)} articles retrieved from PubMed, ordered by PICO relevance score (10 = most relevant)._\n",
             "| Rank | Score | Title | PMID | Link |",
             "|------|-------|-------|------|------|",
         ]
@@ -1598,7 +1598,11 @@ def run_rct_search_pipeline(
             "\n> Select your top articles, download PDFs "
             "and place them in input/sr/ to run the SR pipeline."
         )
-        
+        table_lines.append(
+            "\n> For explanation on ranking, please refer to the full report "
+            "in the reports folder."
+        )
+
         report_parts.append("\n".join(table_lines))
         top = ranked[0]["title"] if ranked else "N/A"
         print("[RCT Search] Ranking complete. Top article: " + top)
