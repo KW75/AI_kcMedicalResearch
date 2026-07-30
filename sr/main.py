@@ -1,4 +1,4 @@
-﻿# sr/main.py  --  python sr/main.py --pdf-dir sr/data/uploads --effect-measure SMD
+# sr/main.py  --  python sr/main.py --pdf-dir sr/data/uploads --effect-measure SMD
 import argparse, logging, sys
 import pandas as pd
 from pathlib import Path
@@ -63,8 +63,13 @@ def main():
 
     # ── Stage 1: Upload ──────────────────────────────────────────────────────
     logger.info("=== STAGE 1: Upload ===")
-    fm   = FileManager()
-    recs = fm.upload_directory(pdf_dir)
+    if args.provider == "anthropic":
+        fm   = FileManager()
+        recs = fm.upload_directory(pdf_dir)
+    else:
+        from sr.src.upload.file_manager import local_records
+        recs = local_records(pdf_dir)
+        logger.info(f"[UPLOAD] Non-Anthropic provider — using local PDF paths ({len(recs)} files)")
     (SR_DIR / "data" / "uploads").mkdir(parents=True, exist_ok=True)
     pd.DataFrame(recs).to_csv(SR_DIR / "data" / "uploads" / "upload_manifest.csv", index=False)
 
@@ -75,11 +80,13 @@ def main():
         inclusion_criteria=cfg.get("inclusion_criteria", []),
         exclusion_criteria=cfg.get("exclusion_criteria", []),
         model=args.model,
+        provider=args.provider,
     ).screen_batch(recs)
     (SR_DIR / "data" / "screened").mkdir(parents=True, exist_ok=True)
     pd.DataFrame(sr).to_csv(SR_DIR / "data" / "screened" / "screening_log.csv", index=False)
     included = [r for r in recs
-                if any(s["file_id"]==r["file_id"] and s["decision"]=="INCLUDE" for s in sr)]
+                if any(s["filename"] == r["filename"] and s["decision"] == "INCLUDE"
+                       for s in sr)]
     if not included:
         logger.error("No studies included after screening. Stopping."); return
 

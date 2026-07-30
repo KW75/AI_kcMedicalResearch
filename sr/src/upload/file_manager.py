@@ -1,4 +1,4 @@
-﻿import hashlib, sqlite3, os, time, logging
+import hashlib, sqlite3, os, time, logging
 from pathlib import Path
 from typing import Optional
 import anthropic
@@ -76,3 +76,26 @@ class FileManager:
             con.execute("DELETE FROM file_registry WHERE sha256=?", (sha,))
             logger.warning(f"[RECONCILE] Removed stale: {fid}")
         con.commit(); con.close()
+
+def local_records(pdf_dir: Path, pattern: str = "*.pdf") -> list[dict]:
+    """
+    Build upload records from local PDF paths without calling any API.
+    Produces the same dict structure as FileManager.upload_pdf() but sets
+    file_id=None and adds pdf_path so downstream stages use vision fallback.
+    """
+    import hashlib
+    pdfs = sorted(Path(pdf_dir).glob(pattern))
+    if not pdfs:
+        raise FileNotFoundError(f"No PDFs in {pdf_dir}")
+    records = []
+    for p in pdfs:
+        content = p.read_bytes()
+        records.append({
+            "file_id":    None,
+            "pdf_path":   str(p),
+            "filename":   p.name,
+            "size_bytes": len(content),
+            "sha256":     hashlib.sha256(content).hexdigest(),
+            "cached":     False,
+        })
+    return records

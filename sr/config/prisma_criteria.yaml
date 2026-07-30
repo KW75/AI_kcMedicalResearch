@@ -1,26 +1,15 @@
+review_title: Effect of Cognitive-Behavioral Therapy on Pain
 effect_measure: SMD
-exclusion_criteria:
-- Non-randomised or observational study designs
-- Paediatric population (mean age <18 years)
-- Conference abstracts without full-text companion paper
-- Animal or in vitro studies
-- Duplicate publications (select most complete dataset)
-- CBT delivered solely as a minor co-intervention
-inclusion_criteria:
-- RCT study design (parallel-group or crossover)
-- Adult human participants (>=18 years)
-- Diagnosed fibromyalgia per ACR or equivalent criteria
-- Intervention is Cognitive-Behavioral Therapy (individual or group)
-- Comparator is placebo, active comparator, usual care, or waitlist
-- Reports pain intensity as a primary or secondary outcome
-- Full text available in English
 pico:
-  comparator: Placebo or active comparator
-  intervention: Cognitive-Behavioral Therapy
-  outcome: Pain intensity at post intervention
   population: Adults with fibromyalgia
-  study_design: RCT
-review_title: 'Effect of Cognitive-Behavioral Therapy on Pain intensity: A Systematic
-  Review and Meta-Analysis
-
-  '
+  intervention: Cognitive-Behavioral Therapy
+  comparator: Placebo or active comparator
+  outcome: Pain intensity at post intervention
+pubmed_query_cleaned: Adults with fibromyalgia AND Cognitive-Behavioral Therapy AND
+  Pain intensity AND randomized controlled trial[pt]
+inclusion_criteria:
+- RCT
+- Adult participants
+exclusion_criteria:
+- Non-RCT
+- Animal studies
