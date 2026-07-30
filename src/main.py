@@ -1305,7 +1305,7 @@ def run_rct_search_pipeline(
     pico_comparator   = ""
     pico_outcome      = ""
 
-    if pico_json_files and not dry_run:
+    if pico_json_files:
         print()
         print(f"[RCT Search] Saved PICO files found in {_pico_source}:")
 
@@ -1332,7 +1332,7 @@ def run_rct_search_pipeline(
             except Exception as _e:
                 print(f"[RCT Search] Could not load PICO JSON: {_e}")
 
-    if not any([pico_population, pico_intervention, pico_comparator, pico_outcome]) and not dry_run:
+    if not any([pico_population, pico_intervention, pico_comparator, pico_outcome]):
         print()
         print("[RCT Search] Enter PICO components (press Enter to skip any field):")
         try:
@@ -1647,10 +1647,7 @@ def run_rct_search_pipeline(
     final_parts = [p for p in report_parts if "Ranked Article List" in p or "Final Status" in p]
     if final_parts and final_dir != out_dir:
         final_md_path = final_dir / f"rct_search_{timestamp}.md"
-        final_md_content = (
-            "\n".join(final_parts)
-            + "\n\n---\n\n> For explanation on ranking, please refer to the full report in the reports folder."
-        )
+        final_md_content = "\n".join(final_parts)
         final_md_path.write_text(final_md_content, encoding="utf-8")
         print(f"Final report saved    : output/rct_search/{final_md_path.name}")
         final_docx_path = final_dir / f"rct_search_{timestamp}.docx"

@@ -106,7 +106,8 @@ class TestE2ERctSearch:
 
         with patch("src.main.DOCS_RCT_SEARCH", BASE_DIR / "docs" / "rct_search"), \
              patch("src.main._read_topic_file",
-                   return_value="Effect of metformin on HbA1c in type 2 diabetes"):
+                   return_value="Effect of metformin on HbA1c in type 2 diabetes"), \
+             patch("builtins.input", return_value="0"):
             md_path = run_rct_search_pipeline(
                 provider="ollama",
                 reports_dir=tmp_path,
