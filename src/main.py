@@ -1435,7 +1435,7 @@ def run_rct_search_pipeline(
             pico_json_dir.mkdir(parents=True, exist_ok=True)
             pico_json_path = pico_json_dir / f"pico_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
             pico_data = {
-                "timestamp":         datetime.now().strftime("%Y%m%d_%H%M%S"),
+                "timestamp":         datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 "topic":             topic,
                 "formulator_output": response,
                 "population":        "",
@@ -1445,6 +1445,8 @@ def run_rct_search_pipeline(
                 "study_design":      "RCT",
                 "effect_measure":    "SMD",
                 "source_mode":       "rct_search",
+                "pubmed_query_raw":  "",
+                "pubmed_query_cleaned": "",
             }
             import re as _re
             def _extract_pico_field(text, labels):
@@ -1603,7 +1605,11 @@ def run_rct_search_pipeline(
         pico_files = sorted(OUTPUT_RCT_SEARCH.glob("pico_*.json"), reverse=True)
         if pico_files:
             pico_data = json.loads(pico_files[0].read_text(encoding="utf-8"))
-            pico_data["ranked_articles"] = ranked
+            pico_data["ranked_articles"]      = ranked
+            pico_data["pubmed_query_raw"]     = " AND ".join(
+                [t for t in [pico_population, pico_intervention, pico_outcome] if t]
+            ) if any([pico_population, pico_intervention, pico_outcome]) else topic
+            pico_data["pubmed_query_cleaned"] = _pubmed_query
             pico_files[0].write_text(
                 json.dumps(pico_data, indent=2, ensure_ascii=False),
                 encoding="utf-8",
