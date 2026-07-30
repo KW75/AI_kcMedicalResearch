@@ -1,89 +1,17 @@
-.venv/
+﻿.venv/
 __pycache__/
-*.py[cod]
-
+*.pyc
+*.pyo
 .env
-.env.*
-!.env.example
-
+sr/data/
+reports/
+output/
+input/
 .pytest_cache/
-.coverage
-htmlcov/
-
+*.egg-info/
+patch_main.py
 dist/
 build/
-*.egg-info/
-
-.vscode/
-
-# Local-only handoff/reference files
-HANDOFF*.md
-HANDOFF*.html
-GITHUB_SETUP_REFERENCE*.md
-GITHUB_SETUP_REFERENCE*.html
-
-reports/
-
-# Sensitive and personal files
-PWD_*.txt
-PWD_*.TXT
-*.TXT
-*API*.txt
-*API*.TXT
-
-# uploads and SR working data
-uploads/
-sr/data/
-sr/outputs/
-
-# ChromaDB vector store
 chroma_db/
-*.sqlite3
-
-# Generated output files (deliverables — not source)
-output/coding/*
-output/writing/*
-output/appraisal/*
-output/rct_search/*
-output/search/*
-output/sr/*
-
-# Keep the folders themselves
-!output/coding/.gitkeep
-!output/writing/.gitkeep
-!output/appraisal/.gitkeep
-!output/rct_search/.gitkeep
-!output/search/.gitkeep
-!output/sr/.gitkeep
-
-
-# Output files �X regenerated locally, never committed
-output/
-reports/coding/
-reports/writing/
-reports/appraisal/
-reports/rct_search/
-reports/search/
-reports/systematic_review/
-reports/transcripts/
-
-# Output files �X regenerated locally, never committed
-output/
-reports/coding/
-reports/writing/
-reports/appraisal/
-reports/rct_search/
-reports/search/
-reports/systematic_review/
-reports/transcripts/
-
-# Keep empty folder placeholders even inside ignored folders
-!output/**/.gitkeep
-!reports/**/.gitkeep
-
-
-# Do not track user input files
-input/
-
-fix_*.py
-temp_*.py
+.coverage
+htmlcov/

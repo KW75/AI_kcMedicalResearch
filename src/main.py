@@ -1843,16 +1843,8 @@ def run_sr_launcher(provider: str = "", model: str = "") -> None:
     for p in pdf_files:
         print(f"     {p.name}")
 
-    # -- Step 2: copy PDFs to sr/data/uploads/ --------------------------------
-    uploads_dir = BASE_DIR / "sr" / "data" / "uploads"
-    uploads_dir.mkdir(parents=True, exist_ok=True)
-    for p in pdf_files:
-        dest = uploads_dir / p.name
-        if dest.exists():
-            print(f"[SR] Already present: sr/data/uploads/{p.name}")
-        else:
-            shutil.copy2(p, dest)
-            print(f"[SR] Copied: {p.name} -> sr/data/uploads/")
+    # -- Step 2: PDF source is input/sr/ — sr/main.py handles project copying --
+    uploads_dir = INPUT_SR
 
     # -- Step 3: load PICO JSON and update prisma_criteria.yaml --------------
     pico_files = sorted(INPUT_SR.glob("pico_*.json"),
@@ -1892,16 +1884,22 @@ def run_sr_launcher(provider: str = "", model: str = "") -> None:
         print("[SR] No pico_*.json found in input/sr/ — using existing config.")
 
     # -- Step 4: resolve model ------------------------------------------------
-    _model    = model    or "qwen3.7-plus"
     _provider = provider or "qwen"
-    print(f"\n[SR] Provider: {_provider}  Model: {_model}")
-    print("[SR] Starting pipeline — this may take several minutes...\n")
+    _DEFAULT_MODELS = {
+        "qwen":      "qwen3.7-plus",
+        "deepseek":  "deepseek-v4-flash",
+        "openai":    "gpt-4o-mini",
+        "anthropic": "claude-sonnet-4-5",
+        "groq":      "llama-3.3-70b-versatile",
+        "ollama":    "llama3.2",
+    }
+    _model = model or _DEFAULT_MODELS.get(_provider, "qwen3.7-plus")
 
     # -- Step 5: run sr/main.py -----------------------------------------------
     sr_main = BASE_DIR / "sr" / "main.py"
     cmd = [
         sys.executable, str(sr_main),
-        "--pdf-dir",        str(uploads_dir),
+        "--pdf-dir",        str(INPUT_SR),
         "--provider",       _provider,
         "--model",          _model,
         "--effect-measure", cfg_yaml.get("effect_measure", "SMD")

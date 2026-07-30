@@ -35,6 +35,7 @@ h1{text-align:center;font-size:1.8rem;font-weight:800;color:#f1f5f9;margin-botto
 .pill-yellow{background:#713f12;color:#fde68a}
 .warn{background:#451a03;border:1px solid #92400e;border-radius:8px;padding:10px 14px;font-size:.78rem;color:#fde68a;margin-bottom:12px}
 .info{background:#0c2a4a;border:1px solid #1e4976;border-radius:8px;padding:10px 14px;font-size:.78rem;color:#93c5fd;margin-bottom:12px}
+.ok{background:#052e16;border:1px solid #166534;border-radius:8px;padding:10px 14px;font-size:.78rem;color:#86efac;margin-bottom:12px}
 .toggle-all{display:block;margin:0 auto 28px;background:#3b82f6;color:#fff;border:none;border-radius:8px;padding:9px 28px;font-size:.85rem;font-weight:600;cursor:pointer}
 .toggle-all:hover{background:#2563eb}
 .h-coding{background:linear-gradient(135deg,#1e3a5f,#1e293b)}
@@ -72,7 +73,7 @@ footer{text-align:center;margin-top:48px;font-size:.76rem;color:#475569}
     <tr><td>Reviewer</td><td>Reviews code quality, security, and best practices</td></tr>
     <tr><td>Tester</td><td>Generates pytest test cases for your code</td></tr>
   </table>
-  <div class="section-label">Input — place files here before starting</div>
+  <div class="section-label">Input &mdash; place files here before starting</div>
   <table>
     <tr><th>Folder</th><th>File types</th></tr>
     <tr><td><code>input/coding/</code></td><td>.py .js .ts .json .yaml .md .txt</td></tr>
@@ -147,23 +148,15 @@ python src\main.py --mode writing --provider openai</pre>
     <tr><th>#</th><th>Stage</th><th>What happens</th></tr>
     <tr><td>1</td><td>Formulator</td><td>Structures topic into formal PICO question</td></tr>
     <tr><td>2</td><td>Searcher</td><td>Builds Boolean search strings for 7 SR databases</td></tr>
-    <tr><td>3</td><td>Validator</td><td>Validates PICO alignment, syntax, RCT filters — APPROVED or REQUIRES REFINEMENT</td></tr>
-    <tr><td>4</td><td>PubMed Fetch + AI Ranking</td><td>Fetches up to 20 articles from PubMed, AI scores each 1–10 for PICO relevance</td></tr>
+    <tr><td>3</td><td>Validator</td><td>Validates PICO alignment, syntax, RCT filters &mdash; APPROVED or REQUIRES REFINEMENT</td></tr>
+    <tr><td>4</td><td>PubMed Fetch + AI Ranking</td><td>Fetches up to 20 articles from PubMed, AI scores each 1&ndash;10 for PICO relevance</td></tr>
   </table>
   <div class="section-label">PICO Input Options</div>
   <table>
     <tr><th>Option</th><th>How</th></tr>
-    <tr><td>Import saved PICO</td><td>Place <code>pico_*.json</code> in <code>input/rct_search/</code> — offered at startup</td></tr>
+    <tr><td>Import saved PICO</td><td>Place <code>pico_*.json</code> in <code>input/rct_search/</code> &mdash; offered at startup</td></tr>
     <tr><td>Enter manually</td><td>Interactive prompts for P, I, C, O at startup</td></tr>
     <tr><td>Topic file</td><td>Place topic in <code>docs/rct_search/topic.md</code></td></tr>
-  </table>
-  <div class="section-label">Input files</div>
-  <table>
-    <tr><th>File / Folder</th><th>Purpose</th></tr>
-    <tr><td><code>input/rct_search/pico_*.json</code></td><td>Previously saved PICO — imported at startup</td></tr>
-    <tr><td><code>docs/rct_search/pico-framework.md</code></td><td>PICO framework reference for Formulator</td></tr>
-    <tr><td><code>docs/rct_search/database-guide.md</code></td><td>Database-specific syntax guide for Searcher</td></tr>
-    <tr><td><code>docs/rct_search/validation-criteria.md</code></td><td>Inclusion/exclusion criteria for Validator</td></tr>
   </table>
   <div class="section-label">Run</div>
   <pre>python src\main.py --mode rct_search
@@ -172,7 +165,7 @@ python src\main.py --mode rct_search --provider deepseek</pre>
   <div class="section-label">Output</div>
   <table>
     <tr><th>File</th><th>Location</th><th>Contents</th></tr>
-    <tr><td><code>rct_search_*.md</code></td><td><code>reports/rct_search/</code></td><td>Full transcript — Formulator, Searcher, Validator, Next Steps</td></tr>
+    <tr><td><code>rct_search_*.md</code></td><td><code>reports/rct_search/</code></td><td>Full transcript &mdash; Formulator, Searcher, Validator, Next Steps</td></tr>
     <tr><td><code>rct_search_*.docx</code></td><td><code>reports/rct_search/</code></td><td>Full Word report</td></tr>
     <tr><td><code>rct_search_*.md</code></td><td><code>output/rct_search/</code></td><td>Lean ranked article list + Final Status only</td></tr>
     <tr><td><code>rct_search_*.docx</code></td><td><code>output/rct_search/</code></td><td>Ranked article list Word doc (easy review)</td></tr>
@@ -193,22 +186,14 @@ python src\main.py --mode rct_search --provider deepseek</pre>
   <div class="section-label">Two search types</div>
   <table>
     <tr><th>Type</th><th>Use when</th><th>Output sections</th></tr>
-    <tr><td><strong>1 — Topic Search</strong></td><td>You want a summary of current evidence</td><td>Search Strategy, Evidence Summary, Clinical Implications, Reference List</td></tr>
-    <tr><td><strong>2 — Article Search</strong></td><td>You have a title, author, or PMID</td><td>Identification, Best Match, Relevance Assessment, Further Results</td></tr>
+    <tr><td><strong>1 &mdash; Topic Search</strong></td><td>You want a summary of current evidence</td><td>Search Strategy, Evidence Summary, Clinical Implications, Reference List</td></tr>
+    <tr><td><strong>2 &mdash; Article Search</strong></td><td>You have a title, author, or PMID</td><td>Identification, Best Match, Relevance Assessment, Further Results</td></tr>
   </table>
-  <div class="section-label">File-based input (optional — skips interactive prompt)</div>
+  <div class="section-label">File-based input (optional &mdash; skips interactive prompt)</div>
   <p style="font-size:.82rem;color:#cbd5e1;margin-bottom:6px;">Create <code>docs/search/topic.md</code> with exactly two lines:</p>
   <pre>topic
 Effect of metformin on HbA1c in type 2 diabetes</pre>
-  <p style="font-size:.82rem;color:#cbd5e1;margin-top:-8px;margin-bottom:6px;">Or for a paper search:</p>
-  <pre>paper
-Aspirin low dose myocardial infarction prevention</pre>
-  <div class="section-label">Quality standards</div>
-  <span class="pill pill-blue">No fabricated citations</span>
-  <span class="pill pill-blue">Exact effect sizes and p-values</span>
-  <span class="pill pill-blue">Flag preprints</span>
-  <span class="pill pill-blue">Max 1500 words</span>
-  <div class="section-label" style="margin-top:12px">Run</div>
+  <div class="section-label">Run</div>
   <pre>python src\main.py --mode search
 python src\main.py --mode search --provider groq</pre>
   <div class="section-label">Output</div>
@@ -236,29 +221,17 @@ python src\main.py --mode search --provider groq</pre>
     <tr><td>Methodologist</td><td>RoB 2 / CASP / AMSTAR 2 scoring; GRADE evidence quality rating</td></tr>
     <tr><td>Summariser</td><td>Plain-language summary (max 150 words), key-findings table, evidence grade</td></tr>
   </table>
-  <div class="section-label">7-Section Report Structure (max 1500 words total)</div>
-  <table>
-    <tr><th>#</th><th>Section</th><th>Word limit</th></tr>
-    <tr><td>1</td><td>Study Details</td><td>100</td></tr>
-    <tr><td>2</td><td>PICO</td><td>150</td></tr>
-    <tr><td>3</td><td>Methodology</td><td>250</td></tr>
-    <tr><td>4</td><td>Results</td><td>300</td></tr>
-    <tr><td>5</td><td>Risk of Bias</td><td>250</td></tr>
-    <tr><td>6</td><td>Clinical Applicability</td><td>200</td></tr>
-    <tr><td>7</td><td>Overall Judgement</td><td>150</td></tr>
-  </table>
   <div class="section-label">Scoring Tools</div>
-  <span class="pill pill-orange">RoB 2 — RCTs</span>
-  <span class="pill pill-orange">CASP — Observational</span>
-  <span class="pill pill-orange">AMSTAR 2 — Systematic Reviews</span>
-  <span class="pill pill-orange">GRADE — Evidence Quality</span>
-  <div class="section-label" style="margin-top:12px">Input — place articles here before starting</div>
+  <span class="pill pill-orange">RoB 2 &mdash; RCTs</span>
+  <span class="pill pill-orange">CASP &mdash; Observational</span>
+  <span class="pill pill-orange">AMSTAR 2 &mdash; Systematic Reviews</span>
+  <span class="pill pill-orange">GRADE &mdash; Evidence Quality</span>
+  <div class="section-label" style="margin-top:12px">Input &mdash; place articles here before starting</div>
   <table>
     <tr><th>Folder</th><th>File types</th></tr>
     <tr><td><code>input/appraisal/</code></td><td>.pdf .txt .md .docx</td></tr>
     <tr><td><code>docs/appraisal/</code></td><td>appraisal-guide.md, scoring-criteria.md</td></tr>
   </table>
-  <div class="info">&#128161; Works best with PDF articles from RCT Search or Medical Search mode. Download PDFs, place in <code>input/appraisal/</code>, then run appraisal.</div>
   <div class="section-label">Run</div>
   <pre>python src\main.py --mode appraisal
 python src\main.py --mode appraisal --provider anthropic</pre>
@@ -280,24 +253,61 @@ python src\main.py --mode appraisal --provider anthropic</pre>
   <div class="section-label">Pipeline Stages</div>
   <table>
     <tr><th>#</th><th>Stage</th><th>Output</th></tr>
-    <tr><td>1</td><td>Upload PDFs (SHA-256 dedup)</td><td><code>data/uploads/upload_manifest.csv</code></td></tr>
-    <tr><td>2</td><td>Relevance screening (INCLUDE/EXCLUDE/UNCERTAIN)</td><td><code>data/screened/screening_log.csv</code></td></tr>
-    <tr><td>3</td><td>Data extraction (PICO-anchored)</td><td><code>data/extracted/extracted_data.csv</code></td></tr>
+    <tr><td>1</td><td>Upload PDFs (local paths, SHA-256 dedup)</td><td><code>uploads/upload_manifest.csv</code></td></tr>
+    <tr><td>2</td><td>Relevance screening (INCLUDE / EXCLUDE / UNCERTAIN)</td><td><code>data/screened/screening_log.csv</code></td></tr>
+    <tr><td>3</td><td>Data extraction (PICO-anchored, three-tier OCR)</td><td><code>data/extracted/extracted_data.csv</code></td></tr>
     <tr><td>3.5</td><td>RoB 2.0 (5 Cochrane domains)</td><td><code>data/extracted/rob2_assessment.csv</code></td></tr>
-    <tr><td>4</td><td>Meta-analysis (DerSimonian-Laird RE)</td><td><code>data/results/meta_analysis_results.csv</code></td></tr>
-    <tr><td>5</td><td>Forest plot (weight-scaled)</td><td><code>outputs/figures/forest_plot.png</code></td></tr>
-    <tr><td>6</td><td>Reports (DOCX + HTML + PDF)</td><td><code>outputs/reports/</code></td></tr>
+    <tr><td>4</td><td>Meta-analysis (Hedges g / MD, DerSimonian-Laird RE)</td><td><code>data/results/meta_analysis_results.csv</code></td></tr>
+    <tr><td>5</td><td>Forest plot (weight-scaled PNG)</td><td><code>output/figures/forest_plot.png</code></td></tr>
+    <tr><td>6</td><td>Reports (DOCX + HTML; PDF needs WeasyPrint)</td><td><code>output/reports/</code></td></tr>
   </table>
-  <div class="section-label">Recommended workflow with RCT Search</div>
+  <div class="section-label">Project folder layout (per run)</div>
+  <pre>reports\sr\YYYYMMDD_HHMMSS\
+  uploads\              ← PDF copies for this run
+  data\
+    screened\           ← screening_log.csv
+    extracted\          ← extracted_data.csv, rob2_assessment.csv
+    results\            ← meta_analysis_results.csv
+  output\
+    figures\            ← forest_plot.png
+    reports\            ← systematic_review.docx / .html</pre>
+  <div class="ok">&#9989; Outputs are also mirrored to <code>output\sr\</code> and <code>sr\outputs\</code> after each run.</div>
+  <div class="section-label">Text extraction &mdash; three-tier fallback</div>
   <table>
-    <tr><th>Step</th><th>Action</th></tr>
-    <tr><td>1</td><td>Run <code>--mode rct_search</code> — get ranked PubMed articles</td></tr>
-    <tr><td>2</td><td>Review <code>output/rct_search/rct_search_*.docx</code> — pick top articles</td></tr>
-    <tr><td>3</td><td>Download PDFs, place in <code>input/sr/</code></td></tr>
-    <tr><td>4</td><td>Edit <code>sr/config/prisma_criteria.yaml</code> with your PICO</td></tr>
-    <tr><td>5</td><td>Run SR pipeline via launcher menu option 6</td></tr>
+    <tr><th>Tier</th><th>Method</th><th>Triggers when</th></tr>
+    <tr><td>1</td><td>pdfplumber</td><td>Always attempted first</td></tr>
+    <tr><td>2</td><td>pymupdf (fitz)</td><td>pdfplumber returns garbled / sparse text; rejects &#x00;-encoded (Caesar-shifted) PDFs</td></tr>
+    <tr><td>3</td><td>Tesseract OCR</td><td>pymupdf also garbled or contains null bytes</td></tr>
   </table>
-  <div class="section-label">Key Config Fields (prisma_criteria.yaml)</div>
+  <div class="section-label">Stage 4 &mdash; effect-size fallbacks</div>
+  <table>
+    <tr><th>Situation</th><th>Fallback</th></tr>
+    <tr><td>Pre-computed CI present in paper</td><td>Used directly</td></tr>
+    <tr><td>mean + SD + N per arm present</td><td>Hedges g or MD computed</td></tr>
+    <tr><td>n_intervention / n_control absent but n_total present</td><td>n_total split evenly (n/2 per arm)</td></tr>
+    <tr><td>Means / SDs genuinely absent</td><td>Study skipped with warning</td></tr>
+  </table>
+  <div class="section-label">Current meta-analysis result (fibromyalgia / CBT / SMD)</div>
+  <table>
+    <tr><th>Study</th><th>Hedges g</th><th>95% CI</th><th>Note</th></tr>
+    <tr><td>Ang 2010</td><td>+0.057</td><td>[&minus;0.618, 0.733]</td><td>n_total fallback (n=16/arm)</td></tr>
+    <tr><td>McCrae (zsy234)</td><td>&minus;0.234</td><td>[&minus;0.687, 0.218]</td><td>OCR tier 3</td></tr>
+    <tr><td colspan="2"><strong>Pooled SMD</strong></td><td><strong>&minus;0.144 [&minus;0.520, 0.232]</strong></td><td>I&sup2; = 0.0%</td></tr>
+  </table>
+  <div class="section-label">Known limitations</div>
+  <table>
+    <tr><th>Study</th><th>Issue</th></tr>
+    <tr><td>Jensen (PDF 2)</td><td>VAS pain data genuinely absent from extracted text</td></tr>
+    <tr><td>Karlsson (PDF 3)</td><td>N values extracted but means/SDs not found in OCR text</td></tr>
+    <tr><td>Lami / s10608</td><td>N values extracted but means/SDs not found in OCR text</td></tr>
+    <tr><td>All PDFs</td><td>CID-font encoded &mdash; pdfplumber always garbled; pymupdf or OCR used</td></tr>
+    <tr><td>WeasyPrint</td><td>Not installed &mdash; PDF output falls back to HTML only</td></tr>
+  </table>
+  <div class="section-label">Install WeasyPrint (optional &mdash; enables PDF output)</div>
+  <pre>.venv\Scripts\python.exe -m pip install weasyprint
+# Also requires GTK3 runtime on Windows:
+# https://github.com/tschoonj/GTK-for-Windows-Runtime-Environment-Installer/releases</pre>
+  <div class="section-label">Key config fields (prisma_criteria.yaml)</div>
   <pre>pico:
   population:   "Adults (>=18 years) with fibromyalgia"
   intervention: "Cognitive-Behavioral Therapy"
@@ -309,12 +319,20 @@ inclusion_criteria:
   - "RCT study design"
 exclusion_criteria:
   - "Non-randomised designs"</pre>
-  <div class="section-label">Effect Measure Guide</div>
+  <div class="section-label">Effect measure guide</div>
   <table>
     <tr><th>Outcome type</th><th>Use</th><th>Notes</th></tr>
-    <tr><td>Continuous, same scale</td><td><code>MD</code></td><td>e.g. all studies use VAS 0–10</td></tr>
-    <tr><td>Continuous, mixed scales</td><td><code>SMD</code></td><td>Hedges g — safe default for mixed instruments</td></tr>
+    <tr><td>Continuous, same scale</td><td><code>MD</code></td><td>e.g. all studies use VAS 0&ndash;10</td></tr>
+    <tr><td>Continuous, mixed scales</td><td><code>SMD</code></td><td>Hedges g &mdash; safe default for mixed instruments</td></tr>
     <tr><td>Binary / event</td><td><code>OR</code> or <code>RR</code></td><td>needs event counts</td></tr>
+  </table>
+  <div class="section-label">Recommended workflow</div>
+  <table>
+    <tr><th>Step</th><th>Action</th></tr>
+    <tr><td>1</td><td>Run <code>--mode rct_search</code> &rarr; get ranked PubMed articles</td></tr>
+    <tr><td>2</td><td>Review <code>output/rct_search/rct_search_*.docx</code> &rarr; pick top articles</td></tr>
+    <tr><td>3</td><td>Download PDFs, place in <code>input/sr/</code></td></tr>
+    <tr><td>4</td><td>Run SR pipeline: <code>python src\main.py --mode sr --provider deepseek</code></td></tr>
   </table>
 </div></div>
 
@@ -327,10 +345,10 @@ exclusion_criteria:
 <div class="card-body">
   <table>
     <tr><th>Provider</th><th>Flag</th><th>Env var (.env)</th><th>Notes</th></tr>
-    <tr><td>Ollama</td><td><code>--provider ollama</code></td><td>none</td><td>Default — runs locally, no API key needed</td></tr>
+    <tr><td>Ollama</td><td><code>--provider ollama</code></td><td>none</td><td>Default &mdash; runs locally, no API key needed</td></tr>
     <tr><td>OpenAI</td><td><code>--provider openai</code></td><td><code>OPENAI_API_KEY</code></td><td>GPT-4o etc.</td></tr>
-    <tr><td>Anthropic</td><td><code>--provider anthropic</code></td><td><code>ANTHROPIC_API_KEY</code></td><td>Claude models</td></tr>
-    <tr><td>DeepSeek</td><td><code>--provider deepseek</code></td><td><code>DEEPSEEK_API_KEY</code></td><td>Geo-unrestricted</td></tr>
+    <tr><td>Anthropic</td><td><code>--provider anthropic</code></td><td><code>ANTHROPIC_API_KEY</code></td><td>Claude models; required for file upload in SR</td></tr>
+    <tr><td>DeepSeek</td><td><code>--provider deepseek</code></td><td><code>DEEPSEEK_API_KEY</code></td><td>Recommended for SR pipeline</td></tr>
     <tr><td>Groq</td><td><code>--provider groq</code></td><td><code>GROQ_API_KEY</code></td><td>Fast inference</td></tr>
     <tr><td>Qwen</td><td><code>--provider qwen</code></td><td><code>DASHSCOPE_API_KEY</code></td><td>Alibaba Cloud Model Studio</td></tr>
   </table>
@@ -357,7 +375,7 @@ QWEN_MODEL=qwen3.7-plus</pre>
     <tr><td><code>--list-sessions</code></td><td>List saved transcripts in reports/</td></tr>
     <tr><td><code>--help-guide</code></td><td>Open this HTML guide in browser</td></tr>
     <tr><td><code>--report</code></td><td>Generate writing report (writing mode only)</td></tr>
-    <tr><td><code>--revise</code></td><td>Legacy code revision pipeline (coding mode only)</td></tr>
+    <tr><td><code>--effect-measure</code></td><td>OR / RR / MD / SMD (SR mode only)</td></tr>
   </table>
 </div></div>
 
@@ -365,7 +383,7 @@ QWEN_MODEL=qwen3.7-plus</pre>
 <div class="card" onclick="toggle(this)">
 <div class="card-header h-rag">
   <div class="card-icon" style="background:#312e81">&#128190;</div>
-  <div><div class="card-title">RAG — File &amp; URL Indexing</div><div class="card-badge">Automatic at session start</div></div>
+  <div><div class="card-title">RAG &mdash; File &amp; URL Indexing</div><div class="card-badge">Automatic at session start</div></div>
 </div>
 <div class="card-body">
   <p style="font-size:.82rem;color:#cbd5e1;margin-bottom:12px;">Files placed in the input folder are automatically chunked, embedded, and stored in a per-session ChromaDB collection. Content is retrieved and injected into the AI context at each step.</p>
@@ -388,7 +406,7 @@ QWEN_MODEL=qwen3.7-plus</pre>
     <tr><td>rct_search</td><td><code>input/rct_search/</code> (also accepts <code>pico_*.json</code>)</td></tr>
     <tr><td>appraisal</td><td><code>input/appraisal/</code></td></tr>
     <tr><td>search</td><td><code>input/search/</code></td></tr>
-    <tr><td>sr</td><td><code>input/sr/</code> (PDF articles for SR pipeline)</td></tr>
+    <tr><td>sr</td><td><code>input/sr/</code> (PDF articles + <code>pico_*.json</code>)</td></tr>
   </table>
   <div class="section-label">Embedding setup (.env)</div>
   <pre>EMBEDDING_PROVIDER=ollama
@@ -397,7 +415,7 @@ EMBEDDING_MODEL=nomic-embed-text</pre>
 </div></div>
 
 </div><!-- end grid -->
-<footer>AI kcMedical Research &nbsp;&middot;&nbsp; PRISMA 2020 / Cochrane Handbook v6.5 &nbsp;&middot;&nbsp; 291 tests &nbsp;&middot;&nbsp; 65% coverage (main.py) &nbsp;&middot;&nbsp; All SR outputs require human verification.</footer>
+<footer>AI kcMedical Research &nbsp;&middot;&nbsp; PRISMA 2020 / Cochrane Handbook v6.5 &nbsp;&middot;&nbsp; 291 tests passing &nbsp;&middot;&nbsp; Pooled SMD &minus;0.144 [&minus;0.520, 0.232] I&sup2;=0.0% (Ang 2010 + McCrae) &nbsp;&middot;&nbsp; All SR outputs require human verification.</footer>
 <script>
 function toggle(card){card.classList.toggle("open")}
 function toggleAll(){

@@ -1,4 +1,4 @@
-﻿"""
+"""
 tests/test_sr.py
 Unit tests for the SR pipeline — pure-Python logic only.
 No Anthropic API calls, no real PDFs required.
@@ -298,28 +298,27 @@ class TestSRLauncher:
         out = capsys.readouterr().out
         assert "SR Automation Pipeline" in out
 
-    def test_launcher_copies_pdfs(self, tmp_path, capsys):
-        import src.main as _m
-        self._make_input_sr(tmp_path)
+        def test_launcher_passes_input_sr_as_pdf_dir(self, tmp_path, capsys):
+            import src.main as _m
+            self._make_input_sr(tmp_path)
 
-        mock_result = unittest.mock.MagicMock()
-        mock_result.returncode = 0
+            mock_result = unittest.mock.MagicMock()
+            mock_result.returncode = 0
 
-        uploads_dir = tmp_path / "sr" / "data" / "uploads"
-        uploads_dir.mkdir(parents=True, exist_ok=True)
-        (tmp_path / "sr" / "config").mkdir(parents=True, exist_ok=True)
-        (tmp_path / "sr" / "main.py").write_text("# stub", encoding="utf-8")
+            (tmp_path / "sr" / "config").mkdir(parents=True, exist_ok=True)
+            (tmp_path / "sr" / "main.py").write_text("# stub", encoding="utf-8")
 
-        with (
-            unittest.mock.patch.object(_m, "INPUT_SR", tmp_path / "input" / "sr"),
-            unittest.mock.patch.object(_m, "BASE_DIR", tmp_path),
-            unittest.mock.patch("subprocess.run", return_value=mock_result),
-        ):
-            _m.run_sr_launcher()
+            with (
+                unittest.mock.patch.object(_m, "INPUT_SR", tmp_path / "input" / "sr"),
+                unittest.mock.patch.object(_m, "BASE_DIR", tmp_path),
+                unittest.mock.patch("subprocess.run", return_value=mock_result),
+             ):
+                _m.run_sr_launcher()
 
-        out = capsys.readouterr().out
-        assert "Copied" in out or "Already present" in out
-        assert (uploads_dir / "dummy.pdf").exists()
+            out = capsys.readouterr().out
+            # Launcher should report the PDF source folder and pass it to sr/main.py
+            assert "input/sr" in out or "input\\sr" in out
+            assert "Running:" in out
 
     def test_launcher_loads_pico_json(self, tmp_path, capsys):
         import src.main as _m

@@ -1,4 +1,4 @@
-﻿import json, logging, os, time
+import json, logging, os, time
 from typing import Optional
 import anthropic
 
@@ -18,6 +18,7 @@ Assess the attached RCT across five domains. Return ONLY valid JSON:
                    "missing_data":"<text>","outcome_measurement":"<text>",
                    "reported_result":"<text>"}}"""
 
+
 def _openai_compat_creds(provider: str, api_key: Optional[str] = None):
     """Return (api_key, base_url) for OpenAI-compatible providers."""
     if provider == "qwen":
@@ -31,7 +32,7 @@ def _openai_compat_creds(provider: str, api_key: Optional[str] = None):
     if provider == "deepseek":
         return api_key or os.environ["DEEPSEEK_API_KEY"], "https://api.deepseek.com"
     if provider == "openai":
-        return api_key or os.environ["OPENAI_API_KEY"], None   # default OpenAI base
+        return api_key or os.environ["OPENAI_API_KEY"], None
     if provider == "ollama":
         base = os.environ.get("OLLAMA_URL", "http://localhost:11434") + "/v1"
         return "ollama", base
@@ -39,7 +40,7 @@ def _openai_compat_creds(provider: str, api_key: Optional[str] = None):
 
 
 class RoB2Assessor:
-    def __init__(self, model="qwen3.7-plus", provider="qwen", api_key: Optional[str]=None):
+    def __init__(self, model="qwen3.7-plus", provider="qwen", api_key: Optional[str] = None):
         self.provider = provider.lower()
         self.model    = model
         if self.provider == "anthropic":
@@ -50,7 +51,6 @@ class RoB2Assessor:
             _key, _base = _openai_compat_creds(self.provider, api_key)
             self.client = OpenAI(api_key=_key, base_url=_base)
 
-
     def assess_by_file_id(self, file_id, filename="") -> dict:
         """Anthropic Files API path only."""
         if self.provider != "anthropic":
@@ -60,22 +60,21 @@ class RoB2Assessor:
             )
         try:
             resp = self.client.beta.messages.create(
-                model=self.model, max_tokens=1024,
-                messages=[{"role":"user","content":[
-                    {"type":"document","source":{"type":"file","file_id":file_id},
-                     "cache_control":{"type":"ephemeral"}},
-                    {"type":"text","text":ROB2_PROMPT}]}],
+                model=self.model, max_tokens=2048,
+                messages=[{"role": "user", "content": [
+                    {"type": "document", "source": {"type": "file", "file_id": file_id},
+                     "cache_control": {"type": "ephemeral"}},
+                    {"type": "text", "text": ROB2_PROMPT}
+                ]}],
                 betas=[BETA_HEADER])
             raw = resp.content[0].text.strip()
-            if raw.startswith("```"):
-                raw=raw.split("```")[1]
-                if raw.startswith("json"): raw=raw[4:]
-            r = json.loads(raw)
-            r.update({"file_id":file_id,"filename":filename,"error":None})
+            from sr.src.utils.json_utils import extract_json
+            r = extract_json(raw)
+            r.update({"file_id": file_id, "filename": filename, "error": None})
             return r
         except Exception as e:
-            return {"file_id":file_id,"filename":filename,"error":str(e),
-                    "domains":{},"overall_judgment":"High"}
+            return {"file_id": file_id, "filename": filename, "error": str(e),
+                    "domains": {}, "overall_judgment": "High"}
 
     def _call_with_images(self, base64_images: list, prompt: str) -> str:
         """Send PDF pages as base64 images via OpenAI-compatible vision API."""
@@ -88,31 +87,88 @@ class RoB2Assessor:
         resp = self.client.chat.completions.create(
             model=self.model,
             messages=[{"role": "user", "content": content}],
-            max_tokens=1024,
+            max_tokens=2048,
             extra_body={"enable_thinking": False},
         )
         return resp.choices[0].message.content.strip()
 
+    def _call_with_text(self, pdf_text: str, prompt: str) -> str:
+        """Send PDF text via OpenAI-compatible API with retry on empty response."""
+        for attempt, max_chars in enumerate([6000, 3000]):
+            truncated = pdf_text[:max_chars] if len(pdf_text) > max_chars else pdf_text
+            full = f"{prompt}\n\n--- ARTICLE TEXT ---\n{truncated}\n--- END ---"
+            resp = self.client.chat.completions.create(
+                model=self.model,
+                messages=[{"role": "user", "content": full}],
+                max_tokens=2048,
+                extra_body={"enable_thinking": False},
+            )
+            content = resp.choices[0].message.content
+            if content and content.strip():
+                return content.strip()
+            if attempt == 0:
+                time.sleep(2)
+        raise ValueError("Empty response from model after retry")
+
     def assess_by_pdf_path(self, pdf_path: str, filename="") -> dict:
-        """Vision-based assessment for non-Anthropic providers."""
+        """Text-based RoB 2.0 assessment using pdfplumber with OCR fallback."""
         try:
-            from pdf2image import convert_from_path
-            import io, base64
-            poppler = os.environ.get("POPPLER_PATH")
-            pages   = convert_from_path(pdf_path, dpi=150, poppler_path=poppler)
-            images  = []
-            for page in pages:
-                buf = io.BytesIO()
-                page.save(buf, format="PNG")
-                images.append(base64.b64encode(buf.getvalue()).decode())
-            raw = self._call_with_images(images, ROB2_PROMPT)
-            if raw.startswith("```"):
-                raw=raw.split("```")[1]
-                if raw.startswith("json"): raw=raw[4:]
-            r = json.loads(raw)
+            pdf_text = ""
+
+            # --- Attempt 1: pdfplumber ---
+            try:
+                import pdfplumber
+                with pdfplumber.open(pdf_path) as pdf:
+                    chunks = []
+                    for p in pdf.pages[:20]:
+                        t = p.extract_text() or ""
+                        if t.strip():
+                            chunks.append(t[:800])
+                    pdf_text = "\n\n".join(chunks).strip()
+            except Exception as txt_err:
+                logger.warning(f"pdfplumber failed for {filename}: {txt_err}")
+
+            # --- Detect garbled CID-font text and fall back to OCR ---
+            if not pdf_text or "(cid:" in pdf_text or pdf_text.count(" ") < 20:
+                logger.info(f"Garbled text detected for {filename} — switching to OCR")
+                try:
+                    import fitz
+                    import pytesseract
+                    import io
+                    from PIL import Image
+                    pytesseract.pytesseract.tesseract_cmd = (
+                        r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+                    )
+                    doc = fitz.open(pdf_path)
+                    total_pages = len(doc)
+                    if total_pages <= 6:
+                        selected = list(range(total_pages))
+                    else:
+                        selected = list(range(3)) + list(range(3, total_pages))[:9]
+                    ocr_chunks = []
+                    for i in selected:
+                        pix = doc[i].get_pixmap(matrix=fitz.Matrix(2, 2))
+                        img = Image.open(io.BytesIO(pix.tobytes("png")))
+                        t = pytesseract.image_to_string(img).strip()
+                        if t:
+                            ocr_chunks.append(t[:1500])
+                    pdf_text = "\n\n".join(ocr_chunks).strip()
+                    logger.info(f"OCR extracted {len(pdf_text)} chars from {filename}")
+                except Exception as ocr_err:
+                    logger.warning(f"OCR failed for {filename}: {ocr_err}")
+
+            if not pdf_text:
+                pdf_text = f"[Could not extract text from {filename}]"
+            if len(pdf_text) > 6000:
+                pdf_text = pdf_text[:6000] + "\n...[truncated]"
+
+            raw = self._call_with_text(pdf_text, ROB2_PROMPT)
+            from sr.src.utils.json_utils import extract_json
+            r = extract_json(raw)
             r.update({"file_id": None, "filename": filename, "error": None})
             return r
         except Exception as e:
+            logger.error(f"RoB2 assessment failed {filename}: {e}")
             return {"file_id": None, "filename": filename, "error": str(e),
                     "domains": {}, "overall_judgment": "High"}
 
@@ -128,5 +184,3 @@ class RoB2Assessor:
             if i < len(included_records):
                 time.sleep(delay_seconds)
         return results
-    
-

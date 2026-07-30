@@ -1,9 +1,10 @@
-﻿import json, logging, os, time
+import json, logging, os, time
 from typing import Optional
 import anthropic
 
 logger      = logging.getLogger(__name__)
 BETA_HEADER = "files-api-2025-04-14"
+
 
 EXTRACTION_PROMPT_TEMPLATE = '''You are a clinical data extractor for a systematic review.
 
@@ -15,9 +16,17 @@ REVIEW PICO CONTEXT:
   INTERVENTION: {intervention}
   COMPARATOR:   {comparator}
 
-CRITICAL: Extract data for the REVIEW'S outcome above, not whichever outcome the
-source paper itself calls "primary." Set outcome_match true if found, false if not.
-Return null for any field you cannot find. Return ONLY valid JSON matching this schema:
+CRITICAL INSTRUCTIONS:
+1. Extract data for the REVIEW'S outcome above, not whichever outcome the paper calls "primary."
+2. Set outcome_match true if the outcome or a closely related pain measure is found, false if not.
+3. Search ALL tables, figures captions, and results paragraphs for means, SDs, and group n values.
+4. n_intervention and n_control are the number of participants per arm — look in participant flow,
+   Table 1, or the results section. Do NOT leave these null if sample size is mentioned anywhere.
+5. mean_intervention/mean_control are post-intervention scores (or change scores if post not given).
+6. If only change-from-baseline scores are reported, use those as mean_intervention/mean_control.
+7. Return null ONLY if the value is genuinely absent from the text.
+Return ONLY valid JSON matching this schema:
+
 {{"study_metadata":{{"first_author":null,"year":null,"country":null,
   "funding_source":null,"trial_registration_id":null,"journal":null,"doi":null}},
  "participants":{{"n_intervention":null,"n_control":null,"n_total":null,
@@ -44,11 +53,11 @@ Return null for any field you cannot find. Return ONLY valid JSON matching this 
 
 
 class DataExtractor:
-    def __init__(self, pico_criteria: Optional[dict]=None,
-                 pico_outcome: Optional[str]=None,
-                 model: str="qwen3.7-plus",
-                 provider: str="qwen",
-                 api_key: Optional[str]=None):
+    def __init__(self, pico_criteria: Optional[dict] = None,
+                 pico_outcome: Optional[str] = None,
+                 model: str = "qwen3.7-plus",
+                 provider: str = "qwen",
+                 api_key: Optional[str] = None):
         self.provider = provider.lower()
         self.model    = model
         self.pico     = pico_criteria or {}
@@ -83,20 +92,19 @@ class DataExtractor:
         try:
             resp = self.client.beta.messages.create(
                 model=self.model, max_tokens=4096,
-                messages=[{"role":"user","content":[
-                    {"type":"document","source":{"type":"file","file_id":file_id},
-                     "cache_control":{"type":"ephemeral"}},
-                    {"type":"text","text":self._prompt()}]}],
+                messages=[{"role": "user", "content": [
+                    {"type": "document", "source": {"type": "file", "file_id": file_id},
+                     "cache_control": {"type": "ephemeral"}},
+                    {"type": "text", "text": self._prompt()}
+                ]}],
                 betas=[BETA_HEADER])
             raw = resp.content[0].text.strip()
-            if raw.startswith("```"):
-                raw=raw.split("```")[1]
-                if raw.startswith("json"): raw=raw[4:]
-            r = json.loads(raw)
-            r.update({"file_id":file_id,"filename":filename,"extraction_error":None})
+            from sr.src.utils.json_utils import extract_json
+            r = extract_json(raw)
+            r.update({"file_id": file_id, "filename": filename, "extraction_error": None})
             return r
         except Exception as e:
-            return {"file_id":file_id,"filename":filename,"extraction_error":str(e)}
+            return {"file_id": file_id, "filename": filename, "extraction_error": str(e)}
 
     def _call_with_images(self, base64_images: list, prompt: str) -> str:
         """Send PDF pages as base64 images via OpenAI-compatible vision API."""
@@ -114,26 +122,109 @@ class DataExtractor:
         )
         return resp.choices[0].message.content.strip()
 
+    def _call_with_text(self, pdf_text: str, prompt: str) -> str:
+        """Send PDF text as plain string via OpenAI-compatible API."""
+        full = f"{prompt}\n\n--- ARTICLE TEXT ---\n{pdf_text}\n--- END ---"
+        resp = self.client.chat.completions.create(
+            model=self.model,
+            messages=[{"role": "user", "content": full}],
+            max_tokens=4096,
+            extra_body={"enable_thinking": False},
+        )
+        content = resp.choices[0].message.content
+        if not content or not content.strip():
+            raise ValueError("Empty response from model")
+        return content.strip()
+
     def extract_by_pdf_path(self, pdf_path: str, filename="") -> dict:
-        """Vision-based extraction for non-Anthropic providers."""
+        """Text-based extraction using pdfplumber with pymupdf+OCR fallback."""
         try:
-            from pdf2image import convert_from_path
-            import io, base64
-            poppler = os.environ.get("POPPLER_PATH")
-            pages   = convert_from_path(pdf_path, dpi=150, poppler_path=poppler)
-            images  = []
-            for page in pages:
-                buf = io.BytesIO()
-                page.save(buf, format="PNG")
-                images.append(base64.b64encode(buf.getvalue()).decode())
-            raw = self._call_with_images(images, self._prompt())
-            if raw.startswith("```"):
-                raw = raw.split("```")[1]
-                if raw.startswith("json"): raw = raw[4:]
-            r = json.loads(raw)
+            pdf_text = ""
+
+            # --- Attempt 1: pdfplumber ---
+            try:
+                import pdfplumber
+                with pdfplumber.open(pdf_path) as pdf:
+                    chunks = []
+                    for p in pdf.pages[:20]:
+                        t = p.extract_text() or ""
+                        if t.strip():
+                            chunks.append(t[:800])
+                    pdf_text = "\n\n".join(chunks).strip()
+            except Exception as txt_err:
+                logger.warning(f"pdfplumber failed for {filename}: {txt_err}")
+
+            # --- Attempt 2: pymupdf direct text (handles CID fonts better) ---
+            if not pdf_text or "(cid:" in pdf_text or pdf_text.count(" ") < 20:
+                logger.info(f"pdfplumber garbled for {filename} — trying pymupdf")
+                try:
+                    import fitz
+                    doc = fitz.open(pdf_path)
+                    total_pages = len(doc)
+                    if total_pages <= 6:
+                        selected = list(range(total_pages))
+                    else:
+                        selected = list(range(3)) + list(range(3, total_pages))[:9]
+                    mupdf_chunks = []
+                    for i in selected:
+                        t = doc[i].get_text().strip()
+                        if t and len(t.split()) > 10:
+                            mupdf_chunks.append(t[:1500])
+                    candidate = "\n\n".join(mupdf_chunks).strip()
+                    if candidate and candidate.count(" ") >= 20 and "\x00" not in candidate:
+                        pdf_text = candidate
+                        logger.info(
+                            f"pymupdf extracted {len(pdf_text)} chars "
+                            f"from {filename}")
+                except Exception as mupdf_err:
+                    logger.warning(f"pymupdf failed for {filename}: {mupdf_err}")
+
+            # --- Attempt 3: OCR fallback (last resort) ---
+            if not pdf_text or "(cid:" in pdf_text or pdf_text.count(" ") < 20:
+                logger.info(f"Garbled text detected for {filename} — switching to OCR")
+                try:
+                    import fitz
+                    import pytesseract
+                    import io
+                    from PIL import Image
+                    pytesseract.pytesseract.tesseract_cmd = (
+                        r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+                    )
+                    doc = fitz.open(pdf_path)
+                    total_pages = len(doc)
+                    if total_pages <= 6:
+                        selected = list(range(total_pages))
+                    else:
+                        selected = list(range(3)) + list(range(3, total_pages))[:9]
+                    ocr_chunks = []
+                    for i in selected:
+                        pix = doc[i].get_pixmap(matrix=fitz.Matrix(2, 2))
+                        img = Image.open(io.BytesIO(pix.tobytes("png")))
+                        t = pytesseract.image_to_string(img).strip()
+                        if t:
+                            ocr_chunks.append(t[:1500])
+                    pdf_text = "\n\n".join(ocr_chunks).strip()
+                    logger.info(f"OCR extracted {len(pdf_text)} chars from {filename}")
+                except Exception as ocr_err:
+                    logger.warning(f"OCR failed for {filename}: {ocr_err}")
+
+            if not pdf_text:
+                pdf_text = f"[Could not extract text from {filename}]"
+            if len(pdf_text) > 14000:
+                pdf_text = pdf_text[:14000] + "\n...[truncated]"
+
+            if not pdf_text:
+                pdf_text = f"[Could not extract text from {filename}]"
+            if len(pdf_text) > 14000:
+                pdf_text = pdf_text[:14000] + "\n...[truncated]"
+
+            raw = self._call_with_text(pdf_text, self._prompt())
+            from sr.src.utils.json_utils import extract_json
+            r = extract_json(raw)
             r.update({"file_id": None, "filename": filename, "extraction_error": None})
             return r
         except Exception as e:
+            logger.error(f"Extraction failed {filename}: {e}")
             return {"file_id": None, "filename": filename, "extraction_error": str(e)}
 
     def extract_batch(self, included_records, delay_seconds=2.0) -> list[dict]:
