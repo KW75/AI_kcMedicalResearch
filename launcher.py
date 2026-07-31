@@ -1,4 +1,4 @@
-﻿import subprocess
+import subprocess
 import sys
 import os
 import shutil
@@ -36,6 +36,9 @@ PROVIDERS = [
     ('5', 'OpenAI',                       '--provider openai'),
     ('6', 'Anthropic',                    '--provider anthropic'),
 ]
+
+# Vision providers for SR pipeline
+VISION_PROVIDERS = ['qwen', 'openai', 'anthropic', 'groq']
 
 # Fallback destinations for input file overflow (tried in order)
 _MOVE_DESTINATIONS = [
@@ -183,7 +186,8 @@ def pick_mode():
         safe_input(f'  {DIM}Press Enter to try again...{RESET}')
 
 
-def pick_provider():
+def pick_provider(mode_flag: str = ""):
+    """Select provider with validation for SR mode."""
     while True:
         print()
         print(f'  {ACCENT}SELECT PROVIDER{RESET}')
@@ -191,16 +195,55 @@ def pick_provider():
         for key, label, _ in PROVIDERS:
             print(f'  {TEXT}{key}{RESET}  {TEXT}{label}{RESET}')
         print()
+        
+        # Show warning for SR mode
+        if mode_flag == '--mode sr':
+            print(f'  {ACCENT}⚠️  SR Pipeline requires a vision-capable provider{RESET}')
+            print(f'  {DIM}   Supported: qwen, openai, anthropic, groq{RESET}')
+            print(f'  {DIM}   NOT supported: ollama, deepseek{RESET}')
+            print()
+        
         choice = safe_input(
             f'  {ACCENT}Enter choice [1-6] or Enter for Ollama: {RESET}',
             default=''
         )
+        
         if choice == '':
-            return ''
-        for key, label, flag in PROVIDERS:
-            if choice == key:
-                return flag
-        print(f'  {ACCENT}Invalid choice.{RESET}')
+            selected_provider = ''
+        else:
+            found = False
+            for key, label, flag in PROVIDERS:
+                if choice == key:
+                    selected_provider = flag
+                    found = True
+                    break
+            if not found:
+                print(f'  {ACCENT}Invalid choice.{RESET}')
+                continue
+        
+        # --- Validate provider for SR mode ---
+        if mode_flag == '--mode sr':
+            # Get the provider name from the flag
+            provider_name = selected_provider.split()[-1] if selected_provider and ' ' in selected_provider else selected_provider
+            if not provider_name:
+                provider_name = 'ollama'  # default
+            
+            if provider_name not in VISION_PROVIDERS:
+                print()
+                print(f'  {ACCENT}❌ ERROR: "{provider_name}" does NOT support vision API{RESET}')
+                print(f'  {DIM}The SR pipeline requires vision-based extraction (images of PDF pages).{RESET}')
+                print()
+                print(f'  {TEXT}Supported providers for SR mode:{RESET}')
+                print(f'    • {ACCENT}qwen{RESET}     (recommended) - Qwen vision model')
+                print(f'    • {ACCENT}openai{RESET}   - GPT-4 vision')
+                print(f'    • {ACCENT}anthropic{RESET} - Claude vision')
+                print(f'    • {ACCENT}groq{RESET}     - Vision models available')
+                print()
+                print(f'  {DIM}Please select a supported provider.{RESET}')
+                input(f'  {DIM}Press Enter to try again...{RESET}')
+                continue
+        
+        return selected_provider
 
 
 def run_custom():
@@ -285,7 +328,7 @@ def main():
             if input_mode:
                 check_input_folder(input_mode)
 
-            prov_flag = pick_provider()
+            prov_flag = pick_provider(mode_flag)
             flags = [f for f in [mode_flag, prov_flag] if f]
             cmd   = [PYTHON, str(BASE / 'src' / 'main.py')] + ' '.join(flags).split()
 
