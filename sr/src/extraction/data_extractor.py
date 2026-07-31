@@ -67,6 +67,22 @@ class DataExtractor:
         self.pico = pico_criteria or {}
         self.outcome = pico_outcome or self.pico.get("outcome")
 
+        # --- Vision support check ---
+        # Only these providers support vision API
+        vision_providers = ["qwen", "openai", "anthropic", "groq"]
+        if self.provider not in vision_providers:
+            raise ValueError(
+                f"❌ Provider '{self.provider}' does NOT support vision API.\n"
+                "The SR pipeline requires vision-based extraction (images of PDF pages).\n\n"
+                "Supported providers for SR mode:\n"
+                "  • qwen     (recommended) - Qwen vision model\n"
+                "  • openai   - GPT-4 vision\n"
+                "  • anthropic - Claude vision\n"
+                "  • groq     - Vision models available\n\n"
+                "Please use one of the supported providers:\n"
+                "  python src/main.py --mode sr --provider qwen"
+            )
+
         if not self.outcome:
             logger.warning("DataExtractor: no review outcome specified")
 
@@ -92,7 +108,7 @@ class DataExtractor:
         score = 0
         text_lower = text.lower()
         
-        # Comprehensive medical outcome indicators (same as before)
+        # Comprehensive medical outcome indicators
         indicators = {
             # Pain outcomes
             'pain': 4, 'vas': 5, 'nrs': 5, 'fiq': 5, 'mpq': 5, 'bpi': 5,
@@ -155,26 +171,21 @@ class DataExtractor:
         if found_groups >= 2:
             score += 5
         
-        # --- NEW: Bonus for pages with table + mean/sd or pain + mean/sd ---
-        # This helps prioritize pages that actually contain data tables
+        # Bonus for pages with table + mean/sd or pain + mean/sd
         if 'table' in text_lower and ('mean' in text_lower or 'sd' in text_lower):
             score += 15
         
         if 'pain' in text_lower and ('mean' in text_lower or 'sd' in text_lower):
             score += 15
                
-        # --- POSITION BIAS: Favor pages in the middle-to-end of the paper ---
-        # Results are typically in the second half of the paper
+        # Position bias: favor pages in the middle-to-end of the paper
         position_ratio = page_num / max(total_pages, 1)
         
         if 0.3 <= position_ratio <= 0.8:
-            # Middle portion of paper - likely results
             score += 8
         elif 0.8 < position_ratio <= 0.95:
-            # Near the end - likely discussion with some results
             score += 5
         elif position_ratio > 0.95:
-            # Very end - references, less likely to have data
             score -= 5
         
         # Penalize first 2 pages (abstract/introduction)
@@ -185,8 +196,6 @@ class DataExtractor:
 
     def _get_page_images(self, pdf_path: str, filename: str) -> list:
         """Convert PDF pages to base64 images with smart page selection"""
-        import fitz
-        
         doc = fitz.open(pdf_path)
         total_pages = len(doc)
         
@@ -233,11 +242,8 @@ class DataExtractor:
                 selected = list(range(total_pages))
             else:
                 pages = set()
-                # First 3 pages
                 pages.update(range(min(3, total_pages)))
-                # Last 4 pages (results likely here)
                 pages.update(range(max(0, total_pages - 4), total_pages))
-                # Some middle pages
                 if total_pages > 10:
                     mid = total_pages // 2
                     pages.update([mid - 1, mid, mid + 1])
@@ -265,52 +271,42 @@ class DataExtractor:
 
     def _get_page_images_expanded(self, pdf_path: str, filename: str) -> list:
         """Expanded page selection - more pages, wider context"""
-        import fitz
-        
         doc = fitz.open(pdf_path)
         total_pages = len(doc)
         
         if total_pages <= 10:
             return self._pages_to_images(doc, list(range(total_pages)))
         
-        # Take more pages: first 4, last 6, and more middle samples
         pages = set()
-        pages.update(range(min(4, total_pages)))  # First 4
-        pages.update(range(max(0, total_pages - 6), total_pages))  # Last 6
+        pages.update(range(min(4, total_pages)))
+        pages.update(range(max(0, total_pages - 6), total_pages))
         
-        # More middle samples
         if total_pages > 12:
             step = max(1, (total_pages - 10) // 8)
             for i in range(4, total_pages - 6, step):
                 pages.add(i)
         
-        selected = sorted(pages)[:12]  # Up to 12 pages
+        selected = sorted(pages)[:12]
         
         logger.info(f"[VISION] Expanded selection: {len(selected)} pages")
         return self._pages_to_images(doc, selected)
     
     def _get_page_images_results(self, pdf_path: str, filename: str) -> list:
         """Focus on results section - middle to end of paper"""
-        import fitz
-        
         doc = fitz.open(pdf_path)
         total_pages = len(doc)
         
         if total_pages <= 8:
             return self._pages_to_images(doc, list(range(total_pages)))
         
-        # Focus on pages 30-80% of the document (results section)
         start = int(total_pages * 0.3)
         end = int(total_pages * 0.8)
         
         if end - start < 4:
-            # If results section is small, expand it
             start = max(0, start - 2)
             end = min(total_pages, end + 2)
         
         pages = list(range(start, end))
-        
-        # Also include a few pages at the very end (discussion may have data)
         pages.extend(range(max(0, total_pages - 3), total_pages))
         
         selected = sorted(set(pages))[:10]
@@ -320,32 +316,24 @@ class DataExtractor:
     
     def _get_page_images_full(self, pdf_path: str, filename: str) -> list:
         """Sample pages across the entire document"""
-        import fitz
-        
         doc = fitz.open(pdf_path)
         total_pages = len(doc)
         
         if total_pages <= 12:
             return self._pages_to_images(doc, list(range(total_pages)))
         
-        # Sample evenly across all pages
         step = max(1, total_pages // 10)
         pages = list(range(0, total_pages, step))[:10]
-        
-        # Always include first and last few pages
         pages.extend([0, 1, 2])
         pages.extend([total_pages - 3, total_pages - 2, total_pages - 1])
         
         selected = sorted(set(pages))[:12]
         
         logger.info(f"[VISION] Full document sample: {[p+1 for p in selected]}")
-        return self._pages_to_images(doc, selected) 
+        return self._pages_to_images(doc, selected)
     
     def _pages_to_images(self, doc, pages: list) -> list:
         """Convert page numbers to base64 images"""
-        import io
-        from PIL import Image
-        
         base64_images = []
         for page_num in pages:
             if page_num < len(doc):
@@ -357,11 +345,17 @@ class DataExtractor:
                 base64_images.append(img_base64)
         
         return base64_images
-        
 
     def _call_vision_api(self, base64_images: list, prompt: str) -> str:
         """Send images to vision API (Qwen, OpenAI, etc.)"""
-
+        
+        # --- Vision support check ---
+        if self.provider not in ["qwen", "openai", "anthropic", "groq"]:
+            raise RuntimeError(
+                f"❌ Provider '{self.provider}' does NOT support vision API.\n"
+                "Please use --provider qwen (recommended), openai, anthropic, or groq."
+            )
+        
         content = [{"type": "text", "text": prompt}]
         for img in base64_images[:5]:  # Max 5 pages
             content.append({
@@ -397,24 +391,19 @@ class DataExtractor:
             for strategy_name, strategy_func in strategies:
                 logger.info(f"[VISION] Trying {strategy_name} strategy for {filename}")
                 
-                # Get page images using this strategy
                 base64_images = strategy_func(pdf_path, filename)
                 
                 if not base64_images:
                     logger.warning(f"[VISION] No images from {strategy_name} strategy")
                     continue
                 
-                # Call vision API
                 raw = self._call_vision_api(base64_images, self._prompt())
                 raw_response = raw
                 
-                # Parse the response
                 from sr.src.utils.json_utils import extract_json
                 r = extract_json(raw)
                 
-                # Check if we got data
                 if r and isinstance(r, dict):
-                    # Check for data in flat or nested structure
                     has_mean = (r.get('mean_intervention') or 
                                r.get('primary_outcome', {}).get('mean_intervention'))
                     has_match = (r.get('outcome_match') or 
@@ -429,7 +418,6 @@ class DataExtractor:
                 else:
                     logger.info(f"[VISION] {strategy_name} strategy returned invalid result")
             
-            # If all strategies failed, return error
             if not result:
                 logger.warning(f"[VISION] All strategies failed for {filename}")
                 return {

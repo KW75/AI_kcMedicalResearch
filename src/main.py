@@ -17,14 +17,19 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
-from urllib.request import urlopen  # bare name so tests can patch src.main.urlopen
+from urllib.request import urlopen
 import uuid
 from datetime import datetime
 from pathlib import Path
-from src.modes.rct_search import run_rct_search_pipeline
 from dotenv import load_dotenv
+
+# Ensure project root is on sys.path BEFORE any imports
+_ROOT = Path(__file__).resolve().parent.parent
+if str(_ROOT) not in sys.path:
+    sys.path.insert(0, str(_ROOT))
+
+# Import coding mode functions
 try:
-# When imported as a package by pytest: from src.main import ...
     from src.modes.coding import (
         run_builder,
         run_reviewer,
@@ -32,7 +37,6 @@ try:
         parse_direct_instructions,
     )
 except ModuleNotFoundError:
-    # When run directly: python src/main.py
     from modes.coding import (
         run_builder,
         run_reviewer,
@@ -40,13 +44,20 @@ except ModuleNotFoundError:
         parse_direct_instructions,
     )
 
-# Import RCT Search mode
+# Import RCT Search with fallback
 try:
     from src.modes.rct_search import run_rct_search_pipeline
 except ModuleNotFoundError:
-    from modes.rct_search import run_rct_search_pipeline
+    try:
+        from modes.rct_search import run_rct_search_pipeline
+    except ModuleNotFoundError:
+        # Define fallback if module doesn't exist
+        def run_rct_search_pipeline(provider="ollama", model=None, dry_run=False, reports_dir=None):
+            print("[RCT Search] Module not available. Please ensure src/modes/rct_search.py exists.")
+            return None
 
 load_dotenv()
+
 
 # Ensure project root is on sys.path so `from src import rag` works
 _ROOT = Path(__file__).resolve().parent.parent
