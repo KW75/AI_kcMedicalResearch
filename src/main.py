@@ -1391,12 +1391,14 @@ def fetch_pubmed_articles(
 # ---------------------------------------------------------------------------
 # SR launcher
 # ---------------------------------------------------------------------------
+
 def run_sr_launcher(provider: str = "", model: str = "") -> None:
     """Run the SR automation pipeline (CLI mode — no Streamlit)."""
     import shutil
     import subprocess as _sp
     import json as _json
     import yaml as _yaml
+    from datetime import datetime
 
     print("\n" + "=" * 58)
     print("  SR Automation Pipeline")
@@ -1413,48 +1415,123 @@ def run_sr_launcher(provider: str = "", model: str = "") -> None:
     for p in pdf_files:
         print(f"     {p.name}")
 
-    # -- Step 2: PDF source is input/sr/ — sr/main.py handles project copying --
-    uploads_dir = INPUT_SR
-
-    # -- Step 3: load PICO JSON and update prisma_criteria.yaml --------------
+    # -- Step 2: PICO Management ----------------------------------------------
+    print("\n" + "=" * 58)
+    print("  PICO Configuration")
+    print("=" * 58)
+    
+    # Find existing PICO JSON files
     pico_files = sorted(INPUT_SR.glob("pico_*.json"),
                         key=lambda f: f.stat().st_mtime, reverse=True)
-    cfg_yaml: dict = {}
+    
+    pico_data = None
+    pico_path = None
+    
     if pico_files:
-        pico_path = pico_files[0]
+        # Show existing PICO files
+        print(f"\n  Found {len(pico_files)} PICO file(s) in input/sr/:")
+        for idx, pf in enumerate(pico_files[:5], 1):
+            print(f"    {idx}. {pf.name}")
+        print(f"    0. Create new PICO")
+        print()
+        
         try:
-            pico_data = _json.loads(pico_path.read_text(encoding="utf-8"))
-            print(f"[SR] PICO loaded from {pico_path.name}")
-
-            cfg_yaml = {
-                "review_title":       pico_data.get("topic", ""),
-                "effect_measure":     pico_data.get("effect_measure", "SMD"),
-                "pico": {
-                    "population":     pico_data.get("population", ""),
-                    "intervention":   pico_data.get("intervention", ""),
-                    "comparator":     pico_data.get("comparator", ""),
-                    "outcome":        pico_data.get("outcome", ""),
-                },
-                "pubmed_query_cleaned": pico_data.get("pubmed_query_cleaned", ""),
-                "inclusion_criteria": ["RCT", "Adult participants"],
-                "exclusion_criteria": ["Non-RCT", "Animal studies"],
-            }
-
-            prisma_path = BASE_DIR / "sr" / "config" / "prisma_criteria.yaml"
-            prisma_path.parent.mkdir(parents=True, exist_ok=True)
-            prisma_path.write_text(
-                _yaml.dump(cfg_yaml, allow_unicode=True, sort_keys=False),
-                encoding="utf-8",
+            choice = input("  Select a PICO file to use (0 for new): ").strip()
+        except (EOFError, KeyboardInterrupt):
+            choice = "1"
+        
+        if choice.isdigit() and 1 <= int(choice) <= len(pico_files[:5]):
+            pico_path = pico_files[int(choice) - 1]
+            try:
+                pico_data = _json.loads(pico_path.read_text(encoding="utf-8"))
+                print(f"\n  ✅ PICO loaded from: {pico_path.name}")
+                print(f"     Population:   {pico_data.get('population', 'N/A')}")
+                print(f"     Intervention: {pico_data.get('intervention', 'N/A')}")
+                print(f"     Comparator:   {pico_data.get('comparator', 'N/A')}")
+                print(f"     Outcome:      {pico_data.get('outcome', 'N/A')}")
+                print(f"     Effect:       {pico_data.get('effect_measure', 'SMD')}")
+                
+                # Ask if user wants to modify
+                try:
+                    modify = input("\n  Modify this PICO? [y/N]: ").strip().upper()
+                except (EOFError, KeyboardInterrupt):
+                    modify = "N"
+                
+                if modify == "Y":
+                    pico_data = _modify_pico(pico_data)
+                    # Save modified version
+                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                    new_path = INPUT_SR / f"pico_{timestamp}.json"
+                    new_path.write_text(
+                        _json.dumps(pico_data, indent=2, ensure_ascii=False),
+                        encoding="utf-8"
+                    )
+                    pico_path = new_path
+                    print(f"  ✅ Modified PICO saved to: {new_path.name}")
+                    
+            except Exception as e:
+                print(f"  ⚠️ Could not load PICO: {e}")
+                pico_data = None
+        
+        elif choice == "0":
+            pico_data = _create_pico()
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            pico_path = INPUT_SR / f"pico_{timestamp}.json"
+            pico_path.write_text(
+                _json.dumps(pico_data, indent=2, ensure_ascii=False),
+                encoding="utf-8"
             )
-            print(f"[SR] prisma_criteria.yaml updated")
-            print(f"[SR] PubMed query : {cfg_yaml.get('pubmed_query_cleaned', 'n/a')}")
-        except Exception as _e:
-            print(f"[SR] Warning: could not load PICO JSON: {_e}")
+            print(f"  ✅ New PICO saved to: {pico_path.name}")
+    
+    if pico_data is None:
+        # No PICO loaded - create new
+        print("\n  No PICO configuration found.")
+        try:
+            create = input("  Create a new PICO configuration? [Y/n]: ").strip().upper()
+        except (EOFError, KeyboardInterrupt):
+            create = "Y"
+        
+        if create != "N":
+            pico_data = _create_pico()
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            pico_path = INPUT_SR / f"pico_{timestamp}.json"
+            pico_path.write_text(
+                _json.dumps(pico_data, indent=2, ensure_ascii=False),
+                encoding="utf-8"
+            )
+            print(f"  ✅ New PICO saved to: {pico_path.name}")
+        else:
+            print("  ⚠️ No PICO configured. Using existing config.")
+    
+    # -- Step 3: Update prisma_criteria.yaml with PICO data -----------------
+    cfg_yaml: dict = {}
+    if pico_data:
+        cfg_yaml = {
+            "review_title":       pico_data.get("topic", pico_data.get("topic", "Systematic Review")),
+            "effect_measure":     pico_data.get("effect_measure", "SMD"),
+            "pico": {
+                "population":     pico_data.get("population", ""),
+                "intervention":   pico_data.get("intervention", ""),
+                "comparator":     pico_data.get("comparator", ""),
+                "outcome":        pico_data.get("outcome", ""),
+            },
+            "pubmed_query_cleaned": pico_data.get("pubmed_query_cleaned", ""),
+            "inclusion_criteria": ["RCT", "Adult participants"],
+            "exclusion_criteria": ["Non-RCT", "Animal studies"],
+        }
+        
+        prisma_path = BASE_DIR / "sr" / "config" / "prisma_criteria.yaml"
+        prisma_path.parent.mkdir(parents=True, exist_ok=True)
+        prisma_path.write_text(
+            _yaml.dump(cfg_yaml, allow_unicode=True, sort_keys=False),
+            encoding="utf-8",
+        )
+        print(f"\n  ✅ prisma_criteria.yaml updated with PICO")
+        print(f"     PubMed query: {cfg_yaml.get('pubmed_query_cleaned', 'n/a')}")
     else:
-        print("[SR] No pico_*.json found in input/sr/ — using existing config.")
+        print("\n  ⚠️ Using existing prisma_criteria.yaml")
 
-    # -- Step 4: resolve model ------------------------------------------------
-    _provider = provider or "qwen"
+    # -- Step 4: resolve provider and model ------------------------------------
     _DEFAULT_MODELS = {
         "qwen":      "qwen3.7-plus",
         "deepseek":  "deepseek-v4-flash",
@@ -1463,6 +1540,35 @@ def run_sr_launcher(provider: str = "", model: str = "") -> None:
         "groq":      "llama-3.3-70b-versatile",
         "ollama":    "llama3.2",
     }
+    
+    _provider = provider or "qwen"
+    
+    # --- Provider check for vision support ---
+    if _provider == "deepseek":
+        print("\n" + "=" * 58)
+        print("  ⚠️  WARNING: DeepSeek does NOT support vision API")
+        print("=" * 58)
+        print("  The SR pipeline uses vision-based extraction (images of PDF pages).")
+        print("  DeepSeek's API only accepts text, not images.")
+        print()
+        print("  Please use one of these providers with vision support:")
+        print("    • qwen     (recommended) - Qwen vision model")
+        print("    • openai   - GPT-4 vision")
+        print("    • anthropic - Claude vision")
+        print()
+        print("  To switch provider, run:")
+        print("    python src/main.py --mode sr --provider qwen")
+        print("=" * 58 + "\n")
+        
+        try:
+            choice = input("Continue anyway? (This will likely fail) [y/N]: ").strip().upper()
+            if choice != "Y":
+                print("Aborting. Please use --provider qwen")
+                return
+        except (EOFError, KeyboardInterrupt):
+            print("\nAborting.")
+            return
+    
     _model = model or _DEFAULT_MODELS.get(_provider, "qwen3.7-plus")
 
     # -- Step 5: run sr/main.py -----------------------------------------------
@@ -1473,9 +1579,9 @@ def run_sr_launcher(provider: str = "", model: str = "") -> None:
         "--provider",       _provider,
         "--model",          _model,
         "--effect-measure", cfg_yaml.get("effect_measure", "SMD")
-                            if pico_files else "SMD",
+                            if pico_data else "SMD",
     ]
-    print(f"[SR] Running: {' '.join(cmd)}\n")
+    print(f"\n[SR] Running: {' '.join(cmd)}\n")
     result = _sp.run(cmd, cwd=str(BASE_DIR))
 
     if result.returncode == 0:
@@ -1487,6 +1593,60 @@ def run_sr_launcher(provider: str = "", model: str = "") -> None:
     else:
         print(f"\n[SR] Pipeline exited with code {result.returncode}.")
         print("[SR] Check the output above for errors.")
+
+
+def _create_pico() -> dict:
+    """Interactive PICO creation."""
+    print("\n  Enter PICO components for your systematic review:")
+    print("  (Press Enter to skip any field)")
+    
+    population = input("    Population   (P): ").strip()
+    intervention = input("    Intervention (I): ").strip()
+    comparator = input("    Comparator   (C): ").strip()
+    outcome = input("    Outcome      (O): ").strip()
+    
+    topic = f"Effect of {intervention} on {outcome}" if intervention and outcome else "Systematic Review"
+    
+    pico_data = {
+        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "topic": topic,
+        "population": population,
+        "intervention": intervention,
+        "comparator": comparator,
+        "outcome": outcome,
+        "study_design": "RCT",
+        "effect_measure": "SMD",
+        "source_mode": "manual_sr",
+        "pubmed_query_raw": f"{population} AND {intervention} AND {outcome}" if all([population, intervention, outcome]) else "",
+        "pubmed_query_cleaned": "",
+    }
+    
+    return pico_data
+
+
+def _modify_pico(pico_data: dict) -> dict:
+    """Allow user to modify existing PICO."""
+    print("\n  Modify PICO components (press Enter to keep current value):")
+    
+    fields = [
+        ("population", "Population   (P)"),
+        ("intervention", "Intervention (I)"),
+        ("comparator", "Comparator   (C)"),
+        ("outcome", "Outcome      (O)"),
+    ]
+    
+    for key, label in fields:
+        current = pico_data.get(key, "")
+        new_val = input(f"    {label} [{current}]: ").strip()
+        if new_val:
+            pico_data[key] = new_val
+    
+    # Update topic if intervention or outcome changed
+    if pico_data.get("intervention") and pico_data.get("outcome"):
+        pico_data["topic"] = f"Effect of {pico_data['intervention']} on {pico_data['outcome']}"
+    
+    return pico_data
+
 
 def list_roles(mode: str = "coding") -> None:
     """Print each role's prompt file and injected documentation for a mode."""
