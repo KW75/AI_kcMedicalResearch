@@ -1,4 +1,4 @@
-﻿import base64, datetime
+import base64, datetime
 from pathlib import Path
 
 HTML_TEMPLATE = """<!DOCTYPE html>
@@ -32,6 +32,10 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     tbody tr{{border-bottom:1px solid #f0f2f5}}
     tbody tr:hover{{background:#f8fafc}}
     tbody td{{padding:9px 12px;vertical-align:top;color:#374151}}
+    /* Screening table column widths */
+    .screening-filename {{ max-width: 160px; word-wrap: break-word; font-size: .76rem; }}
+    .screening-rationale {{ max-width: 300px; word-wrap: break-word; font-size: .76rem; }}
+    .screening-check {{ text-align: center; }}
     .bi{{display:inline-block;background:#d1fae5;color:#065f46;border-radius:5px;padding:2px 9px;font-size:.73rem;font-weight:700}}
     .bx{{display:inline-block;background:#fee2e2;color:#991b1b;border-radius:5px;padding:2px 9px;font-size:.73rem;font-weight:700}}
     .bu{{display:inline-block;background:#fef3c7;color:#92400e;border-radius:5px;padding:2px 9px;font-size:.73rem;font-weight:700}}
@@ -157,18 +161,37 @@ class HTMLReportGenerator:
                 f'<div><h4 style="font-size:.77rem;color:#065f46;margin-bottom:6px;">Inclusion</h4>{ul(inc)}</div>'
                 f'<div><h4 style="font-size:.77rem;color:#991b1b;margin-bottom:6px;">Exclusion</h4>{ul(exc)}</div></div>')
 
-    def _screening_rows(self,results):
-        rows=[]
-        for i,r in enumerate(results,1):
-            d=r.get("decision","--"); bc={"INCLUDE":"bi","EXCLUDE":"bx"}.get(d,"bu")
-            pm=r.get("pico_match",{})
-            def f(v): return "&#10003;" if v is True else ("&#10007;" if v is False else "--")
-            rows.append(f"<tr><td>{i}</td><td style='font-size:.76rem;'>{self._e(r.get('filename',''))}</td>"
-                        f"<td><span class='{bc}'>{d}</span></td><td>{r.get('confidence',0):.2f}</td>"
-                        f"<td>{f(r.get('is_rct'))}</td><td>{f(pm.get('population'))}</td>"
-                        f"<td>{f(pm.get('intervention'))}</td><td>{f(pm.get('comparator'))}</td>"
-                        f"<td>{f(pm.get('outcome'))}</td>"
-                        f"<td style='max-width:200px;font-size:.76rem;'>{self._e(r.get('rationale',''))}</td></tr>")
+    def _screening_rows(self, results):
+        """Generate screening rows with truncated filename and proper column widths."""
+        rows = []
+        for i, r in enumerate(results, 1):
+            d = r.get("decision", "--")
+            bc = {"INCLUDE": "bi", "EXCLUDE": "bx"}.get(d, "bu")
+            pm = r.get("pico_match", {})
+            
+            def f(v):
+                return "&#10003;" if v is True else ("&#10007;" if v is False else "--")
+            
+            # Truncate filename to 35 characters with tooltip
+            filename = r.get('filename', '')
+            if len(filename) > 35:
+                filename_display = filename[:32] + "..."
+            else:
+                filename_display = filename
+            
+            rows.append(
+                f"<tr><td>{i}</td>"
+                f"<td class='screening-filename' title='{self._e(filename)}'>{self._e(filename_display)}</td>"
+                f"<td><span class='{bc}'>{d}</span></td>"
+                f"<td>{r.get('confidence', 0):.2f}</td>"
+                f"<td class='screening-check'>{f(r.get('is_rct'))}</td>"
+                f"<td class='screening-check'>{f(pm.get('population'))}</td>"
+                f"<td class='screening-check'>{f(pm.get('intervention'))}</td>"
+                f"<td class='screening-check'>{f(pm.get('comparator'))}</td>"
+                f"<td class='screening-check'>{f(pm.get('outcome'))}</td>"
+                f"<td class='screening-rationale'>{self._e(r.get('rationale', ''))}</td>"
+                f"</tr>"
+            )
         return "\n".join(rows)
 
     def _extraction_rows(self,results):
