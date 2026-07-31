@@ -170,6 +170,39 @@ def call_ai(prompt: str, provider: str = "ollama", model: Optional[str] = None) 
         return response.choices[0].message.content
 
 
+def _add_hyperlink(paragraph, text: str, url: str):
+    """Add a clickable hyperlink to a paragraph."""
+    try:
+        from docx.oxml.ns import qn
+        from docx.oxml import OxmlElement
+        
+        part = paragraph.part
+        r_id = part.relate_to(
+            url,
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink",
+            is_external=True
+        )
+        
+        hyperlink = OxmlElement("w:hyperlink")
+        hyperlink.set(qn("r:id"), r_id)
+        
+        new_run = OxmlElement("w:r")
+        rPr = OxmlElement("w:rPr")
+        rStyle = OxmlElement("w:rStyle")
+        rStyle.set(qn("w:val"), "Hyperlink")
+        rPr.append(rStyle)
+        new_run.append(rPr)
+        
+        new_t = OxmlElement("w:t")
+        new_t.text = text
+        new_run.append(new_t)
+        hyperlink.append(new_run)
+        paragraph._p.append(hyperlink)
+    except Exception:
+        # Fallback: plain text
+        paragraph.add_run(text)
+
+
 def _md_to_docx(md_content: str, title: str, out_path: Path) -> None:
     """Convert markdown to DOCX using python-docx"""
     try:
@@ -268,9 +301,22 @@ def _ranked_articles_to_docx(
             row[1].text = f"{r['score']}/10"
             row[2].text = r["title"]
             row[3].text = r["pmid"]
-            # Add link
+            # Add hyperlink using helper function
             p = row[4].paragraphs[0]
-            p.add_run().add_hyperlink(r["url"], "PubMed")
+            _add_hyperlink(p, "PubMed", r["url"])
+
+        # Add comments after the table
+        doc.add_paragraph()
+        note1 = doc.add_paragraph()
+        note1.add_run(
+            "Select your top 5 articles, download PDFs and place them in input/sr/ to run the SR pipeline."
+        ).italic = True
+
+        doc.add_paragraph()
+        note2 = doc.add_paragraph()
+        note2.add_run(
+            "For explanation on ranking, please refer to the full report in the reports folder."
+        ).italic = True
 
         doc.save(str(out_path))
     except ImportError:
