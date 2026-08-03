@@ -205,6 +205,88 @@ def _latest_outputs(folder: Path, suffixes: tuple[str, ...] = (".md", ".docx")) 
     files = [f for f in folder.iterdir() if f.is_file() and f.suffix.lower() in suffixes]
     return sorted(files, key=lambda f: f.stat().st_mtime, reverse=True)[:4]
 
+# ============================================================================
+# NEW: API KEY MANAGEMENT (Minimal addition)
+# ============================================================================
+
+def _api_key_sidebar():
+    """Simple sidebar for users to enter API keys - works with existing code"""
+
+    with st.sidebar:
+        st.header("🔑 API Keys")
+        st.caption("Enter your API keys here (optional)")
+
+        # Check if env keys exist
+        has_env = any([
+            os.environ.get('OPENAI_API_KEY'),
+            os.environ.get('ANTHROPIC_API_KEY'),
+            os.environ.get('GROQ_API_KEY'),
+            os.environ.get('DEEPSEEK_API_KEY'),
+            os.environ.get('DASHSCOPE_API_KEY'),
+        ])
+
+        if has_env:
+            st.success("✅ Using environment API keys")
+
+        # Store API keys in session
+        if 'api_keys' not in st.session_state:
+            st.session_state.api_keys = {}
+
+        # Provider-specific key inputs
+        providers_with_keys = {
+            'openai': 'OpenAI',
+            'anthropic': 'Anthropic',
+            'groq': 'Groq',
+            'deepseek': 'DeepSeek',
+            'qwen': 'Qwen (Alibaba)',
+        }
+
+        key_changed = False
+        for key, label in providers_with_keys.items():
+            current_key = st.session_state.api_keys.get(key, '')
+            env_var = f'{key.upper()}_API_KEY'
+            if key == 'qwen':
+                env_var = 'DASHSCOPE_API_KEY'
+
+            # Show if env key exists
+            env_exists = os.environ.get(env_var, '')
+
+            input_key = st.text_input(
+                f"{label}",
+                type="password",
+                placeholder="Enter API key..." if not env_exists else "Override environment key",
+                key=f"api_{key}"
+            )
+
+            # Store in session state
+            if input_key:
+                st.session_state.api_keys[key] = input_key
+                key_changed = True
+
+        # Show current status
+        if st.session_state.api_keys:
+            st.divider()
+            st.caption("Current session keys:")
+            for key in st.session_state.api_keys:
+                st.caption(f"✅ {key.title()}: ********")
+
+        return key_changed
+
+
+def _get_env_with_api_keys():
+    """Get environment with API keys merged from session"""
+    env_vars = os.environ.copy()
+
+    # Add session-stored API keys
+    for key, value in st.session_state.get('api_keys', {}).items():
+        if value:
+            env_var = f'{key.upper()}_API_KEY'
+            if key == 'qwen':
+                env_var = 'DASHSCOPE_API_KEY'
+            env_vars[env_var] = value
+
+    return env_vars
+
 
 # -- Cloud / Local terminal launcher -------------------------------------------
 
@@ -257,30 +339,37 @@ def _run_cli_cloud(mode: str, provider: str, model: str, submode: str = "", prom
 
     st.code("$ " + " ".join(cmd_parts))
 
-    # Check if we have API keys (for cloud providers)
-    if provider in ["qwen", "openai", "anthropic", "deepseek", "groq"]:
-        import os
-        env_var_map = {
-            "qwen": "QWEN_API_KEY",
-            "openai": "OPENAI_API_KEY",
-            "anthropic": "ANTHROPIC_API_KEY",
-            "deepseek": "DEEPSEEK_API_KEY",
-            "groq": "GROQ_API_KEY"
-        }
-        env_var = env_var_map.get(provider)
-        if env_var and not os.getenv(env_var):
-            st.warning(f"⚠️ {env_var} not set. Please add it to Streamlit Secrets.")
-            st.info("Go to your Streamlit Cloud dashboard → Settings → Secrets")
-            return "error: missing API key"
+    # Check for API keys (session first, then env)
+    env_var_map = {
+        "qwen": "DASHSCOPE_API_KEY",
+        "openai": "OPENAI_API_KEY",
+        "anthropic": "ANTHROPIC_API_KEY",
+        "deepseek": "DEEPSEEK_API_KEY",
+        "groq": "GROQ_API_KEY"
+    }
+    env_var = env_var_map.get(provider)
+
+    # Check session API keys first
+    session_keys = st.session_state.get('api_keys', {})
+    has_key = session_keys.get(provider, '') or os.getenv(env_var, '')
+
+    if env_var and not has_key:
+        st.warning(f"⚠️ {env_var} not set. Please enter it in the sidebar or add to Streamlit Secrets.")
+        st.info("Go to sidebar → API Keys → Enter your key")
+        return "error: missing API key"
 
     with st.spinner(f"Running {mode} mode..."):
         try:
+            # Get merged environment
+            env_vars = _get_env_with_api_keys()
+
             result = subprocess.run(
                 cmd_parts,
                 cwd=str(Path(__file__).resolve().parent.parent.parent),
                 capture_output=True,
                 text=True,
-                timeout=300
+                timeout=300,
+                env=env_vars
             )
 
             if result.stdout:
@@ -304,7 +393,7 @@ def _run_cli_cloud(mode: str, provider: str, model: str, submode: str = "", prom
 
 
 def _launch_terminal_local(mode: str, provider: str, model: str, submode: str = "") -> str:
-    """Original terminal launch for local use"""
+    """Original terminal launch for local use - with API keys from session"""
     import subprocess
     import sys
     from pathlib import Path
@@ -327,24 +416,64 @@ def _launch_terminal_local(mode: str, provider: str, model: str, submode: str = 
 
     cmd_str = " ".join(f'"{p}"' if " " in p else p for p in cmd_parts)
 
+    # Get merged environment for the subprocess
+    env_vars = _get_env_with_api_keys()
+
     try:
         if sys.platform == "win32":
+            # For local Windows, we need to pass environment to the new console
+            # Create a temp script that sets environment variables
+            import tempfile
+            script_lines = []
+
+            # Set API keys from session
+            for key, value in st.session_state.get('api_keys', {}).items():
+                if value:
+                    env_var = f'{key.upper()}_API_KEY'
+                    if key == 'qwen':
+                        env_var = 'DASHSCOPE_API_KEY'
+                    script_lines.append(f'set "{env_var}={value}"')
+
+            # Also set DASHSCOPE endpoints if they exist
+            if os.environ.get('DASHSCOPE_BASE_URL'):
+                script_lines.append(f'set "DASHSCOPE_BASE_URL={os.environ.get("DASHSCOPE_BASE_URL")}"')
+            if os.environ.get('DASHSCOPE_ANTHROPIC_URL'):
+                script_lines.append(f'set "DASHSCOPE_ANTHROPIC_URL={os.environ.get("DASHSCOPE_ANTHROPIC_URL")}"')
+
+            # Change directory and run command
+            script_lines.append(f'cd /d "{base}"')
+            script_lines.append(cmd_str)
+            script_lines.append('')
+            script_lines.append('echo.')
+            script_lines.append('echo Session completed. Press any key to close this window...')
+            script_lines.append('pause >nul')
+
+            script_content = "\r\n".join(script_lines)
+
+            # Write temp batch file
+            temp_bat = Path(tempfile.gettempdir()) / f"ai_km_run_{mode}_{provider}.bat"
+            temp_bat.write_text(script_content, encoding='utf-8')
+
+            # Launch the batch file
             subprocess.Popen(
-                ["powershell", "-NoExit", "-Command",
-                 f"Set-Location '{base}'; {cmd_str}; Write-Host ''; Write-Host 'Session completed. Press any key to close this window...'; $null = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')"],
+                ["cmd", "/k", str(temp_bat)],
                 creationflags=subprocess.CREATE_NEW_CONSOLE,
                 cwd=base,
+                env=env_vars
             )
+
         elif sys.platform == "darwin":
             subprocess.Popen(
                 ["osascript", "-e",
-                 f'tell app "Terminal" to do script "cd \'{base}\' && {cmd_str} && echo \'Session completed. Press any key to close...\' && read"']
+                 f'tell app "Terminal" to do script "cd \'{base}\' && {cmd_str} && echo \'Session completed. Press any key to close...\' && read"'],
+                env=env_vars
             )
         else:
             subprocess.Popen(
                 ["x-terminal-emulator", "-e", "bash", "-c",
                  f"cd '{base}' && {cmd_str} && echo 'Session completed. Press any key to close...' && read"],
                 cwd=base,
+                env=env_vars
             )
         return "ok"
     except Exception as exc:
@@ -501,6 +630,9 @@ def _render_header(subtitle: str = "") -> None:
 # -- HOME PAGE -----------------------------------------------------------------
 
 def _home_page() -> None:
+    # Call API key sidebar
+    _api_key_sidebar()
+
     _render_header("Select a mode to begin")
 
     col_exit, col_spacer = st.columns([1, 11])
@@ -625,6 +757,9 @@ def _home_page() -> None:
 # -- MODE PAGE -----------------------------------------------------------------
 
 def _mode_page(mode: str) -> None:
+    # Call API key sidebar
+    _api_key_sidebar()
+
     cfg = MODES[mode]
     _render_header(f"Mode: {cfg['label']}")
 
@@ -786,7 +921,7 @@ def main() -> None:
         page_title="AI kcMedicalResearch",
         page_icon=str(ASSETS_DIR / "logo_AI_kcMedicalResearch.png") if (ASSETS_DIR / "logo_AI_kcMedicalResearch.png").exists() else "\U0001f9ec",
         layout="wide",
-        initial_sidebar_state="collapsed",
+        initial_sidebar_state="expanded",  # Changed to expanded so sidebar is visible
     )
     _inject_css()
 
