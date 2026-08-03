@@ -5,6 +5,7 @@ import io
 import os
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 import streamlit as st
@@ -205,17 +206,33 @@ def _latest_outputs(folder: Path, suffixes: tuple[str, ...] = (".md", ".docx")) 
     files = [f for f in folder.iterdir() if f.is_file() and f.suffix.lower() in suffixes]
     return sorted(files, key=lambda f: f.stat().st_mtime, reverse=True)[:4]
 
+
 # ============================================================================
-# NEW: API KEY MANAGEMENT (Minimal addition)
+# API KEY MANAGEMENT
 # ============================================================================
+
+def _get_env_with_api_keys():
+    """Get environment with API keys merged from session"""
+    env_vars = os.environ.copy()
+    
+    # Add session-stored API keys
+    for key, value in st.session_state.get('api_keys', {}).items():
+        if value:
+            env_var = f'{key.upper()}_API_KEY'
+            if key == 'qwen':
+                env_var = 'DASHSCOPE_API_KEY'
+            env_vars[env_var] = value
+    
+    return env_vars
+
 
 def _api_key_sidebar():
     """Simple sidebar for users to enter API keys - works with existing code"""
-
+    
     with st.sidebar:
         st.header("🔑 API Keys")
         st.caption("Enter your API keys here (optional)")
-
+        
         # Check if env keys exist
         has_env = any([
             os.environ.get('OPENAI_API_KEY'),
@@ -224,14 +241,14 @@ def _api_key_sidebar():
             os.environ.get('DEEPSEEK_API_KEY'),
             os.environ.get('DASHSCOPE_API_KEY'),
         ])
-
+        
         if has_env:
             st.success("✅ Using environment API keys")
-
+        
         # Store API keys in session
         if 'api_keys' not in st.session_state:
             st.session_state.api_keys = {}
-
+        
         # Provider-specific key inputs
         providers_with_keys = {
             'openai': 'OpenAI',
@@ -240,52 +257,33 @@ def _api_key_sidebar():
             'deepseek': 'DeepSeek',
             'qwen': 'Qwen (Alibaba)',
         }
-
-        key_changed = False
+        
         for key, label in providers_with_keys.items():
             current_key = st.session_state.api_keys.get(key, '')
             env_var = f'{key.upper()}_API_KEY'
             if key == 'qwen':
                 env_var = 'DASHSCOPE_API_KEY'
-
+            
             # Show if env key exists
             env_exists = os.environ.get(env_var, '')
-
+            
             input_key = st.text_input(
                 f"{label}",
                 type="password",
                 placeholder="Enter API key..." if not env_exists else "Override environment key",
                 key=f"api_{key}"
             )
-
+            
             # Store in session state
             if input_key:
                 st.session_state.api_keys[key] = input_key
-                key_changed = True
-
+        
         # Show current status
         if st.session_state.api_keys:
             st.divider()
             st.caption("Current session keys:")
             for key in st.session_state.api_keys:
                 st.caption(f"✅ {key.title()}: ********")
-
-        return key_changed
-
-
-def _get_env_with_api_keys():
-    """Get environment with API keys merged from session"""
-    env_vars = os.environ.copy()
-
-    # Add session-stored API keys
-    for key, value in st.session_state.get('api_keys', {}).items():
-        if value:
-            env_var = f'{key.upper()}_API_KEY'
-            if key == 'qwen':
-                env_var = 'DASHSCOPE_API_KEY'
-            env_vars[env_var] = value
-
-    return env_vars
 
 
 # -- Cloud / Local terminal launcher -------------------------------------------
@@ -299,10 +297,15 @@ def _launch_terminal(mode: str, provider: str, model: str, submode: str = "", pr
     import streamlit as st
 
     # Check if running in cloud environment
-    is_cloud = (os.environ.get('STREAMLIT_SHARING') or
-                os.environ.get('REPL_ID') or
-                os.environ.get('CODESPACES') or
-                os.environ.get('STREAMLIT_SERVER_PORT'))
+    is_cloud = (
+        os.environ.get('STREAMLIT_SHARING') or
+        os.environ.get('REPL_ID') or
+        os.environ.get('CODESPACES') or
+        os.environ.get('STREAMLIT_SERVER_PORT') or
+        os.environ.get('RENDER') or  # Render.com detection
+        os.environ.get('RENDER_SERVICE_ID') or  # Another Render indicator
+        os.environ.get('RENDER_GIT_COMMIT')  # Another Render indicator
+    )
 
     if is_cloud:
         return _run_cli_cloud(mode, provider, model, submode, prompt)
@@ -311,11 +314,12 @@ def _launch_terminal(mode: str, provider: str, model: str, submode: str = "", pr
 
 
 def _run_cli_cloud(mode: str, provider: str, model: str, submode: str = "", prompt: str = "") -> str:
-    """Run CLI directly in cloud environment"""
+    """Run CLI directly in cloud environment (Render, Streamlit Cloud, etc.)"""
     import subprocess
     import sys
     from pathlib import Path
     import streamlit as st
+    import os
 
     # Save prompt if provided
     if prompt.strip():
@@ -348,34 +352,43 @@ def _run_cli_cloud(mode: str, provider: str, model: str, submode: str = "", prom
         "groq": "GROQ_API_KEY"
     }
     env_var = env_var_map.get(provider)
-
+    
     # Check session API keys first
     session_keys = st.session_state.get('api_keys', {})
     has_key = session_keys.get(provider, '') or os.getenv(env_var, '')
-
+    
     if env_var and not has_key:
-        st.warning(f"⚠️ {env_var} not set. Please enter it in the sidebar or add to Streamlit Secrets.")
+        st.warning(f"⚠️ {env_var} not set. Please enter it in the sidebar or add to environment.")
         st.info("Go to sidebar → API Keys → Enter your key")
         return "error: missing API key"
 
     with st.spinner(f"Running {mode} mode..."):
         try:
-            # Get merged environment
-            env_vars = _get_env_with_api_keys()
-
+            # Get merged environment with API keys from session
+            env_vars = os.environ.copy()
+            
+            # Add session-stored API keys
+            for key, value in st.session_state.get('api_keys', {}).items():
+                if value:
+                    env_var_name = f'{key.upper()}_API_KEY'
+                    if key == 'qwen':
+                        env_var_name = 'DASHSCOPE_API_KEY'
+                    env_vars[env_var_name] = value
+            
+            # Run the command
             result = subprocess.run(
                 cmd_parts,
                 cwd=str(Path(__file__).resolve().parent.parent.parent),
                 capture_output=True,
                 text=True,
-                timeout=300,
+                timeout=600,  # 10 minute timeout for Render
                 env=env_vars
             )
 
             if result.stdout:
-                st.text_area("Output", result.stdout, height=300)
+                st.text_area("📄 Output", result.stdout, height=300)
             if result.stderr:
-                st.text_area("Errors", result.stderr, height=100)
+                st.text_area("⚠️ Errors/Warnings", result.stderr, height=100)
 
             if result.returncode == 0:
                 st.success("✅ Command completed successfully!")
@@ -385,7 +398,7 @@ def _run_cli_cloud(mode: str, provider: str, model: str, submode: str = "", prom
                 return f"error: code {result.returncode}"
 
         except subprocess.TimeoutExpired:
-            st.error("⏰ Command timed out after 5 minutes")
+            st.error("⏰ Command timed out after 10 minutes")
             return "error: timeout"
         except Exception as exc:
             st.error(f"❌ Error: {exc}")
@@ -397,6 +410,7 @@ def _launch_terminal_local(mode: str, provider: str, model: str, submode: str = 
     import subprocess
     import sys
     from pathlib import Path
+    import tempfile
 
     py = sys.executable
     mp = str(MAIN_PY)
@@ -421,11 +435,9 @@ def _launch_terminal_local(mode: str, provider: str, model: str, submode: str = 
 
     try:
         if sys.platform == "win32":
-            # For local Windows, we need to pass environment to the new console
-            # Create a temp script that sets environment variables
-            import tempfile
+            # For local Windows, create a temp batch file with API keys
             script_lines = []
-
+            
             # Set API keys from session
             for key, value in st.session_state.get('api_keys', {}).items():
                 if value:
@@ -433,13 +445,13 @@ def _launch_terminal_local(mode: str, provider: str, model: str, submode: str = 
                     if key == 'qwen':
                         env_var = 'DASHSCOPE_API_KEY'
                     script_lines.append(f'set "{env_var}={value}"')
-
+            
             # Also set DASHSCOPE endpoints if they exist
             if os.environ.get('DASHSCOPE_BASE_URL'):
                 script_lines.append(f'set "DASHSCOPE_BASE_URL={os.environ.get("DASHSCOPE_BASE_URL")}"')
             if os.environ.get('DASHSCOPE_ANTHROPIC_URL'):
                 script_lines.append(f'set "DASHSCOPE_ANTHROPIC_URL={os.environ.get("DASHSCOPE_ANTHROPIC_URL")}"')
-
+            
             # Change directory and run command
             script_lines.append(f'cd /d "{base}"')
             script_lines.append(cmd_str)
@@ -447,13 +459,13 @@ def _launch_terminal_local(mode: str, provider: str, model: str, submode: str = 
             script_lines.append('echo.')
             script_lines.append('echo Session completed. Press any key to close this window...')
             script_lines.append('pause >nul')
-
+            
             script_content = "\r\n".join(script_lines)
-
+            
             # Write temp batch file
             temp_bat = Path(tempfile.gettempdir()) / f"ai_km_run_{mode}_{provider}.bat"
             temp_bat.write_text(script_content, encoding='utf-8')
-
+            
             # Launch the batch file
             subprocess.Popen(
                 ["cmd", "/k", str(temp_bat)],
@@ -461,17 +473,21 @@ def _launch_terminal_local(mode: str, provider: str, model: str, submode: str = 
                 cwd=base,
                 env=env_vars
             )
-
+            
         elif sys.platform == "darwin":
+            # For macOS, we need to export environment variables
+            env_exports = " && ".join([f'export {k}="{v}"' for k, v in env_vars.items() if k.endswith('_API_KEY')])
             subprocess.Popen(
                 ["osascript", "-e",
-                 f'tell app "Terminal" to do script "cd \'{base}\' && {cmd_str} && echo \'Session completed. Press any key to close...\' && read"'],
+                 f'tell app "Terminal" to do script "cd \'{base}\' && {env_exports} && {cmd_str} && echo \'Session completed. Press any key to close...\' && read"'],
                 env=env_vars
             )
         else:
+            # Linux
+            env_exports = " && ".join([f'export {k}="{v}"' for k, v in env_vars.items() if k.endswith('_API_KEY')])
             subprocess.Popen(
                 ["x-terminal-emulator", "-e", "bash", "-c",
-                 f"cd '{base}' && {cmd_str} && echo 'Session completed. Press any key to close...' && read"],
+                 f"cd '{base}' && {env_exports} && {cmd_str} && echo 'Session completed. Press any key to close...' && read"],
                 cwd=base,
                 env=env_vars
             )
@@ -630,9 +646,7 @@ def _render_header(subtitle: str = "") -> None:
 # -- HOME PAGE -----------------------------------------------------------------
 
 def _home_page() -> None:
-    # Call API key sidebar
     _api_key_sidebar()
-
     _render_header("Select a mode to begin")
 
     col_exit, col_spacer = st.columns([1, 11])
@@ -757,9 +771,7 @@ def _home_page() -> None:
 # -- MODE PAGE -----------------------------------------------------------------
 
 def _mode_page(mode: str) -> None:
-    # Call API key sidebar
     _api_key_sidebar()
-
     cfg = MODES[mode]
     _render_header(f"Mode: {cfg['label']}")
 
@@ -921,7 +933,7 @@ def main() -> None:
         page_title="AI kcMedicalResearch",
         page_icon=str(ASSETS_DIR / "logo_AI_kcMedicalResearch.png") if (ASSETS_DIR / "logo_AI_kcMedicalResearch.png").exists() else "\U0001f9ec",
         layout="wide",
-        initial_sidebar_state="expanded",  # Changed to expanded so sidebar is visible
+        initial_sidebar_state="expanded",
     )
     _inject_css()
 
