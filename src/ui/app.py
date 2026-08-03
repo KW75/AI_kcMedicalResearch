@@ -1,10 +1,3 @@
-
-"""
-src/ui/app.py  -  Main Streamlit UI for AI kcMedicalResearch v2.2.0
-Landing page: six mode cards in a single row
-Each mode page: instructions, settings, file upload, run, output, downloads
-"""
-
 from __future__ import annotations
 
 import base64
@@ -34,14 +27,17 @@ MODES: dict[str, dict] = {
         "description": "Code generation,\nReview & Revision.",
         "extensions":  [".py", ".js", ".ts", ".html", ".css", ".java",
                         ".c", ".cpp", ".cs", ".rb", ".go", ".rs", ".txt", ".md"],
+        "submodes":    ["Builder (pipeline)", "Reviewer", "Tester"],
         "instructions": (
             "**How to use Coding mode**\n\n"
             "1. Drop source files into `input/coding/`.\n"
             "2. Choose your provider and model below.\n"
-            "3. Click **Run Coding** \u2014 the AI will review / generate code.\n"
-            "4. Outputs (code files + markdown report) appear in `output/coding/`.\n\n"
-            "_Tip: use the **--revise** flag from the CLI for a "
-            "Builder -> Reviewer -> Tester pipeline._"
+            "3. Select a sub-mode:\n"
+            "   - **Builder**: Full pipeline (Builder → Reviewer → Tester)\n"
+            "   - **Reviewer**: Standalone code review\n"
+            "   - **Tester**: Standalone test generation\n"
+            "4. Click **Run Coding** — the AI will process your code.\n"
+            "5. Outputs appear in `output/coding/`."
         ),
     },
     "writing": {
@@ -54,9 +50,12 @@ MODES: dict[str, dict] = {
         "instructions": (
             "**How to use Writing mode**\n\n"
             "1. Drop `.txt`, `.md`, `.docx`, or `.pdf` files into `input/writing/`.\n"
-            "2. Choose your provider and model.\n"
-            "3. Click **Run Writing** \u2014 a structured report is generated.\n"
-            "4. Markdown and Word outputs appear in `output/writing/`."
+            "2. Choose your provider and model below.\n"
+            "3. Click **Run Writing** — you will be prompted in the terminal to select:\n"
+            "   - **Topic Track**: Editorial/opinion style (newspaper)\n"
+            "   - **Article Track**: Medical journal article style\n"
+            "4. A structured report is generated.\n"
+            "5. Markdown and Word outputs appear in `output/writing/`."
         ),
     },
     "appraisal": {
@@ -69,8 +68,11 @@ MODES: dict[str, dict] = {
         "instructions": (
             "**How to use Appraisal mode**\n\n"
             "1. Drop article PDFs or text files into `input/appraisal/`.\n"
-            "2. Choose your provider and model.\n"
-            "3. Click **Run Appraisal** \u2014 three parallel agents assess the article.\n"
+            "2. Choose your provider and model below.\n"
+            "3. Click **Run Appraisal** — you will be prompted in the terminal to select:\n"
+            "   - **Appraiser**: Critical appraisal of methodology\n"
+            "   - **Methodologist**: Statistical and design assessment\n"
+            "   - **Summariser**: Concise article summary\n"
             "4. Merged report (`.md` + `.docx`) appears in `output/appraisal/`."
         ),
     },
@@ -83,10 +85,10 @@ MODES: dict[str, dict] = {
         "extensions":  [".txt", ".md"],
         "instructions": (
             "**How to use RCT Search mode**\n\n"
-            "1. Enter your PICO topic in the text box below, or place a `topic.md` "
-            "file in `input/rct_search/`.\n"
-            "2. Choose your provider and model.\n"
-            "3. Click **Run RCT Search** \u2014 the pipeline builds, validates, and "
+            "1. Place a `topic.md` file in `input/rct_search/`, or enter your PICO topic "
+            "when prompted in the terminal.\n"
+            "2. Choose your provider and model below.\n"
+            "3. Click **Run RCT Search** — the pipeline builds, validates, and "
             "refines a search strategy.\n"
             "4. Outputs appear in `output/rct_search/`."
         ),
@@ -100,10 +102,13 @@ MODES: dict[str, dict] = {
         "extensions":  [".txt", ".md"],
         "instructions": (
             "**How to use Search mode**\n\n"
-            "1. Enter your clinical topic or paper title in the text box below, or "
-            "place a `topic.md` file in `input/search/`.\n"
-            "2. Choose provider and model.\n"
-            "3. Click **Run Search** \u2014 results are saved to `output/search/`."
+            "1. Place a `topic.md` file in `input/search/`, or enter your clinical topic "
+            "when prompted in the terminal.\n"
+            "2. Choose your provider and model below.\n"
+            "3. Click **Run Search** — you will be prompted in the terminal to select:\n"
+            "   - **Topic Search**: Web synopsis with reference links\n"
+            "   - **Article Search**: PubMed search by article type + comparison\n"
+            "4. Results are saved to `output/search/`."
         ),
     },
     "sr": {
@@ -132,7 +137,6 @@ PROVIDERS = ["ollama", "openai", "anthropic", "deepseek", "groq", "qwen"]
 # -- helpers -------------------------------------------------------------------
 
 def _icon_b64(path: Path) -> str | None:
-    """Resize icon to 96x96, preserve transparency, return base64 data-URI."""
     if not path.exists():
         return None
     try:
@@ -145,7 +149,7 @@ def _icon_b64(path: Path) -> str | None:
         return "data:image/png;base64," + data
     except Exception:
         try:
-            ext  = path.suffix.lower().lstrip(".")
+            ext = path.suffix.lower().lstrip(".")
             mime = "jpeg" if ext in ("jpg", "jpeg") else "png"
             return "data:image/" + mime + ";base64," + base64.b64encode(path.read_bytes()).decode()
         except Exception:
@@ -159,44 +163,22 @@ def _logo_b64() -> str | None:
     return None
 
 
-def _open_folder(folder: Path) -> None:
-    folder.mkdir(parents=True, exist_ok=True)
-    if sys.platform == "win32":
-        subprocess.Popen(["explorer", str(folder)])
-    elif sys.platform == "darwin":
-        subprocess.Popen(["open", str(folder)])
-    else:
-        subprocess.Popen(["xdg-open", str(folder)])
-
-
 def _show_folder_contents(folder: Path, exts: list[str], label: str) -> None:
-    """Show folder contents with download buttons. No Explorer button."""
     folder.mkdir(parents=True, exist_ok=True)
-    files = (
-        sorted(
-            f for f in folder.iterdir()
-            if f.is_file() and f.suffix.lower() in exts
-        )
-        if folder.exists() else []
-    )
-    with st.expander(
-        f"\U0001f4c2 {label}  \u2014  `{folder.relative_to(BASE_DIR)}`",
-        expanded=True,
-    ):
+    files = sorted(
+        [f for f in folder.iterdir() if f.is_file() and f.suffix.lower() in exts]
+    ) if folder.exists() else []
+    with st.expander(f"\U0001f4c2 {label}  \u2014  `{folder.relative_to(BASE_DIR)}`", expanded=True):
         if files:
             for f in files:
                 c1, c2 = st.columns([6, 1])
                 with c1:
-                    st.markdown(
-                        f'<span class="file-badge">\U0001f4c4 {f.name}</span>',
-                        unsafe_allow_html=True,
-                    )
+                    st.markdown(f'<span class="file-badge">\U0001f4c4 {f.name}</span>', unsafe_allow_html=True)
                 with c2:
-                    ext  = f.suffix.lower()
+                    ext = f.suffix.lower()
                     mime = (
                         "text/markdown" if ext == ".md" else
-                        "application/vnd.openxmlformats-officedocument"
-                        ".wordprocessingml.document" if ext == ".docx" else
+                        "application/vnd.openxmlformats-officedocument.wordprocessingml.document" if ext == ".docx" else
                         "application/pdf" if ext == ".pdf" else
                         "application/octet-stream"
                     )
@@ -214,100 +196,105 @@ def _show_folder_contents(folder: Path, exts: list[str], label: str) -> None:
 def _count_files(folder: Path, exts: list[str]) -> int:
     if not folder.exists():
         return 0
-    return sum(
-        1 for f in folder.iterdir()
-        if f.is_file() and f.suffix.lower() in exts
-    )
+    return sum(1 for f in folder.iterdir() if f.is_file() and f.suffix.lower() in exts)
 
 
-def _latest_outputs(
-    folder: Path,
-    suffixes: tuple[str, ...] = (".md", ".docx"),
-) -> list[Path]:
+def _latest_outputs(folder: Path, suffixes: tuple[str, ...] = (".md", ".docx")) -> list[Path]:
     if not folder.exists():
         return []
-    files = [
-        f for f in folder.iterdir()
-        if f.is_file() and f.suffix.lower() in suffixes
-    ]
+    files = [f for f in folder.iterdir() if f.is_file() and f.suffix.lower() in suffixes]
     return sorted(files, key=lambda f: f.stat().st_mtime, reverse=True)[:4]
 
 
-def _launch_terminal(
-    mode: str, provider: str, model: str, topic: str = ""
-) -> str:
-    """Launch main.py in a new terminal window for interactive use."""
-    if mode in ("search", "rct_search") and topic.strip():
-        topic_file = INPUT_DIR / mode / "topic.md"
-        topic_file.parent.mkdir(parents=True, exist_ok=True)
-        topic_file.write_text(topic.strip(), encoding="utf-8")
-
-    py   = sys.executable
-    mp   = str(MAIN_PY)
+def _launch_terminal(mode: str, provider: str, model: str, submode: str = "") -> str:
+    """Launch terminal with the command and keep it open after completion."""
+    py = sys.executable
+    mp = str(MAIN_PY)
     base = str(BASE_DIR)
+
+    # Build command
+    cmd_parts = [py, mp, "--mode", mode, "--provider", provider]
+    if model.strip():
+        cmd_parts += ["--model", model.strip()]
+
+    # --- Pass sub-mode to CLI for Coding mode only ---
+    # Writing, Search, and Appraisal modes handle sub-modes interactively in the CLI
+    if mode == "coding" and submode:
+        if "Builder" in submode:
+            cmd_parts += ["--role", "Builder"]
+        elif "Reviewer" in submode:
+            cmd_parts += ["--role", "Reviewer"]
+        elif "Tester" in submode:
+            cmd_parts += ["--role", "Tester"]
+
+    cmd_str = " ".join(f'"{p}"' if " " in p else p for p in cmd_parts)
 
     try:
         if sys.platform == "win32":
-            # Use & call operator so PowerShell does not misparse --flags
-            py_ps   = py.replace("'", "''")
-            mp_ps   = mp.replace("'", "''")
-            base_ps = base.replace("'", "''")
-            model_part = f" --model {model.strip()}" if model.strip() else ""
-            ps_cmd = (
-                f"& '{py_ps}' '{mp_ps}'"
-                f" --mode {mode} --provider {provider}{model_part}"
-            )
             subprocess.Popen(
-                ["powershell", "-NoExit", "-Command",
-                 f"Set-Location '{base_ps}'; {ps_cmd}"],
+                ["powershell", "-NoExit", "-Command", 
+                 f"Set-Location '{base}'; {cmd_str}; Write-Host ''; Write-Host 'Session completed. Press any key to close this window...'; $null = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')"],
                 creationflags=subprocess.CREATE_NEW_CONSOLE,
                 cwd=base,
             )
         elif sys.platform == "darwin":
-            py_sh   = py.replace("'", "'\\''")
-            mp_sh   = mp.replace("'", "'\\''")
-            base_sh = base.replace("'", "'\\''")
-            model_part = f" --model {model.strip()}" if model.strip() else ""
-            script = (
-                f"cd '{base_sh}' && '{py_sh}' '{mp_sh}'"
-                f" --mode {mode} --provider {provider}{model_part}"
-            )
             subprocess.Popen(
-                ["osascript", "-e",
-                 f'tell app "Terminal" to do script "{script}"'],
+                ["osascript", "-e", 
+                 f'tell app "Terminal" to do script "cd \'{base}\' && {cmd_str} && echo \'Session completed. Press any key to close...\' && read"']
             )
         else:
-            args = [py, mp, "--mode", mode, "--provider", provider]
-            if model.strip():
-                args += ["--model", model.strip()]
             subprocess.Popen(
-                ["x-terminal-emulator", "-e"] + args,
+                ["x-terminal-emulator", "-e", "bash", "-c", 
+                 f"cd '{base}' && {cmd_str} && echo 'Session completed. Press any key to close...' && read"],
                 cwd=base,
             )
         return "ok"
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         return f"error: {exc}"
 
 
-# -- global CSS ----------------------------------------------------------------
+def _exit_to_launcher() -> None:
+    """Display exit message and clear session state."""
+    st.markdown(
+        """
+        <div style="text-align:center;padding:60px 20px;">
+            <h1 style="font-size:3rem;">👋</h1>
+            <h2 style="color:#1a1a2e;">Return to Launcher</h2>
+            <p style="font-size:1.2rem;color:#555;margin-top:20px;">
+                Close this browser tab and return to the terminal where the launcher is running.
+            </p>
+            <p style="font-size:1rem;color:#888;margin-top:10px;">
+                Press <strong>Ctrl+C</strong> in the terminal to stop the UI server when done.
+            </p>
+            <div style="margin-top:30px;">
+                <a href="#" onclick="window.close();return false;" 
+                   style="font-size:1.2rem;padding:10px 30px;background:#4A90D9;color:white;border:none;border-radius:8px;cursor:pointer;text-decoration:none;display:inline-block;">
+                    Close this tab
+                </a>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    for key in list(st.session_state.keys()):
+        if key != "page":
+            del st.session_state[key]
+    st.session_state["page"] = "home"
+    st.stop()
+
+
+# -- CSS -----------------------------------------------------------------------
 
 def _inject_css() -> None:
     st.markdown(
         """
         <style>
-        /* ── root font size: makes all rem units behave as expected ── */
         :root { font-size: 16px !important; }
         html, body { font-size: 16px !important; }
         .main .block-container { font-size: 16px !important; }
-        /* global */
         body { font-family: "Segoe UI", sans-serif; }
-        .block-container {
-            padding-top: 1rem;
-            padding-left: 1.2rem;
-            padding-right: 1.2rem;
-        }
+        .block-container { padding-top: 1rem; padding-left: 1.2rem; padding-right: 1.2rem; }
 
-        /* header */
         .app-header {
             display: flex;
             align-items: center;
@@ -316,11 +303,15 @@ def _inject_css() -> None:
             border-bottom: 2px solid #e0e0e0;
             margin-bottom: 1rem;
         }
-        .app-header img   { height: 72px; }
-        .app-header h1    { font-size: 2.4rem; margin: 0; color: #1a1a2e; }
-        .app-header small { font-size: 1.2rem; color: #666; }
+        .app-header img { height: 72px; }
+        .app-header h1 { font-size: 2.4rem; margin: 0; color: #1a1a2e; }
+        .app-header .subtitle { 
+            font-size: 1.4rem; 
+            color: #555; 
+            font-weight: 700; 
+            letter-spacing: .05em;
+        }
 
-        /* mode cards */
         .mode-card {
             border-radius: 14px;
             padding: 1.2rem 0.6rem 1rem;
@@ -328,104 +319,59 @@ def _inject_css() -> None:
             transition: transform .15s, box-shadow .15s;
             height: 100%;
             min-height: 280px;
+            cursor: pointer;
         }
-        .mode-card:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 8px 24px rgba(0,0,0,.15);
+        .mode-card:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(0,0,0,.15); }
+        .mode-card img { width: 96px; height: 96px; object-fit: contain; margin: 0 auto .8rem; display: block; }
+        .mode-card h3 { font-size: 1.55rem; font-weight: 700; margin: .35rem 0 .3rem; }
+        .mode-card p.desc { font-size: 1.2rem; color: #333; margin: 0 0 .3rem; line-height: 1.5; white-space: pre-line; }
+        .mode-card p.fcount { font-size: 1.05rem; color: #777; margin-top: .35rem; }
+
+        /* Navigation buttons - more visible */
+        div[data-testid="stButton"] button:has(span:contains("🏠 Home")) {
+            background-color: #4A90D9 !important;
+            color: white !important;
+            font-weight: 700 !important;
+            font-size: 1.6rem !important;
+            padding: 0.6rem 1.5rem !important;
+            border-radius: 8px !important;
+            border: none !important;
         }
-        .mode-card img {
-            width: 96px;
-            height: 96px;
-            object-fit: contain;
-            margin: 0 auto .8rem;
-            display: block;
+        div[data-testid="stButton"] button:has(span:contains("🏠 Home")):hover {
+            background-color: #357ABD !important;
         }
-        .mode-card h3 {
-            font-size: 1.55rem;
-            font-weight: 700;
-            margin: .35rem 0 .3rem;
+        div[data-testid="stButton"] button:has(span:contains("🚪 Exit to Launcher")) {
+            background-color: #E74C3C !important;
+            color: white !important;
+            font-weight: 700 !important;
+            font-size: 1.6rem !important;
+            padding: 0.6rem 1.5rem !important;
+            border-radius: 8px !important;
+            border: none !important;
         }
-        .mode-card p.desc {
-            font-size: 1.2rem;
-            color: #333;
-            margin: 0 0 .3rem;
-            line-height: 1.5;
-            white-space: pre-line;
-        }
-        .mode-card p.fcount {
-            font-size: 1.05rem;
-            color: #777;
-            margin-top: .35rem;
+        div[data-testid="stButton"] button:has(span:contains("🚪 Exit to Launcher")):hover {
+            background-color: #C0392B !important;
         }
 
-        /* ALL buttons - strongest possible selectors */
-        button[kind="secondary"],
-        button[kind="primary"],
-        div[data-testid="stButton"] > button,
-        div[data-testid="stFormSubmitButton"] > button,
-        section[data-testid="stSidebar"] button,
-        .stButton button {
+        /* ALL buttons */
+        button[kind="secondary"], button[kind="primary"],
+        div[data-testid="stButton"] > button, .stButton button {
             font-size: 1.9rem !important;
             padding: .6rem 1.1rem !important;
             line-height: 1.5 !important;
             min-height: 3.4rem !important;
         }
-
-        /* download buttons */
-        div[data-testid="stDownloadButton"] > button,
-        .stDownloadButton button {
+        div[data-testid="stDownloadButton"] > button, .stDownloadButton button {
             font-size: 1.7rem !important;
             padding: .5rem 1rem !important;
             min-height: 3rem !important;
         }
-
-        /* expander header text */
-        details > summary p,
-        details > summary span,
-        div[data-testid="stExpander"] summary p {
-            font-size: 1.25rem !important;
-        }
-
-        /* form labels */
-        .stSelectbox label,
-        .stTextInput label,
-        .stTextArea label,
-        .stFileUploader label {
-            font-size: 1.2rem !important;
-        }
-
-        /* selectbox / input values */
-        .stSelectbox div[data-baseweb="select"] *,
-        .stTextInput input,
-        .stTextArea textarea {
-            font-size: 1.15rem !important;
-        }
-
-        /* alerts */
-        .stAlert p,
-        div[data-testid="stAlert"] p {
-            font-size: 1.15rem !important;
-        }
-
-        /* markdown body text */
-        .stMarkdown p,
-        .stMarkdown li {
-            font-size: 1.15rem;
-            line-height: 1.6;
-        }
-
-        /* file badge */
-        .file-badge {
-            display: inline-block;
-            background: #f0f0f0;
-            border-radius: 6px;
-            padding: .2rem .65rem;
-            font-size: 1.1rem;
-            margin: .2rem;
-            color: #333;
-        }
-
-        /* headings */
+        details > summary p, div[data-testid="stExpander"] summary p { font-size: 1.25rem !important; }
+        .stSelectbox label, .stTextInput label, .stFileUploader label { font-size: 1.2rem !important; }
+        .stSelectbox div[data-baseweb="select"] *, .stTextInput input { font-size: 1.15rem !important; }
+        .stAlert p, div[data-testid="stAlert"] p { font-size: 1.15rem !important; }
+        .stMarkdown p, .stMarkdown li { font-size: 1.15rem; line-height: 1.6; }
+        .file-badge { display: inline-block; background: #f0f0f0; border-radius: 6px; padding: .2rem .65rem; font-size: 1.1rem; margin: .2rem; color: #333; }
         h2 { font-size: 1.9rem !important; }
         h3 { font-size: 1.6rem !important; }
         </style>
@@ -434,20 +380,19 @@ def _inject_css() -> None:
     )
 
 
-# -- header --------------------------------------------------------------------
+# -- HEADER --------------------------------------------------------------------
 
 def _render_header(subtitle: str = "") -> None:
-    logo      = _logo_b64()
+    logo = _logo_b64()
     logo_html = f'<img src="{logo}" alt="logo">' if logo else ""
-    sub_html  = f"<small>{subtitle}</small>" if subtitle else ""
     st.markdown(
         f"""
         <div class="app-header">
             {logo_html}
             <div>
                 <h1>AI kcMedicalResearch</h1>
-                <p style="margin:0;font-size:0.95rem;color:#555;letter-spacing:.05em;">Pipeline User Interface</p>
-                {sub_html}
+                <p style="margin:0;font-size:1.4rem;font-weight:700;color:#555;letter-spacing:.05em;">Pipeline User Interface</p>
+                {f'<span class="subtitle">{subtitle}</span>' if subtitle else ''}
             </div>
         </div>
         """,
@@ -455,27 +400,28 @@ def _render_header(subtitle: str = "") -> None:
     )
 
 
-# -- home page -----------------------------------------------------------------
+# -- HOME PAGE -----------------------------------------------------------------
 
 def _home_page() -> None:
     _render_header("Select a mode to begin")
 
+    col_exit, col_spacer = st.columns([1, 11])
+    with col_exit:
+        if st.button("\U0001f6aa Exit to Launcher", key="exit_launcher_home"):
+            _exit_to_launcher()
+
     st.markdown(
         '''
-        <div style="background:#e8f4fd;border-left:5px solid #1a73e8;
-        padding:1rem 1.4rem;border-radius:8px;margin-bottom:.5rem;">
-        <p style="margin:0;font-size:1.2rem;font-weight:700;color:#1a1a2e;">
-        📂  Files uploaded to <strong>Input</strong> are automatically transferred to their respective input folder.</p>
+        <div style="background:#e8f4fd;border-left:5px solid #1a73e8;padding:1rem 1.4rem;border-radius:8px;margin-bottom:.5rem;">
+        <p style="margin:0;font-size:1.2rem;font-weight:700;color:#1a1a2e;">📂 Files uploaded to <strong>Input</strong> are automatically transferred to their respective input folder.</p>
         </div>
         ''',
         unsafe_allow_html=True,
     )
     st.markdown(
         '''
-        <div style="background:#e8f9f0;border-left:5px solid #34a853;
-        padding:1rem 1.4rem;border-radius:8px;margin-bottom:1.2rem;">
-        <p style="margin:0;font-size:1.2rem;font-weight:700;color:#1a1a2e;">
-        📤  Processed results are placed in their respective <strong>Output</strong> folder and available for download.</p>
+        <div style="background:#e8f9f0;border-left:5px solid #34a853;padding:1rem 1.4rem;border-radius:8px;margin-bottom:1.2rem;">
+        <p style="margin:0;font-size:1.2rem;font-weight:700;color:#1a1a2e;">📤 Processed results are placed in their respective <strong>Output</strong> folder and available for download.</p>
         </div>
         ''',
         unsafe_allow_html=True,
@@ -484,24 +430,18 @@ def _home_page() -> None:
     cols = st.columns(6, gap="small")
 
     for col, (key, cfg) in zip(cols, MODES.items()):
-        icon_uri  = _icon_b64(cfg["icon"]) or ""
+        icon_uri = _icon_b64(cfg["icon"]) or ""
         icon_html = (
-            f'<img src="{icon_uri}" alt="{cfg["label"]}" '
-            f'style="width:96px;height:96px;object-fit:contain;'
-            f'display:block;margin:0 auto .8rem;">'
+            f'<img src="{icon_uri}" alt="{cfg["label"]}" style="width:96px;height:96px;object-fit:contain;display:block;margin:0 auto .8rem;">'
             if icon_uri else
-            f'<div style="font-size:3.5rem;text-align:center;">'
-            f'\U0001f52c</div>'
+            f'<div style="font-size:3.5rem;text-align:center;">\U0001f52c</div>'
         )
         n_in = _count_files(INPUT_DIR / key, cfg["extensions"])
 
         with col:
-            # card HTML
             st.markdown(
                 f"""
-                <div class="mode-card"
-                     style="background:{cfg['bg']};
-                            border:2px solid {cfg['accent']}60;">
+                <div class="mode-card" style="background:{cfg['bg']};border:2px solid {cfg['accent']}60;">
                     {icon_html}
                     <h3 style="color:{cfg['accent']}">{cfg['label']}</h3>
                     <p class="desc">{cfg['description']}</p>
@@ -512,12 +452,10 @@ def _home_page() -> None:
             )
             st.write("")
 
-            # Input toggle
-            if st.button("\U0001f4c2 Input", key=f"inp_{key}",
-                         use_container_width=True):
+            if st.button("\U0001f4c2 Input", key=f"inp_{key}", use_container_width=True):
                 current = st.session_state.get(f"show_input_{key}", False)
                 for k in MODES:
-                    st.session_state[f"show_input_{k}"]  = False
+                    st.session_state[f"show_input_{k}"] = False
                     st.session_state[f"show_output_{k}"] = False
                 st.session_state[f"show_input_{key}"] = not current
                 st.rerun()
@@ -525,20 +463,9 @@ def _home_page() -> None:
             if st.session_state.get(f"show_input_{key}", False):
                 dest = INPUT_DIR / key
                 dest.mkdir(parents=True, exist_ok=True)
-                existing = sorted(
-                    f for f in dest.iterdir()
-                    if f.is_file() and f.suffix.lower() in cfg["extensions"]
-                )
+                existing = sorted(f for f in dest.iterdir() if f.is_file() and f.suffix.lower() in cfg["extensions"])
                 if existing:
-                    st.markdown(
-                        " ".join(
-                            f'<span class="file-badge">'
-                            f'\U0001f4c4 {f.name}</span>'
-                            for f in existing
-                        ),
-                        unsafe_allow_html=True,
-                    )
-                # uploader — no st.rerun() so buttons below remain reachable
+                    st.markdown(" ".join(f'<span class="file-badge">\U0001f4c4 {f.name}</span>' for f in existing), unsafe_allow_html=True)
                 ups = st.file_uploader(
                     f"Add files \u2192 `input/{key}/`",
                     accept_multiple_files=True,
@@ -551,23 +478,16 @@ def _home_page() -> None:
                         fp = dest / uf.name
                         fp.write_bytes(uf.read())
                         saved.append(uf.name)
-                    st.success(
-                        f"\u2705 Saved {len(saved)} file(s): "
-                        + ", ".join(f"`{n}`" for n in saved)
-                    )
+                    st.success(f"\u2705 Saved {len(saved)} file(s): " + ", ".join(f"`{n}`" for n in saved))
                     st.rerun()
-                # explicit close so user can reach buttons below
-                if st.button("\u2716 Close", key=f"close_inp_{key}",
-                             use_container_width=True):
+                if st.button("\u2716 Close", key=f"close_inp_{key}", use_container_width=True):
                     st.session_state[f"show_input_{key}"] = False
                     st.rerun()
 
-            # Output toggle
-            if st.button("\U0001f4e4 Output", key=f"out_{key}",
-                         use_container_width=True):
+            if st.button("\U0001f4e4 Output", key=f"out_{key}", use_container_width=True):
                 current = st.session_state.get(f"show_output_{key}", False)
                 for k in MODES:
-                    st.session_state[f"show_input_{k}"]  = False
+                    st.session_state[f"show_input_{k}"] = False
                     st.session_state[f"show_output_{k}"] = False
                 st.session_state[f"show_output_{key}"] = not current
                 st.rerun()
@@ -575,20 +495,11 @@ def _home_page() -> None:
             if st.session_state.get(f"show_output_{key}", False):
                 out_folder = OUTPUT_DIR / key
                 out_folder.mkdir(parents=True, exist_ok=True)
-                out_files = sorted(
-                    (f for f in out_folder.iterdir() if f.is_file()),
-                    key=lambda f: f.stat().st_mtime,
-                    reverse=True,
-                )
+                out_files = sorted([f for f in out_folder.iterdir() if f.is_file()], key=lambda f: f.stat().st_mtime, reverse=True)
                 if out_files:
                     for fp in out_files[:3]:
-                        ext  = fp.suffix.lower()
-                        mime = (
-                            "text/markdown" if ext == ".md" else
-                            "application/vnd.openxmlformats-officedocument"
-                            ".wordprocessingml.document" if ext == ".docx" else
-                            "application/octet-stream"
-                        )
+                        ext = fp.suffix.lower()
+                        mime = "text/markdown" if ext == ".md" else "application/octet-stream"
                         st.download_button(
                             label=f"\u2b07 {fp.name}",
                             data=fp.read_bytes(),
@@ -601,105 +512,67 @@ def _home_page() -> None:
                         st.caption(f"+ {len(out_files) - 3} older file(s)")
                 else:
                     st.info("No output files yet.")
-                # explicit close
-                if st.button("\u2716 Close", key=f"close_out_{key}",
-                             use_container_width=True):
+                if st.button("\u2716 Close", key=f"close_out_{key}", use_container_width=True):
                     st.session_state[f"show_output_{key}"] = False
                     st.rerun()
 
-            # Navigate to mode page
-            if st.button(f"\u25b6 {cfg['label']}", key=f"go_{key}",
-                         use_container_width=True):
+            if st.button(f"\u25b6 {cfg['label']}", key=f"go_{key}", use_container_width=True):
                 for k in MODES:
-                    st.session_state[f"show_input_{k}"]  = False
+                    st.session_state[f"show_input_{k}"] = False
                     st.session_state[f"show_output_{k}"] = False
                 st.session_state["page"] = key
                 st.rerun()
 
-            # Exit — close all panels and stay on home
-            if st.button("\U0001f6aa Exit", key=f"exit_{key}",
-                         use_container_width=True):
-                for k in list(st.session_state.keys()):
-                    if (k.startswith("show_input_")
-                            or k.startswith("show_output_")):
-                        st.session_state[k] = False
-                st.session_state["page"] = "home"
-                st.rerun()
 
-
-# -- mode page -----------------------------------------------------------------
+# -- MODE PAGE -----------------------------------------------------------------
 
 def _mode_page(mode: str) -> None:
     cfg = MODES[mode]
     _render_header(f"Mode: {cfg['label']}")
 
-    # top nav — both buttons return to home
-    nav_l, nav_r, nav_spacer = st.columns([2, 2, 8])
+    # Navigation - Home and Exit only
+    nav_l, nav_m, nav_spacer = st.columns([1, 1, 10])
     with nav_l:
-        if st.button("\U0001f3e0 Home", use_container_width=True):
+        if st.button("🏠 Home", use_container_width=True):
             st.session_state["page"] = "home"
             st.rerun()
-    with nav_r:
-        if st.button("\U0001f6aa Exit", use_container_width=True):
-            st.session_state["page"] = "home"
-            st.rerun()
+    with nav_m:
+        if st.button("🚪 Exit to Launcher", use_container_width=True):
+            _exit_to_launcher()
     with nav_spacer:
         pass
     st.divider()
 
-    # instructions
     with st.expander("\U0001f4cb Instructions", expanded=False):
         st.markdown(cfg["instructions"])
 
-    # icon + mode title — base64 img tag only, no st.image()
     icon_uri = _icon_b64(cfg["icon"])
     if icon_uri:
         ic, ti = st.columns([1, 10])
         with ic:
-            st.markdown(
-                f'<img src="{icon_uri}" alt="{cfg["label"]}" '
-                f'style="width:64px;height:64px;'
-                f'object-fit:contain;margin-top:.4rem;">',
-                unsafe_allow_html=True,
-            )
+            st.markdown(f'<img src="{icon_uri}" alt="{cfg["label"]}" style="width:64px;height:64px;object-fit:contain;margin-top:.4rem;">', unsafe_allow_html=True)
         with ti:
             st.subheader(cfg["label"])
     else:
         st.subheader(cfg["label"])
 
-    # provider / model settings
+    # Sub-mode selection - ONLY for Coding mode
+    submode = None
+    if mode == "coding" and cfg.get("submodes"):
+        submode = st.selectbox("Select sub-mode / pipeline", cfg["submodes"], key=f"submode_{mode}")
+
+    # Provider / Model
     with st.expander("\u2699\ufe0f Provider / Model settings", expanded=True):
         col_p, col_m = st.columns(2)
         with col_p:
-            provider = st.selectbox(
-                "Provider", PROVIDERS, index=0, key=f"provider_{mode}"
-            )
+            provider = st.selectbox("Provider", PROVIDERS, index=0, key=f"provider_{mode}")
         with col_m:
-            model = st.text_input(
-                "Model (leave blank for default)", "", key=f"model_{mode}"
-            )
+            model = st.text_input("Model (leave blank for default)", "", key=f"model_{mode}")
 
-    # topic input for search modes only
-    topic = ""
-    if mode in ("search", "rct_search"):
-        topic = st.text_area(
-            "Enter topic / PICO question  "
-            "(or leave blank if `topic.md` is already in the input folder)",
-            height=110,
-            key=f"topic_{mode}",
-        )
-
-    # file uploader — sr mode gets its own uploader + PICO import widget
+    # File upload
     if mode == "sr":
-        st.markdown(
-            "**Upload article PDFs to** `input/sr/`  \u2014  Accepted: .pdf"
-        )
-        uploaded_sr = st.file_uploader(
-            "Choose PDF files",
-            accept_multiple_files=True,
-            type=["pdf"],
-            key="upload_sr",
-        )
+        st.markdown("**Upload article PDFs to** `input/sr/`  \u2014  Accepted: .pdf")
+        uploaded_sr = st.file_uploader("Choose PDF files", accept_multiple_files=True, type=["pdf"], key="upload_sr")
         if uploaded_sr:
             dest_sr = INPUT_DIR / "sr"
             dest_sr.mkdir(parents=True, exist_ok=True)
@@ -708,93 +581,49 @@ def _mode_page(mode: str) -> None:
                 fp = dest_sr / uf.name
                 fp.write_bytes(uf.read())
                 saved_sr.append(uf.name)
-            st.success(
-                f"\u2705 Saved {len(saved_sr)} PDF(s) to `input/sr/`: "
-                + ", ".join(f"`{n}`" for n in saved_sr)
-            )
+            st.success(f"\u2705 Saved {len(saved_sr)} PDF(s) to `input/sr/`: " + ", ".join(f"`{n}`" for n in saved_sr))
             st.rerun()
 
-        # ── PICO import from RCT Search ──────────────────────────────────
+        # PICO import
         pico_dir = OUTPUT_DIR / "rct_search"
-        pico_files = sorted(
-            pico_dir.glob("pico_*.json"), reverse=True
-        ) if pico_dir.exists() else []
-
+        pico_files = sorted(pico_dir.glob("pico_*.json"), reverse=True) if pico_dir.exists() else []
         with st.expander("\U0001f4e5 Import PICO from RCT Search", expanded=bool(pico_files)):
             if not pico_files:
-                st.info(
-                    "No PICO files found in `output/rct_search/`. "
-                    "Run RCT Search mode first to generate one, "
-                    "or fill in the PICO fields manually in "
-                    "`sr/config/prisma_criteria.yaml`."
-                )
+                st.info("No PICO files found in `output/rct_search/`. Run RCT Search mode first.")
             else:
-                pico_names = [p.name for p in pico_files]
-                chosen = st.selectbox(
-                    "Select a saved PICO file",
-                    pico_names,
-                    key="pico_select_sr",
-                )
+                chosen = st.selectbox("Select a saved PICO file", [p.name for p in pico_files], key="pico_select_sr")
                 chosen_path = pico_dir / chosen
                 import json as _json
                 pico_data = _json.loads(chosen_path.read_text(encoding="utf-8"))
 
-                # show editable fields pre-filled from JSON
                 st.markdown("**Review / edit PICO fields before importing:**")
                 col_a, col_b = st.columns(2)
                 with col_a:
-                    p_pop   = st.text_input("Population",    pico_data.get("population",    ""), key="pico_pop")
-                    p_int   = st.text_input("Intervention",  pico_data.get("intervention",  ""), key="pico_int")
-                    p_com   = st.text_input("Comparator",    pico_data.get("comparator",    ""), key="pico_com")
+                    p_pop = st.text_input("Population", pico_data.get("population", ""), key="pico_pop")
+                    p_int = st.text_input("Intervention", pico_data.get("intervention", ""), key="pico_int")
                 with col_b:
-                    p_out   = st.text_input("Outcome",       pico_data.get("outcome",       ""), key="pico_out")
-                    p_des   = st.text_input("Study design",  pico_data.get("study_design",  "RCT"), key="pico_des")
-                    p_eff   = st.selectbox("Effect measure", ["SMD","MD","OR","RR"],
-                                           index=["SMD","MD","OR","RR"].index(
-                                               pico_data.get("effect_measure", "SMD")
-                                           ) if pico_data.get("effect_measure","SMD") in ["SMD","MD","OR","RR"] else 0,
-                                           key="pico_eff")
-
-                st.markdown("**Formulator output (topic summary):**")
-                st.text_area(
-                    "Formulator output",
-                    pico_data.get("formulator_output", ""),
-                    height=120,
-                    disabled=True,
-                    key="pico_formulator_preview",
-                    label_visibility="collapsed",
-                )
+                    p_com = st.text_input("Comparator", pico_data.get("comparator", ""), key="pico_com")
+                    p_out = st.text_input("Outcome", pico_data.get("outcome", ""), key="pico_out")
+                    p_eff = st.selectbox("Effect measure", ["SMD", "MD", "OR", "RR"],
+                                         index=["SMD", "MD", "OR", "RR"].index(pico_data.get("effect_measure", "SMD")) if pico_data.get("effect_measure", "SMD") in ["SMD", "MD", "OR", "RR"] else 0,
+                                         key="pico_eff")
 
                 if st.button("\u2705 Apply PICO to SR config", key="pico_apply"):
                     import yaml as _yaml
                     yaml_path = BASE_DIR / "sr" / "config" / "prisma_criteria.yaml"
-                    if yaml_path.exists():
-                        cfg_yaml = _yaml.safe_load(yaml_path.read_text(encoding="utf-8")) or {}
-                    else:
-                        cfg_yaml = {}
+                    cfg_yaml = _yaml.safe_load(yaml_path.read_text(encoding="utf-8")) if yaml_path.exists() else {}
                     cfg_yaml.setdefault("pico", {})
-                    cfg_yaml["pico"]["population"]    = p_pop
-                    cfg_yaml["pico"]["intervention"]  = p_int
-                    cfg_yaml["pico"]["comparator"]    = p_com
-                    cfg_yaml["pico"]["outcome"]       = p_out
-                    cfg_yaml["pico"]["study_design"]  = p_des
-                    cfg_yaml["effect_measure"]        = p_eff
+                    cfg_yaml["pico"]["population"] = p_pop
+                    cfg_yaml["pico"]["intervention"] = p_int
+                    cfg_yaml["pico"]["comparator"] = p_com
+                    cfg_yaml["pico"]["outcome"] = p_out
+                    cfg_yaml["effect_measure"] = p_eff
                     yaml_path.parent.mkdir(parents=True, exist_ok=True)
-                    yaml_path.write_text(
-                        _yaml.dump(cfg_yaml, allow_unicode=True, sort_keys=False),
-                        encoding="utf-8",
-                    )
-                    st.success(
-                        f"\u2705 PICO written to `sr/config/prisma_criteria.yaml` "
-                        f"from `{chosen}`. You can now run Systematic Review."
-                    )
+                    yaml_path.write_text(_yaml.dump(cfg_yaml, allow_unicode=True, sort_keys=False), encoding="utf-8")
+                    st.success(f"\u2705 PICO written to `sr/config/prisma_criteria.yaml`")
                     st.rerun()
-
-    elif mode != "sr":
-        st.markdown(
-            f"**Upload files to** `input/{mode}/`  \u2014  "
-            f"Accepted: {', '.join(cfg['extensions'])}"
-        )
+    else:
+        st.markdown(f"**Upload files to** `input/{mode}/`  \u2014  Accepted: {', '.join(cfg['extensions'])}")
         uploaded = st.file_uploader(
             "Choose files",
             accept_multiple_files=True,
@@ -809,66 +638,39 @@ def _mode_page(mode: str) -> None:
                 fp = dest / uf.name
                 fp.write_bytes(uf.read())
                 saved.append(uf.name)
-            st.success(
-                f"\u2705 Saved {len(saved)} file(s) to `input/{mode}/`: "
-                + ", ".join(f"`{n}`" for n in saved)
-            )
+            st.success(f"\u2705 Saved {len(saved)} file(s) to `input/{mode}/`: " + ", ".join(f"`{n}`" for n in saved))
             st.rerun()
 
     st.divider()
 
-    # folder browsers — no Explorer button
     fb1, fb2 = st.columns(2)
     with fb1:
-        _show_folder_contents(
-            INPUT_DIR / mode,
-            cfg["extensions"],
-            f"Input \u2014 {cfg['label']}",
-        )
+        _show_folder_contents(INPUT_DIR / mode, cfg["extensions"], f"Input \u2014 {cfg['label']}")
     with fb2:
-        _show_folder_contents(
-            OUTPUT_DIR / mode,
-            [".md", ".docx", ".pdf", ".py", ".txt"],
-            f"Output \u2014 {cfg['label']}",
-        )
+        _show_folder_contents(OUTPUT_DIR / mode, [".md", ".docx", ".pdf", ".py", ".txt"], f"Output \u2014 {cfg['label']}")
 
     st.divider()
 
-    # run button
-    if st.button(
-        f"\u25b6\ufe0f Run {cfg['label']}",
-        type="primary",
-        use_container_width=True,
-        key=f"run_{mode}",
-    ):
-        result = _launch_terminal(mode, provider, model, topic)
+    run_label = f"\u25b6\ufe0f Run {cfg['label']}"
+    if mode == "coding" and submode:
+        run_label += f" ({submode})"
+
+    if st.button(run_label, type="primary", use_container_width=True, key=f"run_{mode}"):
+        result = _launch_terminal(mode, provider, model, submode or "")
         if result == "ok":
-            st.success(
-                f"\u2705 **{cfg['label']}** session launched "
-                f"in a new terminal window."
-            )
-            st.info(
-                "\U0001f4bb Work in the terminal window. "
-                f"When done, use the Output browser above to find your "
-                f"results in `output/{mode}/`."
-            )
+            st.success(f"\u2705 **{cfg['label']}** session launched in a new terminal window.")
+            st.info(f"\U0001f4bb Work in the terminal window. When done, use the Output browser above to find your results in `output/{mode}/`.")
         else:
             st.error(f"Could not open terminal: {result}")
 
-    # download latest outputs — always visible below run button
     latest = _latest_outputs(OUTPUT_DIR / mode)
     if latest:
         st.markdown("**Download previous outputs:**")
         dl_cols = st.columns(min(len(latest), 4))
         for dl_col, fp in zip(dl_cols, latest):
             with dl_col:
-                ext  = fp.suffix.lower()
-                mime = (
-                    "text/markdown" if ext == ".md" else
-                    "application/vnd.openxmlformats-officedocument"
-                    ".wordprocessingml.document" if ext == ".docx" else
-                    "application/octet-stream"
-                )
+                ext = fp.suffix.lower()
+                mime = "text/markdown" if ext == ".md" else "application/octet-stream"
                 st.download_button(
                     label=f"\u2b07 {fp.name}",
                     data=fp.read_bytes(),
@@ -879,62 +681,24 @@ def _mode_page(mode: str) -> None:
                 )
 
 
-# -- router --------------------------------------------------------------------
+# -- ROUTER --------------------------------------------------------------------
 
 def main() -> None:
     st.set_page_config(
         page_title="AI kcMedicalResearch",
-        page_icon=(
-            str(ASSETS_DIR / "logo_AI_kcMedicalResearch.png")
-            if (ASSETS_DIR / "logo_AI_kcMedicalResearch.png").exists()
-            else "\U0001f9ec"
-        ),
+        page_icon=str(ASSETS_DIR / "logo_AI_kcMedicalResearch.png") if (ASSETS_DIR / "logo_AI_kcMedicalResearch.png").exists() else "\U0001f9ec",
         layout="wide",
         initial_sidebar_state="collapsed",
     )
     _inject_css()
-    import streamlit.components.v1 as _components
-    _components.html("""
-        <script>
-        (function() {
-            const FONT_RULES = [
-                ['button', '20px'],
-                ['p', '18px'],
-                ['li', '18px'],
-                ['label', '18px'],
-                ['input', '17px'],
-                ['textarea', '17px'],
-            ];
-            function applyFonts() {
-                FONT_RULES.forEach(([sel, size]) => {
-                    try {
-                        parent.document.querySelectorAll(sel).forEach(el => {
-                            el.style.setProperty('font-size', size, 'important');
-                        });
-                    } catch(e) {}
-                });
-            }
-            // Run once immediately
-            applyFonts();
-            // Re-run whenever DOM changes (Streamlit rerenders)
-            const observer = new MutationObserver(applyFonts);
-            observer.observe(parent.document.body, {
-                childList: true,
-                subtree: true
-            });
-        })();
-        </script>
-    """, height=0)
 
     if "page" not in st.session_state:
         st.session_state["page"] = "home"
 
-    page = st.session_state["page"]
-
-    if page == "home":
+    if st.session_state["page"] == "home":
         _home_page()
-    elif page in MODES:
-        _mode_page(page)
+    elif st.session_state["page"] in MODES:
+        _mode_page(st.session_state["page"])
     else:
         st.session_state["page"] = "home"
         st.rerun()
