@@ -351,16 +351,21 @@ def _run_cli_cloud(mode: str, provider: str, model: str, submode: str = "", prom
         "deepseek": "DEEPSEEK_API_KEY",
         "groq": "GROQ_API_KEY"
     }
-    env_var = env_var_map.get(provider)
     
-    # Check session API keys first
-    session_keys = st.session_state.get('api_keys', {})
-    has_key = session_keys.get(provider, '') or os.getenv(env_var, '')
-    
-    if env_var and not has_key:
-        st.warning(f"⚠️ {env_var} not set. Please enter it in the sidebar or add to environment.")
-        st.info("Go to sidebar → API Keys → Enter your key")
-        return "error: missing API key"
+    # FIX: Only check API keys for non-ollama providers
+    if provider != "ollama":
+        env_var = env_var_map.get(provider)
+        if not env_var:
+            env_var = f"{provider.upper()}_API_KEY"
+        
+        # Check session API keys first
+        session_keys = st.session_state.get('api_keys', {})
+        has_key = session_keys.get(provider, '') or os.getenv(env_var, '')
+        
+        if not has_key:
+            st.warning(f"⚠️ {env_var} not set. Please enter it in the sidebar or add to environment.")
+            st.info("Go to sidebar → API Keys → Enter your key")
+            return "error: missing API key"
 
     with st.spinner(f"Running {mode} mode..."):
         try:
