@@ -313,6 +313,10 @@ def _launch_terminal(mode: str, provider: str, model: str, submode: str = "", pr
         return _launch_terminal_local(mode, provider, model, submode)
 
 
+
+    
+    # ... rest of code ...
+
 def _run_cli_cloud(mode: str, provider: str, model: str, submode: str = "", prompt: str = "") -> str:
     """Run CLI directly in cloud environment (Render, Streamlit Cloud, etc.)"""
     import subprocess
@@ -327,10 +331,13 @@ def _run_cli_cloud(mode: str, provider: str, model: str, submode: str = "", prom
         prompt_file.parent.mkdir(parents=True, exist_ok=True)
         prompt_file.write_text(prompt.strip(), encoding="utf-8")
 
-    # Build command
+   
+    # Build command with sub-mode support for search
     cmd_parts = [sys.executable, "src/main.py", "--mode", mode, "--provider", provider]
-    if model.strip():
-        cmd_parts += ["--model", model.strip()]
+    
+    # Add sub-mode for search mode
+    if mode == "search" and submode:
+        cmd_parts += ["--sub", submode]        
 
     # Add submode flags for coding
     if mode == "coding" and submode:

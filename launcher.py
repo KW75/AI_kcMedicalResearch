@@ -8,14 +8,39 @@ BASE   = Path(__file__).resolve().parent
 PYTHON = sys.executable
 os.system('')
 
-# ANSI colors
+# ANSI colors - Works on both light and dark backgrounds
 RESET    = '\033[0m'
-FRAME    = '\033[94m'
-LOGO     = '\033[38;5;51m'
-LOGO_TXT = '\033[32m'
-TEXT     = '\033[97m'
-DIM      = '\033[0;31;40m'
-ACCENT   = '\033[38;5;121m'
+BOLD     = '\033[1m'
+DIM      = '\033[2m'
+
+# Text colors (works on both backgrounds)
+BLACK    = '\033[30m'
+RED      = '\033[31m'
+GREEN    = '\033[32m'
+YELLOW   = '\033[33m'
+BLUE     = '\033[34m'
+MAGENTA  = '\033[35m'
+CYAN     = '\033[36m'
+WHITE    = '\033[37m'
+
+# Bright variants - USE THESE for main text
+BRIGHT_BLACK   = '\033[90m'
+BRIGHT_RED     = '\033[91m'
+BRIGHT_GREEN   = '\033[92m'
+BRIGHT_YELLOW  = '\033[93m'
+BRIGHT_BLUE    = '\033[94m'
+BRIGHT_MAGENTA = '\033[95m'
+BRIGHT_CYAN    = '\033[96m'
+BRIGHT_WHITE   = '\033[97m'
+
+# Aliases for existing color names
+FRAME    = BRIGHT_BLUE
+LOGO     = BRIGHT_CYAN
+LOGO_TXT = BRIGHT_GREEN
+
+# FIXED: Use BRIGHT_YELLOW for main text (visible on white background)
+TEXT     = BRIGHT_YELLOW
+ACCENT   = BRIGHT_CYAN
 
 MODES = [
     ('1', 'Coding',      '--mode coding'),

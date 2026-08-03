@@ -1821,22 +1821,45 @@ def handle_appraisal_mode(
 # Writing mode dispatcher  (Writer pipeline / Editor / QA standalone)
 # ---------------------------------------------------------------------------
 
-def handle_search_mode(provider: str, model: str) -> None:
-    model = model or OLLAMA_MODEL
+def handle_search_mode(provider: str, model: str, sub_mode: str = None) -> None:
     """Dispatcher for Search mode (Topic Search and Article Search)."""
+    import os
     from src.modes.search import run_topic_search, run_article_search
 
     print("\n=== SEARCH MODE ===")
     print("  1. Topic Search  (web synopsis with reference links)")
     print("  2. Article Search (PubMed by article type + comparison)")
-    sub = input("  Select sub-mode: ").strip()
+    
+    # Determine sub-mode
+    is_cloud = any([
+        os.environ.get('RENDER'),
+        os.environ.get('STREAMLIT_SERVER_PORT'),
+        os.environ.get('STREAMLIT_SHARING'),
+    ])
+    
+    if sub_mode:
+        sub = sub_mode
+        print(f"  ✅ Using sub-mode: {sub}")
+    elif is_cloud:
+        # Cloud environment - use default
+        print("  ☁️  Cloud environment detected. Defaulting to Topic Search (1).")
+        sub = "1"
+    else:
+        # Local - interactive
+        try:
+            sub = input("  Select sub-mode [1-2]: ").strip()
+            if not sub:
+                sub = "1"
+        except (EOFError, KeyboardInterrupt):
+            print("\n  ⚠️ No input received. Defaulting to Topic Search (1).")
+            sub = "1"
 
     if sub not in ("1", "2"):
-        print("  Invalid selection. Returning to menu.")
-        return
+        print("  Invalid selection. Defaulting to Topic Search (1).")
+        sub = "1"
 
-    # Collect direct instructions  (same pattern as Coding / Writing modes)
-    print("  Enter your search query below.")
+    # Collect direct instructions
+    print("\n  Enter your search query below.")
     print("  Lines starting with > are instructions (auto-prefixed if omitted).")
     print("  Press ENTER on a blank line to start.\n")
     raw_lines: list[str] = []
@@ -1877,7 +1900,6 @@ def handle_search_mode(provider: str, model: str) -> None:
             verbose=True,
             model=model,
         )
-
 
 def handle_writing_mode(
     provider: str = "ollama",
@@ -2267,6 +2289,8 @@ def parse_args(args: list[str] | None = None) -> argparse.Namespace:
                         help="Open the interactive HTML help guide in your browser")
     parser.add_argument("--ui",             action="store_true", default=False,
                         help="Launch the main Streamlit UI")
+    parser.add_argument('--sub', '--submode', type=str, default=None,
+                    help='Sub-mode selection: 1=Topic Search, 2=Article Search')
     return parser.parse_args(args)
 
 
@@ -2345,10 +2369,14 @@ if __name__ == "__main__":
                 sys.exit(1)
             generate_writing_report(provider=args.provider, model=args.model)
         elif args.mode == "search":
+            sub_mode = getattr(args, 'sub', None)
             handle_search_mode(
                 provider=args.provider,
                 model=args.model,
+                sub_mode=sub_mode,
             )
+
+
         elif args.mode == "sr":
             run_sr_launcher(
                 provider=args.provider,
