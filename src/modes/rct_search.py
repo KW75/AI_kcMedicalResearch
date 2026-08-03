@@ -1,6 +1,6 @@
 """
-RCT Search Mode - PICO-driven PubMed search and AI ranking
-Extracted from src/main.py for modularity
+RCT Search Mode - PICO-driven multi-database search and AI ranking
+Supports: PubMed + Europe PMC
 """
 import json
 import re
@@ -10,6 +10,7 @@ import urllib.parse
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
+import random
 
 # Project paths
 BASE = Path(__file__).resolve().parent.parent.parent
@@ -121,9 +122,147 @@ def fetch_pubmed_articles(
                 "title": title,
                 "abstract": abstract,
                 "url": f"https://pubmed.ncbi.nlm.nih.gov/{pmid}/",
+                "source": "PubMed"
             })
 
     return articles
+
+
+def fetch_europepmc_articles(
+    query: str,
+    max_results: int = 100,
+) -> list[dict]:
+    """
+    Search Europe PMC via REST API (free, no API key required).
+    Returns list of dicts with identifier, title, abstract, url.
+    Returns empty list on any error.
+    """
+    import urllib.request
+    import json
+    
+    # Europe PMC API endpoint
+    base = "https://www.ebi.ac.uk/europepmc/webservices/rest/search"
+    
+    # Build query - Europe PMC uses different syntax
+    clean_query = re.sub(r'[^\w\s]', ' ', query)
+    
+    search_url = (
+        f"{base}?query={urllib.parse.quote(clean_query)}"
+        f"&resultType=core"
+        f"&pageSize={min(max_results, 100)}"
+        f"&format=json"
+    )
+    
+    try:
+        req = urllib.request.Request(search_url, headers={"Accept": "application/json"})
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+    except Exception as e:
+        print(f"[Europe PMC] Search failed: {e}")
+        return []
+    
+    articles = []
+    results = data.get("resultList", {}).get("result", [])
+    
+    for item in results:
+        title = item.get("title", "")
+        abstract = item.get("abstractText", "")
+        pmid = item.get("pmid", "")
+        doi = item.get("doi", "")
+        source = item.get("source", "")
+        
+        # Skip if no title
+        if not title:
+            continue
+        
+        # Use pmid if available, otherwise use doi, otherwise generate hash
+        if pmid:
+            identifier = pmid
+            url = f"https://pubmed.ncbi.nlm.nih.gov/{pmid}/"
+        elif doi:
+            identifier = doi.replace('/', '_')
+            url = f"https://doi.org/{doi}"
+        else:
+            # Generate a unique identifier from title
+            identifier = f"europe_{abs(hash(title)) % 10000000}"
+            url = ""
+        
+        articles.append({
+            "pmid": identifier,
+            "title": title,
+            "abstract": abstract or "No abstract available.",
+            "url": url,
+            "source": f"Europe PMC ({source})" if source else "Europe PMC",
+            "original_pmid": pmid if pmid else "",
+            "doi": doi if doi else ""
+        })
+    
+    return articles
+
+
+def merge_search_results(
+    pubmed_articles: list[dict],
+    europepmc_articles: list[dict],
+) -> list[dict]:
+    """
+    Merge and deduplicate results from multiple sources.
+    Uses PMID and title similarity for deduplication.
+    """
+    import re
+    
+    merged = []
+    seen_pmids = set()
+    seen_titles = set()
+    
+    def normalize_title(title: str) -> str:
+        # Remove common patterns for better matching
+        title = re.sub(r'[^a-zA-Z0-9\s]', '', title)
+        title = ' '.join(title.lower().split())
+        # Remove common stop words
+        stop_words = {'the', 'a', 'an', 'and', 'or', 'but', 'for', 'nor', 'on', 'at', 'to', 'by', 'in', 'of', 'with'}
+        title = ' '.join([w for w in title.split() if w not in stop_words])
+        return title[:50]
+    
+    # Add PubMed articles (highest priority)
+    for article in pubmed_articles:
+        pmid = article.get("pmid", "")
+        norm_title = normalize_title(article["title"])
+        if pmid not in seen_pmids and norm_title not in seen_titles:
+            if pmid:
+                seen_pmids.add(pmid)
+            seen_titles.add(norm_title)
+            merged.append(article)
+    
+    # Add Europe PMC articles (deduplicated by PMID and title)
+    for article in europepmc_articles:
+        pmid = article.get("pmid", "")
+        norm_title = normalize_title(article["title"])
+        original_pmid = article.get("original_pmid", "")
+        
+        # Check if this article is already in the merged list
+        is_duplicate = False
+        
+        # Check by original PMID if available
+        if original_pmid and original_pmid in seen_pmids:
+            is_duplicate = True
+        
+        # Check by generated identifier
+        if pmid in seen_pmids:
+            is_duplicate = True
+        
+        # Check by title similarity
+        if norm_title in seen_titles:
+            is_duplicate = True
+        
+        if not is_duplicate:
+            if pmid:
+                seen_pmids.add(pmid)
+            if original_pmid:
+                seen_pmids.add(original_pmid)
+            seen_titles.add(norm_title)
+            merged.append(article)
+    
+    return merged
 
 
 def call_ai(prompt: str, provider: str = "ollama", model: Optional[str] = None) -> str:
@@ -269,41 +408,57 @@ def _ranked_articles_to_docx(
         doc.add_paragraph()
 
         if not ranked:
-            doc.add_paragraph("No articles retrieved from PubMed.")
+            doc.add_paragraph("No articles retrieved from PubMed or Europe PMC.")
             doc.save(str(out_path))
             return
+
+        # Determine which sources are present for dynamic caption
+        sources_present = set()
+        for r in ranked:
+            source = r.get("source", "")
+            if source:
+                # Extract just the main source name (e.g., "PubMed", "Europe")
+                main_source = source.split()[0] if source.startswith("Europe") else source
+                sources_present.add(main_source)
+        
+        source_text = " and ".join(sorted(sources_present)) if sources_present else "PubMed and Europe PMC"
 
         # Caption
         cap = doc.add_paragraph()
         cap.add_run(
-            f"All {len(ranked)} articles retrieved from PubMed, "
+            f"All {len(ranked)} articles retrieved from {source_text}, "
             "ordered by PICO relevance score (10 = most relevant)."
         ).italic = True
 
         doc.add_paragraph()
 
-        # Table
-        table = doc.add_table(rows=1, cols=5)
+        # Table: Rank | Score | Source | Title | PMID | Link
+        table = doc.add_table(rows=1, cols=6)
         table.style = "Table Grid"
 
         # Header
         hdr = table.rows[0].cells
         hdr[0].text = "Rank"
         hdr[1].text = "Score"
-        hdr[2].text = "Title"
-        hdr[3].text = "PMID"
-        hdr[4].text = "PubMed Link"
+        hdr[2].text = "Source"
+        hdr[3].text = "Title"
+        hdr[4].text = "PMID"
+        hdr[5].text = "Link"
 
         # Data rows
         for r in ranked:
             row = table.add_row().cells
             row[0].text = str(r["rank"])
             row[1].text = f"{r['score']}/10"
-            row[2].text = r["title"]
-            row[3].text = r["pmid"]
-            # Add hyperlink using helper function
-            p = row[4].paragraphs[0]
-            _add_hyperlink(p, "PubMed", r["url"])
+            row[2].text = r.get("source", "Unknown")
+            row[3].text = r["title"]
+            row[4].text = r["pmid"]
+            # Add hyperlink
+            p = row[5].paragraphs[0]
+            if r.get("url"):
+                _add_hyperlink(p, "View", r["url"])
+            else:
+                p.add_run("No link")
 
         # Add comments after the table
         doc.add_paragraph()
@@ -324,9 +479,9 @@ def _ranked_articles_to_docx(
         import csv
         with open(out_path.with_suffix(".csv"), "w", newline="", encoding="utf-8") as f:
             writer = csv.writer(f)
-            writer.writerow(["Rank", "Score", "Title", "PMID", "URL"])
+            writer.writerow(["Rank", "Score", "Source", "Title", "PMID", "URL"])
             for r in ranked:
-                writer.writerow([r["rank"], r["score"], r["title"], r["pmid"], r["url"]])
+                writer.writerow([r["rank"], r["score"], r.get("source", "Unknown"), r["title"], r["pmid"], r.get("url", "")])
 
 
 def run_rct_search_pipeline(
@@ -340,7 +495,7 @@ def run_rct_search_pipeline(
       1. Formulator - structures user topic into PICO question
       2. Searcher - builds Boolean search strategy for all 7 databases
       3. Validator - validates alignment and approves or requests refinement
-      4. PubMed Fetch + AI Ranking
+      4. PubMed + Europe PMC Fetch, merge, and AI ranking
     Saves output as output/rct_search/rct_search_{ts}.md and .docx.
     Returns path of the .md report.
     """
@@ -351,7 +506,7 @@ def run_rct_search_pipeline(
     print("  1. Structure your topic into a PICO question")
     print("  2. Build a search strategy for all 7 SR databases")
     print("  3. Validate the strategy before download")
-    print("  4. Fetch and rank articles from PubMed")
+    print("  4. Fetch and rank articles from PubMed and Europe PMC")
     print("  No article appraisal - use --mode appraisal for that.")
     print("=" * 55 + "\n")
 
@@ -569,36 +724,62 @@ def run_rct_search_pipeline(
         "- Run python src/main.py --mode sr for full systematic review pipeline\n"
     )
 
-    # -- Stage 4: PubMed Fetch + AI Ranking ----------------------------------
+    # -- Stage 4: Multi-Database Search (PubMed + Europe PMC) ----------
 
-    # Fix 1: Broaden the RCT filter
+    # Clean PICO terms for PubMed
     _pico_terms = [_clean_pico_term(t) for t in [pico_population, pico_intervention, pico_outcome] if t]
     _pico_terms = [t for t in _pico_terms if t]
     _pubmed_query = " AND ".join(_pico_terms) if _pico_terms else topic
 
-    # KEY FIX: Broadened RCT filter to find more papers
+    # Broadened RCT filter for PubMed
     _pubmed_query = _pubmed_query + " AND (randomized controlled trial[pt] OR clinical trial[pt] OR random*[tiab] OR RCT[tiab])"
-    print(f"[RCT Search] PubMed query (cleaned): {_pubmed_query}")
+    print(f"[RCT Search] PubMed query: {_pubmed_query}")
     print("[RCT Search] Searching PubMed for relevant articles...")
 
-    # Fix 2: Increase max_results to 100
-    articles = fetch_pubmed_articles(_pubmed_query, max_results=100) if not dry_run else [
+    # Search PubMed
+    pubmed_articles = fetch_pubmed_articles(_pubmed_query, max_results=100) if not dry_run else []
+
+    # Search Europe PMC
+    print("[RCT Search] Searching Europe PMC for relevant articles...")
+    _europe_query = f"{pico_population} {pico_intervention} {pico_outcome}" if pico_population else topic
+    europepmc_articles = fetch_europepmc_articles(_europe_query, max_results=100) if not dry_run else []
+
+    # Merge results
+    articles = merge_search_results(pubmed_articles, europepmc_articles) if not dry_run else [
         {"pmid": "00000001", "title": "[DRY RUN] Test Article",
          "abstract": "Dry run abstract.",
-         "url": "https://pubmed.ncbi.nlm.nih.gov/00000001/"}
+         "url": "https://pubmed.ncbi.nlm.nih.gov/00000001/",
+         "source": "Dry Run"}
     ]
 
+    # Shuffle to prevent position bias in AI ranking
+    if not dry_run and articles:
+        random.shuffle(articles)
+        print(f"[RCT Search] Shuffled {len(articles)} articles for unbiased ranking")
+
+    print(f"[RCT Search] Found {len(pubmed_articles)} PubMed + {len(europepmc_articles)} Europe PMC = {len(articles)} unique articles")
+
     if articles:
-        print(f"[RCT Search] Found {len(articles)} article(s). Ranking by PICO relevance...")
+        print(f"[RCT Search] Ranking {len(articles)} articles by PICO relevance...")
+        
+        # Build abstracts block with clear source information
         abstracts_block = ""
         for idx, art in enumerate(articles, 1):
+            source = art.get("source", "PubMed")
+            pmid = art.get("pmid", "N/A")
+            title = art.get("title", "No title")
+            url = art.get("url", "")
+            abstract = art.get("abstract", "No abstract available.")
+            
             abstracts_block += (
-                "\n### Article " + str(idx) + "\n"
-                + "Title: " + art["title"] + "\n"
-                + "PMID: " + art["pmid"] + "\n"
-                + "URL: " + art["url"] + "\n"
-                + "Abstract: " + art["abstract"] + "\n"
+                f"\n### Article {idx}\n"
+                f"Source: {source}\n"
+                f"PMID: {pmid}\n"
+                f"Title: {title}\n"
+                f"URL: {url}\n"
+                f"Abstract: {abstract}\n"
             )
+        
         rank_prompt = (
             "You are a systematic review expert. Your ONLY task is to rate articles.\n\n"
             "PICO Question:\n" + previous_response + "\n\n"
@@ -606,20 +787,23 @@ def run_rct_search_pipeline(
             "- Rate each article for relevance to the PICO question on a scale of 1-10.\n"
             "- 10 = highly relevant RCT directly matching the PICO.\n"
             "- 1 = not relevant.\n"
+            "- IMPORTANT: Score MUST be a single digit between 1 and 10. Do NOT use 0, 100, or any other scale.\n"
+            "- Articles come from PubMed and Europe PMC. Both are valid sources.\n"
             "- Output ONLY the rating lines. No summaries, no headers, no extra text.\n"
             "- Each line MUST follow this EXACT format:\n"
-            "ARTICLE_RANK: 1 | SCORE: 9 | PMID: 12345678 | TITLE: Example title here | URL: https://pubmed.ncbi.nlm.nih.gov/12345678/\n\n"
+            "ARTICLE_RANK: 1 | SCORE: 9 | PMID: 12345678 | SOURCE: PubMed | TITLE: Example title here | URL: https://pubmed.ncbi.nlm.nih.gov/12345678/\n\n"
             "EXAMPLE OUTPUT (do not copy - use real values):\n"
-            "ARTICLE_RANK: 1 | SCORE: 9 | PMID: 11111111 | TITLE: CBT for fibromyalgia RCT | URL: https://pubmed.ncbi.nlm.nih.gov/11111111/\n"
-            "ARTICLE_RANK: 2 | SCORE: 7 | PMID: 22222222 | TITLE: Mindfulness for chronic pain | URL: https://pubmed.ncbi.nlm.nih.gov/22222222/\n"
-            "ARTICLE_RANK: 3 | SCORE: 3 | PMID: 33333333 | TITLE: Ketamine infusion study | URL: https://pubmed.ncbi.nlm.nih.gov/33333333/\n\n"
+            "ARTICLE_RANK: 1 | SCORE: 9 | PMID: 11111111 | SOURCE: PubMed | TITLE: CBT for fibromyalgia RCT | URL: https://pubmed.ncbi.nlm.nih.gov/11111111/\n"
+            "ARTICLE_RANK: 2 | SCORE: 7 | PMID: 22222222 | SOURCE: Europe PMC | TITLE: Mindfulness for chronic pain | URL: https://pubmed.ncbi.nlm.nih.gov/22222222/\n"
+            "ARTICLE_RANK: 3 | SCORE: 3 | PMID: 33333333 | SOURCE: Europe PMC | TITLE: Ketamine infusion study | URL: https://pubmed.ncbi.nlm.nih.gov/33333333/\n\n"
             "NOW RATE THESE ARTICLES - output rating lines ONLY:\n\n"
             + abstracts_block
         )
+        
         if dry_run:
             rank_response = "\n".join(
                 "ARTICLE_RANK: " + str(i) + " | SCORE: " + str(10 - i) + " | "
-                + "PMID: " + art["pmid"] + " | TITLE: " + art["title"]
+                + "PMID: " + art["pmid"] + " | SOURCE: " + art.get("source", "Unknown") + " | TITLE: " + art["title"]
                 + " | URL: " + art["url"]
                 for i, art in enumerate(articles, 1)
             )
@@ -630,50 +814,127 @@ def run_rct_search_pipeline(
                 )
             except RuntimeError as exc:
                 rank_response = "[ERROR ranking articles: " + str(exc) + "]"
+        
         ranked = []
         if rank_response.startswith("[ERROR"):
             print(f"[RCT Search] Ranking error: {rank_response}")
-        for ln in rank_response.splitlines():
-            m = re.match(
-                r"ARTICLE_RANK:\s*(\d+)\s*\|\s*SCORE:\s*(\d+)\s*\|"
-                r"\s*PMID:\s*(\S+)\s*\|\s*TITLE:\s*(.+?)\s*\|\s*URL:\s*(\S+)",
-                ln.strip()
-            )
-            if m:
-                ranked.append({
-                    "rank": int(m.group(1)),
-                    "score": int(m.group(2)),
-                    "pmid": m.group(3),
-                    "title": m.group(4),
-                    "url": m.group(5),
-                })
+            # Fallback: use articles in fetch order
+            ranked = [
+                {"rank": i, "score": min(10, len(articles) - i + 1),
+                 "pmid": a["pmid"], "title": a["title"], "url": a["url"], "source": a.get("source", "Unknown")}
+                for i, a in enumerate(articles, 1)
+            ]
+        else:
+            # Parse the AI response
+            for ln in rank_response.splitlines():
+                ln = ln.strip()
+                if not ln:
+                    continue
+                
+                # Try to match the format with SOURCE field
+                m = re.match(
+                    r"ARTICLE_RANK:\s*(\d+)\s*\|\s*SCORE:\s*(\d+)\s*\|"
+                    r"\s*PMID:\s*(\S+)\s*\|\s*SOURCE:\s*([^|]+)\s*\|\s*TITLE:\s*(.+?)\s*\|\s*URL:\s*(\S+)",
+                    ln
+                )
+                if m:
+                    score = int(m.group(2))
+                    original_score = score
+                    
+                    # Normalize: AI seems to use 0-100 or 0-160 scale
+                    if score > 10:
+                        # Try dividing by 10 first
+                        normalized_score = round(score / 10)
+                        # If still > 10, divide by 16
+                        if normalized_score > 10:
+                            normalized_score = round(score / 16)
+                        # Cap at 1-10
+                        if normalized_score > 10:
+                            normalized_score = 10
+                        elif normalized_score < 1:
+                            normalized_score = 1
+                        score = normalized_score
+                        print(f"[RCT Search] Normalized score: {original_score} → {score} for {m.group(3)}")
+                    
+                    ranked.append({
+                        "rank": int(m.group(1)),
+                        "score": score,
+                        "pmid": m.group(3).strip(),
+                        "source": m.group(4).strip(),
+                        "title": m.group(5).strip(),
+                        "url": m.group(6).strip(),
+                    })
+                else:
+                    # Try without SOURCE field (fallback for older format)
+                    m2 = re.match(
+                        r"ARTICLE_RANK:\s*(\d+)\s*\|\s*SCORE:\s*(\d+)\s*\|"
+                        r"\s*PMID:\s*(\S+)\s*\|\s*TITLE:\s*(.+?)\s*\|\s*URL:\s*(\S+)",
+                        ln
+                    )
+                    if m2:
+                        score = int(m2.group(2))
+                        original_score = score
+                        
+                        # Normalize
+                        if score > 10:
+                            normalized_score = round(score / 10)
+                            if normalized_score > 10:
+                                normalized_score = round(score / 16)
+                            if normalized_score > 10:
+                                normalized_score = 10
+                            elif normalized_score < 1:
+                                normalized_score = 1
+                            score = normalized_score
+                            print(f"[RCT Search] Normalized score: {original_score} → {score} for {m2.group(3)}")
+                        
+                        # Find the article in our list to get its source
+                        pmid = m2.group(3).strip()
+                        source = "PubMed"  # Default
+                        for art in articles:
+                            if art.get("pmid") == pmid:
+                                source = art.get("source", "PubMed")
+                                break
+                        ranked.append({
+                            "rank": int(m2.group(1)),
+                            "score": score,
+                            "pmid": pmid,
+                            "source": source,
+                            "title": m2.group(4).strip(),
+                            "url": m2.group(5).strip(),
+                        })
+        
+        # If no articles were parsed or less than expected, use fallback
+        if not ranked or len(ranked) < len(articles) * 0.5:
+            print(f"[RCT Search] Warning: Only {len(ranked)} articles parsed from AI response. Using fallback ranking.")
+            ranked = [
+                {"rank": i, "score": min(10, len(articles) - i + 1),
+                 "pmid": a["pmid"], "title": a["title"], "url": a["url"], "source": a.get("source", "Unknown")}
+                for i, a in enumerate(articles, 1)
+            ]
+        
+        # Sort by score (highest first)
         ranked.sort(key=lambda x: x["score"], reverse=True)
         for new_rank, r in enumerate(ranked, 1):
             r["rank"] = new_rank
-        if not ranked:
-            print("[RCT Search] Warning: AI ranking returned no parseable results.")
-            print("[RCT Search] Raw ranking response (first 500 chars):")
-            print(rank_response[:500])
-            # fallback: use fetch order, score descending by position
-            ranked = [
-                {"rank": i, "score": len(articles) - i + 1,
-                 "pmid": a["pmid"], "title": a["title"], "url": a["url"]}
-                for i, a in enumerate(articles, 1)
-            ]
+        
+        # Build the table
         table_lines = [
             "## Ranked Article List\n",
-            f"_All {len(ranked)} articles retrieved from PubMed, ordered by PICO relevance score (10 = most relevant)._\n",
-            "| Rank | Score | Title | PMID | Link |",
-            "|------|-------|-------|------|------|",
+            f"_All {len(ranked)} articles retrieved from PubMed and Europe PMC, ordered by PICO relevance score (10 = most relevant)._\n",
+            "| Rank | Score | Source | Title | PMID | Link |",
+            "|------|-------|--------|-------|------|------|",
         ]
         for r in ranked:
+            source = r.get("source", "Unknown")
+            url_display = r["url"] if r["url"] else "#"
             table_lines.append(
                 "| " + str(r["rank"]) + " | " + str(r["score"]) + "/10 | "
-                + r["title"] + " | " + r["pmid"]
-                + " | [PubMed](" + r["url"] + ") |"
+                + source + " | "
+                + r["title"][:60] + ("..." if len(r["title"]) > 60 else "") + " | " 
+                + r["pmid"] + " | [Link](" + url_display + ") |"
             )
         table_lines.append(
-            "\n> Select your top articles, download PDFs "
+            "\n> Select your top 5 articles, download PDFs "
             "and place them in input/sr/ to run the SR pipeline."
         )
         table_lines.append(
@@ -684,6 +945,8 @@ def run_rct_search_pipeline(
         report_parts.append("\n".join(table_lines))
         top = ranked[0]["title"] if ranked else "N/A"
         print("[RCT Search] Ranking complete. Top article: " + top)
+        
+        # Update PICO JSON
         pico_files = sorted(OUTPUT_RCT_SEARCH.glob("pico_*.json"), reverse=True)
         if pico_files:
             pico_data = json.loads(pico_files[0].read_text(encoding="utf-8"))
@@ -699,9 +962,9 @@ def run_rct_search_pipeline(
             print("[RCT Search] PICO JSON updated with "
                   + str(len(ranked)) + " ranked article(s).")
     else:
-        print("[RCT Search] No articles found on PubMed for this topic.")
+        print("[RCT Search] No articles found on PubMed or Europe PMC.")
         report_parts.append(
-            "## Ranked Article List\n\n_No articles retrieved from PubMed._\n"
+            "## Ranked Article List\n\n_No articles retrieved from PubMed or Europe PMC._\n"
         )
 
     # -- End Stage 4 ----------------------------------------------------------
