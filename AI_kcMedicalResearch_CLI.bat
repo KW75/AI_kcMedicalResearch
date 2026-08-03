@@ -6,10 +6,6 @@ if not exist "%PROJECT_DIR%\.venv\Scripts\python.exe" (
     pause
     exit /b 1
 )
-
-:: Set dark background with white text (0 = Black background, F = White text)
-color 0F
-
 title AI kcMedical Research
 cd /d "%PROJECT_DIR%"
 echo.
