@@ -1,2 +1,9 @@
+# .streamlit/config.toml
 [theme]
 baseFontSize = 18
+
+[server]
+runOnSave = false
+
+[browser]
+gatherUsageStats = false

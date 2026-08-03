@@ -4,6 +4,9 @@ import os
 import shutil
 from pathlib import Path
 
+# --- Cloud detection ---
+IS_CLOUD = os.environ.get('STREAMLIT_SHARING') or os.environ.get('REPL_ID') or os.environ.get('CODESPACES')
+
 BASE   = Path(__file__).resolve().parent
 PYTHON = sys.executable
 os.system('')
@@ -188,6 +191,11 @@ def pick_mode():
 
 def pick_provider(mode_flag: str = ""):
     """Select provider with validation for SR mode."""
+    # If in cloud, default to Qwen
+    if IS_CLOUD:
+        print(f'  {ACCENT}Cloud mode: defaulting to Qwen provider{RESET}')
+        return '--provider qwen'
+
     while True:
         print()
         print(f'  {ACCENT}SELECT PROVIDER{RESET}')
@@ -195,19 +203,19 @@ def pick_provider(mode_flag: str = ""):
         for key, label, _ in PROVIDERS:
             print(f'  {TEXT}{key}{RESET}  {TEXT}{label}{RESET}')
         print()
-        
+
         # Show warning for SR mode
         if mode_flag == '--mode sr':
             print(f'  {ACCENT}⚠️  SR Pipeline requires a vision-capable provider{RESET}')
             print(f'  {DIM}   Supported: qwen, openai, anthropic, groq{RESET}')
             print(f'  {DIM}   NOT supported: ollama, deepseek{RESET}')
             print()
-        
+
         choice = safe_input(
             f'  {ACCENT}Enter choice [1-6] or Enter for Ollama: {RESET}',
             default=''
         )
-        
+
         if choice == '':
             selected_provider = ''
         else:
@@ -220,14 +228,14 @@ def pick_provider(mode_flag: str = ""):
             if not found:
                 print(f'  {ACCENT}Invalid choice.{RESET}')
                 continue
-        
+
         # --- Validate provider for SR mode ---
         if mode_flag == '--mode sr':
             # Get the provider name from the flag
             provider_name = selected_provider.split()[-1] if selected_provider and ' ' in selected_provider else selected_provider
             if not provider_name:
                 provider_name = 'ollama'  # default
-            
+
             if provider_name not in VISION_PROVIDERS:
                 print()
                 print(f'  {ACCENT}❌ ERROR: "{provider_name}" does NOT support vision API{RESET}')
@@ -242,7 +250,7 @@ def pick_provider(mode_flag: str = ""):
                 print(f'  {DIM}Please select a supported provider.{RESET}')
                 input(f'  {DIM}Press Enter to try again...{RESET}')
                 continue
-        
+
         return selected_provider
 
 

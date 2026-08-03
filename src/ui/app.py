@@ -206,19 +206,117 @@ def _latest_outputs(folder: Path, suffixes: tuple[str, ...] = (".md", ".docx")) 
     return sorted(files, key=lambda f: f.stat().st_mtime, reverse=True)[:4]
 
 
-def _launch_terminal(mode: str, provider: str, model: str, submode: str = "") -> str:
-    """Launch terminal with the command and keep it open after completion."""
+# -- Cloud / Local terminal launcher -------------------------------------------
+
+def _launch_terminal(mode: str, provider: str, model: str, submode: str = "", prompt: str = "") -> str:
+    """Launch CLI - detects environment and runs appropriately"""
+    import os
+    import sys
+    import subprocess
+    from pathlib import Path
+    import streamlit as st
+
+    # Check if running in cloud environment
+    is_cloud = (os.environ.get('STREAMLIT_SHARING') or
+                os.environ.get('REPL_ID') or
+                os.environ.get('CODESPACES') or
+                os.environ.get('STREAMLIT_SERVER_PORT'))
+
+    if is_cloud:
+        return _run_cli_cloud(mode, provider, model, submode, prompt)
+    else:
+        return _launch_terminal_local(mode, provider, model, submode)
+
+
+def _run_cli_cloud(mode: str, provider: str, model: str, submode: str = "", prompt: str = "") -> str:
+    """Run CLI directly in cloud environment"""
+    import subprocess
+    import sys
+    from pathlib import Path
+    import streamlit as st
+
+    # Save prompt if provided
+    if prompt.strip():
+        prompt_file = INPUT_DIR / mode / "instructions.txt"
+        prompt_file.parent.mkdir(parents=True, exist_ok=True)
+        prompt_file.write_text(prompt.strip(), encoding="utf-8")
+
+    # Build command
+    cmd_parts = [sys.executable, "src/main.py", "--mode", mode, "--provider", provider]
+    if model.strip():
+        cmd_parts += ["--model", model.strip()]
+
+    # Add submode flags for coding
+    if mode == "coding" and submode:
+        if "Builder" in submode:
+            cmd_parts += ["--role", "Builder"]
+        elif "Reviewer" in submode:
+            cmd_parts += ["--role", "Reviewer"]
+        elif "Tester" in submode:
+            cmd_parts += ["--role", "Tester"]
+
+    st.code("$ " + " ".join(cmd_parts))
+
+    # Check if we have API keys (for cloud providers)
+    if provider in ["qwen", "openai", "anthropic", "deepseek", "groq"]:
+        import os
+        env_var_map = {
+            "qwen": "QWEN_API_KEY",
+            "openai": "OPENAI_API_KEY",
+            "anthropic": "ANTHROPIC_API_KEY",
+            "deepseek": "DEEPSEEK_API_KEY",
+            "groq": "GROQ_API_KEY"
+        }
+        env_var = env_var_map.get(provider)
+        if env_var and not os.getenv(env_var):
+            st.warning(f"⚠️ {env_var} not set. Please add it to Streamlit Secrets.")
+            st.info("Go to your Streamlit Cloud dashboard → Settings → Secrets")
+            return "error: missing API key"
+
+    with st.spinner(f"Running {mode} mode..."):
+        try:
+            result = subprocess.run(
+                cmd_parts,
+                cwd=str(Path(__file__).resolve().parent.parent.parent),
+                capture_output=True,
+                text=True,
+                timeout=300
+            )
+
+            if result.stdout:
+                st.text_area("Output", result.stdout, height=300)
+            if result.stderr:
+                st.text_area("Errors", result.stderr, height=100)
+
+            if result.returncode == 0:
+                st.success("✅ Command completed successfully!")
+                return "ok"
+            else:
+                st.error(f"❌ Command failed with exit code {result.returncode}")
+                return f"error: code {result.returncode}"
+
+        except subprocess.TimeoutExpired:
+            st.error("⏰ Command timed out after 5 minutes")
+            return "error: timeout"
+        except Exception as exc:
+            st.error(f"❌ Error: {exc}")
+            return f"error: {exc}"
+
+
+def _launch_terminal_local(mode: str, provider: str, model: str, submode: str = "") -> str:
+    """Original terminal launch for local use"""
+    import subprocess
+    import sys
+    from pathlib import Path
+
     py = sys.executable
     mp = str(MAIN_PY)
     base = str(BASE_DIR)
 
-    # Build command
     cmd_parts = [py, mp, "--mode", mode, "--provider", provider]
     if model.strip():
         cmd_parts += ["--model", model.strip()]
 
-    # --- Pass sub-mode to CLI for Coding mode only ---
-    # Writing, Search, and Appraisal modes handle sub-modes interactively in the CLI
     if mode == "coding" and submode:
         if "Builder" in submode:
             cmd_parts += ["--role", "Builder"]
@@ -232,19 +330,19 @@ def _launch_terminal(mode: str, provider: str, model: str, submode: str = "") ->
     try:
         if sys.platform == "win32":
             subprocess.Popen(
-                ["powershell", "-NoExit", "-Command", 
+                ["powershell", "-NoExit", "-Command",
                  f"Set-Location '{base}'; {cmd_str}; Write-Host ''; Write-Host 'Session completed. Press any key to close this window...'; $null = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')"],
                 creationflags=subprocess.CREATE_NEW_CONSOLE,
                 cwd=base,
             )
         elif sys.platform == "darwin":
             subprocess.Popen(
-                ["osascript", "-e", 
+                ["osascript", "-e",
                  f'tell app "Terminal" to do script "cd \'{base}\' && {cmd_str} && echo \'Session completed. Press any key to close...\' && read"']
             )
         else:
             subprocess.Popen(
-                ["x-terminal-emulator", "-e", "bash", "-c", 
+                ["x-terminal-emulator", "-e", "bash", "-c",
                  f"cd '{base}' && {cmd_str} && echo 'Session completed. Press any key to close...' && read"],
                 cwd=base,
             )
@@ -267,7 +365,7 @@ def _exit_to_launcher() -> None:
                 Press <strong>Ctrl+C</strong> in the terminal to stop the UI server when done.
             </p>
             <div style="margin-top:30px;">
-                <a href="#" onclick="window.close();return false;" 
+                <a href="#" onclick="window.close();return false;"
                    style="font-size:1.2rem;padding:10px 30px;background:#4A90D9;color:white;border:none;border-radius:8px;cursor:pointer;text-decoration:none;display:inline-block;">
                     Close this tab
                 </a>
@@ -305,10 +403,10 @@ def _inject_css() -> None:
         }
         .app-header img { height: 72px; }
         .app-header h1 { font-size: 2.4rem; margin: 0; color: #1a1a2e; }
-        .app-header .subtitle { 
-            font-size: 1.4rem; 
-            color: #555; 
-            font-weight: 700; 
+        .app-header .subtitle {
+            font-size: 1.4rem;
+            color: #555;
+            font-weight: 700;
             letter-spacing: .05em;
         }
 
