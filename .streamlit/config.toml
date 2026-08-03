@@ -1,9 +1,11 @@
 # .streamlit/config.toml
+
 [theme]
-baseFontSize = 18
+base = "dark"           # "dark", "light", or "auto"
+baseFontSize = 18       # Font size in pixels
 
 [server]
-runOnSave = false
+runOnSave = false       # Don't auto-reload on file save
 
 [browser]
-gatherUsageStats = false
+gatherUsageStats = false  # Opt out of anonymous usage stats
