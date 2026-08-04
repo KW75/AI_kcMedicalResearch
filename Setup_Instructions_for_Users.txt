@@ -1,0 +1,232 @@
+Updated Setup Instructions File
+powershell
+
+# First, remove the old file (it has a typo)
+rm Setup_Instructon_to_users.txt
+
+# Create the new file with proper name
+
+Setup_Instructions_for_Users.txt (or keep as .md for better formatting):
+markdown
+
+# AI kcMedicalResearch - Setup Instructions for Users
+
+## Quick Start (All Platforms)
+
+### Prerequisites
+1. Install Docker Desktop:
+   - **Windows:** https://www.docker.com/products/docker-desktop
+   - **macOS:** https://www.docker.com/products/docker-desktop
+   - **Linux:** https://docs.docker.com/engine/install/
+
+------------------------------------------------------------------
+## 🪟 Windows Users
+------------------------------------------------------------------
+
+### One-Click Setup (Recommended)
+1. Open Command Prompt or PowerShell
+2. Clone the repository:
+
+   ```cmd
+   git clone https://github.com/KW75/AI_kcMedicalResearch.git
+   cd AI_kcMedicalResearch
+
+    Double-click Docker_setup.bat
+
+    Follow the prompts:
+
+        Choose C: or D: drive
+        Add API keys (or later)
+        Choose CLI or UI mode
+
+    Start working!
+
+Quick Launch (After Setup)
+
+    CLI Mode: Double-click AI_kcMedicalResearch_CLI.bat
+
+    UI Mode: Double-click AI_kcMedicalResearch_UI.bat
+
+------------------------------------------------------------------
+🍎 macOS Users
+------------------------------------------------------------------
+
+### One-Click Setup (Recommended)
+
+1. Open Terminal
+2. Clone the repository:
+
+    bash
+    git clone https://github.com/KW75/AI_kcMedicalResearch.git
+    cd AI_kcMedicalResearch
+
+    Make scripts executable (first time only):
+
+    bash
+    chmod +x Mac_*.sh
+
+    Run the setup:
+
+    bash
+    ./Mac_Setup_Instruction_to_Users.sh
+
+    Follow the prompts:
+
+        Choose install location (Projects, Documents, Desktop, or Custom)
+        Add API keys (or later)
+        Choose CLI or UI mode
+
+    Start working!
+
+Quick Launch (After Setup)
+
+    CLI Mode: ./Mac_kcMedicalResearch_CLI.sh
+
+    UI Mode: ./Mac_kcMedicalResearch_UI.sh
+
+------------------------------------------------------------------
+🔧 Configuration
+------------------------------------------------------------------
+***API Keys Setup***
+
+    After running the setup script, edit the .env file
+
+    Add your API keys:
+
+    GROQ_API_KEY=your_key_here          # Get from: https://console.groq.com
+    DASHSCOPE_API_KEY=your_key_here     # Get from: https://dashscope.aliyuncs.com
+    OPENAI_API_KEY=your_key_here        # Optional: https://platform.openai.com
+    ANTHROPIC_API_KEY=your_key_here     # Optional: https://console.anthropic.com
+    DEEPSEEK_API_KEY=your_key_here      # Optional: https://platform.deepseek.com
+
+
+***Input***
+
+Place your input files in the appropriate folders:
+
+input/
+├── coding/          # For coding pipeline
+├── writing/         # For writing pipeline
+├── appraisal/       # For appraisal pipeline
+├── search/          # For search pipeline
+├── rct_search/      # For RCT search
+└── sr/              # For SR pipeline (PDFs + pico_*.json)
+
+***Output***
+
+Output will appear in:
+
+output/
+├── coding/
+├── writing/
+├── appraisal/
+├── search/
+├── rct_search/
+└── sr/
+
+***Reports***
+
+Running Commentary and Explanations will appear in:
+
+reports/
+├── coding/
+├── writing/
+├── appraisal/
+├── search/
+├── rct_search/
+└── sr/
+
+
+------------------------------------------------------------------
+🚀 Running the App
+------------------------------------------------------------------
+CLI Mode
+
+    Windows: Double-click AI_kcMedicalResearch_CLI.bat or run python launcher.py
+
+    macOS: Run ./Mac_kcMedicalResearch_CLI.sh or python launcher.py
+
+UI Mode (Streamlit)
+
+    Windows: Double-click AI_kcMedicalResearch_UI.bat
+
+    macOS: Run ./Mac_kcMedicalResearch_UI.sh
+
+    Browser opens automatically at: http://localhost:8501
+
+------------------------------------------------------------------
+⚡ Quick Commands
+------------------------------------------------------------------
+***Docker Commands (All Platforms)***
+bash
+
+# Build the image
+docker build -t ai-kcmedicalresearch .
+
+# Run CLI
+docker run -it --rm -v $(pwd)/input:/app/input -v $(pwd)/output:/app/output --env-file .env ai-kcmedicalresearch python launcher.py
+
+# Run UI
+docker run -it --rm -p 8501:8501 -v $(pwd)/input:/app/input -v $(pwd)/output:/app/output --env-file .env ai-kcmedicalresearch streamlit run src/ui/app.py --server.port=8501 --server.address=0.0.0.0
+
+
+***Local Commands (Without Docker)***
+bash
+
+# Install dependencies
+python -m venv .venv
+.venv\Scripts\activate  # Windows
+source .venv/bin/activate  # macOS/Linux
+pip install -r requirements.txt
+
+# Run CLI
+python launcher.py
+
+# Run UI
+streamlit run src/ui/app.py
+
+------------------------------------------------------------------
+🆘 Troubleshooting
+------------------------------------------------------------------
+***Docker Issues***
+Issue	                Solution
+Docker not found	Install Docker Desktop from https://www.docker.com/products/docker-desktop
+Docker not running	Start Docker Desktop from system tray/menu bar
+Build fails	        Check internet connection and Docker logs
+Volume mount errors	Ensure folders exist: input/, output/, data/
+
+***API Key Issues***
+
+    Check if entered correctly (no extra spaces)
+    For Qwen: Use DASHSCOPE_API_KEY env var
+    Check Render env variables are saved
+
+***Pipeline Fails***
+
+    Check logs in the UI output area
+    Verify input files are in correct folder
+    Check API key is valid for selected provider
+
+***Theme Not Detected (CLI)***
+
+    Launcher auto-detects on first run
+    Override with:
+
+        Windows: setx CLI_THEME dark or setx CLI_THEME light
+        macOS/Linux: export CLI_THEME=dark or export CLI_THEME=light
+
+------------------------------------------------------------------
+📚 Documentation
+------------------------------------------------------------------
+
+    Full Documentation: HANDOFF.md
+
+    Quick Start: README.md
+
+------------------------------------------------------------------
+✅ Setup Complete!
+------------------------------------------------------------------
+
+You're now ready to use AI kcMedicalResearch!
+
+Total setup time: ~5 minutes
