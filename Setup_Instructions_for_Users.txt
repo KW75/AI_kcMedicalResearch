@@ -68,7 +68,7 @@ Quick Launch (After Setup)
     Run the setup:
 
     bash
-    ./Mac_Setup_Instruction_to_Users.sh
+    ./Mac_Setup.sh
 
     Follow the prompts:
 
