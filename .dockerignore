@@ -1,0 +1,52 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project specific
+input/
+output/
+data/
+logs/
+*.log
+.env
+.env.local
+.env.*.local
+*.db
+*.sqlite
+
+# Git
+.git/
+.gitignore
+
+# Documentation
+README.md
+HANDOFF.md
+*.md
+!docs/
+
+# Batch files (not needed in Docker)
+*.bat
+*.cmd
+
+# Docker
+*.tar
+docker-compose.override.yml

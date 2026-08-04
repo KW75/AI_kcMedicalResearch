@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  ai-kcmedicalresearch:
+    build: .
+    container_name: ai-kcmedicalresearch
+    ports:
+      - "8501:8501"   # Streamlit UI
+      - "8000:8000"   # API if needed
+    volumes:
+      # Mount local directories for input/output
+      - ./input:/app/input
+      - ./output:/app/output
+      - ./data:/app/data
+      # Mount .env if it exists
+      - ./.env:/app/.env:ro
+    environment:
+      - CLI_THEME=${CLI_THEME:-dark}
+      - OLLAMA_HOST=${OLLAMA_HOST:-http://host.docker.internal:11434}
+      # Pass through API keys from host .env
+      - GROQ_API_KEY=${GROQ_API_KEY}
+      - DASHSCOPE_API_KEY=${DASHSCOPE_API_KEY}
+      - DASHSCOPE_BASE_URL=${DASHSCOPE_BASE_URL}
+      - DASHSCOPE_ANTHROPIC_URL=${DASHSCOPE_ANTHROPIC_URL}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
+    stdin_open: true
+    tty: true
+    # For Windows, connect to host's Ollama
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
