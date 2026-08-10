@@ -43,7 +43,8 @@ def _get_client() -> chromadb.Client:
     """Return (or lazily create) the module-level ChromaDB client."""
     global _chroma_client
     if _chroma_client is None:
-        db_path = Path(__file__).parent.parent / "chroma_db"
+        # Updated path: go up 3 levels from SOURCE_CODE/utils/ to project root
+        db_path = Path(__file__).resolve().parent.parent.parent / "chroma_db"
         db_path.mkdir(parents=True, exist_ok=True)
         _chroma_client = chromadb.PersistentClient(path=str(db_path))
     return _chroma_client
@@ -165,6 +166,7 @@ def _embed_openai(texts: list[str]) -> list[list[float]]:
     except (urllib.error.URLError, urllib.error.HTTPError, KeyError) as exc:
         raise RuntimeError(f"OpenAI embedding failed: {exc}") from exc
 
+
 def _fetch_url(url: str) -> str:
     """
     Fetch a public URL and return its text content with HTML tags stripped.
@@ -192,6 +194,7 @@ def _fetch_url(url: str) -> str:
     # Collapse whitespace
     raw = _re.sub(r"\s+", " ", raw).strip()
     return raw
+
 
 def _extract_urls(text: str) -> list[str]:
     """
@@ -230,7 +233,6 @@ def index_uploads(mode: str, session_id: str, upload_base: str = "uploads") -> i
 
     files = [
         f for f in folder.iterdir()
-
         if f.is_file() and f.suffix.lower() in {
             ".txt", ".md", ".pdf",
             ".py", ".js", ".ts", ".html", ".css", ".json", ".yaml", ".yml",
