@@ -1,5 +1,3 @@
-markdown
-
 # AI kcMedical Research
 
 A multi-mode AI assistant for medical research, critical appraisal, systematic review, coding, and writing.
@@ -7,7 +5,7 @@ Runs locally via Ollama or via cloud providers (OpenAI, Anthropic, DeepSeek, Gro
 
 - **Version:** 2.3.0
 - **Tests:** 254 passed, 6 skipped
-- **Last commit:** b82f4d2
+- **Last commit:** 1436a46
 - **GitHub:** https://github.com/KW75/AI_kcMedicalResearch
 - **Live App:** https://ai-kcmedicalresearch.onrender.com
 
@@ -21,7 +19,7 @@ Runs locally via Ollama or via cloud providers (OpenAI, Anthropic, DeepSeek, Gro
 ```cmd
 git clone https://github.com/KW75/AI_kcMedicalResearch.git
 cd AI_kcMedicalResearch
-Docker_setup.bat
+docker\docker_setup.bat
 # Follow prompts → START WORKING!
 
 macOS 🍎
@@ -29,12 +27,12 @@ bash
 
 git clone https://github.com/KW75/AI_kcMedicalResearch.git
 cd AI_kcMedicalResearch
-chmod +x Mac_*.sh
-./Mac_Setup.sh
+chmod +x docker/mac_*.sh
+./docker/mac_docker_setup.sh
 # Follow prompts → START WORKING!
 
 Total time: ~5 minutes. No Python setup required!
-🐳 Docker (Manual)
+🐳 Docker (Manual - All Platforms)
 bash
 
 # Build image
@@ -260,20 +258,20 @@ Project Structure
 text
 
 AI_kcMedicalResearch/
-├── 🪟 WINDOWS SUPPORT
-│   ├── Docker_setup.bat              ⭐ One-click Windows setup
-│   ├── AI_kcMedicalResearch_CLI.bat  🎨 Enhanced CLI launcher
-│   └── AI_kcMedicalResearch_UI.bat   🎨 Enhanced UI launcher
-├── 🍎 MACOS SUPPORT
-│   ├── Mac_Setup.sh                  ⭐ One-click macOS setup
-│   ├── Mac_kcMedicalResearch_CLI.sh  🎨 Enhanced CLI launcher
-│   └── Mac_kcMedicalResearch_UI.sh   🎨 Enhanced UI launcher
+├── 🪟 WINDOWS SCRIPTS
+│   ├── docker_setup.bat               ⭐ One-click Windows Docker setup
+│   ├── docker_menu.bat                🎨 Interactive menu (CLI/UI)
+│   └── docker_cli.bat                 ⚡ Quick CLI launch
+├── 🍎 MACOS SCRIPTS
+│   ├── mac_docker_setup.sh            ⭐ One-click macOS Docker setup
+│   ├── mac_docker_menu.sh             🎨 Interactive menu (CLI/UI)
+│   ├── mac_docker_cli.sh              ⚡ Quick CLI launch
+│   └── mac_make_Scripts_executable.sh 🔧 Helper to make scripts executable
 ├── 🐳 DOCKER SUPPORT
-│   ├── Dockerfile
-│   ├── docker-compose.yml
-│   ├── docker_run.bat
-│   └── docker_quick_start.bat
-├── 📄 SOURCE_CODE/                   ★ MAIN SOURCE CODE
+│   ├── Dockerfile                     Container definition
+│   ├── docker-compose.yml             Orchestration
+│   └── .dockerignore                  Build exclusions
+├── 📄 SOURCE_CODE/                    ★ MAIN SOURCE CODE
 │   ├── main.py
 │   ├── pipelines/
 │   │   ├── coding/
@@ -281,35 +279,35 @@ AI_kcMedicalResearch/
 │   │   ├── appraisal/
 │   │   ├── search/
 │   │   ├── rct_search/
-│   │   └── sr/                       ★ SR Pipeline
+│   │   └── sr/                        ★ SR Pipeline
 │   ├── ui/
-│   │   └── app.py                    ★ Streamlit UI
+│   │   └── app.py                     ★ Streamlit UI
 │   └── utils/
 │       ├── path_utils.py
-│       ├── document_reader.py        ★ Multi-format reader
+│       ├── document_reader.py         ★ Multi-format reader
 │       └── rag.py
-├── 📝 prompts/                       ★ Prompt templates (15 files)
-├── 📖 Readme/                        ★ Documentation
-│   ├── HANDOFF.md                    ★ Comprehensive handoff
-│   ├── README.md                     ★ This file
+├── 📝 prompts/                        ★ Prompt templates (15 files)
+├── 📖 Readme/                         ★ Documentation
+│   ├── HANDOFF.md                     ★ Comprehensive handoff
+│   ├── README.md                      ★ This file
 │   ├── Setup_Instructions_for_Users.txt
-│   └── flashcard-help.html           ★ Interactive help guide
-├── 🎨 assets/                        ★ UI assets
-├── 📁 input/                         ★ Input files
+│   └── flashcard-help.html            ★ Interactive help guide
+├── 🎨 assets/                         ★ UI assets
+├── 📁 input/                          ★ Input files
 │   ├── coding/
 │   ├── writing/
 │   ├── appraisal/
 │   ├── search/
 │   ├── rct_search/
 │   └── sr/
-├── 📁 output/                        ★ Generated output
-├── 📁 reports/                       ★ Generated reports
-├── 📁 tests/                         ★ All tests
-├── 📁 chroma_db/                     ★ RAG vector database
+├── 📁 output/                         ★ Generated output
+├── 📁 reports/                        ★ Generated reports
+├── 📁 tests/                          ★ All tests
+├── 📁 chroma_db/                      ★ RAG vector database
 ├── requirements.txt
 ├── render.yaml
 ├── .env.template
-└── .env                              ★ API keys (local only)
+└── .env                               ★ API keys (local only)
 
 Running Tests
 bash
@@ -338,7 +336,7 @@ Windows 🪟
     git clone https://github.com/KW75/AI_kcMedicalResearch.git
     cd AI_kcMedicalResearch
 
-    Double-click Docker_setup.bat
+    Double-click docker\docker_setup.bat
 
     Follow prompts and start working!
 
@@ -352,9 +350,9 @@ macOS 🍎
     git clone https://github.com/KW75/AI_kcMedicalResearch.git
     cd AI_kcMedicalResearch
 
-    Make scripts executable: chmod +x Mac_*.sh
+    Make scripts executable: chmod +x docker/mac_*.sh
 
-    Run: ./Mac_Setup.sh
+    Run: ./docker/mac_docker_setup.sh
 
     Follow prompts and start working!
 
@@ -364,61 +362,22 @@ OCR Support (optional — for scanned PDFs)
 Text-based PDFs work automatically via PyMuPDF. For scanned/image PDFs:
 
     Install Tesseract binary: https://github.com/UB-Mannheim/tesseract/wiki
-
     Install Poppler for Windows: https://github.com/oschwartz10612/poppler-windows
-
     Add both bin/ folders to your system PATH
-
     Install Python packages: pip install pytesseract pillow pdf2image
-
     OCR fallback activates automatically when PyMuPDF returns empty text
 
 Known Issues
-#	Issue	Priority	Root Cause
-1	Lami extraction fails	High	Table 4 not found
-2	WeasyPrint not installed	Medium	PDF output falls back to HTML
-3	Low test coverage	Low	appraisal.py, search.py, writing.py, ui/app.py
+#	Issue	                        Priority	Root Cause
+1	Lami extraction fails	        High	        Table 4 not found
+2	WeasyPrint not installed	Medium	        PDF output falls back to HTML
+3	Low test coverage	        Low	        appraisal.py, search.py, writing.py, ui/app.py
+
 Contributing
-
-    Fork the repository
-
-    Create a feature branch: git checkout -b feature/your-feature
-
-    Make your changes
-
-    Run tests: python -m pytest
-
-    Commit and push
-
-    Create a pull request
-
-License
-
-[Your License Here]
-
-The setup_colleague.bat saga is officially over! 🏆
-text
-
-
-Now let's commit the updated README:
-
-```powershell
-# Stage the updated README
-git add README.md
-
-# Commit
-git commit -m "docs: update README.md for v2.3.0 with cross-platform Docker support
-
-- Added one-click setup instructions for Windows and macOS
-- Updated project structure to reflect SOURCE_CODE/
-- Added Docker commands and documentation
-- Updated provider list with Qwen
-- Added vision provider support table
-- Added multi-format document support section
-- Updated quick start commands
-- Fixed all paths to reflect new structure
-- Added cross-platform support summary"
-
-# Push
-git push origin main
+1. Fork the repository
+2. Create a feature branch: git checkout -b feature/your-feature
+3. Make your changes
+4. Run tests: python -m pytest
+5. Commit and push
+6. Create a pull request
 
