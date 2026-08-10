@@ -1,4 +1,4 @@
-# SOURCE_CODE/pipelines/sr/src/screening/relevance_screener.py
+﻿# SOURCE_CODE/pipelines/sr/src/screening/relevance_screener.py
 import json, logging, os, time
 from pathlib import Path
 from typing import Optional
@@ -67,7 +67,7 @@ class RelevanceScreener:
 
             # --- Detect garbled CID-font text and fall back to OCR ---
             if not pdf_text or "(cid:" in pdf_text or pdf_text.count(" ") < 20:
-                logger.info(f"Garbled text detected for {filename} — switching to OCR")
+                logger.info(f"Garbled text detected for {filename}  - switching to OCR")
                 try:
                     import fitz
                     import pytesseract

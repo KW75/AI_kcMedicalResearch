@@ -1,4 +1,4 @@
-# =============================================================================
+﻿# =============================================================================
 #  launcher.py  |  AI kcMedicalResearch  |  v2.3.0
 # =============================================================================
 
@@ -19,7 +19,7 @@ except ImportError:
     os.system('')
     _COLORAMA = False
 
-BASE   = Path(__file__).resolve().parent
+BASE   = Path(__file__).resolve().parent.parent
 PYTHON = sys.executable
 
 # -----------------------------------------------------------------------------
@@ -233,7 +233,7 @@ def banner() -> None:
     print(f'  {FRAME}║{RESET}  {INFO}Providers:{RESET} '
           f'{ACCENT}ollama  qwen  groq  openai  anthropic{RESET}{W(3)}{FRAME}  ║{RESET}')
     print(f'  {FRAME}║{RESET}  {INFO}Help   :{RESET}  '
-          f'{INFO}python SOURCE_CODE/main.py --help-guide{RESET}{W(10)}{FRAME}  ║{RESET}')
+          f'{INFO}python SOURCE_CODE/main.py --help-guide{RESET}{W(2)}{FRAME}  ║{RESET}')
 
     print(f'  {FRAME}╚═══════════════════════════════════════════════════════╝{RESET}')
 
@@ -406,7 +406,7 @@ def _find_move_destination(mode: str) -> Path:
 
 
 def check_input_folder(mode: str) -> None:
-    input_dir = BASE / 'input' / mode
+    input_dir = BASE / "input" / mode
     if not input_dir.exists():
         return
     files = [f for f in input_dir.iterdir() if f.is_file()]
@@ -459,9 +459,9 @@ def _run_cmd(cmd: list, label: str = '') -> None:
     flags_str = ' '.join(cmd[2:])
     display   = flags_str if len(flags_str) <= 33 else flags_str[:30] + '...'
     print()
-    print(f'  {FRAME}╔══ Running ════════════════════════════════════════════╗{RESET}')
+    print(f'  {FRAME}╔══ Running ═════════════════════════════════════════════════════╗{RESET}')
     print(f'  {FRAME}║{RESET}  {ACCENT}python SOURCE_CODE/main.py {display:<33}{RESET}  {FRAME}║{RESET}')
-    print(f'  {FRAME}╚══ Ctrl+C stops and returns to menu ═══════════════════╝{RESET}')
+    print(f'  {FRAME}╚══ Ctrl+C stops and returns to menu ════════════════════════════╝{RESET}')
     print()
     creationflags = subprocess.CREATE_NEW_PROCESS_GROUP if os.name == 'nt' else 0
     try:
@@ -481,12 +481,12 @@ def run_custom() -> None:
     if not custom.strip():
         print(f'  {INFO}Cancelled.{RESET}')
         return
-    cmd = [PYTHON, str(BASE / 'SOURCE_CODE' / 'main.py')] + custom.split()
+    cmd = [PYTHON, str(BASE / "SOURCE_CODE" / 'main.py')] + custom.split()
     _run_cmd(cmd, label='custom')
 
 
 def run_ui() -> None:
-    cmd = [PYTHON, str(BASE / 'SOURCE_CODE' / 'main.py'), '--ui']
+    cmd = [PYTHON, str(BASE / "SOURCE_CODE" / 'main.py'), '--ui']
     print()
     print(f'  {FRAME}╔══ Streamlit UI ═══════════════════════════════════════╗{RESET}')
     print(f'  {FRAME}║{RESET}  {GOOD}Opening :{RESET}  {ACCENT}http://localhost:8501{RESET}{"  " * 12}{FRAME}║{RESET}')
@@ -575,7 +575,7 @@ def main() -> None:
             prov_flag = pick_provider(mode_flag)
 
             flags = [f for f in [mode_flag, prov_flag] if f]
-            cmd   = [PYTHON, str(BASE / 'SOURCE_CODE' / 'main.py')] + ' '.join(flags).split()
+            cmd   = [PYTHON, str(BASE / "SOURCE_CODE" / 'main.py')] + ' '.join(flags).split()
             _run_cmd(cmd, label=label or '')
 
             safe_input(f'  {INFO}Press Enter to return to menu...{RESET}')

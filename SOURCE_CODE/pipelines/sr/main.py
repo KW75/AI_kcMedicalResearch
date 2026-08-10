@@ -1,4 +1,4 @@
-# SOURCE_CODE/pipelines/sr/main.py
+﻿# SOURCE_CODE/pipelines/sr/main.py
 import argparse, logging, sys
 import pandas as pd
 from pathlib import Path
@@ -42,7 +42,7 @@ def load_config(p=None):
 
 def main():
     ap = argparse.ArgumentParser(
-        description="SR Automation Pipeline — PRISMA 2020 / Cochrane Handbook v6.5")
+        description="SR Automation Pipeline  - PRISMA 2020 / Cochrane Handbook v6.5")
     ap.add_argument("--pdf-dir",        default=None,
                     help="Override PDF input folder (default: input/sr/)")
     ap.add_argument("--config",         default=None,
@@ -61,7 +61,7 @@ def main():
 
     cfg = load_config(args.config)
 
-    # ── Effect measure resolution: CLI > yaml > fallback OR ──────────────────
+    # ?? Effect measure resolution: CLI > yaml > fallback OR ??????????????????
     VALID = ("OR", "RR", "MD", "SMD")
     yaml_em = cfg.get("effect_measure")
     if yaml_em and yaml_em not in VALID:
@@ -73,20 +73,20 @@ def main():
     if not args.effect_measure:
         args.effect_measure = "OR"
         logger.warning(
-            "No effect_measure specified — defaulting to OR. "
+            "No effect_measure specified  - defaulting to OR. "
             "Add 'effect_measure: MD' (or SMD/RR) to prisma_criteria.yaml.")
 
-    # ── Resolve PDF input folder ──────────────────────────────────────────────
+    # ?? Resolve PDF input folder ??????????????????????????????????????????????
     if args.pdf_dir:
         pdf_dir = Path(args.pdf_dir)
     else:
         pdf_dir = PROJECT_ROOT / "input" / "sr"
 
-    # ── Initialise project layout ─────────────────────────────────────────────
+    # ?? Initialise project layout ?????????????????????????????????????????????
     layout = SRProjectLayout(run_id=args.run_id)
     logger.info(f"Project folder: {layout.project}")
 
-    # ── Stage 1: Upload ───────────────────────────────────────────────────────
+    # ?? Stage 1: Upload ???????????????????????????????????????????????????????
     logger.info("=== STAGE 1: Upload ===")
     if args.provider == "anthropic":
         fm   = FileManager()
@@ -95,7 +95,7 @@ def main():
         from .src.upload.file_manager import local_records
         recs = local_records(pdf_dir)
         logger.info(
-            f"[UPLOAD] Non-Anthropic provider — "
+            f"[UPLOAD] Non-Anthropic provider  - "
             f"using local PDF paths ({len(recs)} files)")
 
     # Copy PDFs into project uploads\ and update pdf_path in each record
@@ -111,7 +111,7 @@ def main():
     pd.DataFrame(recs).to_csv(
         layout.uploads / "upload_manifest.csv", index=False)
 
-    # ── Stage 2: Screening ────────────────────────────────────────────────────
+    # ?? Stage 2: Screening ????????????????????????????????????????????????????
     logger.info("=== STAGE 2: Screening ===")
     sr = RelevanceScreener(
         pico_criteria      = cfg["pico"],
@@ -131,7 +131,7 @@ def main():
         logger.error("No studies included after screening. Stopping.")
         return
 
-    # ── Stage 3: Extraction ───────────────────────────────────────────────────
+    # ?? Stage 3: Extraction ???????????????????????????????????????????????????
     logger.info("=== STAGE 3: Extraction ===")
     er = DataExtractor(
         pico_criteria = cfg.get("pico", {}),
@@ -141,7 +141,7 @@ def main():
 
     write_extracts(layout.extracted_csv, er)
 
-    # ── Stage 3.5: RoB 2.0 ───────────────────────────────────────────────────
+    # ?? Stage 3.5: RoB 2.0 ???????????????????????????????????????????????????
     logger.info("=== STAGE 3.5: RoB 2.0 Assessment ===")
     rob = RoB2Assessor(
         model    = args.model,
@@ -150,7 +150,7 @@ def main():
 
     write_rob2(layout.rob2_csv, rob)
 
-    # ── Stage 4: Meta-Analysis ────────────────────────────────────────────────
+    # ?? Stage 4: Meta-Analysis ????????????????????????????????????????????????
     logger.info("=== STAGE 4: Meta-Analysis ===")
     reported = [r.get("primary_outcome", {}).get("effect_measure") for r in er
                 if r.get("primary_outcome", {}).get("outcome_match", True) is not False]
@@ -161,11 +161,11 @@ def main():
         if args.effect_measure in ("OR", "RR") and n_diff > n_ratio:
             logger.warning(
                 f"Chosen {args.effect_measure} but {n_diff}/{len(reported)} "
-                f"studies report continuous measures — consider --effect-measure MD/SMD.")
+                f"studies report continuous measures  - consider --effect-measure MD/SMD.")
         elif args.effect_measure in ("MD", "SMD") and n_ratio > n_diff:
             logger.warning(
                 f"Chosen {args.effect_measure} but {n_ratio}/{len(reported)} "
-                f"studies report ratio measures — consider --effect-measure OR/RR.")
+                f"studies report ratio measures  - consider --effect-measure OR/RR.")
 
     rows      = []
     meta_audit= []
@@ -284,7 +284,7 @@ def main():
         f"[{ma['ci_lower']:.3f},{ma['ci_upper']:.3f}] "
         f"I2={ma['I2']:.1f}%")
 
-    # ── Stage 5: Forest Plot ──────────────────────────────────────────────────
+    # ?? Stage 5: Forest Plot ??????????????????????????????????????????????????
     logger.info("=== STAGE 5: Forest Plot ===")
     fp = str(layout.figures / "forest_plot.png")
     ForestPlotGenerator().generate(
@@ -292,7 +292,7 @@ def main():
         effect_measure = args.effect_measure,
         output_path    = fp)
 
-    # ── Stage 6: Reports ──────────────────────────────────────────────────────
+    # ?? Stage 6: Reports ??????????????????????????????????????????????????????
     logger.info("=== STAGE 6: Reports ===")
     title = cfg.get("review_title", "Systematic Review")
     pico  = cfg.get("pico",  {})
@@ -327,7 +327,7 @@ def main():
         output_path        = str(layout.pdf),
         also_save_html     = True)
 
-    # ── Mirror to output\sr\ ──────────────────────────────────────────────────
+    # ?? Mirror to output\sr\ ??????????????????????????????????????????????????
     layout.mirror_all()
 
     logger.info("Pipeline complete.")

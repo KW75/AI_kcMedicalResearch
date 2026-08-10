@@ -1,9 +1,9 @@
 ﻿"""
-writing.py ??Writing Mode engine (v1.2 two-track system)
+writing.py  - Writing Mode engine (v1.2 two-track system)
 Tracks:
-  topic   ??newspaper/editorial style, default 800 words
-  article ??medical journal style, default 3500 words
-Pipeline: Writer ??Editor ??QA (linear)
+  topic    - newspaper/editorial style, default 800 words
+  article  - medical journal style, default 3500 words
+Pipeline: Writer  - Editor  - QA (linear)
 Standalone: Editor, QA (require input/writing/ files)
 """
 
@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Callable
 
 # Add SOURCE_CODE to path
-PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent.parent.parent
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 SOURCE_CODE_DIR = PROJECT_ROOT / "SOURCE_CODE"
 sys.path.insert(0, str(SOURCE_CODE_DIR))
 
@@ -464,10 +464,10 @@ def _write_report(
     header += "\n---\n\n"
 
     if role.upper() == "QA":
-        # QA has no output/ file ??write full report here
+        # QA has no output/ file  - write full report here
         body = content
     else:
-        # Writer and Editor ??write preview only; full doc is in output/writing/
+        # Writer and Editor  - write preview only; full doc is in output/writing/
         preview = content[:300].replace("\n", " ").strip()
         if len(content) > 300:
             preview += "..."
@@ -533,7 +533,7 @@ def _prompt_word_limit(track: str) -> int:
 
 
 # ---------------------------------------------------------------------------
-# Pipeline: Writer ??Editor ??QA
+# Pipeline: Writer  - Editor  - QA
 # ---------------------------------------------------------------------------
 def run_writer(
     direct_instructions: list,

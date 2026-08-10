@@ -6,30 +6,64 @@
 setlocal EnableDelayedExpansion
 
 :: --- 0. RESOLVE PROJECT ROOT -------------------------------------------------
-set "PROJECT_DIR=%~dp0.."
-if "!PROJECT_DIR:~-1!"=="\" set "PROJECT_DIR=!PROJECT_DIR:~0,-1!"
-title AI kcMedical Research - UI - %PROJECT_DIR%
-cd /d "%PROJECT_DIR%"
+:: Get the directory where this script is located (scripts\windows)
+set "SCRIPT_DIR=%~dp0"
+:: Remove trailing backslash
+if "!SCRIPT_DIR:~-1!"=="\" set "SCRIPT_DIR=!SCRIPT_DIR:~0,-1!"
+:: Go up TWO levels: scripts\windows -> scripts -> project root
+set "PROJECT_DIR=!SCRIPT_DIR!\..\.."
+:: Normalize path - use cd to resolve
+pushd "!PROJECT_DIR!" 2>nul
+if errorlevel 1 (
+    echo ERROR: Cannot find project root.
+    pause & exit /b 1
+)
+set "PROJECT_DIR=%CD%"
+popd
+
+title AI kcMedical Research - UI - !PROJECT_DIR!
+cd /d "!PROJECT_DIR!"
 
 call :print_header
 
-:: --- 1. GUARD: .venv present? ------------------------------------------------
-if not exist "%PROJECT_DIR%\.venv\Scripts\python.exe" (
-    call :box_error ".venv not found. Run AI_kcMedicalResearch_CLI.bat first."
-    pause & exit /b 1
+:: --- 1. CHECK / CREATE .venv ------------------------------------------------
+if not exist "!PROJECT_DIR!\.venv\Scripts\python.exe" (
+    echo   [SETUP] .venv not found. Creating virtual environment...
+    echo.
+    python -m venv .venv
+    if !errorlevel! neq 0 (
+        call :box_error "Failed to create .venv. Ensure Python 3.10+ is installed."
+        pause & exit /b 1
+    )
+    echo   [SETUP] .venv created OK.
+    echo   [SETUP] Installing dependencies...
+    echo.
+    "!PROJECT_DIR!\.venv\Scripts\pip.exe" install -r requirements.txt --quiet
+    if !errorlevel! neq 0 (
+        call :box_error "Failed to install dependencies. Check internet connection."
+        pause & exit /b 1
+    )
+    echo   [SETUP] Dependencies installed OK.
+    echo.
+    echo   ============================================================
+    echo    SETUP COMPLETE! You can now run the UI.
+    echo   ============================================================
+    echo.
 )
 
 :: --- 2. GUARD: app.py present? -----------------------------------------------
-if not exist "%PROJECT_DIR%\SOURCE_CODE\ui\app.py" (
+if not exist "!PROJECT_DIR!\SOURCE_CODE\ui\app.py" (
     call :box_error "UI app not found at SOURCE_CODE\ui\app.py"
+    echo   Current directory: !PROJECT_DIR!
+    echo   Expected: !PROJECT_DIR!\SOURCE_CODE\ui\app.py
     pause & exit /b 1
 )
 
 :: --- 3. CHECK STREAMLIT INSTALLED --------------------------------------------
-"%PROJECT_DIR%\.venv\Scripts\python.exe" -c "import streamlit" >nul 2>&1
+"!PROJECT_DIR!\.venv\Scripts\python.exe" -c "import streamlit" >nul 2>&1
 if !errorlevel! neq 0 (
     echo   Streamlit not found. Installing now...
-    "%PROJECT_DIR%\.venv\Scripts\pip.exe" install streamlit --quiet
+    "!PROJECT_DIR!\.venv\Scripts\pip.exe" install streamlit --quiet
     if !errorlevel! neq 0 (
         call :box_error "Failed to install streamlit. Check your internet connection."
         pause & exit /b 1
@@ -51,10 +85,10 @@ ping -n 4 127.0.0.1 >nul
 start "" "http://localhost:8501"
 
 :: --- 6. START STREAMLIT ------------------------------------------------------
-set "APP=%PROJECT_DIR%\SOURCE_CODE\ui\app.py"
-set "PY=%PROJECT_DIR%\.venv\Scripts\python.exe"
+set "APP=!PROJECT_DIR!\SOURCE_CODE\ui\app.py"
+set "PY=!PROJECT_DIR!\.venv\Scripts\python.exe"
 
-"%PY%" -m streamlit run "%APP%" ^
+"!PY!" -m streamlit run "!APP!" ^
     "--server.runOnSave=false" ^
     "--server.headless=false" ^
     "--browser.gatherUsageStats=false"
@@ -76,7 +110,7 @@ echo.
 echo   ============================================================
 echo    AI kcMedical Research  ^|  Pipeline UI  ^|  v2.3.2
 echo   ============================================================
-echo    Project : %PROJECT_DIR%
+echo    Project : !PROJECT_DIR!
 echo   ============================================================
 echo.
 goto :eof

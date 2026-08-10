@@ -1,4 +1,4 @@
-# SOURCE_CODE/pipelines/sr/src/screening/rob2_tool.py
+﻿# SOURCE_CODE/pipelines/sr/src/screening/rob2_tool.py
 import json, logging, os, time
 from typing import Optional
 import anthropic
@@ -131,7 +131,7 @@ class RoB2Assessor:
 
             # --- Detect garbled CID-font text and fall back to OCR ---
             if not pdf_text or "(cid:" in pdf_text or pdf_text.count(" ") < 20:
-                logger.info(f"Garbled text detected for {filename} — switching to OCR")
+                logger.info(f"Garbled text detected for {filename}  - switching to OCR")
                 try:
                     import fitz
                     import pytesseract

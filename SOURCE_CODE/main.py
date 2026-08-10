@@ -1,5 +1,5 @@
 ﻿"""
-main.py ??AI Automation Tool  v2.2.0
+main.py  - AI Automation Tool  v2.2.0
 Supports six workflow modes: coding, writing, rct_search, appraisal, search, sr.
 Supports six AI providers: ollama (default), openai, anthropic, deepseek, groq, qwen.
 RAG layer: per-session, mode-specific input/ folder indexing via rag.py.
@@ -136,7 +136,7 @@ for _d in [
     OUTPUT_CODING, OUTPUT_WRITING, OUTPUT_APPRAISAL,
     OUTPUT_RCT_SEARCH, OUTPUT_SEARCH, OUTPUT_SR,
     REPORTS_DIR,
-    # reports/ subfolders ??each mode writes here
+    # reports/ subfolders  - each mode writes here
     REPORTS_DIR / "coding",
     REPORTS_DIR / "writing",
     REPORTS_DIR / "appraisal",
@@ -187,9 +187,9 @@ def auto_load_input_files(mode: str) -> list[Path]:
     if files:
         print(f"[auto-load] Found {len(files)} file(s) in input/{mode}/:")
         for f in files:
-            print(f"  ??{f.name}")
+            print(f"   - {f.name}")
     else:
-        print(f"[auto-load] No input files in input/{mode}/ ??proceeding without pre-loaded context.")
+        print(f"[auto-load] No input files in input/{mode}/  - proceeding without pre-loaded context.")
     return files
 
 
@@ -305,7 +305,7 @@ DOC_FILES_BY_ROLE: dict[str, list[Path]] = {
 def call_openai_provider(
     prompt: str,
     model: str | None = None,
-    max_tokens: int = 2048,
+    max_tokens: int = 8192,
 ) -> str:
     """Send a prompt to the OpenAI chat completions endpoint."""
     if not OPENAI_API_KEY:
@@ -327,7 +327,7 @@ def call_openai_provider(
         method="POST",
     )
     try:
-        with urlopen(req, timeout=60) as resp:
+        with urlopen(req, timeout=180) as resp:
             data = json.loads(resp.read())
         choices = data.get("choices", [])
         if not choices or not choices[0].get("message", {}).get("content"):
@@ -344,7 +344,7 @@ def call_openai_provider(
 def call_anthropic_provider(
     prompt: str,
     model: str | None = None,
-    max_tokens: int = 2048,
+    max_tokens: int = 8192,
 ) -> str:
     """Send a prompt to the Anthropic messages endpoint."""
     if not ANTHROPIC_API_KEY:
@@ -367,7 +367,7 @@ def call_anthropic_provider(
         method="POST",
     )
     try:
-        with urlopen(req, timeout=60) as resp:
+        with urlopen(req, timeout=180) as resp:
             data = json.loads(resp.read())
         content = data.get("content", [])
         if not content or not content[0].get("text"):
@@ -384,7 +384,7 @@ def call_anthropic_provider(
 def call_ollama_provider(
     prompt: str,
     model: str | None = None,
-    max_tokens: int = 2048,
+    max_tokens: int = 8192,
 ) -> str:
     """Send a prompt to the local Ollama generate endpoint."""
     model   = model or OLLAMA_MODEL
@@ -402,7 +402,7 @@ def call_ollama_provider(
         method="POST",
     )
     try:
-        with urlopen(req, timeout=300) as resp:
+        with urlopen(req, timeout=600) as resp:
             data = json.loads(resp.read())
         response_text = data.get("response", "")
         if not response_text:
@@ -417,7 +417,7 @@ def call_ollama_provider(
 def call_deepseek_provider(
     prompt: str,
     model: str | None = None,
-    max_tokens: int = 2048,
+    max_tokens: int = 8192,
 ) -> str:
     """Send a prompt to the DeepSeek chat completions endpoint."""
     if not DEEPSEEK_API_KEY:
@@ -441,7 +441,7 @@ def call_deepseek_provider(
         method="POST",
     )
     try:
-        with urlopen(req, timeout=60) as resp:
+        with urlopen(req, timeout=180) as resp:
             data = json.loads(resp.read())
         choices = data.get("choices", [])
         if not choices:
@@ -462,7 +462,7 @@ def call_deepseek_provider(
 def call_groq_provider(
     prompt: str,
     model: str | None = None,
-    max_tokens: int = 2048,
+    max_tokens: int = 8192,
 ) -> str:
     """Send a prompt to the Groq inference endpoint."""
     if not GROQ_API_KEY:
@@ -485,7 +485,7 @@ def call_groq_provider(
         method="POST",
     )
     try:
-        with urlopen(req, timeout=60) as resp:
+        with urlopen(req, timeout=180) as resp:
             data = json.loads(resp.read())
         choices = data.get("choices", [])
         if not choices or not choices[0].get("message", {}).get("content"):
@@ -502,7 +502,7 @@ def call_groq_provider(
 def call_qwen_provider(
     prompt: str,
     model: str | None = None,
-    max_tokens: int = 2048,
+    max_tokens: int = 8192,
 ) -> str:
     """Send a prompt to Alibaba Cloud Model Studio (Qwen) via OpenAI-compatible API."""
     if not DASHSCOPE_API_KEY:
@@ -526,7 +526,7 @@ def call_qwen_provider(
         method="POST",
     )
     try:
-        with urlopen(req, timeout=60) as resp:
+        with urlopen(req, timeout=180) as resp:
             data = json.loads(resp.read())
         choices = data.get("choices", [])
         if not choices or not choices[0].get("message", {}).get("content"):
@@ -652,7 +652,7 @@ def append_to_transcript(
 ) -> None:
     """Append one interaction step to an existing transcript file."""
     entry = (
-        f"\n## Step {step} ??{role_name}\n"
+        f"\n## Step {step}  - {role_name}\n"
         f"**Task:** {task}\n\n"
         f"**Response:**\n{response}\n"
     )
@@ -1070,7 +1070,7 @@ def generate_writing_report(
         if content.strip():
             sections.append(f"### {f.name}\n{content.strip()}")
         else:
-            print(f"  Warning: no readable content in {f.name} ??skipped.")
+            print(f"  Warning: no readable content in {f.name}  - skipped.")
 
     if not sections:
         print("No readable content found in any file. Exiting.")
@@ -1095,10 +1095,10 @@ def generate_writing_report(
 
     docx_path = OUTPUT_WRITING / f"writing_report_{timestamp}.docx"
     try:
-        _md_to_docx(response, f"Writing Report ??{timestamp}", docx_path)
+        _md_to_docx(response, f"Writing Report  - {timestamp}", docx_path)
         print(f"Word document saved   : output\\writing\\{docx_path.name}")
     except Exception as exc:  # noqa: BLE001
-        print(f"  Warning: could not generate .docx ??{exc}")
+        print(f"  Warning: could not generate .docx  - {exc}")
 
     return md_path
 
@@ -1231,10 +1231,10 @@ def generate_code_revision(
     print(f"Markdown report saved : reports\\{md_path.name}")
 
     try:
-        _md_to_docx(md_content, f"Code Revision Report ??{timestamp}", docx_path)
+        _md_to_docx(md_content, f"Code Revision Report  - {timestamp}", docx_path)
         print(f"Word document saved   : reports\\{docx_path.name}")
     except Exception as exc:  # noqa: BLE001
-        print(f"  Warning: could not generate .docx ??{exc}")
+        print(f"  Warning: could not generate .docx  - {exc}")
 
     return md_path
 
@@ -1266,7 +1266,7 @@ def _read_article_files(input_appraisal: Path) -> list[dict]:
             if len(text) <= ARTICLE_SIZE_LIMIT:
                 results.append({"name": f.name, "content": text})
             else:
-                print(f"[Appraisal] {f.name} exceeds {ARTICLE_SIZE_LIMIT} chars ??passed to RAG.")
+                print(f"[Appraisal] {f.name} exceeds {ARTICLE_SIZE_LIMIT} chars  - passed to RAG.")
         except Exception as exc:  # noqa: BLE001
             print(f"[Appraisal] Could not read {f.name}: {exc}")
     return results
@@ -1412,7 +1412,7 @@ def fetch_pubmed_articles(
 # ---------------------------------------------------------------------------
 
 def run_sr_launcher(provider: str = "", model: str = "") -> None:
-    """Run the SR automation pipeline (CLI mode ??no Streamlit)."""
+    """Run the SR automation pipeline (CLI mode  - no Streamlit)."""
     import shutil
     import subprocess as _sp
     import json as _json
@@ -1463,7 +1463,7 @@ def run_sr_launcher(provider: str = "", model: str = "") -> None:
             pico_path = pico_files[int(choice) - 1]
             try:
                 pico_data = _json.loads(pico_path.read_text(encoding="utf-8"))
-                print(f"\n  ??PICO loaded from: {pico_path.name}")
+                print(f"\n   - PICO loaded from: {pico_path.name}")
                 print(f"     Population:   {pico_data.get('population', 'N/A')}")
                 print(f"     Intervention: {pico_data.get('intervention', 'N/A')}")
                 print(f"     Comparator:   {pico_data.get('comparator', 'N/A')}")
@@ -1486,7 +1486,7 @@ def run_sr_launcher(provider: str = "", model: str = "") -> None:
                         encoding="utf-8"
                     )
                     pico_path = new_path
-                    print(f"  ??Modified PICO saved to: {new_path.name}")
+                    print(f"   - Modified PICO saved to: {new_path.name}")
                     
             except Exception as e:
                 print(f"  ?嚙踝蕭? Could not load PICO: {e}")
@@ -1500,7 +1500,7 @@ def run_sr_launcher(provider: str = "", model: str = "") -> None:
                 _json.dumps(pico_data, indent=2, ensure_ascii=False),
                 encoding="utf-8"
             )
-            print(f"  ??New PICO saved to: {pico_path.name}")
+            print(f"   - New PICO saved to: {pico_path.name}")
     
     if pico_data is None:
         # No PICO loaded - create new
@@ -1518,7 +1518,7 @@ def run_sr_launcher(provider: str = "", model: str = "") -> None:
                 _json.dumps(pico_data, indent=2, ensure_ascii=False),
                 encoding="utf-8"
             )
-            print(f"  ??New PICO saved to: {pico_path.name}")
+            print(f"   - New PICO saved to: {pico_path.name}")
         else:
             print("  ?嚙踝蕭? No PICO configured. Using existing config.")
     
@@ -1545,7 +1545,7 @@ def run_sr_launcher(provider: str = "", model: str = "") -> None:
             _yaml.dump(cfg_yaml, allow_unicode=True, sort_keys=False),
             encoding="utf-8",
         )
-        print(f"\n  ??prisma_criteria.yaml updated with PICO")
+        print(f"\n   - prisma_criteria.yaml updated with PICO")
         print(f"     PubMed query: {cfg_yaml.get('pubmed_query_cleaned', 'n/a')}")
     else:
         print("\n  ?嚙踝蕭? Using existing prisma_criteria.yaml")
@@ -1571,9 +1571,9 @@ def run_sr_launcher(provider: str = "", model: str = "") -> None:
         print("  DeepSeek's API only accepts text, not images.")
         print()
         print("  Please use one of these providers with vision support:")
-        print("    ??qwen     (recommended) - Qwen vision model")
-        print("    ??openai   - GPT-4 vision")
-        print("    ??anthropic - Claude vision")
+        print("     - qwen     (recommended) - Qwen vision model")
+        print("     - openai   - GPT-4 vision")
+        print("     - anthropic - Claude vision")
         print()
         print("  To switch provider, run:")
         print("    python SOURCE_CODE/main.py --mode sr --provider qwen")
@@ -1710,11 +1710,11 @@ def handle_coding_mode(
     print("  CODING MODE")
     print("=" * 60)
     print(f"  {COLOURS['Builder']}1. Builder {RESET} "
-          f"??pipeline: build ??review ??test ??output/coding/")
+          f" - pipeline: build  - review  - test  - output/coding/")
     print(f"  {COLOURS['Reviewer']}2. Reviewer{RESET} "
-          f"??standalone: review code in input/coding/")
+          f" - standalone: review code in input/coding/")
     print(f"  {COLOURS['Tester']}3. Tester  {RESET} "
-          f"??standalone: test code in input/coding/")
+          f" - standalone: test code in input/coding/")
     print("  0. Back to menu")
     print("=" * 60)
 
@@ -1730,7 +1730,7 @@ def handle_coding_mode(
 
     sub_mode_map = {"1": "Builder", "2": "Reviewer", "3": "Tester"}
     if choice not in sub_mode_map:
-        print("Invalid choice ??returning to menu.")
+        print("Invalid choice  - returning to menu.")
         return
 
     sub_mode = sub_mode_map[choice]
@@ -1747,7 +1747,7 @@ def handle_coding_mode(
         except (EOFError, KeyboardInterrupt):
             break
         if line.strip() == "":
-            print("\n  ??Instructions received ??starting processing...\n")
+            print("\n   - Instructions received  - starting processing...\n")
             break
         if not line.strip().startswith(">"):
             line = "> " + line.strip()
@@ -1760,10 +1760,10 @@ def handle_coding_mode(
         print(f"\n{colour}[{sub_mode.upper()}]{RESET} "
               f"Direct instructions captured ({len(direct_instructions)}):")
         for instr in direct_instructions:
-            print(f"  ??{instr}")
+            print(f"   - {instr}")
     else:
         print(f"\n{colour}[{sub_mode.upper()}]{RESET} "
-              "No direct instructions found ??using docs/coding/ guidelines only.")
+              "No direct instructions found  - using docs/coding/ guidelines only.")
 
     auto_load_input_files("coding")
     print()
@@ -1815,8 +1815,8 @@ def handle_appraisal_mode(
     print("=" * 60)
     print("  Place article(s) in input/appraisal/ before starting.")
     print("  Supported formats: PDF, DOCX, MD, TXT")
-    print("  Output  ??output/appraisal/")
-    print("  Reports ??reports/appraisal/")
+    print("  Output   - output/appraisal/")
+    print("  Reports  - reports/appraisal/")
     print("=" * 60)
 
     lines: list[str] = []
@@ -1858,7 +1858,7 @@ def handle_search_mode(provider: str, model: str, sub_mode: str = None) -> None:
     
     if sub_mode:
         sub = sub_mode
-        print(f"  ??Using sub-mode: {sub}")
+        print(f"   - Using sub-mode: {sub}")
     elif is_cloud:
         # Cloud environment - use default
         print("  ?嚙踝蕭?  Cloud environment detected. Defaulting to Topic Search (1).")
@@ -1888,7 +1888,7 @@ def handle_search_mode(provider: str, model: str, sub_mode: str = None) -> None:
         except (EOFError, KeyboardInterrupt):
             break
         if line.strip() == "":
-            print("\n  Instructions received ??starting search...\n")
+            print("\n  Instructions received  - starting search...\n")
             break
         if not line.strip().startswith(">"):
             line = "> " + line.strip()
@@ -1952,8 +1952,8 @@ def handle_writing_mode(
     print("\n" + "=" * 60)
     print("  WRITING MODE")
     print("=" * 60)
-    print("  1. Topic Track    ??editorial / opinion (newspaper style)")
-    print("  2. Article Track  ??medical journal article")
+    print("  1. Topic Track     - editorial / opinion (newspaper style)")
+    print("  2. Article Track   - medical journal article")
     print("  0. Back to menu")
     print("=" * 60)
     try:
@@ -1969,15 +1969,15 @@ def handle_writing_mode(
     elif track_choice == "2":
         track = TRACK_ARTICLE
     else:
-        print("Invalid choice ??returning to menu.")
+        print("Invalid choice  - returning to menu.")
         return
 
     # ?嚙?嚙?Sub-mode selection ?嚙?嚙?嚙?嚙?嚙?嚙?嚙?嚙?嚙?嚙?嚙?嚙?嚙?嚙?嚙?嚙?嚙?嚙?嚙?嚙?嚙?嚙?嚙?嚙?嚙?嚙?嚙?嚙?嚙?嚙?嚙?嚙?嚙?嚙?嚙?嚙?嚙?嚙?嚙?
     print(f"\n  Track: {track.upper()}")
     print("  " + "-" * 40)
-    print("  1. Writer  ??full pipeline: Writer -> Editor -> QA")
-    print("  2. Editor  ??standalone: edit documents in input/writing/")
-    print("  3. QA      ??standalone: review documents in input/writing/")
+    print("  1. Writer   - full pipeline: Writer -> Editor -> QA")
+    print("  2. Editor   - standalone: edit documents in input/writing/")
+    print("  3. QA       - standalone: review documents in input/writing/")
     print("  0. Back")
     try:
         sub_choice = input("Select sub-mode [0-3]: ").strip()
@@ -1989,7 +1989,7 @@ def handle_writing_mode(
         return
     sub_mode_map = {"1": "Writer", "2": "Editor", "3": "QA"}
     if sub_choice not in sub_mode_map:
-        print("Invalid choice ??returning to menu.")
+        print("Invalid choice  - returning to menu.")
         return
     sub_mode = sub_mode_map[sub_choice]
 

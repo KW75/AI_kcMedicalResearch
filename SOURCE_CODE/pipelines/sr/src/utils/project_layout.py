@@ -1,21 +1,21 @@
-# SOURCE_CODE/pipelines/sr/src/utils/project_layout.py
+﻿# SOURCE_CODE/pipelines/sr/src/utils/project_layout.py
 """
 project_layout.py
 -----------------
 Single source of truth for all runtime paths used by the SR pipeline.
 
 Directory contract
-──────────────────
-input\sr\                          ← user drops PDFs + PICO here
-output\sr\figures\                 ← mirror: latest forest plot
-output\sr\reports\                 ← mirror: latest DOCX / HTML
+??????????????????
+input\sr\                           - user drops PDFs + PICO here
+output\sr\figures\                  - mirror: latest forest plot
+output\sr\reports\                  - mirror: latest DOCX / HTML
 reports\sr\<RUN_ID>\
-    uploads\                       ← copy of every input PDF
-    data\screened\                 ← screening_log.csv
-    data\extracted\                ← extracted_data.csv, rob2_assessment.csv
-    data\results\                  ← meta_analysis_results.csv
-    output\figures\                ← forest plot (primary copy)
-    output\reports\                ← DOCX, HTML (primary copy)
+    uploads\                        - copy of every input PDF
+    data\screened\                  - screening_log.csv
+    data\extracted\                 - extracted_data.csv, rob2_assessment.csv
+    data\results\                   - meta_analysis_results.csv
+    output\figures\                 - forest plot (primary copy)
+    output\reports\                 - DOCX, HTML (primary copy)
 """
 
 import os
@@ -23,20 +23,20 @@ import shutil
 from datetime import datetime
 from pathlib import Path
 
-# ── Root ──────────────────────────────────────────────────────────────────────
+# ?? Root ??????????????????????????????????????????????????????????????????????
 # Determine project root dynamically
 _current_file = Path(__file__).resolve()
 PROJECT_ROOT = _current_file.parent.parent.parent.parent.parent  # Go up to project root
 
-# ── Input (read-only by pipeline) ─────────────────────────────────────────────
+# ?? Input (read-only by pipeline) ?????????????????????????????????????????????
 INPUT_SR        = PROJECT_ROOT / "input" / "sr"
 
-# ── Mirror output (always reflects latest run) ────────────────────────────────
+# ?? Mirror output (always reflects latest run) ????????????????????????????????
 OUTPUT_SR       = PROJECT_ROOT / "output" / "sr"
 OUTPUT_FIGURES  = OUTPUT_SR / "figures"
 OUTPUT_REPORTS  = OUTPUT_SR / "reports"
 
-# ── Legacy sr\data paths (kept for backward compat during transition) ─────────
+# ?? Legacy sr\data paths (kept for backward compat during transition) ?????????
 # Note: These are now inside SOURCE_CODE/pipelines/sr/
 SR_DIR = _current_file.parent.parent.parent  # Go up to sr directory
 LEGACY_UPLOADS  = SR_DIR / "data" / "uploads"
@@ -63,7 +63,7 @@ class SRProjectLayout:
         self.run_id     = run_id or make_run_id()
         self.project    = PROJECT_ROOT / "reports" / "sr" / self.run_id
 
-        # ── Sub-paths ─────────────────────────────────────────────────────────
+        # ?? Sub-paths ?????????????????????????????????????????????????????????
         self.uploads        = self.project / "uploads"
         self.screened       = self.project / "data" / "screened"
         self.extracted      = self.project / "data" / "extracted"
@@ -71,7 +71,7 @@ class SRProjectLayout:
         self.figures        = self.project / "output" / "figures"
         self.reports        = self.project / "output" / "reports"
 
-        # ── Audit CSV paths ───────────────────────────────────────────────────
+        # ?? Audit CSV paths ???????????????????????????????????????????????????
         self.screens_csv    = self.screened  / "screening_log.csv"
         self.extracted_csv  = self.extracted / "extracted_data.csv"
         self.rob2_csv       = self.extracted / "rob2_assessment.csv"

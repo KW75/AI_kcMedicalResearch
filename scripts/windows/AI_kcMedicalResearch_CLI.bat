@@ -1,195 +1,96 @@
 @echo off
 :: =============================================================================
 ::  AI_kcMedicalResearch_CLI.bat
-::  v2.3.0  |  Global / Shared CLI Launcher  |  Updated for SOURCE_CODE
+::  v2.3.2  |  Global / Shared CLI Launcher  |  Uses launcher.py
 :: =============================================================================
 setlocal EnableDelayedExpansion
 
-:: ─────────────────────────────────────────────────────────────────────────────
-::  0.  RESOLVE PROJECT ROOT
-:: ─────────────────────────────────────────────────────────────────────────────
-set "PROJECT_DIR=%~dp0.."
-if "!PROJECT_DIR:~-1!"=="\" set "PROJECT_DIR=!PROJECT_DIR:~0,-1!"
-title AI kcMedical Research  ^|  CLI  ^|  %PROJECT_DIR%
-cd /d "%PROJECT_DIR%"
+:: --- 0. RESOLVE PROJECT ROOT -------------------------------------------------
+set "SCRIPT_DIR=%~dp0"
+if "!SCRIPT_DIR:~-1!"=="\" set "SCRIPT_DIR=!SCRIPT_DIR:~0,-1!"
+set "PROJECT_DIR=!SCRIPT_DIR!\..\.."
+pushd "!PROJECT_DIR!" 2>nul
+if errorlevel 1 (
+    echo ERROR: Cannot find project root.
+    pause & exit /b 1
+)
+set "PROJECT_DIR=%CD%"
+popd
 
-:: ─────────────────────────────────────────────────────────────────────────────
-::  1.  HEADER
-:: ─────────────────────────────────────────────────────────────────────────────
-call :print_header "CLI Launcher"
+title AI kcMedical Research - CLI - !PROJECT_DIR!
+cd /d "!PROJECT_DIR!"
 
-:: ─────────────────────────────────────────────────────────────────────────────
-::  2.  DETECT / SET CLI_THEME  (persisted per-user, no admin needed)
-:: ─────────────────────────────────────────────────────────────────────────────
-call :detect_theme
+call :print_header
 
-:: ─────────────────────────────────────────────────────────────────────────────
-::  3.  LOCATE PYTHON  (.venv first, then system PATH)
-:: ─────────────────────────────────────────────────────────────────────────────
-call :locate_python
-if !errorlevel! neq 0 ( pause & exit /b 1 )
-
-:: ─────────────────────────────────────────────────────────────────────────────
-::  4.  FIRST-RUN SETUP  (only when .venv is missing)
-:: ─────────────────────────────────────────────────────────────────────────────
-if "!HAVE_VENV!"=="0" (
-    call :first_run_setup
+:: --- 1. CHECK / CREATE .venv ------------------------------------------------
+if not exist "!PROJECT_DIR!\.venv\Scripts\python.exe" (
+    echo   [SETUP] .venv not found. Creating virtual environment...
+    echo.
+    python -m venv .venv
     if !errorlevel! neq 0 (
-        call :box_error "Setup failed — see messages above."
+        call :box_error "Failed to create .venv. Ensure Python 3.10+ is installed."
         pause & exit /b 1
     )
-    set "PYTHON_EXE=%PROJECT_DIR%\.venv\Scripts\python.exe"
-)
-
-:: ─────────────────────────────────────────────────────────────────────────────
-::  5.  ENSURE colorama  (silent, one-liner)
-:: ─────────────────────────────────────────────────────────────────────────────
-"!PYTHON_EXE!" -c "import colorama" >nul 2>&1
-if !errorlevel! neq 0 (
-    echo   [setup] Installing colorama...
-    "!PROJECT_DIR!\.venv\Scripts\pip.exe" install colorama --quiet
-)
-
-:: ─────────────────────────────────────────────────────────────────────────────
-::  6.  LAUNCH INFO + PYTHON LAUNCHER
-:: ─────────────────────────────────────────────────────────────────────────────
-echo.
-echo   ============================================================
-echo    Theme    : !CLI_THEME!
-echo    Python   : !PYTHON_EXE!
-echo    venv     : %PROJECT_DIR%\.venv
-echo   ------------------------------------------------------------
-echo    TIP: Select option 8 in the menu to launch Pipeline UI
-echo    TIP: Alt+Tab switches between the CLI and browser
-echo   ============================================================
-echo.
-
-"!PYTHON_EXE!" "%PROJECT_DIR%\scripts\launcher.py"
-set "EXIT_CODE=!errorlevel!"
-
-:: ─────────────────────────────────────────────────────────────────────────────
-::  7.  EXIT
-:: ─────────────────────────────────────────────────────────────────────────────
-if !EXIT_CODE! neq 0 (
+    echo   [SETUP] .venv created OK.
+    echo   [SETUP] Installing dependencies...
     echo.
-    call :box_error "Launcher exited with code !EXIT_CODE! — check logs above."
-    pause
+    "!PROJECT_DIR!\.venv\Scripts\pip.exe" install -r requirements.txt --quiet
+    if !errorlevel! neq 0 (
+        call :box_error "Failed to install dependencies. Check internet connection."
+        pause & exit /b 1
+    )
+    echo   [SETUP] Dependencies installed OK.
+    echo.
+    echo   ============================================================
+    echo    SETUP COMPLETE! You can now run the CLI.
+    echo   ============================================================
+    echo.
 )
-exit /b !EXIT_CODE!
+
+:: --- 2. GUARD: launcher.py present? -----------------------------------------
+if not exist "!PROJECT_DIR!\scripts\launcher.py" (
+    call :box_error "launcher.py not found at scripts\launcher.py"
+    echo   Current directory: !PROJECT_DIR!
+    echo   Expected: !PROJECT_DIR!\scripts\launcher.py
+    pause & exit /b 1
+)
+
+:: --- 3. LAUNCH INFO ----------------------------------------------------------
+echo   ------------------------------------------------------------
+echo    Launching CLI
+echo    Using   : launcher.py
+echo   ------------------------------------------------------------
+echo.
+
+:: --- 4. START LAUNCHER -------------------------------------------------------
+set "LAUNCHER=!PROJECT_DIR!\scripts\launcher.py"
+set "PY=!PROJECT_DIR!\.venv\Scripts\python.exe"
+
+"!PY!" "!LAUNCHER!" %*
+
+:: --- 5. DONE -----------------------------------------------------------------
+echo.
+echo   CLI session ended.
+echo.
+pause
+exit /b 0
 
 
 :: =============================================================================
-::  S U B R O U T I N E S   (shared — identical in both .bat files)
+::  SUBROUTINES
 :: =============================================================================
 
-:print_header  <subtitle>
+:print_header
 echo.
 echo   ============================================================
-echo    AI kcMedical Research   ^|  %~1  ^|  v2.3.0
+echo    AI kcMedical Research  ^|  CLI  ^|  v2.3.2
 echo   ============================================================
-echo    Project : %PROJECT_DIR%
-echo   ============================================================
-echo.
-goto :eof
-
-
-:detect_theme
-for /f "tokens=2*" %%A in (
-    'reg query "HKCU\Environment" /v CLI_THEME 2^>nul'
-) do set "CLI_THEME_STORED=%%B"
-
-if defined CLI_THEME_STORED (
-    set "CLI_THEME=!CLI_THEME_STORED!"
-    goto :eof
-)
-
-echo.
-echo   ============================================================
-echo    FIRST-TIME THEME SETUP
-echo   ============================================================
-echo.
-echo    What is the background colour of YOUR terminal window?
-echo.
-echo      D  =  Dark background   (black / dark grey — most common)
-echo      L  =  Light background  (white / light grey CMD window)
-echo.
-echo    You will only be asked this ONCE.  To change later, run:
-echo      setx CLI_THEME dark    (or light)
-echo.
-set /p "THEME_CHOICE=   Enter D or L  [press Enter for Dark]:  "
-
-if /i "!THEME_CHOICE!"=="L" ( set "CLI_THEME=light" ) else ( set "CLI_THEME=dark" )
-
-setx CLI_THEME "!CLI_THEME!" >nul
-echo.
-echo   [theme] CLI_THEME=!CLI_THEME! saved to your user account.
-echo.
-goto :eof
-
-
-:locate_python
-set "VENV_PYTHON=%PROJECT_DIR%\.venv\Scripts\python.exe"
-
-if exist "%VENV_PYTHON%" (
-    set "PYTHON_EXE=%VENV_PYTHON%"
-    set "HAVE_VENV=1"
-    goto :eof
-)
-
-set "HAVE_VENV=0"
-where python >nul 2>&1
-if !errorlevel! neq 0 (
-    call :box_error "Python not found.  Install Python 3.11+ from python.org"
-    exit /b 1
-)
-for /f "delims=" %%P in ('where python') do (
-    set "PYTHON_EXE=%%P"
-    goto :locate_python_done
-)
-:locate_python_done
-goto :eof
-
-
-:first_run_setup
-echo.
-echo   ============================================================
-echo    FIRST-RUN SETUP  (this only happens once per machine)
-echo   ============================================================
-echo.
-
-if not exist "%PROJECT_DIR%\requirements.txt" (
-    call :box_error "requirements.txt not found in %PROJECT_DIR%"
-    exit /b 1
-)
-
-echo   [1/3]  Creating virtual environment...
-"!PYTHON_EXE!" -m venv "%PROJECT_DIR%\.venv"
-if !errorlevel! neq 0 ( call :box_error "Failed to create .venv" & exit /b 1 )
-echo          Done.
-echo.
-
-echo   [2/3]  Upgrading pip...
-"%PROJECT_DIR%\.venv\Scripts\pip.exe" install --upgrade pip --quiet
-echo          Done.
-echo.
-
-echo   [3/3]  Installing requirements.txt  (may take a few minutes)...
-echo.
-"%PROJECT_DIR%\.venv\Scripts\pip.exe" install -r "%PROJECT_DIR%\requirements.txt"
-if !errorlevel! neq 0 (
-    call :box_error "pip install failed — check internet connection."
-    exit /b 1
-)
-
-echo.
-echo   ============================================================
-echo    Setup complete!  Launching AI kcMedical Research...
+echo    Project : !PROJECT_DIR!
 echo   ============================================================
 echo.
 goto :eof
 
-
-:box_error  <message>
+:box_error
 echo.
 echo   ************************************************************
 echo    ERROR: %~1

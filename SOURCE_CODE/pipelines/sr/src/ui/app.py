@@ -1,6 +1,6 @@
-# SOURCE_CODE/pipelines/sr/src/ui/app.py
+﻿# SOURCE_CODE/pipelines/sr/src/ui/app.py
 """
-sr/src/ui/app.py — Streamlit UI for the SR Automation Pipeline.
+sr/src/ui/app.py  - Streamlit UI for the SR Automation Pipeline.
 
 Run with:
     streamlit run SOURCE_CODE/pipelines/sr/src/ui/app.py
@@ -33,25 +33,25 @@ if str(PROJECT_ROOT) not in sys.path:
 # Page config
 # ---------------------------------------------------------------------------
 st.set_page_config(
-    page_title="AI kcMedical — SR Pipeline",
-    page_icon="🔬",
+    page_title="AI kcMedical  - SR Pipeline",
+    page_icon="?",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
 # ---------------------------------------------------------------------------
-# Sidebar — navigation
+# Sidebar  - navigation
 # ---------------------------------------------------------------------------
-st.sidebar.title("🔬 SR Pipeline")
+st.sidebar.title("? SR Pipeline")
 st.sidebar.markdown("**AI kcMedical Research v2.3.0**")
 st.sidebar.markdown("---")
 
 PAGES = [
-    "📋  Configure",
-    "📂  Upload PDFs",
-    "▶️  Run Pipeline",
-    "📊  Results",
-    "📄  Reports",
+    " -   Configure",
+    " -   Upload PDFs",
+    "?塚?  Run Pipeline",
+    " -   Results",
+    " -   Reports",
 ]
 page = st.sidebar.radio("Navigation", PAGES, label_visibility="collapsed")
 
@@ -68,7 +68,7 @@ st.sidebar.markdown("""
 """)
 st.sidebar.markdown("---")
 st.sidebar.markdown(
-    "📖 Full guide: open `SOURCE_CODE/docs/flashcard-help.html`",
+    " -  Full guide: open `SOURCE_CODE/docs/flashcard-help.html`",
     unsafe_allow_html=True,
 )
 
@@ -97,17 +97,17 @@ def _csv_table(path: Path, label: str) -> None:
     """Display a CSV file as a styled dataframe if it exists."""
     if path.exists():
         df = pd.read_csv(path)
-        st.markdown(f"**{label}** — {len(df)} rows")
+        st.markdown(f"**{label}**  - {len(df)} rows")
         st.dataframe(df, use_container_width=True)
     else:
         st.info(f"{label}: not yet generated.")
 
 
 # ---------------------------------------------------------------------------
-# PAGE 1 — Configure
+# PAGE 1  - Configure
 # ---------------------------------------------------------------------------
-if page == "📋  Configure":
-    st.title("📋 Configure SR Pipeline")
+if page == " -   Configure":
+    st.title(" -  Configure SR Pipeline")
     st.markdown(
         "Edit your PRISMA criteria below. Changes are saved to "
         "`SOURCE_CODE/pipelines/sr/config/prisma_criteria.yaml`."
@@ -158,7 +158,7 @@ if page == "📋  Configure":
             label_visibility="collapsed",
         )
 
-        submitted = st.form_submit_button("💾 Save Configuration", type="primary")
+        submitted = st.form_submit_button("? Save Configuration", type="primary")
 
     if submitted:
         new_cfg = {
@@ -183,14 +183,14 @@ if page == "📋  Configure":
             ],
         }
         _save_config(new_cfg)
-        st.success("✅ Configuration saved to SOURCE_CODE/pipelines/sr/config/prisma_criteria.yaml")
+        st.success(" - Configuration saved to SOURCE_CODE/pipelines/sr/config/prisma_criteria.yaml")
 
 
 # ---------------------------------------------------------------------------
-# PAGE 2 — Upload PDFs
+# PAGE 2  - Upload PDFs
 # ---------------------------------------------------------------------------
-elif page == "📂  Upload PDFs":
-    st.title("📂 Upload PDF Articles")
+elif page == " -   Upload PDFs":
+    st.title(" -  Upload PDF Articles")
     st.markdown(
         "Upload PDF files to `input/sr/`. "
         "These will be processed by the pipeline."
@@ -212,7 +212,7 @@ elif page == "📂  Upload PDFs":
             dest = upload_dir / uf.name
             dest.write_bytes(uf.read())
             saved.append(uf.name)
-        st.success(f"✅ Saved {len(saved)} file(s) to `input/sr/`")
+        st.success(f" - Saved {len(saved)} file(s) to `input/sr/`")
         for name in saved:
             st.markdown(f"- {name}")
 
@@ -223,11 +223,11 @@ elif page == "📂  Upload PDFs":
         for f in existing:
             col1, col2, col3 = st.columns([4, 1, 1])
             with col1:
-                st.markdown(f"📄 {f.name}")
+                st.markdown(f" -  {f.name}")
             with col2:
                 st.markdown(f"`{f.stat().st_size // 1024} KB`")
             with col3:
-                if st.button("🗑️", key=f"del_{f.name}", help=f"Delete {f.name}"):
+                if st.button(" - 儭?, key=f"del_{f.name}", help=f"Delete {f.name}"):
                     f.unlink()
                     st.rerun()
         st.markdown(f"**Total: {len(existing)} PDF(s)**")
@@ -236,10 +236,10 @@ elif page == "📂  Upload PDFs":
 
 
 # ---------------------------------------------------------------------------
-# PAGE 3 — Run Pipeline
+# PAGE 3  - Run Pipeline
 # ---------------------------------------------------------------------------
-elif page == "▶️  Run Pipeline":
-    st.title("▶️ Run SR Pipeline")
+elif page == "?塚?  Run Pipeline":
+    st.title("?塚? Run SR Pipeline")
 
     cfg = _load_config()
     upload_dir = PROJECT_ROOT / "input" / "sr"
@@ -250,19 +250,19 @@ elif page == "▶️  Run Pipeline":
     col1, col2, col3 = st.columns(3)
     with col1:
         if cfg.get("review_title"):
-            st.success("✅ Review title set")
+            st.success(" - Review title set")
         else:
-            st.error("❌ Review title missing")
+            st.error(" - Review title missing")
     with col2:
         if pdf_count > 0:
-            st.success(f"✅ {pdf_count} PDF(s) uploaded")
+            st.success(f" - {pdf_count} PDF(s) uploaded")
         else:
-            st.error("❌ No PDFs uploaded")
+            st.error(" - No PDFs uploaded")
     with col3:
         if cfg.get("effect_measure"):
-            st.success(f"✅ Effect measure: {cfg.get('effect_measure')}")
+            st.success(f" - Effect measure: {cfg.get('effect_measure')}")
         else:
-            st.warning("⚠️ Effect measure not set")
+            st.warning("?? Effect measure not set")
 
     st.markdown("---")
 
@@ -284,18 +284,18 @@ elif page == "▶️  Run Pipeline":
     model = st.selectbox("AI model", MODEL_OPTIONS[provider])
     if provider == "anthropic":
         st.warning(
-            "⚠️ Anthropic may be geo-restricted in your region. "
+            "?? Anthropic may be geo-restricted in your region. "
             "Qwen or Groq are recommended alternatives."
         )
     else:
         st.info(
-            "ℹ️ PDF pages are converted to images for processing. "
-            "Qwen (qwen3.7-plus) is recommended — fast, capable, and geo-unrestricted."
+            "?對? PDF pages are converted to images for processing. "
+            "Qwen (qwen3.7-plus) is recommended  - fast, capable, and geo-unrestricted."
         )
 
     effect_override = st.selectbox(
         "Override effect measure (optional)",
-        ["— use config —", "OR", "RR", "MD", "SMD"],
+        [" - use config  - , "OR", "RR", "MD", "SMD"],
         label_visibility="visible",
     )
 
@@ -306,13 +306,13 @@ elif page == "▶️  Run Pipeline":
         st.warning("Complete the pre-flight checks before running.")
 
     if st.button(
-        "🚀 Run Full Pipeline",
+        " -  Run Full Pipeline",
         type="primary",
         disabled=not ready,
     ):
         em = (
             effect_override
-            if effect_override != "— use config —"
+            if effect_override != " - use config  - 
             else cfg.get("effect_measure", "OR")
         )
 
@@ -362,7 +362,7 @@ elif page == "▶️  Run Pipeline":
                 )
             ]
             if not included:
-                st.error("❌ No studies included after screening. Pipeline stopped.")
+                st.error(" - No studies included after screening. Pipeline stopped.")
                 st.stop()
 
             progress.progress(45, text="Stage 3: Extracting data...")
@@ -412,7 +412,7 @@ elif page == "▶️  Run Pipeline":
                     logs.append(f"  Skip study: {exc}")
 
             if len(rows) < 2:
-                st.error("❌ Fewer than 2 studies with usable data. Cannot run meta-analysis.")
+                st.error(" - Fewer than 2 studies with usable data. Cannot run meta-analysis.")
                 st.stop()
 
             ma = MetaAnalyzer().run(
@@ -456,27 +456,27 @@ elif page == "▶️  Run Pipeline":
                 also_save_html=True,
             )
 
-            progress.progress(100, text="✅ Pipeline complete!")
+            progress.progress(100, text=" - Pipeline complete!")
             st.success(
-                f"✅ Pipeline complete! "
+                f" - Pipeline complete! "
                 f"{len(included)}/{len(recs)} studies included. "
                 f"Pooled {em} = {ma['pooled_effect']:.3f} "
                 f"[{ma['ci_lower']:.3f}, {ma['ci_upper']:.3f}], "
-                f"I² = {ma['I2']:.1f}%"
+                f"I簡 = {ma['I2']:.1f}%"
             )
             st.balloons()
 
         except Exception as exc:
-            st.error(f"❌ Pipeline error: {exc}")
+            st.error(f" - Pipeline error: {exc}")
         finally:
             logging.getLogger("sr").removeHandler(handler)
 
 
 # ---------------------------------------------------------------------------
-# PAGE 4 — Results
+# PAGE 4  - Results
 # ---------------------------------------------------------------------------
-elif page == "📊  Results":
-    st.title("📊 Results")
+elif page == " -   Results":
+    st.title(" -  Results")
 
     tab1, tab2, tab3, tab4 = st.tabs([
         "Screening Log", "Extracted Data", "RoB 2.0", "Meta-Analysis"
@@ -514,10 +514,10 @@ elif page == "📊  Results":
 
 
 # ---------------------------------------------------------------------------
-# PAGE 5 — Reports
+# PAGE 5  - Reports
 # ---------------------------------------------------------------------------
-elif page == "📄  Reports":
-    st.title("📄 Reports")
+elif page == " -   Reports":
+    st.title(" -  Reports")
 
     reports_dir = PROJECT_ROOT / "reports" / "sr"
 
@@ -526,7 +526,7 @@ elif page == "📄  Reports":
     if docx_path.exists():
         with open(docx_path, "rb") as f:
             st.download_button(
-                label="⬇️ Download DOCX report",
+                label="漎? Download DOCX report",
                 data=f,
                 file_name="systematic_review.docx",
                 mime="application/vnd.openxmlformats-officedocument"
@@ -546,7 +546,7 @@ elif page == "📄  Reports":
         st.components.v1.html(html_content, height=800, scrolling=True)
         with open(html_path, "rb") as f:
             st.download_button(
-                label="⬇️ Download HTML report",
+                label="漎? Download HTML report",
                 data=f,
                 file_name="systematic_review.html",
                 mime="text/html",
@@ -559,7 +559,7 @@ elif page == "📄  Reports":
     if pdf_path.exists():
         with open(pdf_path, "rb") as f:
             st.download_button(
-                label="⬇️ Download PDF report",
+                label="漎? Download PDF report",
                 data=f,
                 file_name="systematic_review.pdf",
                 mime="application/pdf",

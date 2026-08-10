@@ -1,4 +1,4 @@
-# SOURCE_CODE/pipelines/sr/src/extraction/data_extractor.py
+﻿# SOURCE_CODE/pipelines/sr/src/extraction/data_extractor.py
 import json, logging, os, time
 import base64
 import io
@@ -73,13 +73,13 @@ class DataExtractor:
         vision_providers = ["qwen", "openai", "anthropic", "groq"]
         if self.provider not in vision_providers:
             raise ValueError(
-                f"❌ Provider '{self.provider}' does NOT support vision API.\n"
+                f" - Provider '{self.provider}' does NOT support vision API.\n"
                 "The SR pipeline requires vision-based extraction (images of PDF pages).\n\n"
                 "Supported providers for SR mode:\n"
-                "  • qwen     (recommended) - Qwen vision model\n"
-                "  • openai   - GPT-4 vision\n"
-                "  • anthropic - Claude vision\n"
-                "  • groq     - Vision models available\n\n"
+                "   - qwen     (recommended) - Qwen vision model\n"
+                "   - openai   - GPT-4 vision\n"
+                "   - anthropic - Claude vision\n"
+                "   - groq     - Vision models available\n\n"
                 "Please use one of the supported providers:\n"
                 "  python src/main.py --mode sr --provider qwen"
             )
@@ -353,7 +353,7 @@ class DataExtractor:
         # --- Vision support check ---
         if self.provider not in ["qwen", "openai", "anthropic", "groq"]:
             raise RuntimeError(
-                f"❌ Provider '{self.provider}' does NOT support vision API.\n"
+                f" - Provider '{self.provider}' does NOT support vision API.\n"
                 "Please use --provider qwen (recommended), openai, anthropic, or groq."
             )
         

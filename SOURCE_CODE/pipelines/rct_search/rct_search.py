@@ -13,7 +13,7 @@ from typing import Optional
 import random
 
 # Add SOURCE_CODE to path
-PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent.parent.parent
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 SOURCE_CODE_DIR = PROJECT_ROOT / "SOURCE_CODE"
 sys.path.insert(0, str(SOURCE_CODE_DIR))
 
@@ -854,7 +854,7 @@ def run_rct_search_pipeline(
                         elif normalized_score < 1:
                             normalized_score = 1
                         score = normalized_score
-                        print(f"[RCT Search] Normalized score: {original_score} ??{score} for {m.group(3)}")
+                        print(f"[RCT Search] Normalized score: {original_score}  - {score} for {m.group(3)}")
                     
                     ranked.append({
                         "rank": int(m.group(1)),
@@ -885,7 +885,7 @@ def run_rct_search_pipeline(
                             elif normalized_score < 1:
                                 normalized_score = 1
                             score = normalized_score
-                            print(f"[RCT Search] Normalized score: {original_score} ??{score} for {m2.group(3)}")
+                            print(f"[RCT Search] Normalized score: {original_score}  - {score} for {m2.group(3)}")
                         
                         # Find the article in our list to get its source
                         pmid = m2.group(3).strip()

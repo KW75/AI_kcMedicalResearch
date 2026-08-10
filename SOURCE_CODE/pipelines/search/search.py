@@ -3,8 +3,8 @@ src/modes/search.py
 Search mode engine for AI kcMedicalResearch.
 
 Sub-modes:
-  - Topic Search  : DuckDuckGo web search ??LLM synopsis with reference links
-  - Article Search: PubMed search by article type ??LLM summary + comparison
+  - Topic Search  : DuckDuckGo web search  - LLM synopsis with reference links
+  - Article Search: PubMed search by article type  - LLM summary + comparison
 """
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ from pathlib import Path
 from typing import Optional
 
 # Add SOURCE_CODE to path
-PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent.parent.parent
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 SOURCE_CODE_DIR = PROJECT_ROOT / "SOURCE_CODE"
 sys.path.insert(0, str(SOURCE_CODE_DIR))
 
@@ -63,7 +63,7 @@ DISCLOSURE = (
 MAX_RESULTS_TOPIC   = 10
 MAX_RESULTS_ARTICLE = 15
 
-# Models known to be small/slow ??use reduced result counts
+# Models known to be small/slow  - use reduced result counts
 _SMALL_MODELS = {"llama3.2", "llama3.2:latest", "qwen2.5-coder:3b", "qwen2.5-coder:3b:latest", "llama3.1:8b"}
 
 def _result_limits(model: str | None) -> tuple[int, int]:
@@ -105,7 +105,7 @@ class _Spinner:
             print(f"{frames[i % 4]}  {self.message}...", end="", flush=True)
             i += 1
             time.sleep(0.12)
-        print(f"?? {self.message} ??done.      ")
+        print(f" -  {self.message}  - done.      ")
 
     def __enter__(self):
         self._thread.start()
@@ -273,7 +273,7 @@ def _pubmed_fetch_abstracts(
     try:
         r = requests.get(PUBMED_EFETCH, params=params, timeout=30)
         r.raise_for_status()
-        # Split by double newline blocks ??each article separated by blank lines
+        # Split by double newline blocks  - each article separated by blank lines
         blocks = re.split(r"\n{3,}", r.text.strip())
         for i, article in enumerate(articles):
             article["abstract"] = blocks[i].strip() if i < len(blocks) else ""
@@ -285,7 +285,7 @@ def _pubmed_fetch_abstracts(
 # LLM call wrapper
 # ---------------------------------------------------------------------------
 # ---------------------------------------------------------------------------
-# LLM call wrapper  (direct call ??no threading, Ctrl+C works on Windows)
+# LLM call wrapper  (direct call  - no threading, Ctrl+C works on Windows)
 # ---------------------------------------------------------------------------
 def _call_llm(
     system_prompt: str,
@@ -298,13 +298,13 @@ def _call_llm(
     print(f"  / {spinner_message}...", end="", flush=True)
     try:
         result = call_llm_fn(system_prompt=system_prompt, user_prompt=user_prompt)
-        print(f"\r  ?? {spinner_message} ??done.      ")
+        print(f"\r   -  {spinner_message}  - done.      ")
         return result
     except KeyboardInterrupt:
-        print(f"\r  ?? {spinner_message} ??interrupted.")
+        print(f"\r   -  {spinner_message}  - interrupted.")
         raise
     except Exception as exc:
-        print(f"\r  ?? {spinner_message} ??error.")
+        print(f"\r   -  {spinner_message}  - error.")
         return f"[ERROR] {exc}"
 
 
@@ -413,7 +413,7 @@ def _topic_user_prompt(query: str, results: list[dict]) -> str:
         ref_list += f"{i}. [{r['title']}]({r['url']})\n"
     return (
         f"## Search Query\n{query}\n\n"
-        f"## Source Articles (AUTHORITATIVE ??do NOT modify or add to this list)\n"
+        f"## Source Articles (AUTHORITATIVE  - do NOT modify or add to this list)\n"
         f"{ref_list}\n"
         f"## Full Search Results\n{results_text}\n"
         "## Task\n"

@@ -1,5 +1,5 @@
 ﻿"""
-coding.py ??Coding mode engine for AI kcMedicalResearch
+coding.py  - Coding mode engine for AI kcMedicalResearch
 Provides three sub-modes: Builder (pipeline), Reviewer (standalone), Tester (standalone)
 """
 
@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Optional
 
 # Add SOURCE_CODE to path
-PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent.parent.parent
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 SOURCE_CODE_DIR = PROJECT_ROOT / "SOURCE_CODE"
 sys.path.insert(0, str(SOURCE_CODE_DIR))
 
@@ -28,7 +28,7 @@ from utils.rag import RAGUtils
 
 def _project_root() -> Path:
     """Return the project root regardless of where the script is called from."""
-    return Path(__file__).resolve().parent.parent.parent.parent.parent
+    return Path(__file__).resolve().parent.parent.parent.parent
 
 
 def _ts() -> str:
@@ -109,7 +109,7 @@ def _write_file(path: Path, content: str) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Spinner ??visible feedback during LLM calls
+# Spinner  - visible feedback during LLM calls
 # ---------------------------------------------------------------------------
 
 class _Spinner:
@@ -135,7 +135,7 @@ class _Spinner:
             self._stop_event.wait(0.15)
             idx += 1
         # Clear the spinner line
-        sys.stdout.write(f"\r  ?? {self._message} ??done.          \n")
+        sys.stdout.write(f"\r   -  {self._message}  - done.          \n")
         sys.stdout.flush()
 
     def __enter__(self):
@@ -243,7 +243,7 @@ def _build_builder_user_prompt(
         "Return ONLY the complete code for ONE single file. "
         "Do not include explanations, markdown prose, or commentary outside of code comments. "
         "Do not generate multiple files or multiple code blocks. "
-        "Do not write a Python file AND an HTML file ??pick the single best format. "
+        "Do not write a Python file AND an HTML file  - pick the single best format. "
         "Begin your response with the very first line of the file (e.g. <!DOCTYPE html> or import ...). "
         "End your response with the very last line of the file (e.g. </html> or the last closing brace). "
         "Do not add any text after the closing line."
@@ -334,7 +334,7 @@ def _build_tester_user_prompt(
 
 
 # ---------------------------------------------------------------------------
-# LLM call ??thin wrapper with spinner feedback
+# LLM call  - thin wrapper with spinner feedback
 # ---------------------------------------------------------------------------
 
 def _call_llm(
@@ -505,7 +505,7 @@ def _detect_extension(
     signatures rather than just the first 500 chars, because LLMs sometimes
     add preamble text before the actual code.
 
-    Priority order ??most specific signatures checked first.
+    Priority order  - most specific signatures checked first.
     Falls back to .py if nothing matches.
     """
     # Normalise for case-insensitive matching
@@ -542,7 +542,7 @@ def _detect_extension(
                  text_lower):
         return ".sql"
 
-    # ---- TypeScript (check before JS ??TS is a superset) ----
+    # ---- TypeScript (check before JS  - TS is a superset) ----
     if re.search(r":\s*(string|number|boolean|void|any)\b", text) or \
        re.search(r"\binterface\s+\w+", text) or \
        re.search(r"\btype\s+\w+\s*=", text):
@@ -593,7 +593,7 @@ def _detect_extension(
 
 
 # ---------------------------------------------------------------------------
-# BUILDER ??pipeline sub-mode
+# BUILDER  - pipeline sub-mode
 # ---------------------------------------------------------------------------
 
 def run_builder(
@@ -626,7 +626,7 @@ def run_builder(
     if is_scratch:
         subprojects = [("new_app", None, None)]
         if verbose:
-            print("[BUILDER] No input files found ??building new app from scratch.")
+            print("[BUILDER] No input files found  - building new app from scratch.")
     else:
         subprojects = code_files
         if verbose:
@@ -705,7 +705,7 @@ def run_builder(
             else:
                 error_feedback = reviewer_response
                 if verbose:
-                    print(f"  [REVIEWER LOOP] FAILED ??feeding errors back to Builder")
+                    print(f"  [REVIEWER LOOP] FAILED  - feeding errors back to Builder")
 
         # ---- TESTER LOOP ----
         tester_passed_flag = False
@@ -768,7 +768,7 @@ def run_builder(
             else:
                 error_feedback = tester_response
                 if verbose:
-                    print(f"  [TESTER LOOP] FAILED ??feeding errors back to Builder")
+                    print(f"  [TESTER LOOP] FAILED  - feeding errors back to Builder")
 
         # ---- Write final output ----
         fully_passed = reviewer_passed_flag and tester_passed_flag
@@ -786,13 +786,13 @@ def run_builder(
             out_name     = f"BUILDER_{stem}_{ts}_FINAL{ext}"
             summary_name = f"BUILDER_{stem}_{ts}_FINAL_SUMMARY.md"
             if verbose:
-                print(f"\n  [BUILDER] Subproject {stem} PASSED ??writing final output.")
+                print(f"\n  [BUILDER] Subproject {stem} PASSED  - writing final output.")
         else:
             outcome      = "MAXITER_WARNING"
             out_name     = f"BUILDER_{stem}_{ts}_MAXITER_WARNING{ext}"
             summary_name = f"BUILDER_{stem}_{ts}_MAXITER_SUMMARY.md"
             if verbose:
-                print(f"\n  [BUILDER] WARNING: {stem} hit max iterations ??writing best available output.")
+                print(f"\n  [BUILDER] WARNING: {stem} hit max iterations  - writing best available output.")
 
         # Final truncation safety net before writing output
         current_code = _ensure_complete(
@@ -826,7 +826,7 @@ def run_builder(
 
 
 # ---------------------------------------------------------------------------
-# REVIEWER ??standalone sub-mode
+# REVIEWER  - standalone sub-mode
 # ---------------------------------------------------------------------------
 
 def run_reviewer(
@@ -850,7 +850,7 @@ def run_reviewer(
     code_files    = _load_code_files(paths["input"])
 
     if not code_files:
-        print("[REVIEWER] No code files found in input/coding/ ??nothing to review.")
+        print("[REVIEWER] No code files found in input/coding/  - nothing to review.")
         return
 
     if verbose:
@@ -888,7 +888,7 @@ def run_reviewer(
         session_results.append({"stem": stem, "outcome": outcome})
 
         if verbose:
-            print(f"  [REVIEWER] {stem} ??{outcome}")
+            print(f"  [REVIEWER] {stem}  - {outcome}")
 
     session_summary = _build_session_summary("Reviewer", session_results)
     session_name    = f"REVIEWER_SESSION_{ts_session}_SUMMARY.md"
@@ -899,7 +899,7 @@ def run_reviewer(
 
 
 # ---------------------------------------------------------------------------
-# TESTER ??standalone sub-mode
+# TESTER  - standalone sub-mode
 # ---------------------------------------------------------------------------
 
 def run_tester(
@@ -923,7 +923,7 @@ def run_tester(
     code_files    = _load_code_files(paths["input"])
 
     if not code_files:
-        print("[TESTER] No code files found in input/coding/ ??nothing to test.")
+        print("[TESTER] No code files found in input/coding/  - nothing to test.")
         return
 
     if verbose:
@@ -961,7 +961,7 @@ def run_tester(
         session_results.append({"stem": stem, "outcome": outcome})
 
         if verbose:
-            print(f"  [TESTER] {stem} ??{outcome}")
+            print(f"  [TESTER] {stem}  - {outcome}")
 
     session_summary = _build_session_summary("Tester", session_results)
     session_name    = f"TESTER_SESSION_{ts_session}_SUMMARY.md"
@@ -1059,7 +1059,7 @@ def _ensure_complete(
     If the Builder output appears truncated, fire continuation calls
     asking the LLM to complete the file from where it stopped.
     Rule 5 (close the file) is intentionally removed from the continuation
-    prompt ??the LLM must write ONLY the missing middle code; closing tags
+    prompt  - the LLM must write ONLY the missing middle code; closing tags
     are appended by this function after all continuations finish.
     """
     is_html = "<!doctype" in code[:50].lower() or "<html" in code.lower()[:200]
@@ -1080,7 +1080,7 @@ def _ensure_complete(
     for attempt in range(1, max_continuations + 1):
         if not _is_truncated(code):
             break
-        print(f"  [BUILDER] Output truncated ??requesting continuation {attempt}/{max_continuations}...")
+        print(f"  [BUILDER] Output truncated  - requesting continuation {attempt}/{max_continuations}...")
         continuation_prompt = (
             "The previous response was cut off before the file was complete.\n"
             "Continue EXACTLY from where you stopped.\n"
@@ -1088,7 +1088,7 @@ def _ensure_complete(
             "1. Do NOT repeat any code already written.\n"
             "2. Do NOT start from the beginning.\n"
             "3. Do NOT add any explanation or prose.\n"
-            "4. Write ONLY the remaining lines of code needed ??"
+            "4. Write ONLY the remaining lines of code needed  - "
             "do NOT close the file, do NOT add </script>, </body>, or </html>.\n"
             "   Those closing tags will be added automatically after you finish.\n\n"
             f"## File type: {'HTML' if is_html else 'code'}\n\n"
