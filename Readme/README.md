@@ -1,265 +1,424 @@
+markdown
+
 # AI kcMedical Research
 
 A multi-mode AI assistant for medical research, critical appraisal, systematic review, coding, and writing.
-Runs locally via Ollama or via cloud providers (OpenAI, Anthropic, DeepSeek, Groq).
+Runs locally via Ollama or via cloud providers (OpenAI, Anthropic, DeepSeek, Groq, Qwen).
 
-- **Version:** 2.1.0
-- **Tests:** 258 passing, 0 failing, ~87% coverage
-- **Last commit:** 6006d23
+- **Version:** 2.3.0
+- **Tests:** 254 passed, 6 skipped
+- **Last commit:** b82f4d2
 - **GitHub:** https://github.com/KW75/AI_kcMedicalResearch
+- **Live App:** https://ai-kcmedicalresearch.onrender.com
 
 ---
 
 ## Quick Start
 
+### 🚀 One-Click Setup (Recommended for Colleagues)
+
+#### Windows 🪟
+```cmd
+git clone https://github.com/KW75/AI_kcMedicalResearch.git
+cd AI_kcMedicalResearch
+Docker_setup.bat
+# Follow prompts → START WORKING!
+
+macOS 🍎
+bash
+
+git clone https://github.com/KW75/AI_kcMedicalResearch.git
+cd AI_kcMedicalResearch
+chmod +x Mac_*.sh
+./Mac_Setup.sh
+# Follow prompts → START WORKING!
+
+Total time: ~5 minutes. No Python setup required!
+🐳 Docker (Manual)
+bash
+
+# Build image
+docker build -f docker/Dockerfile -t ai-kcmedicalresearch .
+
+# CLI mode
+docker run -it --rm \
+    -v $(pwd)/input:/app/input \
+    -v $(pwd)/output:/app/output \
+    -v $(pwd)/data:/app/data \
+    -v $(pwd)/reports:/app/reports \
+    --env-file .env \
+    --add-host host.docker.internal:host-gateway \
+    ai-kcmedicalresearch \
+    python SOURCE_CODE/main.py
+
+# UI mode
+docker run -it --rm -p 8501:8501 \
+    -v $(pwd)/input:/app/input \
+    -v $(pwd)/output:/app/output \
+    -v $(pwd)/data:/app/data \
+    -v $(pwd)/reports:/app/reports \
+    --env-file .env \
+    --add-host host.docker.internal:host-gateway \
+    ai-kcmedicalresearch \
+    streamlit run SOURCE_CODE/ui/app.py --server.port=8501 --server.address=0.0.0.0
+
+💻 Local Development (Without Docker)
+
 Run all commands from the project root.
+bash
 
-    python src/main.py                            # coding mode (Ollama default)
-    python src/main.py --mode writing             # writing mode
-    python src/main.py --mode writing --report    # single-pass writing report
-    python src/main.py --mode rct_search          # RCT search pipeline
-    python src/main.py --mode search              # PubMed search
-    python src/main.py --mode appraisal           # critical appraisal
-    python src/main.py --mode sr                  # systematic review pipeline
-    python src/main.py --provider anthropic       # use Anthropic instead of Ollama
-    python src/main.py --dry-run                  # test without API calls
-    python src/main.py --help-guide               # open interactive HTML help in browser
+# CLI mode
+python SOURCE_CODE/main.py                            # coding mode (Ollama default)
+python SOURCE_CODE/main.py --mode writing             # writing mode
+python SOURCE_CODE/main.py --mode rct_search          # RCT search pipeline
+python SOURCE_CODE/main.py --mode search              # PubMed search
+python SOURCE_CODE/main.py --mode appraisal           # critical appraisal
+python SOURCE_CODE/main.py --mode sr                  # systematic review pipeline
 
----
+# With options
+python SOURCE_CODE/main.py --provider qwen            # use Qwen instead of Ollama
+python SOURCE_CODE/main.py --model llama3.2           # specify model
+python SOURCE_CODE/main.py --dry-run                  # test without API calls
+python SOURCE_CODE/main.py --help-guide               # open interactive HTML help in browser
 
-## Modes
-
-| Mode | Flag | Roles | Output |
-|------|------|-------|--------|
-| Coding | --mode coding | Builder, Reviewer, Tester | reports/session_*.md + .docx |
-| Coding revise | --mode coding --revise | Builder, Reviewer, Tester | reports/session_*.md + .docx |
-| Writing | --mode writing | Writer, Editor, QA | reports/writing_report_*.md + .docx |
-| Writing report | --mode writing --report | Writer, Editor, QA | reports/writing_report_*.md + .docx |
-| RCT Search | --mode rct_search | Formulator, Searcher, Validator | reports/rct_search_*.md |
-| Search | --mode search | Researcher | reports/search_*.md |
-| Appraisal | --mode appraisal | Appraiser, Methodologist, Summariser | reports/session_*.md + .docx |
-| SR | --mode sr | SR Methodologist | sr/outputs/reports/ |
-
----
-
-## Flags
-
-| Flag | Description |
-|------|-------------|
-| --mode | Select mode: coding, writing, rct_search, search, appraisal, sr |
-| --provider | AI provider: ollama, openai, anthropic, deepseek, groq |
-| --report | Writing mode: single-pass report from docs/writing/ files |
-| --revise | Coding mode: Builder to Reviewer to Tester pipeline |
-| --role | Override the starting role |
-| --dry-run | Run without making real API calls |
-| --help-guide | Open interactive HTML help guide in browser |
-
----
-
-## File-Based Input
+Modes
+Mode	Flag	Roles	Output
+Coding	--mode coding	Builder, Reviewer, Tester	output/coding/ + reports/coding/
+Coding Revise	--mode coding --revise	Builder, Reviewer, Tester	output/coding/ + reports/coding/
+Writing	--mode writing	Writer, Editor, QA	output/writing/ + reports/writing/
+Writing Report	--mode writing --report	Writer, Editor, QA	output/writing/ + reports/writing/
+RCT Search	--mode rct_search	Formulator, Searcher, Validator	output/rct_search/ + reports/rct_search/
+Search	--mode search	Researcher	output/search/ + reports/search/
+Appraisal	--mode appraisal	Appraiser, Methodologist, Summariser	output/appraisal/ + reports/appraisal/
+SR	--mode sr	SR Methodologist	output/sr/ + reports/sr/
+Flags
+Flag	Description
+--mode	Select mode: coding, writing, rct_search, search, appraisal, sr
+--provider	AI provider: ollama, openai, anthropic, deepseek, groq, qwen
+--model	Specify model name (provider-specific)
+--report	Writing mode: single-pass report from input/writing/ files
+--revise	Coding mode: Builder → Reviewer → Tester pipeline
+--role	Override the starting role for coding mode
+--sub	Sub-mode for search: 1=Topic Search, 2=Article Search
+--dry-run	Run without making real API calls
+--help-guide	Open interactive HTML help guide in browser
+--ui	Launch Streamlit UI
+--list-sessions	List all session transcripts
+--list-roles	Show available roles and their docs
+--stats	Show session statistics
+File-Based Input
 
 Avoid interactive prompts by placing input files in the relevant folder before running.
+Input Directories
+Mode	Input Folder	Supported Formats
+Coding	input/coding/	.py, .js, .ts, .html, .css, .java, .c, .cpp, .cs, .rb, .go, .rs, .txt, .md, .php, .swift, .kt, .r, .sh, .sql, .svg
+Writing	input/writing/	.txt, .md, .docx, .pdf
+Appraisal	input/appraisal/	.pdf, .txt, .md, .docx
+RCT Search	input/rct_search/	.txt, .md
+Search	input/search/	.txt, .md
+SR	input/sr/	.pdf
+RCT Search
 
-### RCT Search
 Create docs/rct_search/topic.md with one line — the research topic.
-Example:  Effect of metformin on HbA1c in type 2 diabetes
+Example: Effect of metformin on HbA1c in type 2 diabetes
 If absent, the mode prompts at runtime.
+Search
 
-### Search
 Create docs/search/topic.md with two lines.
-Line 1: paper (find a specific paper) or topic (clinical topic summary).
+Line 1: paper (find a specific paper) or topic (clinical topic summary)
 Line 2: your query.
 If absent, the mode prompts at runtime.
+Appraisal
 
-### Appraisal
-Place article files in uploads/appraisal/
-Supported formats: .txt  .md  .pdf  .docx
+Place article files in input/appraisal/
+Supported formats: .txt, .md, .pdf, .docx
 Files up to 8000 characters are injected directly into the prompt.
 Files over 8000 characters are handled via RAG chunking.
-Multiple files are each labelled and appended in sequence.
-
----
-
-## Docs Folder Structure
+Docs Folder Structure
 
 Guidance files are loaded as context for each mode. Edit to customise AI behaviour.
+text
 
-    docs/
-      appraisal/
-        appraisal-guide.md       <- 7-section structure, per-section word limits, study-type notes
-        scoring-criteria.md      <- RoB 2, CASP, AMSTAR 2, GRADE tables
-      coding/
-        architecture.md
-        coding-standards.md
-        decision-log.md
-        PRD.md
-        test-strategy.md
-      rct_search/
-        database-guide.md
-        pico-framework.md
-        topic.md.example         <- copy to topic.md and edit before running
-        validation-criteria.md
-      search/
-        search-guide.md          <- output format and quality standards
-        topic.md.example         <- copy to topic.md and edit before running
-      writing/
-        editorial-standards.md
-        project-brief.md         <- edit before each writing session
-        qa-checklist.md
-        style-guide.md
+docs/
+├── appraisal/
+│   ├── appraisal-guide.md       ← 7-section structure, per-section word limits
+│   ├── custom-checklist.md      ← Custom appraisal checklist
+│   ├── grade-guidance.md        ← GRADE evidence rating
+│   ├── project-brief.md         ← Appraisal project brief
+│   └── scoring-criteria.md      ← RoB 2, CASP, AMSTAR 2, GRADE tables
+├── coding/
+│   ├── architecture.md
+│   ├── coding-standards.md
+│   ├── decision-log.md
+│   ├── PRD.md
+│   └── test-strategy.md
+├── rct_search/
+│   ├── database-guide.md
+│   ├── pico-framework.md
+│   ├── topic.md.example         ← copy to topic.md and edit
+│   └── validation-criteria.md
+├── search/
+│   ├── article-types.md
+│   ├── search-guide.md
+│   ├── search-prompt.md
+│   └── topic.md.example         ← copy to topic.md and edit
+└── writing/
+    ├── article/                 ← Medical journal article track
+    │   ├── editorial-standards.md
+    │   ├── project-brief.md
+    │   ├── qa-checklist.md
+    │   └── style-guide.md
+    └── topic/                   ← Editorial/opinion track
+        ├── editorial-standards.md
+        ├── project-brief.md
+        ├── qa-checklist.md
+        └── style-guide.md
 
----
-
-## Upload Folders (RAG)
-
-| Mode | Upload folder | Notes |
-|------|--------------|-------|
-| coding | uploads/coding/ | Source files for code review |
-| writing | uploads/writing/ | Reference documents |
-| rct_search | uploads/rct_search/ | Background literature |
-| appraisal | uploads/appraisal/ | Article files to appraise (PDF/txt/md/docx) |
-| sr | sr/data/uploads/ | PDFs for SR pipeline |
-
----
-
-## Providers
-
-| Provider | Flag | Environment variable |
-|----------|------|---------------------|
-| Ollama (local) | --provider ollama | OLLAMA_URL (default: http://localhost:11434) |
-| OpenAI | --provider openai | OPENAI_API_KEY |
-| Anthropic | --provider anthropic | ANTHROPIC_API_KEY |
-| DeepSeek | --provider deepseek | DEEPSEEK_API_KEY |
-| Groq | --provider groq | GROQ_API_KEY |
+Providers
+Provider	Flag	Environment Variable	Notes
+Ollama (local)	--provider ollama	OLLAMA_HOST (default: http://localhost:11434)	Free, no key
+Qwen	--provider qwen	DASHSCOPE_API_KEY	Recommended for SR
+OpenAI	--provider openai	OPENAI_API_KEY	GPT-4 vision
+Anthropic	--provider anthropic	ANTHROPIC_API_KEY	Claude vision
+DeepSeek	--provider deepseek	DEEPSEEK_API_KEY	Cost-efficient
+Groq	--provider groq	GROQ_API_KEY	Fast inference
 
 Set keys in .env at the project root.
+Vision Providers (for SR Pipeline)
+Provider	Vision Support	Notes
+✅ Qwen	Yes	Recommended
+✅ OpenAI	Yes	GPT-4 vision
+✅ Anthropic	Yes	Claude vision
+✅ Groq	Yes	Vision models
+❌ DeepSeek	No	Blocked for SR
+❌ Ollama	No	Blocked for SR
+Environment Variables (.env)
+bash
 
----
+# Local Ollama
+OLLAMA_HOST=http://localhost:11434
+OLLAMA_MODEL=llama3.2
 
-## SR Pipeline
+# Cloud Providers
+GROQ_API_KEY=gsk_...
+DASHSCOPE_API_KEY=sk-...
+DASHSCOPE_BASE_URL=https://ws-uv5pi4kkqbrg1vpe.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1
+DASHSCOPE_ANTHROPIC_URL=https://ws-uv5pi4kkqbrg1vpe.ap-southeast-1.maas.aliyuncs.com/apps/anthropic
 
-    notepad sr\config\prisma_criteria.yaml
-    copy *.pdf sr\data\uploads\
-    python sr\main.py --pdf-dir sr\data\uploads --effect-measure SMD
+# Optional
+OPENAI_API_KEY=sk-...
+ANTHROPIC_API_KEY=sk-ant-...
+DEEPSEEK_API_KEY=sk-...
 
-SR outputs:
-  sr/data/screened/screening_log.csv
-  sr/data/extracted/extracted_data.csv
-  sr/outputs/reports/systematic_review.html
-  sr/outputs/reports/systematic_review.docx
+# RAG
+EMBEDDING_PROVIDER=ollama
+EMBEDDING_MODEL=nomic-embed-text
 
----
+# Theme (auto-detected, override if needed)
+CLI_THEME=dark   # or light
 
-## Word Limits
+SR Pipeline
+bash
 
-| Mode / Section | Limit |
-|----------------|-------|
-| Appraisal full report | 1500 words |
-| Appraisal plain-language summary | 200 words |
-| Search clinical topic report | 1500 words |
-| Writing report | 1500 words |
+# 1. Edit configuration
+notepad SOURCE_CODE/pipelines/sr/config/prisma_criteria.yaml
 
----
+# 2. Place PDFs in input/sr/
+copy *.pdf input/sr/
 
-## AI Roles
+# 3. Run SR pipeline
+python SOURCE_CODE/main.py --mode sr --provider qwen
 
-| Mode | Roles |
-|------|-------|
-| coding | Builder, Reviewer, Tester |
-| writing | Writer, Editor, QA |
-| rct_search | Formulator, Searcher, Validator |
-| search | Researcher |
-| appraisal | Appraiser, Methodologist, Summariser |
-| sr | SR Methodologist |
+# Or use the SR UI
+python SOURCE_CODE/pipelines/sr/src/ui/app.py
 
----
+SR Outputs:
 
-## Environment Variables (.env)
+    output/sr/forest_plot.png - Forest plot
 
-    OLLAMA_URL=http://localhost:11434
-    OLLAMA_MODEL=llama3
-    OPENAI_API_KEY=sk-...
-    OPENAI_MODEL=gpt-4o
-    ANTHROPIC_API_KEY=sk-ant-...
-    ANTHROPIC_MODEL=claude-sonnet-4-6
-    DEEPSEEK_API_KEY=sk-...
-    DEEPSEEK_MODEL=deepseek-chat
-    GROQ_API_KEY=gsk_...
-    GROQ_MODEL=llama-3.3-70b-versatile
-    UPLOAD_DIR=uploads
-    EMBEDDING_PROVIDER=ollama
-    EMBEDDING_MODEL=nomic-embed-text
+    reports/sr/systematic_review.docx - Word report
 
----
+    reports/sr/systematic_review.html - HTML report
 
-## OCR Support (optional — for scanned PDFs)
+    reports/sr/systematic_review.pdf - PDF report (if WeasyPrint installed)
+
+    reports/sr/<run_id>/ - Full audit trail
+
+Multi-Format Document Support
+
+The Writing and Appraisal modes now support multiple document formats:
+Format	Writing	Appraisal	OCR Support
+PDF	✅	✅	✅
+DOCX	✅	✅	❌
+DOC	✅	✅	❌
+TXT/MD	✅	✅	❌
+Images (JPG, PNG, TIFF, BMP)	✅	✅	✅
+Excel (XLS, XLSX)	✅ (text)	✅ (text)	❌
+
+Just place files in the appropriate input/ folder and the app handles everything!
+Project Structure
+text
+
+AI_kcMedicalResearch/
+├── 🪟 WINDOWS SUPPORT
+│   ├── Docker_setup.bat              ⭐ One-click Windows setup
+│   ├── AI_kcMedicalResearch_CLI.bat  🎨 Enhanced CLI launcher
+│   └── AI_kcMedicalResearch_UI.bat   🎨 Enhanced UI launcher
+├── 🍎 MACOS SUPPORT
+│   ├── Mac_Setup.sh                  ⭐ One-click macOS setup
+│   ├── Mac_kcMedicalResearch_CLI.sh  🎨 Enhanced CLI launcher
+│   └── Mac_kcMedicalResearch_UI.sh   🎨 Enhanced UI launcher
+├── 🐳 DOCKER SUPPORT
+│   ├── Dockerfile
+│   ├── docker-compose.yml
+│   ├── docker_run.bat
+│   └── docker_quick_start.bat
+├── 📄 SOURCE_CODE/                   ★ MAIN SOURCE CODE
+│   ├── main.py
+│   ├── pipelines/
+│   │   ├── coding/
+│   │   ├── writing/
+│   │   ├── appraisal/
+│   │   ├── search/
+│   │   ├── rct_search/
+│   │   └── sr/                       ★ SR Pipeline
+│   ├── ui/
+│   │   └── app.py                    ★ Streamlit UI
+│   └── utils/
+│       ├── path_utils.py
+│       ├── document_reader.py        ★ Multi-format reader
+│       └── rag.py
+├── 📝 prompts/                       ★ Prompt templates (15 files)
+├── 📖 Readme/                        ★ Documentation
+│   ├── HANDOFF.md                    ★ Comprehensive handoff
+│   ├── README.md                     ★ This file
+│   ├── Setup_Instructions_for_Users.txt
+│   └── flashcard-help.html           ★ Interactive help guide
+├── 🎨 assets/                        ★ UI assets
+├── 📁 input/                         ★ Input files
+│   ├── coding/
+│   ├── writing/
+│   ├── appraisal/
+│   ├── search/
+│   ├── rct_search/
+│   └── sr/
+├── 📁 output/                        ★ Generated output
+├── 📁 reports/                       ★ Generated reports
+├── 📁 tests/                         ★ All tests
+├── 📁 chroma_db/                     ★ RAG vector database
+├── requirements.txt
+├── render.yaml
+├── .env.template
+└── .env                              ★ API keys (local only)
+
+Running Tests
+bash
+
+# Run all tests
+python -m pytest -v
+
+# Run specific test file
+python -m pytest tests/test_main.py -v
+
+# Run tests with coverage
+python -m pytest --cov=SOURCE_CODE --cov-report=term-missing
+
+# Run live provider tests (requires API keys)
+python tests/test_live_providers.py
+
+Current status: 254 passed, 6 skipped
+Laptop / New Machine Setup
+Windows 🪟
+
+    Install Docker Desktop: https://www.docker.com/products/docker-desktop
+
+    Clone the repository:
+    cmd
+
+    git clone https://github.com/KW75/AI_kcMedicalResearch.git
+    cd AI_kcMedicalResearch
+
+    Double-click Docker_setup.bat
+
+    Follow prompts and start working!
+
+macOS 🍎
+
+    Install Docker Desktop: https://www.docker.com/products/docker-desktop
+
+    Clone the repository:
+    bash
+
+    git clone https://github.com/KW75/AI_kcMedicalResearch.git
+    cd AI_kcMedicalResearch
+
+    Make scripts executable: chmod +x Mac_*.sh
+
+    Run: ./Mac_Setup.sh
+
+    Follow prompts and start working!
+
+No hard-coded drive letters — the project works from any path!
+OCR Support (optional — for scanned PDFs)
 
 Text-based PDFs work automatically via PyMuPDF. For scanned/image PDFs:
 
-1. Install Tesseract binary (Windows): https://github.com/UB-Mannheim/tesseract/wiki
-2. Install Poppler for Windows: https://github.com/oschwartz10612/poppler-windows
-3. Add both bin/ folders to your system PATH
-4. pip install pytesseract pillow pdf2image
-5. OCR fallback activates automatically in src/rag.py when PyMuPDF returns empty text
+    Install Tesseract binary: https://github.com/UB-Mannheim/tesseract/wiki
 
----
+    Install Poppler for Windows: https://github.com/oschwartz10612/poppler-windows
 
-## Project Structure
+    Add both bin/ folders to your system PATH
 
-    AI_kcMedicalResearch/
-      src/
-        main.py              <- entry point, all modes
-        rag.py               <- RAG indexing and retrieval
-      sr/
-        main.py              <- SR pipeline entry point
-        config/
-          prisma_criteria.yaml
-      ai/                    <- role prompt files (*.md)
-      docs/                  <- guidance files per mode (committed)
-      uploads/               <- session working documents (gitignored)
-      reports/               <- all generated reports (gitignored)
-      tests/
-        test_main.py         <- 258 tests
-      .env                   <- API keys (not committed)
-      requirements.txt
-      conftest.py
-      test_live_providers.py <- manual API smoke test
-      AI_kcMedicalResearch_setup.bat  <- first-run setup (create venv, install deps)
-      AI_kcMedicalResearch_run.bat    <- daily launcher (activate, logo, run)
+    Install Python packages: pip install pytesseract pillow pdf2image
 
----
+    OCR fallback activates automatically when PyMuPDF returns empty text
 
-## Running Tests
+Known Issues
+#	Issue	Priority	Root Cause
+1	Lami extraction fails	High	Table 4 not found
+2	WeasyPrint not installed	Medium	PDF output falls back to HTML
+3	Low test coverage	Low	appraisal.py, search.py, writing.py, ui/app.py
+Contributing
 
-    python -m pytest -v
-    python -m pytest --tb=short -q
-    python -m pytest -k appraisal
-    python -m pytest --cov=src --cov-report=term-missing
-    python test_live_providers.py
+    Fork the repository
 
-Current status: 258 tests, 0 failures, ~87% coverage
+    Create a feature branch: git checkout -b feature/your-feature
 
----
+    Make your changes
 
-## Laptop / New Machine Setup
+    Run tests: python -m pytest
 
-1. Unzip AI_kcMedicalResearch.zip to any drive/folder (e.g. C:\AI_kcMedicalResearch)
-2. Double-click AI_kcMedicalResearch_setup.bat  (creates .venv, installs requirements)
-3. Copy your .env file into the project root
-4. Double-click AI_kcMedicalResearch_run.bat to start
+    Commit and push
 
-No hard-coded drive letters — the project works from any path.
+    Create a pull request
 
----
+License
 
-## Known Gaps
+[Your License Here]
 
-| # | Gap | Priority |
-|---|-----|----------|
-| 75 | GitHub Actions CI (pytest on every push) | High |
-| 76 | End-to-end mode testing with real templates | High |
-| 79 | PDF OCR support (pytesseract + Tesseract + Poppler) | Medium |
-| 80 | API key validation on startup | High |
-| 81 | GitHub repo audit (.gitignore, secrets, branch protection) | High |
-| 82 | WeasyPrint native Windows libs for PDF export | Low |
-| 83 | Interactive input() paths fully unit-tested | Low |
+The setup_colleague.bat saga is officially over! 🏆
+text
+
+
+Now let's commit the updated README:
+
+```powershell
+# Stage the updated README
+git add README.md
+
+# Commit
+git commit -m "docs: update README.md for v2.3.0 with cross-platform Docker support
+
+- Added one-click setup instructions for Windows and macOS
+- Updated project structure to reflect SOURCE_CODE/
+- Added Docker commands and documentation
+- Updated provider list with Qwen
+- Added vision provider support table
+- Added multi-format document support section
+- Updated quick start commands
+- Fixed all paths to reflect new structure
+- Added cross-platform support summary"
+
+# Push
+git push origin main
+

@@ -1,35 +1,46 @@
-Updated Setup Instructions File
-powershell
+AI kcMedicalResearch - Setup Instructions for Users
 
-# First, remove the old file (it has a typo)
-rm Setup_Instructon_to_users.txt
+============================================
+Setup
+============================================
 
-# Create the new file with proper name
+Install Docker Desktop:
 
-Setup_Instructions_for_Users.txt (or keep as .md for better formatting):
-markdown
+        Windows: https://www.docker.com/products/docker-desktop
+        macOS: https://www.docker.com/products/docker-desktop
+        Linux: https://docs.docker.com/engine/install/
 
-# AI kcMedicalResearch - Setup Instructions for Users
+Install Local AI (Free, No API Key)
 
-## Quick Start (All Platforms)
+    ✅ Good for security - No internet connection required after initial model download!
 
-### Prerequisites
-1. Install Docker Desktop:
-   - **Windows:** https://www.docker.com/products/docker-desktop
-   - **macOS:** https://www.docker.com/products/docker-desktop
-   - **Linux:** https://docs.docker.com/engine/install/
+    Note: Ollama works for all modes except SR mode, which requires Qwen (or other vision provider) for OCR parsing of PDF images.
 
-------------------------------------------------------------------
-## 🪟 Windows Users
-------------------------------------------------------------------
+    Install Ollama: https://ollama.com/download (See below for details)
 
-### One-Click Setup (Recommended)
-1. Open Command Prompt or PowerShell
-2. Clone the repository:
+        Windows: Download and run the installer
+        macOS: Download and run the installer
+        Linux: curl -fsSL https://ollama.com/install.sh | sh
 
-   ```cmd
-   git clone https://github.com/KW75/AI_kcMedicalResearch.git
-   cd AI_kcMedicalResearch
+    Pull a model (first time only, requires internet):
+    bash
+
+    ollama pull llama3.2
+
+    Ollama will run locally on your machine at http://localhost:11434
+
+    Note: If you prefer cloud providers (Groq, Qwen, OpenAI, etc.), you need to add respective API keys to .env file.
+
+🪟 Windows Users
+One-Click Setup (Recommended)
+
+    Open Command Prompt or PowerShell
+
+    Clone the repository:
+    cmd
+
+    git clone https://github.com/KW75/AI_kcMedicalResearch.git
+    cd AI_kcMedicalResearch
 
     Double-click Docker_setup.bat
 
@@ -44,30 +55,27 @@ markdown
 Quick Launch (After Setup)
 
     CLI Mode: Double-click AI_kcMedicalResearch_CLI.bat
-
     UI Mode: Double-click AI_kcMedicalResearch_UI.bat
 
-------------------------------------------------------------------
 🍎 macOS Users
-------------------------------------------------------------------
+One-Click Setup (Recommended)
 
-### One-Click Setup (Recommended)
+    Open Terminal
 
-1. Open Terminal
-2. Clone the repository:
-
+    Clone the repository:
     bash
+
     git clone https://github.com/KW75/AI_kcMedicalResearch.git
     cd AI_kcMedicalResearch
 
     Make scripts executable (first time only):
-
     bash
+
     chmod +x Mac_*.sh
 
     Run the setup:
-
     bash
+
     ./Mac_Setup.sh
 
     Follow the prompts:
@@ -81,40 +89,74 @@ Quick Launch (After Setup)
 Quick Launch (After Setup)
 
     CLI Mode: ./Mac_kcMedicalResearch_CLI.sh
-
     UI Mode: ./Mac_kcMedicalResearch_UI.sh
 
-------------------------------------------------------------------
-🔧 Configuration
-------------------------------------------------------------------
-***API Keys Setup***
+============================================
+Configuration
+============================================
 
-    After running the setup script, edit the .env file
+🔧 API Keys Setup
 
-    Add your API keys:
+After running the setup script, edit the .env file and add your API keys:
+bash
 
-    GROQ_API_KEY=your_key_here          # Get from: https://console.groq.com
-    DASHSCOPE_API_KEY=your_key_here     # Get from: https://dashscope.aliyuncs.com
-    OPENAI_API_KEY=your_key_here        # Optional: https://platform.openai.com
-    ANTHROPIC_API_KEY=your_key_here     # Optional: https://console.anthropic.com
-    DEEPSEEK_API_KEY=your_key_here      # Optional: https://platform.deepseek.com
+# Local Ollama (free, no API key needed)
+OLLAMA_HOST=http://localhost:11434
+OLLAMA_MODEL=llama3.2
 
+# Cloud Providers (optional - add keys if you want to use them)
+GROQ_API_KEY=your_key_here          # Get from: https://console.groq.com
+DASHSCOPE_API_KEY=your_key_here     # Get from: https://dashscope.aliyuncs.com
+OPENAI_API_KEY=your_key_here        # Optional: https://platform.openai.com
+ANTHROPIC_API_KEY=your_key_here     # Optional: https://console.anthropic.com
+DEEPSEEK_API_KEY=your_key_here      # Optional: https://platform.deepseek.com
 
-***Input***
+🔧 Ollama Setup (For Local AI)
+
+    Install Ollama: https://ollama.com/download
+
+    Pull a model (first time only, requires internet):
+    bash
+
+    # Recommended models (small to large)
+    ollama pull llama3.2:3b      # Small, fast (3B parameters)
+    ollama pull llama3.2         # Medium (8B parameters)
+    ollama pull llama3.2:70b     # Large (70B parameters - requires good GPU)
+
+    Verify Ollama is running:
+    bash
+
+    ollama list                  # Show installed models
+    ollama run llama3.2 "Hello"  # Test the model
+
+    Ollama runs completely offline after the model is downloaded!
+
+    Auto-start Ollama (optional):
+
+        Windows: Add to Startup folder
+        macOS: Add to Login Items
+        Linux: Use systemd service
+
+============================================
+Operation Guideline
+============================================
+
+🔧 Input Folder
 
 Place your input files in the appropriate folders:
 
 input/
-├── coding/          # For coding pipeline
-├── writing/         # For writing pipeline
-├── appraisal/       # For appraisal pipeline
-├── search/          # For search pipeline
-├── rct_search/      # For RCT search
+├── coding/          # For coding pipeline (.py, .js, .ts, .html, .css, .java, .c, .cpp, .cs, .rb, .go, .rs, .txt, .md, .php, .swift, .kt, .r, .sh, .sql, .svg)
+├── writing/         # For writing pipeline (.txt, .md, .docx, .pdf)
+├── appraisal/       # For appraisal pipeline (.pdf, .txt, .md, .docx)
+├── search/          # For search pipeline (.txt, .md)
+├── rct_search/      # For RCT search (.txt, .md)
 └── sr/              # For SR pipeline (PDFs + pico_*.json)
 
-***Output***
 
-Output will appear in:
+🔧 Output Folder
+
+Outputs generated will appear in:
 
 output/
 ├── coding/
@@ -124,9 +166,9 @@ output/
 ├── rct_search/
 └── sr/
 
-***Reports***
+🔧Reports Folders
 
-Running Commentary and Explanations will appear in:
+Running commentary and explanations will appear in:
 
 reports/
 ├── coding/
@@ -136,97 +178,135 @@ reports/
 ├── rct_search/
 └── sr/
 
-
-------------------------------------------------------------------
 🚀 Running the App
-------------------------------------------------------------------
 CLI Mode
 
     Windows: Double-click AI_kcMedicalResearch_CLI.bat or run python launcher.py
-
     macOS: Run ./Mac_kcMedicalResearch_CLI.sh or python launcher.py
 
 UI Mode (Streamlit)
 
     Windows: Double-click AI_kcMedicalResearch_UI.bat
-
     macOS: Run ./Mac_kcMedicalResearch_UI.sh
 
     Browser opens automatically at: http://localhost:8501
 
-------------------------------------------------------------------
-⚡ Quick Commands
-------------------------------------------------------------------
-***Docker Commands (All Platforms)***
+============================================
+For Docker Users  (All Platforms)
+============================================
+Docker Commands
 bash
 
 # Build the image
-docker build -t ai-kcmedicalresearch .
+docker build -f docker/Dockerfile -t ai-kcmedicalresearch .
 
 # Run CLI
-docker run -it --rm -v $(pwd)/input:/app/input -v $(pwd)/output:/app/output --env-file .env ai-kcmedicalresearch python launcher.py
+docker run -it --rm \
+    -v $(pwd)/input:/app/input \
+    -v $(pwd)/output:/app/output \
+    -v $(pwd)/data:/app/data \
+    -v $(pwd)/reports:/app/reports \
+    --env-file .env \
+    --add-host host.docker.internal:host-gateway \
+    ai-kcmedicalresearch \
+    python SOURCE_CODE/main.py
 
 # Run UI
-docker run -it --rm -p 8501:8501 -v $(pwd)/input:/app/input -v $(pwd)/output:/app/output --env-file .env ai-kcmedicalresearch streamlit run src/ui/app.py --server.port=8501 --server.address=0.0.0.0
+docker run -it --rm -p 8501:8501 \
+    -v $(pwd)/input:/app/input \
+    -v $(pwd)/output:/app/output \
+    -v $(pwd)/data:/app/data \
+    -v $(pwd)/reports:/app/reports \
+    --env-file .env \
+    --add-host host.docker.internal:host-gateway \
+    ai-kcmedicalresearch \
+    streamlit run SOURCE_CODE/ui/app.py --server.port=8501 --server.address=0.0.0.0
 
-
-***Local Commands (Without Docker)***
+============================================
+For CLI Users (Without Docker)
+============================================
+Local Commands
 bash
 
 # Install dependencies
 python -m venv .venv
-.venv\Scripts\activate  # Windows
+.venv\Scripts\activate     # Windows
 source .venv/bin/activate  # macOS/Linux
 pip install -r requirements.txt
 
 # Run CLI
-python launcher.py
+python SOURCE_CODE/main.py
 
 # Run UI
-streamlit run src/ui/app.py
+streamlit run SOURCE_CODE/ui/app.py
 
-------------------------------------------------------------------
+============================================
 🆘 Troubleshooting
-------------------------------------------------------------------
-***Docker Issues***
+============================================
+# Mac_Setup.sh fails	Ensure scripts are executable: chmod +x Mac_*.sh
+
+# Docker Issues
 Issue	                Solution
 Docker not found	Install Docker Desktop from https://www.docker.com/products/docker-desktop
 Docker not running	Start Docker Desktop from system tray/menu bar
 Build fails	        Check internet connection and Docker logs
-Volume mount errors	Ensure folders exist: input/, output/, data/
+Volume mount errors	Ensure folders exist: input/, output/, data/, reports/
+Docker_setup.bat fails	Run as Administrator, check internet connection
 
-***API Key Issues***
+# Ollama Issues
+Issue	                Solution
+Ollama not found	Install from https://ollama.com/download
+Ollama not running	Start Ollama from Applications (macOS) or Start Menu (Windows)
+Model not found	        Run ollama pull llama3.2 to download the model
+Out of memory	        Use a smaller model: ollama pull llama3.2:3b
+Slow performance	Check if GPU is being used; smaller models run faster
+
+# API Key Issues
 
     Check if entered correctly (no extra spaces)
     For Qwen: Use DASHSCOPE_API_KEY env var
+    For Ollama: No API key needed!
     Check Render env variables are saved
 
-***Pipeline Fails***
+#Pipeline Fails
 
     Check logs in the UI output area
     Verify input files are in correct folder
     Check API key is valid for selected provider
 
-***Theme Not Detected (CLI)***
+    For SR mode: Ensure provider supports vision (Qwen, OpenAI, Anthropic, Groq)
+
+# Theme Not Detected (CLI)
 
     Launcher auto-detects on first run
+
     Override with:
 
         Windows: setx CLI_THEME dark or setx CLI_THEME light
         macOS/Linux: export CLI_THEME=dark or export CLI_THEME=light
 
-------------------------------------------------------------------
+    Close and reopen terminal for changes to take effect
+
+============================================
 📚 Documentation
-------------------------------------------------------------------
+============================================
+    Full Documentation: Readme/HANDOFF.md
+    Quick Start: Readme/README.md
+    Help Guide: Readme/flashcard-help.html (open in browser)
 
-    Full Documentation: HANDOFF.md
-
-    Quick Start: README.md
-
-------------------------------------------------------------------
+============================================
 ✅ Setup Complete!
-------------------------------------------------------------------
-
+============================================
 You're now ready to use AI kcMedicalResearch!
 
-Total setup time: ~5 minutes
+Provider Options Summary
+Provider	Cost	        Setup	                        Internet Required
+Ollama	        Free	        Install Ollama, pull model	No (after download)
+Qwen	        Pay-per-use	Add API key to .env	        Yes
+Groq	        Pay-per-use	Add API key to .env	        Yes
+OpenAI	        Pay-per-use	Add API key to .env	        Yes
+Anthropic	Pay-per-use	Add API key to .env	        Yes
+
+Total setup time: ~5 minutes!
+
+For more help, check the documentation or open an issue on GitHub.
