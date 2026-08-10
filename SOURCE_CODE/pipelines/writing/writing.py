@@ -552,7 +552,7 @@ def run_writer(
     if word_limit is None:
         word_limit = DEFAULT_WORDS[track]
 
-    guidelines   = _load_guidelines(paths["doc_root"], None)
+    guidelines   = _load_guidelines(paths["doc_root"], paths["doc_root"])
     input_files  = _load_input_files(paths["input"])
     is_scratch   = len(input_files) == 0
     subprojects  = [("new_doc", "", ".md")] if is_scratch else input_files
@@ -662,7 +662,7 @@ def run_editor(
         print("  [EDITOR] No files in input/writing/ -- place documents there first.")
         return
 
-    guidelines = _load_guidelines(paths["doc_root"], None)
+    guidelines = _load_guidelines(paths["doc_root"], paths["doc_root"])
 
     for stem, content, suffix in input_files:
         if verbose:
@@ -705,7 +705,7 @@ def run_qa(
         print("  [QA] No files in input/writing/ -- place documents there first.")
         return
 
-    guidelines = _load_guidelines(paths["doc_root"], None)
+    guidelines = _load_guidelines(paths["doc_root"], paths["doc_root"])
 
     for stem, content, suffix in input_files:
         if verbose:

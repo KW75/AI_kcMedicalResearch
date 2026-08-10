@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import json
 import urllib.error
@@ -637,3 +637,9 @@ def test_rename_session_file_not_found(tmp_path, capsys) -> None:
 
 
 def test_rename_session_empty_name_cancelled(tmp_path, monkeypatch, capsys) -> None:
+    f = tmp_path / "session_20250101_120000.md"
+    f.write_text("content", encoding="utf-8")
+    monkeypatch.setattr("builtins.input", lambda _: "")
+    rename_session(filename="session_20250101_120000.md", reports_dir=str(tmp_path))
+    assert "cannot be empty" in capsys.readouterr().out
+

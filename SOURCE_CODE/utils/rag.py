@@ -1,5 +1,5 @@
-"""
-rag.py — Retrieval-Augmented Generation support for ai-automation-tool.
+﻿"""
+rag.py ??Retrieval-Augmented Generation support for ai-automation-tool.
 
 Design decisions:
 - Per-session: ChromaDB collection is named {mode}_{session_id} and deleted
@@ -101,8 +101,8 @@ def get_embeddings(texts: list[str]) -> list[list[float]]:
     Return an embedding vector for each string in *texts*.
 
     Routing logic (controlled by EMBEDDING_PROVIDER in .env):
-      - "ollama"  → POST to {OLLAMA_HOST}/api/embed  (default, local, free)
-      - "openai"  → POST to OpenAI embeddings endpoint (requires API key)
+      - "ollama"  ??POST to {OLLAMA_HOST}/api/embed  (default, local, free)
+      - "openai"  ??POST to OpenAI embeddings endpoint (requires API key)
 
     Raises RuntimeError for unsupported providers or network failures.
     """
@@ -223,8 +223,8 @@ def index_uploads(mode: str, session_id: str, upload_base: str = "uploads") -> i
 
     Supported formats
     -----------------
-    - .txt / .md  — read as UTF-8 text (errors replaced)
-    - .pdf        — text extracted page-by-page with pypdf
+    - .txt / .md  ??read as UTF-8 text (errors replaced)
+    - .pdf        ??text extracted page-by-page with pypdf
     """
     folder = Path(upload_base) / mode
     if not folder.exists():
@@ -294,9 +294,9 @@ def _read_pdf(path: Path) -> str:
     """
     Extract text from a PDF using a three-stage fallback chain:
 
-    Stage 1 — PyMuPDF (fitz): fast, accurate for text-layer PDFs.
-    Stage 2 — pypdf: fallback if fitz is not installed.
-    Stage 3 — OCR (pytesseract + pdf2image): for scanned/image-only PDFs
+    Stage 1 ??PyMuPDF (fitz): fast, accurate for text-layer PDFs.
+    Stage 2 ??pypdf: fallback if fitz is not installed.
+    Stage 3 ??OCR (pytesseract + pdf2image): for scanned/image-only PDFs
               where stages 1 and 2 return empty text.
 
     OCR requires Tesseract binary and Poppler on PATH (or set via .env).
@@ -304,7 +304,7 @@ def _read_pdf(path: Path) -> str:
     """
     text = ""
 
-    # Stage 1 — PyMuPDF
+    # Stage 1 ??PyMuPDF
     try:
         import fitz  # PyMuPDF
         doc  = fitz.open(str(path))
@@ -313,7 +313,7 @@ def _read_pdf(path: Path) -> str:
     except Exception:  # noqa: BLE001
         pass
 
-    # Stage 2 — pypdf (if Stage 1 empty or failed)
+    # Stage 2 ??pypdf (if Stage 1 empty or failed)
     if not text.strip():
         try:
             from pypdf import PdfReader
@@ -322,7 +322,7 @@ def _read_pdf(path: Path) -> str:
         except Exception:  # noqa: BLE001
             pass
 
-    # Stage 3 — OCR fallback for scanned/image PDFs
+    # Stage 3 ??OCR fallback for scanned/image PDFs
     if not text.strip():
         text = _ocr_pdf(path)
 
@@ -366,7 +366,7 @@ def _ocr_pdf(path: Path) -> str:
         return result
 
     except ImportError as exc:
-        print(f"[RAG] OCR skipped — missing dependency: {exc}")
+        print(f"[RAG] OCR skipped ??missing dependency: {exc}")
         print("[RAG] Install: pip install pytesseract pillow pdf2image")
         print("[RAG] Then install Tesseract and Poppler binaries.")
         return ""
@@ -440,3 +440,45 @@ def clear_session(mode: str, session_id: str) -> None:
     existing = [c.name for c in client.list_collections()]
     if collection_name in existing:
         client.delete_collection(name=collection_name)
+# ---------------------------------------------------------------------------
+# RAGUtils wrapper class (for backward compatibility with coding.py)
+# ---------------------------------------------------------------------------
+class RAGUtils:
+    """
+    Wrapper class for RAG operations.
+    Provides a unified interface for RAG functionality.
+    """
+    
+    def __init__(self, mode: str = None, session_id: str = None):
+        self.mode = mode
+        self.session_id = session_id
+        self.embedding_provider = EMBEDDING_PROVIDER
+        self.embedding_model = EMBEDDING_MODEL
+    
+    def index_uploads(self, mode: str = None, session_id: str = None, upload_base: str = "uploads") -> int:
+        """Index documents for the given mode and session."""
+        mode = mode or self.mode
+        session_id = session_id or self.session_id
+        if mode is None or session_id is None:
+            raise ValueError("mode and session_id are required")
+        return index_uploads(mode, session_id, upload_base)
+    
+    def retrieve(self, query: str, mode: str = None, session_id: str = None, n_results: int = None) -> str:
+        """Retrieve relevant chunks for a query."""
+        mode = mode or self.mode
+        session_id = session_id or self.session_id
+        if mode is None or session_id is None:
+            raise ValueError("mode and session_id are required")
+        return retrieve(query, mode, session_id, n_results or N_RESULTS)
+    
+    def clear_session(self, mode: str = None, session_id: str = None) -> None:
+        """Clear the session collection."""
+        mode = mode or self.mode
+        session_id = session_id or self.session_id
+        if mode is None or session_id is None:
+            raise ValueError("mode and session_id are required")
+        clear_session(mode, session_id)
+    
+    def get_context(self, query: str, mode: str = None, session_id: str = None, n_results: int = None) -> str:
+        """Get context for a query (alias for retrieve)."""
+        return self.retrieve(query, mode, session_id, n_results)

@@ -1,4 +1,4 @@
-"""
+ï»¿"""
 main.py ??AI Automation Tool  v2.2.0
 Supports six workflow modes: coding, writing, rct_search, appraisal, search, sr.
 Supports six AI providers: ollama (default), openai, anthropic, deepseek, groq, qwen.
@@ -32,15 +32,15 @@ sys.path.insert(0, str(SOURCE_CODE_DIR))
 # Now imports work from SOURCE_CODE/
 from utils.path_utils import PATH_MANAGER, get_input_dir, get_output_dir
 from utils.document_reader import DocumentReader
-from utils.rag import RAGUtils
+# from utils.rag import RAGUtils (functions imported directly)
 
 # Import pipeline modules
-from pipelines.coding.coding import main as run_coding
-from pipelines.writing.writing import main as run_writing
-from pipelines.appraisal.appraisal import main as run_appraisal
-from pipelines.search.search import main as run_search
-from pipelines.rct_search.rct_search import main as run_rct_search
-from pipelines.sr.main import main as run_sr
+from pipelines.coding import run_coding
+from pipelines.writing import run_writing
+from pipelines.appraisal import run_appraisal
+from pipelines.search import run_search
+from pipelines.rct_search import run_rct_search_pipeline
+from pipelines.sr import run_sr
 
 # Ensure project root is on sys.path BEFORE any imports
 _ROOT = Path(__file__).resolve().parent.parent
@@ -1489,7 +1489,7 @@ def run_sr_launcher(provider: str = "", model: str = "") -> None:
                     print(f"  ??Modified PICO saved to: {new_path.name}")
                     
             except Exception as e:
-                print(f"  ?ï¿½ï¿½? Could not load PICO: {e}")
+                print(f"  ?åš™è¸è•­? Could not load PICO: {e}")
                 pico_data = None
         
         elif choice == "0":
@@ -1520,7 +1520,7 @@ def run_sr_launcher(provider: str = "", model: str = "") -> None:
             )
             print(f"  ??New PICO saved to: {pico_path.name}")
         else:
-            print("  ?ï¿½ï¿½? No PICO configured. Using existing config.")
+            print("  ?åš™è¸è•­? No PICO configured. Using existing config.")
     
     # -- Step 3: Update prisma_criteria.yaml with PICO data -----------------
     cfg_yaml: dict = {}
@@ -1548,7 +1548,7 @@ def run_sr_launcher(provider: str = "", model: str = "") -> None:
         print(f"\n  ??prisma_criteria.yaml updated with PICO")
         print(f"     PubMed query: {cfg_yaml.get('pubmed_query_cleaned', 'n/a')}")
     else:
-        print("\n  ?ï¿½ï¿½? Using existing prisma_criteria.yaml")
+        print("\n  ?åš™è¸è•­? Using existing prisma_criteria.yaml")
 
     # -- Step 4: resolve provider and model ------------------------------------
     _DEFAULT_MODELS = {
@@ -1565,7 +1565,7 @@ def run_sr_launcher(provider: str = "", model: str = "") -> None:
     # --- Provider check for vision support ---
     if _provider == "deepseek":
         print("\n" + "=" * 58)
-        print("  ?ï¿½ï¿½?  WARNING: DeepSeek does NOT support vision API")
+        print("  ?åš™è¸è•­?  WARNING: DeepSeek does NOT support vision API")
         print("=" * 58)
         print("  The SR pipeline uses vision-based extraction (images of PDF pages).")
         print("  DeepSeek's API only accepts text, not images.")
@@ -1861,7 +1861,7 @@ def handle_search_mode(provider: str, model: str, sub_mode: str = None) -> None:
         print(f"  ??Using sub-mode: {sub}")
     elif is_cloud:
         # Cloud environment - use default
-        print("  ?ï¿½ï¿½?  Cloud environment detected. Defaulting to Topic Search (1).")
+        print("  ?åš™è¸è•­?  Cloud environment detected. Defaulting to Topic Search (1).")
         sub = "1"
     else:
         # Local - interactive
@@ -1870,7 +1870,7 @@ def handle_search_mode(provider: str, model: str, sub_mode: str = None) -> None:
             if not sub:
                 sub = "1"
         except (EOFError, KeyboardInterrupt):
-            print("\n  ?ï¿½ï¿½? No input received. Defaulting to Topic Search (1).")
+            print("\n  ?åš™è¸è•­? No input received. Defaulting to Topic Search (1).")
             sub = "1"
 
     if sub not in ("1", "2"):
@@ -1948,7 +1948,7 @@ def handle_writing_mode(
         )
         return call_ai(prompt=combined, provider=provider, model=model)
 
-    # ?ï¿?ï¿?Track selection ?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?
+    # ?åš™?åš™?Track selection ?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?
     print("\n" + "=" * 60)
     print("  WRITING MODE")
     print("=" * 60)
@@ -1972,7 +1972,7 @@ def handle_writing_mode(
         print("Invalid choice ??returning to menu.")
         return
 
-    # ?ï¿?ï¿?Sub-mode selection ?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?
+    # ?åš™?åš™?Sub-mode selection ?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?
     print(f"\n  Track: {track.upper()}")
     print("  " + "-" * 40)
     print("  1. Writer  ??full pipeline: Writer -> Editor -> QA")
@@ -1993,7 +1993,7 @@ def handle_writing_mode(
         return
     sub_mode = sub_mode_map[sub_choice]
 
-    # ?ï¿?ï¿?Word limit ?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?
+    # ?åš™?åš™?Word limit ?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?
     if sub_mode in ("Writer", "Editor"):
         default_wl = DEFAULT_WORDS[track]
         print(f"\n  Default word limit for {track} track: {default_wl}")
@@ -2009,7 +2009,7 @@ def handle_writing_mode(
     else:
         word_limit = DEFAULT_WORDS[track]
 
-    # ?ï¿?ï¿?Instructions ?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?ï¿?
+    # ?åš™?åš™?Instructions ?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?åš™?
     print(f"  [{sub_mode.upper()} | {track.upper()}] Enter instructions below.")
     print("  Lines starting with > are DIRECT TASK INSTRUCTIONS (highest priority).")
     print("  Press ENTER on a blank line when done.\n")

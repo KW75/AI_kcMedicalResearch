@@ -61,7 +61,7 @@ def _ts() -> str:
 
 def _paths(root: Path) -> dict:
     return {
-        "docs":    PROJECT_ROOT / "docs"    / DOCS_DIR_NAME,
+        "doc_root":    PROJECT_ROOT / "docs"    / DOCS_DIR_NAME,
         "input":   PROJECT_ROOT / "input"   / INPUT_DIR_NAME,
         "output":  PROJECT_ROOT / "output"  / INPUT_DIR_NAME,
         "reports": PROJECT_ROOT / "reports" / INPUT_DIR_NAME,
@@ -226,7 +226,7 @@ def _strip_fences(text: str) -> str:
 # ---------------------------------------------------------------------------
 def _system_prompt(guidelines: str) -> str:
     return (
-        "You are an expert medical research methodologist performing a "
+        "You are an medical research appraisal expert performing a "
         "critical appraisal of a medical research article.\n\n"
         "You must follow the appraisal guide and scoring criteria exactly. "
         "Produce a structured 7-section appraisal report followed by a "
@@ -245,7 +245,7 @@ def _appraiser_user_prompt(
     instr_block = ""
     if direct_instructions:
         instr_block = (
-            "## Direct Instructions (highest priority)\n"
+            "## DIRECT TASK INSTRUCTIONS\n"
             + "\n".join(
                 i.lstrip("> ").strip() if isinstance(i, str) else str(i)
                 for i in direct_instructions
@@ -335,7 +335,7 @@ def run_appraisal(
         print("  [APPRAISAL] No files in input/appraisal/ -- place articles there first.")
         return
 
-    guidelines = _load_guidelines(paths["docs"])
+    guidelines = _load_guidelines(paths["doc_root"])
     session_log: list[dict] = []
 
     print(f"\n  [APPRAISAL] Found {len(input_files)} article(s) to appraise.\n")
