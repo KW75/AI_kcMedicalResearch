@@ -1,6 +1,6 @@
 @echo off
 :: =============================================================================
-::  docker_quick_start.bat - Quick Docker CLI Launcher
+::  docker_cli.bat - Quick Docker CLI Launcher
 ::  v2.0.0  |  Updated for SOURCE_CODE structure
 :: =============================================================================
 

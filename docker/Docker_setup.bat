@@ -2,20 +2,27 @@
 setlocal EnableDelayedExpansion
 
 :: =============================================================================
-::  AI kcMedicalResearch - Complete Setup & Run
-::  v2.0.0  |  Updated for SOURCE_CODE structure
+::  AI kcMedicalResearch - Docker Setup & Run
+::  v2.0.0  |  One-click setup with Docker for Windows
 :: =============================================================================
+
+:: ─────────────────────────────────────────────────────────────────────────────
+::  1.  RESOLVE PROJECT ROOT (go up one level from docker/)
+:: ─────────────────────────────────────────────────────────────────────────────
+set "PROJECT_DIR=%~dp0.."
+if "!PROJECT_DIR:~-1!"=="\" set "PROJECT_DIR=!PROJECT_DIR:~0,-1!"
+cd /d "%PROJECT_DIR%"
 
 title AI kcMedicalResearch Setup
 color 0A
 
 :: ─────────────────────────────────────────────────────────────────────────────
-::  1.  WELCOME
+::  2.  WELCOME
 :: ─────────────────────────────────────────────────────────────────────────────
 cls
 echo.
 echo   ============================================================
-echo    AI kcMedicalResearch - Setup & Run
+echo    AI kcMedicalResearch - Docker Setup & Run
 echo   ============================================================
 echo.
 echo   This will:
@@ -30,7 +37,7 @@ echo   ============================================================
 echo.
 
 :: ─────────────────────────────────────────────────────────────────────────────
-::  2.  CHECK DOCKER
+::  3.  CHECK DOCKER
 :: ─────────────────────────────────────────────────────────────────────────────
 echo   [CHECK] Checking Docker...
 where docker >nul 2>&1
@@ -59,7 +66,7 @@ echo   [OK] Docker is running.
 echo.
 
 :: ─────────────────────────────────────────────────────────────────────────────
-::  3.  CHOOSE DRIVE
+::  4.  CHOOSE DRIVE
 :: ─────────────────────────────────────────────────────────────────────────────
 echo   ============================================================
 echo    Where would you like to install?
@@ -86,13 +93,13 @@ if "!DRIVE_CHOICE!"=="1" (
 )
 
 :: ─────────────────────────────────────────────────────────────────────────────
-::  4.  NAVIGATE TO DRIVE
+::  5.  NAVIGATE TO DRIVE
 :: ─────────────────────────────────────────────────────────────────────────────
 !INSTALL_DRIVE!
 cd \
 
 :: ─────────────────────────────────────────────────────────────────────────────
-::  5.  CHECK IF ALREADY INSTALLED
+::  6.  CHECK IF ALREADY INSTALLED
 :: ─────────────────────────────────────────────────────────────────────────────
 if exist "!INSTALL_DRIVE!\AI_kcMedicalResearch" (
     echo.
@@ -131,7 +138,7 @@ if exist "!INSTALL_DRIVE!\AI_kcMedicalResearch" (
 )
 
 :: ─────────────────────────────────────────────────────────────────────────────
-::  6.  CLONE REPOSITORY
+::  7.  CLONE REPOSITORY
 :: ─────────────────────────────────────────────────────────────────────────────
 echo.
 echo   [CLONE] Cloning repository to !INSTALL_DRIVE!\AI_kcMedicalResearch...
@@ -150,12 +157,12 @@ echo   [OK] Repository cloned successfully.
 echo.
 
 :: ─────────────────────────────────────────────────────────────────────────────
-::  7.  ENTER DIRECTORY
+::  8.  ENTER DIRECTORY
 :: ─────────────────────────────────────────────────────────────────────────────
 cd "!INSTALL_DRIVE!\AI_kcMedicalResearch"
 
 :: ─────────────────────────────────────────────────────────────────────────────
-::  8.  CREATE .env FILE
+::  9.  CREATE .env FILE
 :: ─────────────────────────────────────────────────────────────────────────────
 if not exist ".env" (
     echo.
@@ -217,7 +224,7 @@ if not exist ".env" (
 )
 
 :: ─────────────────────────────────────────────────────────────────────────────
-::  9.  CREATE INPUT/OUTPUT DIRECTORIES
+::  10. CREATE INPUT/OUTPUT DIRECTORIES
 :: ─────────────────────────────────────────────────────────────────────────────
 echo.
 echo   [SETUP] Creating input/output directories...
@@ -239,7 +246,7 @@ echo   [OK] Directories created.
 echo.
 
 :: ─────────────────────────────────────────────────────────────────────────────
-::  10. BUILD DOCKER IMAGE (if not exists)
+::  11. BUILD DOCKER IMAGE (if not exists)
 :: ─────────────────────────────────────────────────────────────────────────────
 echo.
 echo   [DOCKER] Checking for existing image...
@@ -266,7 +273,7 @@ if errorlevel 1 (
 )
 
 :: ─────────────────────────────────────────────────────────────────────────────
-::  11. RUN THE APP
+::  12. RUN THE APP
 :: ─────────────────────────────────────────────────────────────────────────────
 :RUN_APP
 echo.

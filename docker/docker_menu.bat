@@ -1,6 +1,6 @@
 @echo off
 :: =============================================================================
-::  docker_run.bat - AI kcMedicalResearch Docker Launcher
+::  docker_menu.bat - AI kcMedicalResearch Docker Menu
 ::  v2.0.0  |  Updated for SOURCE_CODE structure
 :: =============================================================================
 setlocal EnableDelayedExpansion
@@ -11,7 +11,7 @@ cd /d "%PROJECT_DIR%"
 
 echo.
 echo ============================================================
-echo  AI kcMedicalResearch - Docker Launcher
+echo  AI kcMedicalResearch - Docker Menu
 echo ============================================================
 echo.
 
