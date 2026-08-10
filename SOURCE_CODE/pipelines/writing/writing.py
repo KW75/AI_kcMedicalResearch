@@ -1,9 +1,9 @@
-"""
-writing.py — Writing Mode engine (v1.2 two-track system)
+﻿"""
+writing.py ??Writing Mode engine (v1.2 two-track system)
 Tracks:
-  topic   — newspaper/editorial style, default 800 words
-  article — medical journal style, default 3500 words
-Pipeline: Writer → Editor → QA (linear)
+  topic   ??newspaper/editorial style, default 800 words
+  article ??medical journal style, default 3500 words
+Pipeline: Writer ??Editor ??QA (linear)
 Standalone: Editor, QA (require input/writing/ files)
 """
 
@@ -12,6 +12,15 @@ import threading
 import datetime
 from pathlib import Path
 from typing import Callable
+
+# Add SOURCE_CODE to path
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent.parent.parent
+SOURCE_CODE_DIR = PROJECT_ROOT / "SOURCE_CODE"
+sys.path.insert(0, str(SOURCE_CODE_DIR))
+
+from utils.path_utils import PATH_MANAGER, get_input_dir, get_output_dir
+from utils.document_reader import DocumentReader
+from utils.rag import RAGUtils
 
 try:
     from docx import Document
@@ -41,7 +50,7 @@ DISCLOSURE = (
 # Path helpers
 # ---------------------------------------------------------------------------
 def _project_root() -> Path:
-    return Path(__file__).resolve().parent.parent.parent
+    return Path(__file__).resolve().parent.parent.parent.parent.parent
 
 
 def _ts() -> str:
@@ -50,15 +59,15 @@ def _ts() -> str:
 
 def _paths(root: Path) -> dict:
     return {
-        "doc_root": root / "docs"    / "writing",
-        "input":    root / "input"   / "writing",
-        "output":   root / "output"  / "writing",
-        "reports":  root / "reports" / "writing",
+        "doc_root": PROJECT_ROOT / "docs"    / "writing",
+        "input":    PROJECT_ROOT / "input"   / "writing",
+        "output":   PROJECT_ROOT / "output"  / "writing",
+        "reports":  PROJECT_ROOT / "reports" / "writing",
     }
 
 
 def _track_doc_path(root: Path, track: str) -> Path:
-    return root / "docs" / "writing" / track
+    return SOURCE_CODE_DIR / "docs" / "modes" / "writing.md" / track
 
 
 # ---------------------------------------------------------------------------
@@ -455,10 +464,10 @@ def _write_report(
     header += "\n---\n\n"
 
     if role.upper() == "QA":
-        # QA has no output/ file — write full report here
+        # QA has no output/ file ??write full report here
         body = content
     else:
-        # Writer and Editor — write preview only; full doc is in output/writing/
+        # Writer and Editor ??write preview only; full doc is in output/writing/
         preview = content[:300].replace("\n", " ").strip()
         if len(content) > 300:
             preview += "..."
@@ -524,7 +533,7 @@ def _prompt_word_limit(track: str) -> int:
 
 
 # ---------------------------------------------------------------------------
-# Pipeline: Writer → Editor → QA
+# Pipeline: Writer ??Editor ??QA
 # ---------------------------------------------------------------------------
 def run_writer(
     direct_instructions: list,
@@ -543,7 +552,7 @@ def run_writer(
     if word_limit is None:
         word_limit = DEFAULT_WORDS[track]
 
-    guidelines   = _load_guidelines(_track_doc_path(root, track), paths["doc_root"])
+    guidelines   = _load_guidelines(paths["doc_root"], None)
     input_files  = _load_input_files(paths["input"])
     is_scratch   = len(input_files) == 0
     subprojects  = [("new_doc", "", ".md")] if is_scratch else input_files
@@ -558,7 +567,7 @@ def run_writer(
 
         sp = {"stem": stem, "status": "started"}
 
-        # ── WRITER ──────────────────────────────────────────────
+        # ?? WRITER ??????????????????????????????????????????????
         if verbose:
             print(f"\n  [WRITER] Generating draft...")
         writer_out = _call_llm(
@@ -581,7 +590,7 @@ def run_writer(
         _write_docx(w_docx, writer_out, title=f"Writer Draft ({track.upper()}) -- {stem}")
         sp["writer_docx"] = w_docx.name
 
-        # ── EDITOR ──────────────────────────────────────────────
+        # ?? EDITOR ??????????????????????????????????????????????
         if verbose:
             print(f"\n  [EDITOR] Editing draft...")
         editor_out = _call_llm(
@@ -603,7 +612,7 @@ def run_writer(
                     title=f"Edited Document ({track.upper()}) -- {stem}")
         sp["editor_docx"] = e_docx.name
 
-        # ── QA ──────────────────────────────────────────────────
+        # ?? QA ??????????????????????????????????????????????????
         if verbose:
             print(f"\n  [QA] Running quality check...")
         qa_out = _call_llm(
@@ -653,7 +662,7 @@ def run_editor(
         print("  [EDITOR] No files in input/writing/ -- place documents there first.")
         return
 
-    guidelines = _load_guidelines(_track_doc_path(root, track), paths["doc_root"])
+    guidelines = _load_guidelines(paths["doc_root"], None)
 
     for stem, content, suffix in input_files:
         if verbose:
@@ -696,7 +705,7 @@ def run_qa(
         print("  [QA] No files in input/writing/ -- place documents there first.")
         return
 
-    guidelines = _load_guidelines(_track_doc_path(root, track), paths["doc_root"])
+    guidelines = _load_guidelines(paths["doc_root"], None)
 
     for stem, content, suffix in input_files:
         if verbose:
@@ -708,3 +717,6 @@ def run_qa(
         )
         qa_out = _strip_fences(qa_out)
         _write_report(paths["reports"], "QA", track, stem, timestamp, qa_out)
+
+
+

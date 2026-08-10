@@ -1,12 +1,11 @@
-$content = @'
 @echo off
 :: =============================================================================
 ::  docker_run.bat - AI kcMedicalResearch Docker Launcher
-::  v1.0.0  |  No setup required - just Docker!
+::  v2.0.0  |  Updated for SOURCE_CODE structure
 :: =============================================================================
 setlocal EnableDelayedExpansion
 
-set "PROJECT_DIR=%~dp0"
+set "PROJECT_DIR=%~dp0.."
 if "!PROJECT_DIR:~-1!"=="\" set "PROJECT_DIR=!PROJECT_DIR:~0,-1!"
 cd /d "%PROJECT_DIR%"
 
@@ -54,7 +53,7 @@ if errorlevel 1 (
     echo [Setup] Building Docker image (first time only)...
     echo This may take 5-10 minutes...
     echo.
-    docker build -t ai-kcmedicalresearch .
+    docker build -f docker/Dockerfile -t ai-kcmedicalresearch .
     if errorlevel 1 (
         echo [ERROR] Failed to build Docker image.
         pause
@@ -86,13 +85,14 @@ if "!CHOICE!"=="2" (
 
     docker run -it --rm ^
         -p 8501:8501 ^
-        -v "%cd%/input:/app/input" ^
-        -v "%cd%/output:/app/output" ^
-        -v "%cd%/data:/app/data" ^
+        -v "%cd%\input:/app/input" ^
+        -v "%cd%\output:/app/output" ^
+        -v "%cd%\data:/app/data" ^
+        -v "%cd%\reports:/app/reports" ^
         --env-file .env ^
         --add-host host.docker.internal:host-gateway ^
         ai-kcmedicalresearch ^
-        streamlit run src/ui/app.py --server.port=8501 --server.address=0.0.0.0
+        streamlit run SOURCE_CODE/ui/app.py --server.port=8501 --server.address=0.0.0.0
 ) else (
     echo.
     echo ============================================================
@@ -102,13 +102,14 @@ if "!CHOICE!"=="2" (
     echo.
 
     docker run -it --rm ^
-        -v "%cd%/input:/app/input" ^
-        -v "%cd%/output:/app/output" ^
-        -v "%cd%/data:/app/data" ^
+        -v "%cd%\input:/app/input" ^
+        -v "%cd%\output:/app/output" ^
+        -v "%cd%\data:/app/data" ^
+        -v "%cd%\reports:/app/reports" ^
         --env-file .env ^
         --add-host host.docker.internal:host-gateway ^
         ai-kcmedicalresearch ^
-        python launcher.py
+        python SOURCE_CODE/main.py
 )
 
 echo.
@@ -116,5 +117,3 @@ echo ============================================================
 echo  AI kcMedicalResearch stopped.
 echo ============================================================
 pause
-'@
-$content | Out-File -FilePath "docker_run.bat" -Encoding ASCII -Force

@@ -12,3 +12,10 @@ streamlit>=1.35.0
 PyYAML>=6.0.1
 biopython>=1.83
 tqdm>=4.66.0
+
+
+
+
+
+
+

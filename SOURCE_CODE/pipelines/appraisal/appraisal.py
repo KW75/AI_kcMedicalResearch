@@ -1,10 +1,10 @@
-"""
+﻿"""
 src/modes/appraisal.py
 ======================
-Appraisal mode engine — critical appraisal of medical literature.
+Appraisal mode engine ??critical appraisal of medical literature.
 
 Pipeline (per article):
-    APPRAISER  →  output/appraisal/APPRAISAL_[stem]_[ts].md + .docx
+    APPRAISER  ?? output/appraisal/APPRAISAL_[stem]_[ts].md + .docx
                   reports/appraisal/APPRAISAL_[stem]_[ts].md  (process log)
                   reports/appraisal/APPRAISAL_SESSION_[ts]_SUMMARY.md
 """
@@ -16,6 +16,15 @@ import sys
 import threading
 from pathlib import Path
 from typing import Callable
+
+# Add SOURCE_CODE to path
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent.parent.parent
+SOURCE_CODE_DIR = PROJECT_ROOT / "SOURCE_CODE"
+sys.path.insert(0, str(SOURCE_CODE_DIR))
+
+from utils.path_utils import PATH_MANAGER, get_input_dir, get_output_dir
+from utils.document_reader import DocumentReader
+from utils.rag import RAGUtils
 
 # ---------------------------------------------------------------------------
 # Optional dependencies
@@ -43,7 +52,7 @@ INPUT_DIR_NAME = "appraisal"
 # Path helpers
 # ---------------------------------------------------------------------------
 def _project_root() -> Path:
-    return Path(__file__).resolve().parent.parent.parent
+    return Path(__file__).resolve().parent.parent.parent.parent.parent
 
 
 def _ts() -> str:
@@ -52,10 +61,10 @@ def _ts() -> str:
 
 def _paths(root: Path) -> dict:
     return {
-        "docs":    root / "docs"    / DOCS_DIR_NAME,
-        "input":   root / "input"   / INPUT_DIR_NAME,
-        "output":  root / "output"  / INPUT_DIR_NAME,
-        "reports": root / "reports" / INPUT_DIR_NAME,
+        "docs":    PROJECT_ROOT / "docs"    / DOCS_DIR_NAME,
+        "input":   PROJECT_ROOT / "input"   / INPUT_DIR_NAME,
+        "output":  PROJECT_ROOT / "output"  / INPUT_DIR_NAME,
+        "reports": PROJECT_ROOT / "reports" / INPUT_DIR_NAME,
     }
 
 
@@ -250,7 +259,7 @@ def _appraiser_user_prompt(
         "## Task\n"
         "Produce a complete critical appraisal report following the mandatory "
         "7-section structure defined in your guidelines. "
-        "End with a plain-language summary of ≤ 200 words. "
+        "End with a plain-language summary of ??200 words. "
         "Append the disclosure statement at the very end."
     )
 
@@ -271,7 +280,7 @@ def _write_process_log(
     if len(content) > 300:
         preview += "..."
     body = (
-        f"# Appraisal Process Log — {stem}\n"
+        f"# Appraisal Process Log ??{stem}\n"
         f"**Timestamp:** {timestamp}  \n"
         f"**Word count:** {word_count}  \n\n"
         "---\n\n"
@@ -350,7 +359,7 @@ def run_appraisal(
         out_docx = paths["output"] / f"APPRAISAL_{stem}_{timestamp}.docx"
         _write_text(out_md, appraisal_out)
         _write_docx(out_docx, appraisal_out,
-                    title=f"Critical Appraisal — {stem}")
+                    title=f"Critical Appraisal ??{stem}")
 
         # Write process log to reports/
         _write_process_log(paths["reports"], stem, timestamp, appraisal_out)
@@ -376,3 +385,6 @@ def parse_direct_instructions(raw: str) -> list:
         if stripped.startswith(">"):
             lines.append(stripped)
     return lines
+
+
+

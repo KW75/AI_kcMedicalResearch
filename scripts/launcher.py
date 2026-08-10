@@ -1,5 +1,5 @@
-﻿# =============================================================================
-#  launcher.py  繚  AI kcMedicalResearch  繚  v2.3.0
+# =============================================================================
+#  launcher.py  |  AI kcMedicalResearch  |  v2.3.0
 # =============================================================================
 
 import subprocess
@@ -137,8 +137,8 @@ MODES = [
 ]
 
 PROVIDERS = [
-    ('1', 'Ollama',    'local 繚 free 繚 default',  ''),
-    ('2', 'Qwen',      'Alibaba 繚 recommended',   '--provider qwen'),
+    ('1', 'Ollama',    'local - free - default',  ''),
+    ('2', 'Qwen',      'Alibaba - recommended',   '--provider qwen'),
     ('3', 'Groq',      'fast inference',          '--provider groq'),
     ('4', 'DeepSeek',  'cost-efficient',          '--provider deepseek'),
     ('5', 'OpenAI',    'GPT-4 vision',            '--provider openai'),
@@ -184,7 +184,7 @@ def safe_input(prompt: str, default: str = '') -> str:
         return default
 
 
-def hr(width: int = 57, char: str = '?') -> str:
+def hr(width: int = 57, char: str = '-') -> str:
     return f'  {FRAME}{char * width}{RESET}'
 
 
@@ -192,7 +192,7 @@ def section_header(title: str) -> None:
     pad   = 55 - len(title)
     left  = pad // 2
     right = pad - left
-    print(f'  {FRAME}{"?" * left}{RESET}  {TITLE}{title}{RESET}  {FRAME}{"?" * right}{RESET}')
+    print(f'  {FRAME}{"-" * left}{RESET}  {TITLE}{title}{RESET}  {FRAME}{"-" * right}{RESET}')
 
 
 # -----------------------------------------------------------------------------
@@ -202,44 +202,44 @@ def banner() -> None:
     W = _W
 
     print()
-    print(f'  {FRAME}?????????????????????????????????????????????????????????RESET}')
-    print(f'  {FRAME}?RESET}                                                       {FRAME}?RESET}')
+    print(f'  {FRAME}╔═══════════════════════════════════════════════════════╗{RESET}')
+    print(f'  {FRAME}║{RESET}                                                       {FRAME}║{RESET}')
 
-    print(f'  {FRAME}?RESET}   {LOGO}???? ???????????RESET}{W(4)}'
-          f'{LOGO_TXT}AI kcMedical Research{RESET}{W(9)}{FRAME}  ?RESET}')
-    print(f'  {FRAME}?RESET}   {LOGO}????????????????{RESET}{W(4)}'
-          f'{INFO}?????????????????????{RESET}{W(11)}{FRAME}?RESET}')
-    print(f'  {FRAME}?RESET}   {LOGO}???????????RESET}{W(9)}'
-          f'{ACCENT}Version  {RESET}{HILITE}2.3.0{RESET}{W(14)}{FRAME}    ?RESET}')
-    print(f'  {FRAME}?RESET}   {LOGO}???????????RESET}{W(9)}'
-          f'{ACCENT}Tests    {RESET}{GOOD}254 passed 繚 6 skipped{RESET}{W(1)}{FRAME}?RESET}')
-    print(f'  {FRAME}?RESET}   {LOGO}???? ???????????RESET}{W(4)}'
-          f'{ACCENT}Deploy   {RESET}{INFO}render.com / local{RESET}{W(5)}{FRAME}?RESET}')
-    print(f'  {FRAME}?RESET}   {LOGO}???? ???????????RESET}{W(36)}{FRAME}?RESET}')
+    print(f'  {FRAME}║{RESET}   {LOGO}██╗  ██╗ ██████╗{RESET}{W(4)}'
+          f'{LOGO_TXT}AI kcMedical Research{RESET}{W(9)}{FRAME}  ║{RESET}')
+    print(f'  {FRAME}║{RESET}   {LOGO}██║ ██╔╝██╔════╝{RESET}{W(4)}'
+          f'{INFO}─────────────────────{RESET}{W(11)}{FRAME}║{RESET}')
+    print(f'  {FRAME}║{RESET}   {LOGO}█████╔╝ ██║{RESET}{W(9)}'
+          f'{ACCENT}Version  {RESET}{HILITE}2.3.0{RESET}{W(14)}{FRAME}    ║{RESET}')
+    print(f'  {FRAME}║{RESET}   {LOGO}██╔═██╗ ██║{RESET}{W(9)}'
+          f'{ACCENT}Tests    {RESET}{GOOD}254 passed - 6 skipped{RESET}{W(1)}{FRAME}║{RESET}')
+    print(f'  {FRAME}║{RESET}   {LOGO}██║  ██╗╚██████╗{RESET}{W(4)}'
+          f'{ACCENT}Deploy   {RESET}{INFO}render.com / local{RESET}{W(5)}{FRAME}║{RESET}')
+    print(f'  {FRAME}║{RESET}   {LOGO}╚═╝  ╚═╝ ╚═════╝{RESET}{W(36)}{FRAME}║{RESET}')
 
-    print(f'  {FRAME}?RESET}                                                       {FRAME}?RESET}')
+    print(f'  {FRAME}║{RESET}                                                       {FRAME}║{RESET}')
 
-    tagline = 'Medical Research  繚  Review  繚  Analysis'
+    tagline = 'Medical Research  -  Review  -  Analysis'
     pad = (53 - len(tagline)) // 2
-    print(f'  {FRAME}?RESET}{W(pad)}  {SEP}{tagline}{RESET}{W(pad + 1)}{FRAME}?RESET}')
+    print(f'  {FRAME}║{RESET}{W(pad)}  {SEP}{tagline}{RESET}{W(pad + 1)}{FRAME}║{RESET}')
 
-    print(f'  {FRAME}?RESET}                                                       {FRAME}?RESET}')
-    print(f'  {FRAME}?????????????????????????????????????????????????????????ㄌRESET}')
+    print(f'  {FRAME}║{RESET}                                                       {FRAME}║{RESET}')
+    print(f'  {FRAME}╠═══════════════════════════════════════════════════════╣{RESET}')
 
-    print(f'  {FRAME}?RESET}  {INFO}Modes  :{RESET}  '
-          f'{TEXT}coding  writing  appraisal  search{RESET}{W(8)}{FRAME} ?RESET}')
-    print(f'  {FRAME}?RESET}  {INFO}         {RESET}  '
-          f'{TEXT}rct_search  sr  dry-run  ui{RESET}{W(12)}{FRAME}   ?RESET}')
-    print(f'  {FRAME}?RESET}  {INFO}Providers:{RESET} '
-          f'{ACCENT}ollama  qwen  groq  openai  anthropic{RESET}{W(3)}{FRAME}  ?RESET}')
-    print(f'  {FRAME}?RESET}  {INFO}Help   :{RESET}  '
-          f'{INFO}python SOURCE_CODE/main.py --help-guide{RESET}{W(10)}{FRAME}  ?RESET}')
+    print(f'  {FRAME}║{RESET}  {INFO}Modes  :{RESET}  '
+          f'{TEXT}coding  writing  appraisal  search{RESET}{W(8)}{FRAME} ║{RESET}')
+    print(f'  {FRAME}║{RESET}  {INFO}         {RESET}  '
+          f'{TEXT}rct_search  sr  dry-run  ui{RESET}{W(12)}{FRAME}   ║{RESET}')
+    print(f'  {FRAME}║{RESET}  {INFO}Providers:{RESET} '
+          f'{ACCENT}ollama  qwen  groq  openai  anthropic{RESET}{W(3)}{FRAME}  ║{RESET}')
+    print(f'  {FRAME}║{RESET}  {INFO}Help   :{RESET}  '
+          f'{INFO}python SOURCE_CODE/main.py --help-guide{RESET}{W(10)}{FRAME}  ║{RESET}')
 
-    print(f'  {FRAME}?????????????????????????????????????????????????????????RESET}')
+    print(f'  {FRAME}╚═══════════════════════════════════════════════════════╝{RESET}')
 
     theme_hint = (f'{INFO}  theme: {_BG}'
-                  + (' 繚 set CLI_THEME=light to change' if _BG == 'dark' else
-                     ' 繚 set CLI_THEME=dark to change')
+                  + (' - set CLI_THEME=light to change' if _BG == 'dark' else
+                     ' - set CLI_THEME=dark to change')
                   + f'{RESET}')
     print(theme_hint)
     print()
@@ -265,7 +265,7 @@ def pick_mode():
         CW = 25
 
         # -- top border --------------------------------------------------------
-        print(f'  {FRAME}?"?" * CW}?洌"?" * CW}?RESET}')
+        print(f'  {FRAME}┌{"-" * CW}┬{"-" * CW}┐{RESET}')
 
         # -- data rows ---------------------------------------------------------
         for i in range(mid):
@@ -276,28 +276,28 @@ def pick_mode():
                 right_cell = f'  {ACCENT}{r_key}{RESET}  {TEXT}{r_lbl:<18}{RESET}  '
             else:
                 right_cell = ' ' * CW
-            print(f'  {FRAME}?RESET}{left_cell}{FRAME}?RESET}{right_cell}{FRAME}?RESET}')
+            print(f'  {FRAME}│{RESET}{left_cell}{FRAME}│{RESET}{right_cell}{FRAME}│{RESET}')
 
         # -- divider before footer ---------------------------------------------
-        print(f'  {FRAME}?"?" * CW}?慮"?" * CW}?廾RESET}')
+        print(f'  {FRAME}├{"-" * CW}┼{"-" * CW}┤{RESET}')
 
         # -- footer row 1: 9 / H -----------------------------------------------
-        print(f'  {FRAME}?RESET}  {ACCENT}9{RESET}  {TEXT}{"Custom flags":<18}{RESET}  '
-              f'{FRAME}?RESET}  {ACCENT}H{RESET}  {TEXT}{"Help guide":<18}{RESET}  {FRAME}?RESET}')
+        print(f'  {FRAME}│{RESET}  {ACCENT}9{RESET}  {TEXT}{"Custom flags":<18}{RESET}  '
+              f'{FRAME}│{RESET}  {ACCENT}H{RESET}  {TEXT}{"Help guide":<18}{RESET}  {FRAME}│{RESET}')
 
         # -- footer row 2: X / blank -------------------------------------------
-        print(f'  {FRAME}?RESET}  {ACCENT}X{RESET}  {TEXT}{"Exit":<18}{RESET}  '
-              f'{FRAME}?RESET}{" " * CW}{FRAME}?RESET}')
+        print(f'  {FRAME}│{RESET}  {ACCENT}X{RESET}  {TEXT}{"Exit":<18}{RESET}  '
+              f'{FRAME}│{RESET}{" " * CW}{FRAME}│{RESET}')
 
         # -- bottom border -----------------------------------------------------
-        print(f'  {FRAME}?"?" * CW}?揩"?" * CW}?RESET}')
+        print(f'  {FRAME}└{"-" * CW}┴{"-" * CW}┘{RESET}')
 
         print()
         print(f'  {INFO}Tip: Press {ACCENT}Ctrl+C{RESET}{INFO} inside any session to stop and return here.{RESET}')
         print()
 
         choice = safe_input(
-            f'  {ACCENT}?? Enter choice [1-9 / H / X]: {RESET}',
+            f'  {ACCENT}>> Enter choice [1-9 / H / X]: {RESET}',
             default='X'
         ).upper()
 
@@ -311,7 +311,7 @@ def pick_mode():
             if choice == key:
                 return label, flag, False, False
 
-        print(f'\n  {ERR}Invalid choice ??please enter 1-9, H, or X.{RESET}')
+        print(f'\n  {ERR}Invalid choice - please enter 1-9, H, or X.{RESET}')
         safe_input(f'  {INFO}Press Enter to try again...{RESET}')
 
 
@@ -330,31 +330,31 @@ def pick_provider(mode_flag: str = '') -> str:
             prov_id = flag.split()[-1] if flag else 'ollama'
 
             if is_sr and prov_id in BLOCKED_FOR_SR:
-                badge = f'{ERR}??no vision{RESET}'
-                prow  = (f'  {FRAME}?RESET}  {INFO}{key}{RESET}  '
+                badge = f'{ERR}x no vision{RESET}'
+                prow  = (f'  {FRAME}│{RESET}  {INFO}{key}{RESET}  '
                          f'{INFO}{name:<12}{RESET}  {INFO}{desc:<26}{RESET}'
-                         f'{badge}  {FRAME}?RESET}')
+                         f'{badge}  {FRAME}│{RESET}')
             elif is_sr and prov_id in VISION_PROVIDERS:
-                badge = f'{GOOD}??vision  {RESET}'
-                prow  = (f'  {FRAME}?RESET}  {ACCENT}{key}{RESET}  '
+                badge = f'{GOOD}✓ vision  {RESET}'
+                prow  = (f'  {FRAME}│{RESET}  {ACCENT}{key}{RESET}  '
                          f'{TEXT}{name:<12}{RESET}  {INFO}{desc:<26}{RESET}'
-                         f'{badge}  {FRAME}?RESET}')
+                         f'{badge}  {FRAME}│{RESET}')
             else:
-                prow  = (f'  {FRAME}?RESET}  {ACCENT}{key}{RESET}  '
+                prow  = (f'  {FRAME}│{RESET}  {ACCENT}{key}{RESET}  '
                          f'{TEXT}{name:<12}{RESET}  {INFO}{desc:<26}{RESET}'
-                         f'{" " * 12}{FRAME}?RESET}')
+                         f'{" " * 12}{FRAME}│{RESET}')
             print(prow)
 
         print()
 
         if is_sr:
-            print(f'  {WARN}?? SR Pipeline requires a vision-capable provider.{RESET}')
+            print(f'  {WARN}⚠  SR Pipeline requires a vision-capable provider.{RESET}')
             print(f'  {INFO}   Supported: {GOOD}qwen, openai, anthropic, groq{RESET}')
             print(f'  {INFO}   Blocked:   {ERR}ollama, deepseek{RESET}')
             print()
 
         choice = safe_input(
-            f'  {ACCENT}?? Enter choice [1-6] or Enter for Ollama: {RESET}',
+            f'  {ACCENT}>> Enter choice [1-6] or Enter for Ollama: {RESET}',
             default='',
         ).strip()
 
@@ -371,20 +371,20 @@ def pick_provider(mode_flag: str = '') -> str:
                     break
             if not matched:
                 print(f'\n  {ERR}Invalid choice. Please enter 1-6 or press Enter.{RESET}')
-                safe_input(f'  {INFO}Press Enter to try again?州RESET}')
+                safe_input(f'  {INFO}Press Enter to try again...{RESET}')
                 continue
 
         if is_sr and prov_id in BLOCKED_FOR_SR:
             print()
-            print(f'  {ERR}?? "{prov_id}" does not support the vision API.{RESET}')
-            print(f'  {INFO}  The SR pipeline extracts data from PDF images ?RESET}')
+            print(f'  {ERR}x  "{prov_id}" does not support the vision API.{RESET}')
+            print(f'  {INFO}  The SR pipeline extracts data from PDF images -{RESET}')
             print(f'  {INFO}  a vision-capable model is required.{RESET}')
             print()
             print(f'  {GOOD}  Supported vision providers:{RESET}')
             for p in sorted(VISION_PROVIDERS):
-                print(f'     {GOOD}?┐RESET}  {TEXT}{p}{RESET}')
+                print(f'     {GOOD}.{RESET}  {TEXT}{p}{RESET}')
             print()
-            safe_input(f'  {INFO}Press Enter to choose again?州RESET}')
+            safe_input(f'  {INFO}Press Enter to choose again...{RESET}')
             continue
 
         return prov_flag
@@ -414,21 +414,21 @@ def check_input_folder(mode: str) -> None:
         return
 
     print()
-    print(f'  {WARN}?? INPUT FOLDER CHECK{RESET}')
+    print(f'  {WARN}⚠  INPUT FOLDER CHECK{RESET}')
     print(f'  {INFO}Found {len(files)} existing file(s) in {ACCENT}input/{mode}/{RESET}')
     print()
     for f in files:
-        print(f'     {SEP}繚{RESET}  {TEXT}{f.name}{RESET}')
+        print(f'     {SEP}.{RESET}  {TEXT}{f.name}{RESET}')
     print()
     print(f'  {TEXT}Were these files intentionally placed here for this run?{RESET}')
 
     ans = safe_input(
-        f'  {ACCENT}?? Keep them? [Y = keep  /  N = move out]: {RESET}',
+        f'  {ACCENT}>> Keep them? [Y = keep  /  N = move out]: {RESET}',
         default='N',
     ).strip().upper()
 
     if ans == 'Y':
-        print(f'  {GOOD}?? Files kept ??they will be used in this session.{RESET}')
+        print(f'  {GOOD}✓  Files kept - they will be used in this session.{RESET}')
         return
 
     dest = _find_move_destination(mode)
@@ -442,13 +442,13 @@ def check_input_folder(mode: str) -> None:
             failed.append(f'{f.name}  ({exc})')
 
     if moved:
-        print(f'\n  {GOOD}?? Moved {len(moved)} file(s) ??{ACCENT}{dest}{RESET}')
+        print(f'\n  {GOOD}✓  Moved {len(moved)} file(s) -> {ACCENT}{dest}{RESET}')
         for name in moved:
-            print(f'     {SEP}繚{RESET}  {TEXT}{name}{RESET}')
+            print(f'     {SEP}.{RESET}  {TEXT}{name}{RESET}')
     if failed:
-        print(f'\n  {ERR}?? Could not move:{RESET}')
+        print(f'\n  {ERR}x  Could not move:{RESET}')
         for name in failed:
-            print(f'     {SEP}繚{RESET}  {TEXT}{name}{RESET}')
+            print(f'     {SEP}.{RESET}  {TEXT}{name}{RESET}')
     print()
 
 
@@ -459,15 +459,15 @@ def _run_cmd(cmd: list, label: str = '') -> None:
     flags_str = ' '.join(cmd[2:])
     display   = flags_str if len(flags_str) <= 33 else flags_str[:30] + '...'
     print()
-    print(f'  {FRAME}????Running ?????????????????????????????????????????????RESET}')
-    print(f'  {FRAME}?RESET}  {ACCENT}python SOURCE_CODE/main.py {display:<33}{RESET}  {FRAME}?RESET}')
-    print(f'  {FRAME}????Ctrl+C stops and returns to menu ????????????????????{RESET}')
+    print(f'  {FRAME}╔══ Running ════════════════════════════════════════════╗{RESET}')
+    print(f'  {FRAME}║{RESET}  {ACCENT}python SOURCE_CODE/main.py {display:<33}{RESET}  {FRAME}║{RESET}')
+    print(f'  {FRAME}╚══ Ctrl+C stops and returns to menu ═══════════════════╝{RESET}')
     print()
     creationflags = subprocess.CREATE_NEW_PROCESS_GROUP if os.name == 'nt' else 0
     try:
         subprocess.run(cmd, cwd=str(BASE), creationflags=creationflags)
     except (KeyboardInterrupt, EOFError):
-        print(f'\n  {WARN}Session stopped.  Returning to menu?州RESET}\n')
+        print(f'\n  {WARN}Session stopped.  Returning to menu...{RESET}\n')
 
 
 def run_custom() -> None:
@@ -477,7 +477,7 @@ def run_custom() -> None:
     print(f'  {INFO}Type flags, e.g.  {ACCENT}--mode writing --report --provider qwen{RESET}')
     print(f'  {INFO}Leave blank and press Enter to cancel.{RESET}')
     print()
-    custom = safe_input(f'  {ACCENT}?? python SOURCE_CODE/main.py  {RESET}', default='')
+    custom = safe_input(f'  {ACCENT}>> python SOURCE_CODE/main.py  {RESET}', default='')
     if not custom.strip():
         print(f'  {INFO}Cancelled.{RESET}')
         return
@@ -488,21 +488,21 @@ def run_custom() -> None:
 def run_ui() -> None:
     cmd = [PYTHON, str(BASE / 'SOURCE_CODE' / 'main.py'), '--ui']
     print()
-    print(f'  {FRAME}????Streamlit UI ????????????????????????????????????????{RESET}')
-    print(f'  {FRAME}?RESET}  {GOOD}Opening :{RESET}  {ACCENT}http://localhost:8501{RESET}{"  " * 12}{FRAME}?RESET}')
-    print(f'  {FRAME}?RESET}  {INFO}Stop    :{RESET}  {INFO}Close browser tab then press Ctrl+C{RESET}  {FRAME}?RESET}')
-    print(f'  {FRAME}?????????????????????????????????????????????????????????RESET}')
+    print(f'  {FRAME}╔══ Streamlit UI ═══════════════════════════════════════╗{RESET}')
+    print(f'  {FRAME}║{RESET}  {GOOD}Opening :{RESET}  {ACCENT}http://localhost:8501{RESET}{"  " * 12}{FRAME}║{RESET}')
+    print(f'  {FRAME}║{RESET}  {INFO}Stop    :{RESET}  {INFO}Close browser tab then press Ctrl+C{RESET}  {FRAME}║{RESET}')
+    print(f'  {FRAME}╚═══════════════════════════════════════════════════════╝{RESET}')
     print()
     try:
         proc = subprocess.Popen(cmd, cwd=str(BASE))
         proc.wait()
     except (KeyboardInterrupt, EOFError):
         proc.terminate()
-        print(f'\n  {WARN}UI stopped.  Returning to menu?州RESET}\n')
+        print(f'\n  {WARN}UI stopped.  Returning to menu...{RESET}\n')
 
 
 def show_help() -> None:
-    help_file = BASE / 'SOURCE_CODE' / 'docs' / 'flashcard-help.html'
+    help_file = BASE / "Readme" / "flashcard-help.html"
     opened = False
     if help_file.exists():
         try:
@@ -533,7 +533,7 @@ def show_help() -> None:
         print(f'  {INFO}Full guide:{RESET}  {ACCENT}python SOURCE_CODE/main.py --help-guide{RESET}')
         print()
 
-    safe_input(f'  {INFO}Press Enter to return to menu?州RESET}')
+    safe_input(f'  {INFO}Press Enter to return to menu...{RESET}')
 
 
 # -----------------------------------------------------------------------------
@@ -551,7 +551,7 @@ def main() -> None:
         try:
             if label is None and not is_custom and not is_help:
                 clear()
-                print(f'\n  {ACCENT}Goodbye!  ??{RESET}\n')
+                print(f'\n  {ACCENT}Goodbye!  👋{RESET}\n')
                 break
 
             if is_help:
@@ -560,12 +560,12 @@ def main() -> None:
 
             if is_custom:
                 run_custom()
-                safe_input(f'  {INFO}Press Enter to return to menu?州RESET}')
+                safe_input(f'  {INFO}Press Enter to return to menu...{RESET}')
                 continue
 
             if mode_flag == '--ui':
                 run_ui()
-                safe_input(f'  {INFO}Press Enter to return to menu?州RESET}')
+                safe_input(f'  {INFO}Press Enter to return to menu...{RESET}')
                 continue
 
             input_mode = _MODE_INPUT_MAP.get(mode_flag)
@@ -578,11 +578,11 @@ def main() -> None:
             cmd   = [PYTHON, str(BASE / 'SOURCE_CODE' / 'main.py')] + ' '.join(flags).split()
             _run_cmd(cmd, label=label or '')
 
-            safe_input(f'  {INFO}Press Enter to return to menu?州RESET}')
+            safe_input(f'  {INFO}Press Enter to return to menu...{RESET}')
 
         except (KeyboardInterrupt, EOFError):
-            print(f'\n\n  {WARN}Session stopped.  Returning to menu?州RESET}\n')
-            safe_input(f'  {INFO}Press Enter to continue?州RESET}')
+            print(f'\n\n  {WARN}Session stopped.  Returning to menu...{RESET}\n')
+            safe_input(f'  {INFO}Press Enter to continue...{RESET}')
             continue
 
 

@@ -1,3 +1,4 @@
+# docker/Dockerfile
 FROM python:3.11-slim
 
 # Install system dependencies
@@ -17,7 +18,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # Create directories for mounted volumes
-RUN mkdir -p /app/input /app/output /app/data
+RUN mkdir -p /app/input /app/output /app/data /app/reports
 
 # Expose ports
 EXPOSE 8501 8000
@@ -26,5 +27,9 @@ EXPOSE 8501 8000
 ENV PYTHONUNBUFFERED=1
 ENV CLI_THEME=dark
 
+# Ensure SOURCE_CODE is in Python path
+ENV PYTHONPATH=/app:/app/SOURCE_CODE
+
 # Default command (can be overridden)
-CMD ["python", "launcher.py"]
+# Now points to SOURCE_CODE/main.py
+CMD ["python", "SOURCE_CODE/main.py"]

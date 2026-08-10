@@ -1,6 +1,8 @@
-﻿import logging, tempfile
+# SOURCE_CODE/pipelines/sr/src/reporting/pdf_report.py
+import logging, tempfile
 from pathlib import Path
-from sr.src.reporting.html_report import HTMLReportGenerator
+# Fix: Use relative import
+from .html_report import HTMLReportGenerator
 logger = logging.getLogger(__name__)
 
 PDF_CSS = """

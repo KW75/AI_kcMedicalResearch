@@ -1,11 +1,11 @@
 #!/bin/bash
 # =============================================================================
-#  run_mac_cli.sh - Quick CLI Launcher for Mac
-#  v1.0.0
+#  Mac_kcMedicalResearch_CLI.sh - Quick CLI Launcher for Mac
+#  v2.0.0  |  Updated for SOURCE_CODE structure
 # =============================================================================
 
-# Get the directory where this script is located
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Get the directory where this script is located (project root)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 
 echo ""
 echo "============================================================"
@@ -37,7 +37,7 @@ if ! docker images --format "{{.Repository}}" | grep -i "ai-kcmedicalresearch" >
     echo -e "\033[34m[BUILD]\033[0m Building Docker image (first time only)..."
     echo "This may take 5-10 minutes..."
     echo ""
-    docker build -t ai-kcmedicalresearch "$SCRIPT_DIR"
+    docker build -f docker/Dockerfile -t ai-kcmedicalresearch "$SCRIPT_DIR"
 fi
 
 echo -e "\033[34m[RUN]\033[0m Starting CLI..."
@@ -52,4 +52,4 @@ docker run -it --rm \
     --env-file "$SCRIPT_DIR/.env" \
     --add-host host.docker.internal:host-gateway \
     ai-kcmedicalresearch \
-    python launcher.py
+    python SOURCE_CODE/main.py

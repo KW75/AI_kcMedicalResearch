@@ -1,3 +1,4 @@
+# SOURCE_CODE/pipelines/sr/src/screening/rob2_tool.py
 import json, logging, os, time
 from typing import Optional
 import anthropic
@@ -68,7 +69,7 @@ class RoB2Assessor:
                 ]}],
                 betas=[BETA_HEADER])
             raw = resp.content[0].text.strip()
-            from sr.src.utils.json_utils import extract_json
+            from ..utils.json_utils import extract_json
             r = extract_json(raw)
             r.update({"file_id": file_id, "filename": filename, "error": None})
             return r
@@ -163,7 +164,7 @@ class RoB2Assessor:
                 pdf_text = pdf_text[:6000] + "\n...[truncated]"
 
             raw = self._call_with_text(pdf_text, ROB2_PROMPT)
-            from sr.src.utils.json_utils import extract_json
+            from ..utils.json_utils import extract_json
             r = extract_json(raw)
             r.update({"file_id": None, "filename": filename, "error": None})
             return r

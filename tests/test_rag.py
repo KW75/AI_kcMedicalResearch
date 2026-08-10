@@ -1,5 +1,5 @@
 """
-test_rag.py — Unit tests for src/rag.py
+test_rag.py — Unit tests for SOURCE_CODE/utils/rag.py
 
 All tests use mocks or an in-memory ChromaDB client so no files are written
 to disk and Ollama does not need to be running.
@@ -14,7 +14,7 @@ from unittest.mock import MagicMock, patch
 import chromadb
 import pytest
 
-import src.rag as rag
+from SOURCE_CODE.utils import rag
 
 
 # ---------------------------------------------------------------------------
@@ -86,7 +86,7 @@ class TestGetEmbeddings:
         mock_resp.__enter__ = lambda s: s
         mock_resp.__exit__  = MagicMock(return_value=False)
 
-        with patch("src.rag.EMBEDDING_PROVIDER", "ollama"), \
+        with patch("SOURCE_CODE.utils.rag.EMBEDDING_PROVIDER", "ollama"), \
              patch("urllib.request.urlopen", return_value=mock_resp) as mock_open:
             result = rag.get_embeddings(["hello"])
 
@@ -105,8 +105,8 @@ class TestGetEmbeddings:
         mock_resp.__enter__ = lambda s: s
         mock_resp.__exit__  = MagicMock(return_value=False)
 
-        with patch("src.rag.EMBEDDING_PROVIDER", "openai"), \
-             patch("src.rag.OPENAI_API_KEY", "sk-test"), \
+        with patch("SOURCE_CODE.utils.rag.EMBEDDING_PROVIDER", "openai"), \
+             patch("SOURCE_CODE.utils.rag.OPENAI_API_KEY", "sk-test"), \
              patch("urllib.request.urlopen", return_value=mock_resp) as mock_open:
             result = rag.get_embeddings(["hello"])
 
@@ -116,7 +116,7 @@ class TestGetEmbeddings:
 
     def test_unsupported_provider_raises(self):
         """An unknown EMBEDDING_PROVIDER must raise RuntimeError."""
-        with patch("src.rag.EMBEDDING_PROVIDER", "unknown_llm"):
+        with patch("SOURCE_CODE.utils.rag.EMBEDDING_PROVIDER", "unknown_llm"):
             with pytest.raises(RuntimeError, match="Unsupported EMBEDDING_PROVIDER"):
                 rag.get_embeddings(["test"])
 
@@ -147,7 +147,7 @@ class TestIndexUploads:
         client = _make_in_memory_client()
         rag.set_client(client)
 
-        with patch("src.rag.get_embeddings", side_effect=_fake_embeddings):
+        with patch("SOURCE_CODE.utils.rag.get_embeddings", side_effect=_fake_embeddings):
             n = rag.index_uploads(
                 mode="coding",
                 session_id="sess01",
@@ -192,7 +192,7 @@ class TestRetrieve:
         client = _make_in_memory_client()
         rag.set_client(client)
 
-        with patch("src.rag.get_embeddings", side_effect=_fake_embeddings):
+        with patch("SOURCE_CODE.utils.rag.get_embeddings", side_effect=_fake_embeddings):
             rag.index_uploads(
                 mode="rct_search",
                 session_id="s99",
@@ -235,7 +235,7 @@ class TestClearSession:
         client = _make_in_memory_client()
         rag.set_client(client)
 
-        with patch("src.rag.get_embeddings", side_effect=_fake_embeddings):
+        with patch("SOURCE_CODE.utils.rag.get_embeddings", side_effect=_fake_embeddings):
             rag.index_uploads(
                 mode="coding",
                 session_id="del01",

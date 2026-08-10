@@ -1,12 +1,12 @@
 @echo off
 :: =============================================================================
 ::  AI_kcMedicalResearch_UI.bat
-::  v2.3.2  |  Global / Shared Streamlit UI Launcher  |  ASCII-safe
+::  v2.3.2  |  Global / Shared Streamlit UI Launcher  |  Updated for SOURCE_CODE
 :: =============================================================================
 setlocal EnableDelayedExpansion
 
 :: --- 0. RESOLVE PROJECT ROOT -------------------------------------------------
-set "PROJECT_DIR=%~dp0"
+set "PROJECT_DIR=%~dp0.."
 if "!PROJECT_DIR:~-1!"=="\" set "PROJECT_DIR=!PROJECT_DIR:~0,-1!"
 title AI kcMedical Research - UI - %PROJECT_DIR%
 cd /d "%PROJECT_DIR%"
@@ -20,8 +20,8 @@ if not exist "%PROJECT_DIR%\.venv\Scripts\python.exe" (
 )
 
 :: --- 2. GUARD: app.py present? -----------------------------------------------
-if not exist "%PROJECT_DIR%\src\ui\app.py" (
-    call :box_error "UI app not found at src\ui\app.py"
+if not exist "%PROJECT_DIR%\SOURCE_CODE\ui\app.py" (
+    call :box_error "UI app not found at SOURCE_CODE\ui\app.py"
     pause & exit /b 1
 )
 
@@ -51,7 +51,7 @@ ping -n 4 127.0.0.1 >nul
 start "" "http://localhost:8501"
 
 :: --- 6. START STREAMLIT ------------------------------------------------------
-set "APP=%PROJECT_DIR%\src\ui\app.py"
+set "APP=%PROJECT_DIR%\SOURCE_CODE\ui\app.py"
 set "PY=%PROJECT_DIR%\.venv\Scripts\python.exe"
 
 "%PY%" -m streamlit run "%APP%" ^

@@ -1,19 +1,23 @@
+# docker/docker-compose.yml
 version: '3.8'
 
 services:
   ai-kcmedicalresearch:
-    build: .
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
     container_name: ai-kcmedicalresearch
     ports:
       - "8501:8501"   # Streamlit UI
       - "8000:8000"   # API if needed
     volumes:
       # Mount local directories for input/output
-      - ./input:/app/input
-      - ./output:/app/output
-      - ./data:/app/data
+      - ../input:/app/input
+      - ../output:/app/output
+      - ../data:/app/data
+      - ../reports:/app/reports
       # Mount .env if it exists
-      - ./.env:/app/.env:ro
+      - ../.env:/app/.env:ro
     environment:
       - CLI_THEME=${CLI_THEME:-dark}
       - OLLAMA_HOST=${OLLAMA_HOST:-http://host.docker.internal:11434}
@@ -25,8 +29,11 @@ services:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
+      - PYTHONPATH=/app:/app/SOURCE_CODE
     stdin_open: true
     tty: true
     # For Windows, connect to host's Ollama
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    # Command for UI mode (overrides default)
+    # command: streamlit run SOURCE_CODE/ui/app.py --server.port=8501 --server.address=0.0.0.0

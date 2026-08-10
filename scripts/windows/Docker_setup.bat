@@ -3,7 +3,7 @@ setlocal EnableDelayedExpansion
 
 :: =============================================================================
 ::  AI kcMedicalResearch - Complete Setup & Run
-::  v1.0.0  |  One-click setup with Docker
+::  v2.0.0  |  Updated for SOURCE_CODE structure
 :: =============================================================================
 
 title AI kcMedicalResearch Setup
@@ -249,7 +249,7 @@ if errorlevel 1 (
     echo   [DOCKER] Building Docker image (first time only)...
     echo   This may take 5-10 minutes...
     echo.
-    docker build -t ai-kcmedicalresearch .
+    docker build -f docker/Dockerfile -t ai-kcmedicalresearch .
     if errorlevel 1 (
         echo.
         echo   [ERROR] Failed to build Docker image.
@@ -305,7 +305,7 @@ if "!RUN_CHOICE!"=="2" (
         --env-file .env ^
         --add-host host.docker.internal:host-gateway ^
         ai-kcmedicalresearch ^
-        streamlit run src/ui/app.py --server.port=8501 --server.address=0.0.0.0
+        streamlit run SOURCE_CODE/ui/app.py --server.port=8501 --server.address=0.0.0.0
 ) else (
     echo   CLI Mode starting...
     echo   Use the menu to select pipeline and provider
@@ -319,7 +319,7 @@ if "!RUN_CHOICE!"=="2" (
         --env-file .env ^
         --add-host host.docker.internal:host-gateway ^
         ai-kcmedicalresearch ^
-        python launcher.py
+        python SOURCE_CODE/main.py
 )
 
 echo.

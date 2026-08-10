@@ -1,14 +1,14 @@
 @echo off
 :: =============================================================================
 ::  AI_kcMedicalResearch_CLI.bat
-::  v2.3.0  |  Global / Shared CLI Launcher
+::  v2.3.0  |  Global / Shared CLI Launcher  |  Updated for SOURCE_CODE
 :: =============================================================================
 setlocal EnableDelayedExpansion
 
 :: ─────────────────────────────────────────────────────────────────────────────
 ::  0.  RESOLVE PROJECT ROOT
 :: ─────────────────────────────────────────────────────────────────────────────
-set "PROJECT_DIR=%~dp0"
+set "PROJECT_DIR=%~dp0.."
 if "!PROJECT_DIR:~-1!"=="\" set "PROJECT_DIR=!PROJECT_DIR:~0,-1!"
 title AI kcMedical Research  ^|  CLI  ^|  %PROJECT_DIR%
 cd /d "%PROJECT_DIR%"
@@ -64,7 +64,7 @@ echo    TIP: Alt+Tab switches between the CLI and browser
 echo   ============================================================
 echo.
 
-"!PYTHON_EXE!" "%PROJECT_DIR%\launcher.py"
+"!PYTHON_EXE!" "%PROJECT_DIR%\scripts\launcher.py"
 set "EXIT_CODE=!errorlevel!"
 
 :: ─────────────────────────────────────────────────────────────────────────────
@@ -82,9 +82,7 @@ exit /b !EXIT_CODE!
 ::  S U B R O U T I N E S   (shared — identical in both .bat files)
 :: =============================================================================
 
-:: ─────────────────────────────────────────────────────────────────────────────
 :print_header  <subtitle>
-:: ─────────────────────────────────────────────────────────────────────────────
 echo.
 echo   ============================================================
 echo    AI kcMedical Research   ^|  %~1  ^|  v2.3.0
@@ -95,11 +93,7 @@ echo.
 goto :eof
 
 
-:: ─────────────────────────────────────────────────────────────────────────────
 :detect_theme
-::  Read CLI_THEME from HKCU registry (persistent across sessions).
-::  If absent, ask the user once and save with SETX (user scope, no admin).
-:: ─────────────────────────────────────────────────────────────────────────────
 for /f "tokens=2*" %%A in (
     'reg query "HKCU\Environment" /v CLI_THEME 2^>nul'
 ) do set "CLI_THEME_STORED=%%B"
@@ -116,11 +110,11 @@ echo   ============================================================
 echo.
 echo    What is the background colour of YOUR terminal window?
 echo.
-echo      D  =  Dark background   ^(black / dark grey — most common^)
-echo      L  =  Light background  ^(white / light grey CMD window^)
+echo      D  =  Dark background   (black / dark grey — most common)
+echo      L  =  Light background  (white / light grey CMD window)
 echo.
 echo    You will only be asked this ONCE.  To change later, run:
-echo      setx CLI_THEME dark    ^(or light^)
+echo      setx CLI_THEME dark    (or light)
 echo.
 set /p "THEME_CHOICE=   Enter D or L  [press Enter for Dark]:  "
 
@@ -133,11 +127,7 @@ echo.
 goto :eof
 
 
-:: ─────────────────────────────────────────────────────────────────────────────
 :locate_python
-::  Sets PYTHON_EXE and HAVE_VENV.
-::  Returns errorlevel 1 if no Python found anywhere.
-:: ─────────────────────────────────────────────────────────────────────────────
 set "VENV_PYTHON=%PROJECT_DIR%\.venv\Scripts\python.exe"
 
 if exist "%VENV_PYTHON%" (
@@ -160,11 +150,7 @@ for /f "delims=" %%P in ('where python') do (
 goto :eof
 
 
-:: ─────────────────────────────────────────────────────────────────────────────
 :first_run_setup
-::  Create .venv + install requirements.txt.
-::  Only runs when .venv\Scripts\python.exe does not exist.
-:: ─────────────────────────────────────────────────────────────────────────────
 echo.
 echo   ============================================================
 echo    FIRST-RUN SETUP  (this only happens once per machine)
@@ -203,9 +189,7 @@ echo.
 goto :eof
 
 
-:: ─────────────────────────────────────────────────────────────────────────────
 :box_error  <message>
-:: ─────────────────────────────────────────────────────────────────────────────
 echo.
 echo   ************************************************************
 echo    ERROR: %~1

@@ -50,3 +50,6 @@ HANDOFF.md
 # Docker
 *.tar
 docker-compose.override.yml
+
+# Keep SOURCE_CODE
+!SOURCE_CODE/

@@ -1,3 +1,4 @@
+# SOURCE_CODE/pipelines/sr/src/screening/relevance_screener.py
 import json, logging, os, time
 from pathlib import Path
 from typing import Optional
@@ -42,7 +43,8 @@ class RelevanceScreener:
                     {"type": "text", "text": self._prompt()}]}],
                 betas=[BETA_HEADER])
             raw = resp.content[0].text.strip()
-            from sr.src.utils.json_utils import extract_json
+            # Use relative import
+            from ..utils.json_utils import extract_json
             r = extract_json(raw)
             r.update({"file_id": file_id, "filename": filename, "error": None})
             return r
@@ -136,7 +138,7 @@ class RelevanceScreener:
                 logger.error(f"HTTP {http_err.code} from {self.provider}: {body[:500]}")
                 raise
             raw = data["choices"][0]["message"]["content"].strip()
-            from sr.src.utils.json_utils import extract_json
+            from ..utils.json_utils import extract_json
             r = extract_json(raw)
             r.update({"file_id": None, "filename": filename, "error": None})
             return r

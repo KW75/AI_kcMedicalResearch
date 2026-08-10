@@ -6,7 +6,7 @@ import pytest
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 
-import src.main as _m
+from SOURCE_CODE import main as _m
 
 
 class TestSRLauncher:
@@ -30,15 +30,16 @@ class TestSRLauncher:
         mock_result = MagicMock()
         mock_result.returncode = 0
 
-        (tmp_path / "sr" / "data" / "uploads").mkdir(parents=True, exist_ok=True)
-        (tmp_path / "sr" / "config").mkdir(parents=True, exist_ok=True)
-        (tmp_path / "sr" / "main.py").write_text("# stub", encoding="utf-8")
+        # Create minimal stub for sr/main.py
+        sr_dir = tmp_path / "sr"
+        sr_dir.mkdir(parents=True, exist_ok=True)
+        (sr_dir / "main.py").write_text("# stub", encoding="utf-8")
 
         with (
             patch.object(_m, "INPUT_SR", tmp_path / "input" / "sr"),
             patch.object(_m, "BASE_DIR", tmp_path),
             patch("subprocess.run", return_value=mock_result),
-            patch("builtins.input", return_value="1"),  # Select first PICO file
+            patch("builtins.input", return_value="1"),
         ):
             _m.run_sr_launcher()
 
@@ -52,20 +53,19 @@ class TestSRLauncher:
         mock_result = MagicMock()
         mock_result.returncode = 0
 
-        (tmp_path / "sr" / "data" / "uploads").mkdir(parents=True, exist_ok=True)
-        (tmp_path / "sr" / "config").mkdir(parents=True, exist_ok=True)
-        (tmp_path / "sr" / "main.py").write_text("# stub", encoding="utf-8")
+        sr_dir = tmp_path / "sr"
+        sr_dir.mkdir(parents=True, exist_ok=True)
+        (sr_dir / "main.py").write_text("# stub", encoding="utf-8")
 
         with (
             patch.object(_m, "INPUT_SR", tmp_path / "input" / "sr"),
             patch.object(_m, "BASE_DIR", tmp_path),
             patch("subprocess.run", return_value=mock_result),
-            patch("builtins.input", return_value="1"),  # Select first PICO file
+            patch("builtins.input", return_value="1"),
         ):
             _m.run_sr_launcher()
 
         out, err = capsys.readouterr()
-        # Should show PICO configuration section
         assert "PICO" in out
 
     def test_launcher_pipeline_complete_message(self, tmp_path, capsys):
@@ -75,35 +75,33 @@ class TestSRLauncher:
         mock_result = MagicMock()
         mock_result.returncode = 0
 
-        (tmp_path / "sr" / "data" / "uploads").mkdir(parents=True, exist_ok=True)
-        (tmp_path / "sr" / "config").mkdir(parents=True, exist_ok=True)
-        (tmp_path / "sr" / "main.py").write_text("# stub", encoding="utf-8")
+        sr_dir = tmp_path / "sr"
+        sr_dir.mkdir(parents=True, exist_ok=True)
+        (sr_dir / "main.py").write_text("# stub", encoding="utf-8")
 
         with (
             patch.object(_m, "INPUT_SR", tmp_path / "input" / "sr"),
             patch.object(_m, "BASE_DIR", tmp_path),
             patch("subprocess.run", return_value=mock_result),
-            patch("builtins.input", return_value="1"),  # Select first PICO file
+            patch("builtins.input", return_value="1"),
         ):
             _m.run_sr_launcher()
 
         out, err = capsys.readouterr()
-        # Should show pipeline output
         assert "Pipeline complete" in out or "SR Automation Pipeline" in out
 
     def test_launcher_finds_pdf_files(self, tmp_path, capsys):
         """Should find PDF files in input/sr/"""
         input_sr = self._make_input_sr(tmp_path)
-        # Add more PDFs
         (input_sr / "paper1.pdf").write_text("paper1", encoding="utf-8")
         (input_sr / "paper2.pdf").write_text("paper2", encoding="utf-8")
 
         mock_result = MagicMock()
         mock_result.returncode = 0
 
-        (tmp_path / "sr" / "data" / "uploads").mkdir(parents=True, exist_ok=True)
-        (tmp_path / "sr" / "config").mkdir(parents=True, exist_ok=True)
-        (tmp_path / "sr" / "main.py").write_text("# stub", encoding="utf-8")
+        sr_dir = tmp_path / "sr"
+        sr_dir.mkdir(parents=True, exist_ok=True)
+        (sr_dir / "main.py").write_text("# stub", encoding="utf-8")
 
         with (
             patch.object(_m, "INPUT_SR", input_sr),
@@ -125,20 +123,19 @@ class TestSRLauncher:
         mock_result = MagicMock()
         mock_result.returncode = 0
 
-        (tmp_path / "sr" / "data" / "uploads").mkdir(parents=True, exist_ok=True)
-        (tmp_path / "sr" / "config").mkdir(parents=True, exist_ok=True)
-        (tmp_path / "sr" / "main.py").write_text("# stub", encoding="utf-8")
+        sr_dir = tmp_path / "sr"
+        sr_dir.mkdir(parents=True, exist_ok=True)
+        (sr_dir / "main.py").write_text("# stub", encoding="utf-8")
 
         with (
             patch.object(_m, "INPUT_SR", input_sr),
             patch.object(_m, "BASE_DIR", tmp_path),
             patch("subprocess.run", return_value=mock_result),
-            patch("builtins.input", return_value="0"),  # Create new PICO
+            patch("builtins.input", return_value="0"),
         ):
             _m.run_sr_launcher()
 
         out, err = capsys.readouterr()
-        # Should either show PICO creation prompt or use existing config
         assert "PICO" in out or "input/sr" in out
 
     def test_launcher_no_pdf_files(self, tmp_path, capsys):
@@ -172,9 +169,9 @@ class TestSRPipeline:
         mock_result = MagicMock()
         mock_result.returncode = 0
 
-        (tmp_path / "sr" / "data" / "uploads").mkdir(parents=True, exist_ok=True)
-        (tmp_path / "sr" / "config").mkdir(parents=True, exist_ok=True)
-        (tmp_path / "sr" / "main.py").write_text("# stub", encoding="utf-8")
+        sr_dir = tmp_path / "sr"
+        sr_dir.mkdir(parents=True, exist_ok=True)
+        (sr_dir / "main.py").write_text("# stub", encoding="utf-8")
 
         with (
             patch.object(_m, "INPUT_SR", input_sr),
@@ -200,9 +197,9 @@ class TestSRPipeline:
         mock_result = MagicMock()
         mock_result.returncode = 0
 
-        (tmp_path / "sr" / "data" / "uploads").mkdir(parents=True, exist_ok=True)
-        (tmp_path / "sr" / "config").mkdir(parents=True, exist_ok=True)
-        (tmp_path / "sr" / "main.py").write_text("# stub", encoding="utf-8")
+        sr_dir = tmp_path / "sr"
+        sr_dir.mkdir(parents=True, exist_ok=True)
+        (sr_dir / "main.py").write_text("# stub", encoding="utf-8")
 
         with (
             patch.object(_m, "INPUT_SR", input_sr),
@@ -213,5 +210,4 @@ class TestSRPipeline:
             _m.run_sr_launcher(provider="qwen", model="qwen3.7-plus")
 
         out, err = capsys.readouterr()
-        # Should have run without error
         assert "running" in out.lower() or "pipeline" in out.lower()

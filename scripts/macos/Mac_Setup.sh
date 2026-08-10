@@ -1,7 +1,7 @@
 #!/bin/bash
 # =============================================================================
-#  Mac_Setup_Instruction_to_Users.sh - AI kcMedicalResearch Complete Setup for Mac
-#  v1.0.0  |  One-click setup with Docker for macOS
+#  Mac_Setup.sh - AI kcMedicalResearch Complete Setup for Mac
+#  v2.0.0  |  Updated for SOURCE_CODE structure
 # =============================================================================
 
 set -e
@@ -264,7 +264,7 @@ if ! docker images --format "{{.Repository}}" | grep -i "ai-kcmedicalresearch" >
     echo "This may take 5-10 minutes..."
     echo ""
 
-    docker build -t ai-kcmedicalresearch .
+    docker build -f docker/Dockerfile -t ai-kcmedicalresearch .
     if [ $? -ne 0 ]; then
         echo ""
         echo -e "${RED}[ERROR]${NC} Failed to build Docker image."
@@ -321,7 +321,7 @@ if [ "$RUN_CHOICE" == "2" ]; then
         --env-file .env \
         --add-host host.docker.internal:host-gateway \
         ai-kcmedicalresearch \
-        streamlit run src/ui/app.py --server.port=8501 --server.address=0.0.0.0
+        streamlit run SOURCE_CODE/ui/app.py --server.port=8501 --server.address=0.0.0.0
 else
     echo -e "${BLUE}CLI Mode starting...${NC}"
     echo "Use the menu to select pipeline and provider"
@@ -335,7 +335,7 @@ else
         --env-file .env \
         --add-host host.docker.internal:host-gateway \
         ai-kcmedicalresearch \
-        python launcher.py
+        python SOURCE_CODE/main.py
 fi
 
 echo ""

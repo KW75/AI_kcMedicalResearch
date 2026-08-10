@@ -1,4 +1,4 @@
-﻿"""
+"""
 test_live_providers.py  -  Live provider smoke test
 Run manually:  python test_live_providers.py
 Requires:  .env with at least one real API key
@@ -7,7 +7,7 @@ import os, sys, time
 from pathlib import Path
 from dotenv import load_dotenv
 
-load_dotenv(Path(__file__).parent / ".env")
+load_dotenv(Path(__file__).parent.parent / ".env")
 
 PROMPT = "Reply with exactly: OK"
 

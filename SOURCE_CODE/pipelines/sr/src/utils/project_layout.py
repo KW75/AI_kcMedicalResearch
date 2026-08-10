@@ -1,3 +1,4 @@
+# SOURCE_CODE/pipelines/sr/src/utils/project_layout.py
 """
 project_layout.py
 -----------------
@@ -23,23 +24,27 @@ from datetime import datetime
 from pathlib import Path
 
 # ── Root ──────────────────────────────────────────────────────────────────────
-ROOT = Path(os.environ.get("KC_ROOT", r"D:\AI_kcMedicalResearch"))
+# Determine project root dynamically
+_current_file = Path(__file__).resolve()
+PROJECT_ROOT = _current_file.parent.parent.parent.parent.parent  # Go up to project root
 
 # ── Input (read-only by pipeline) ─────────────────────────────────────────────
-INPUT_SR        = ROOT / "input" / "sr"
+INPUT_SR        = PROJECT_ROOT / "input" / "sr"
 
 # ── Mirror output (always reflects latest run) ────────────────────────────────
-OUTPUT_SR       = ROOT / "output" / "sr"
+OUTPUT_SR       = PROJECT_ROOT / "output" / "sr"
 OUTPUT_FIGURES  = OUTPUT_SR / "figures"
 OUTPUT_REPORTS  = OUTPUT_SR / "reports"
 
 # ── Legacy sr\data paths (kept for backward compat during transition) ─────────
-LEGACY_UPLOADS  = ROOT / "sr" / "data" / "uploads"
-LEGACY_SCREENED = ROOT / "sr" / "data" / "screened"
-LEGACY_EXTRACTED= ROOT / "sr" / "data" / "extracted"
-LEGACY_RESULTS  = ROOT / "sr" / "data" / "results"
-LEGACY_FIGURES  = ROOT / "sr" / "outputs" / "figures"
-LEGACY_REPORTS  = ROOT / "sr" / "outputs" / "reports"
+# Note: These are now inside SOURCE_CODE/pipelines/sr/
+SR_DIR = _current_file.parent.parent.parent  # Go up to sr directory
+LEGACY_UPLOADS  = SR_DIR / "data" / "uploads"
+LEGACY_SCREENED = SR_DIR / "data" / "screened"
+LEGACY_EXTRACTED= SR_DIR / "data" / "extracted"
+LEGACY_RESULTS  = SR_DIR / "data" / "results"
+LEGACY_FIGURES  = SR_DIR / "outputs" / "figures"
+LEGACY_REPORTS  = SR_DIR / "outputs" / "reports"
 
 
 def make_run_id() -> str:
@@ -56,7 +61,7 @@ class SRProjectLayout:
 
     def __init__(self, run_id: str | None = None):
         self.run_id     = run_id or make_run_id()
-        self.project    = ROOT / "reports" / "sr" / self.run_id
+        self.project    = PROJECT_ROOT / "reports" / "sr" / self.run_id
 
         # ── Sub-paths ─────────────────────────────────────────────────────────
         self.uploads        = self.project / "uploads"

@@ -1,3 +1,4 @@
+# SOURCE_CODE/pipelines/sr/src/extraction/data_extractor.py
 import json, logging, os, time
 import base64
 import io
@@ -91,7 +92,7 @@ class DataExtractor:
                 api_key=api_key or os.environ["ANTHROPIC_API_KEY"])
         else:
             from openai import OpenAI
-            from sr.src.screening.rob2_tool import _openai_compat_creds
+            from ..screening.rob2_tool import _openai_compat_creds
             _key, _base = _openai_compat_creds(self.provider, api_key)
             self.client = OpenAI(api_key=_key, base_url=_base)
 
@@ -400,7 +401,8 @@ class DataExtractor:
                 raw = self._call_vision_api(base64_images, self._prompt())
                 raw_response = raw
                 
-                from sr.src.utils.json_utils import extract_json
+                # Use relative import
+                from ..utils.json_utils import extract_json
                 r = extract_json(raw)
                 
                 if r and isinstance(r, dict):
@@ -498,7 +500,7 @@ class DataExtractor:
                 ]}],
                 betas=[BETA_HEADER])
             raw = resp.content[0].text.strip()
-            from sr.src.utils.json_utils import extract_json
+            from ..utils.json_utils import extract_json
             r = extract_json(raw)
             r.update({"file_id": file_id, "filename": filename, "extraction_error": None})
             return r

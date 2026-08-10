@@ -1,24 +1,28 @@
-# sr/main.py
+# SOURCE_CODE/pipelines/sr/main.py
 import argparse, logging, sys
 import pandas as pd
 from pathlib import Path
 import yaml
 
-# Ensure project root is on sys.path so sr.src.* imports work
-ROOT = Path(__file__).resolve().parent.parent
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
+# Add the parent directories to path
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent
+SOURCE_CODE_DIR = PROJECT_ROOT / "SOURCE_CODE"
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+if str(SOURCE_CODE_DIR) not in sys.path:
+    sys.path.insert(0, str(SOURCE_CODE_DIR))
 
-from sr.src.upload.file_manager          import FileManager
-from sr.src.screening.relevance_screener import RelevanceScreener
-from sr.src.screening.rob2_tool          import RoB2Assessor
-from sr.src.extraction.data_extractor    import DataExtractor
-from sr.src.analysis.meta_analysis       import MetaAnalyzer
-from sr.src.visualization.forest_plot    import ForestPlotGenerator
-from sr.src.reporting.report_generator   import ReportGenerator
-from sr.src.reporting.pdf_report         import PDFReportGenerator
-from sr.src.utils.project_layout         import SRProjectLayout
-from sr.src.utils.audit_logger           import (
+# Now use relative imports from the sr module
+from .src.upload.file_manager import FileManager
+from .src.screening.relevance_screener import RelevanceScreener
+from .src.screening.rob2_tool import RoB2Assessor
+from .src.extraction.data_extractor import DataExtractor
+from .src.analysis.meta_analysis import MetaAnalyzer
+from .src.visualization.forest_plot import ForestPlotGenerator
+from .src.reporting.report_generator import ReportGenerator
+from .src.reporting.pdf_report import PDFReportGenerator
+from .src.utils.project_layout import SRProjectLayout
+from .src.utils.audit_logger import (
     write_screens, write_extracts, write_rob2, write_results
 )
 
@@ -76,7 +80,7 @@ def main():
     if args.pdf_dir:
         pdf_dir = Path(args.pdf_dir)
     else:
-        pdf_dir = ROOT / "input" / "sr"
+        pdf_dir = PROJECT_ROOT / "input" / "sr"
 
     # ── Initialise project layout ─────────────────────────────────────────────
     layout = SRProjectLayout(run_id=args.run_id)
@@ -88,7 +92,7 @@ def main():
         fm   = FileManager()
         recs = fm.upload_directory(pdf_dir)
     else:
-        from sr.src.upload.file_manager import local_records
+        from .src.upload.file_manager import local_records
         recs = local_records(pdf_dir)
         logger.info(
             f"[UPLOAD] Non-Anthropic provider — "
@@ -336,7 +340,6 @@ def main():
     logger.info(f"  Extracts -> {layout.extracted_csv}")
     logger.info(f"  RoB2     -> {layout.rob2_csv}")
     logger.info(f"  Results  -> {layout.results_csv}")
-
 
 if __name__ == "__main__":
     main()

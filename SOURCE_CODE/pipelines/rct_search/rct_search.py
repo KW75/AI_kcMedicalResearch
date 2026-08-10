@@ -1,4 +1,4 @@
-"""
+﻿"""
 RCT Search Mode - PICO-driven multi-database search and AI ranking
 Supports: PubMed + Europe PMC
 """
@@ -12,13 +12,22 @@ from pathlib import Path
 from typing import Optional
 import random
 
+# Add SOURCE_CODE to path
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent.parent.parent
+SOURCE_CODE_DIR = PROJECT_ROOT / "SOURCE_CODE"
+sys.path.insert(0, str(SOURCE_CODE_DIR))
+
+from utils.path_utils import PATH_MANAGER, get_input_dir, get_output_dir
+from utils.document_reader import DocumentReader
+from utils.rag import RAGUtils
+
 # Project paths
-BASE = Path(__file__).resolve().parent.parent.parent
+BASE = PROJECT_ROOT
 INPUT_DIR = BASE / "input"
 OUTPUT_RCT_SEARCH = BASE / "output" / "rct_search"
 REPORTS_DIR = BASE / "reports"
-DOCS_RCT_SEARCH = BASE / "docs" / "rct_search"
-AI_DIR = BASE / "ai"
+DOCS_RCT_SEARCH = PROJECT_ROOT / "docs" / "rct_search"
+AI_DIR = PROJECT_ROOT / "prompts"
 INPUT_SR = INPUT_DIR / "sr"
 
 
@@ -273,7 +282,7 @@ def call_ai(prompt: str, provider: str = "ollama", model: Optional[str] = None) 
     """
     try:
         # Try to import from main
-        from src.main import call_ai as _call_ai
+        from utils.path_utils import call_ai as _call_ai
         return _call_ai(prompt=prompt, provider=provider, model=model)
     except ImportError:
         # Fallback: use direct API call
@@ -854,7 +863,7 @@ def run_rct_search_pipeline(
                         elif normalized_score < 1:
                             normalized_score = 1
                         score = normalized_score
-                        print(f"[RCT Search] Normalized score: {original_score} → {score} for {m.group(3)}")
+                        print(f"[RCT Search] Normalized score: {original_score} ??{score} for {m.group(3)}")
                     
                     ranked.append({
                         "rank": int(m.group(1)),
@@ -885,7 +894,7 @@ def run_rct_search_pipeline(
                             elif normalized_score < 1:
                                 normalized_score = 1
                             score = normalized_score
-                            print(f"[RCT Search] Normalized score: {original_score} → {score} for {m2.group(3)}")
+                            print(f"[RCT Search] Normalized score: {original_score} ??{score} for {m2.group(3)}")
                         
                         # Find the article in our list to get its source
                         pmid = m2.group(3).strip()
@@ -1027,3 +1036,5 @@ def run_rct_search_pipeline(
     # -------------------------------------------------------------------------
 
     return md_path
+
+

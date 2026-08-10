@@ -1,8 +1,9 @@
+# SOURCE_CODE/pipelines/sr/src/ui/app.py
 """
 sr/src/ui/app.py — Streamlit UI for the SR Automation Pipeline.
 
 Run with:
-    streamlit run sr/src/ui/app.py
+    streamlit run SOURCE_CODE/pipelines/sr/src/ui/app.py
 
 Wraps sr/main.py pipeline stages with a browser-based interface.
 Allows: config editing, PDF upload, pipeline execution, results viewing.
@@ -18,12 +19,15 @@ import pandas as pd
 import streamlit as st
 import yaml
 
-# Ensure project root is on sys.path
-ROOT = Path(__file__).resolve().parent.parent.parent.parent
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
+# Ensure project root and SOURCE_CODE are on sys.path
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent.parent
+SOURCE_CODE_DIR = PROJECT_ROOT / "SOURCE_CODE"
+SR_DIR = SOURCE_CODE_DIR / "pipelines" / "sr"
 
-SR_DIR = Path(__file__).resolve().parent.parent.parent
+if str(SOURCE_CODE_DIR) not in sys.path:
+    sys.path.insert(0, str(SOURCE_CODE_DIR))
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 
 # ---------------------------------------------------------------------------
 # Page config
@@ -39,7 +43,7 @@ st.set_page_config(
 # Sidebar — navigation
 # ---------------------------------------------------------------------------
 st.sidebar.title("🔬 SR Pipeline")
-st.sidebar.markdown("**AI kcMedical Research v2.1.0**")
+st.sidebar.markdown("**AI kcMedical Research v2.3.0**")
 st.sidebar.markdown("---")
 
 PAGES = [
@@ -64,7 +68,7 @@ st.sidebar.markdown("""
 """)
 st.sidebar.markdown("---")
 st.sidebar.markdown(
-    "📖 Full guide: open `docs/flashcard-help.html` in File Explorer",
+    "📖 Full guide: open `SOURCE_CODE/docs/flashcard-help.html`",
     unsafe_allow_html=True,
 )
 
@@ -106,7 +110,7 @@ if page == "📋  Configure":
     st.title("📋 Configure SR Pipeline")
     st.markdown(
         "Edit your PRISMA criteria below. Changes are saved to "
-        "`sr/config/prisma_criteria.yaml`."
+        "`SOURCE_CODE/pipelines/sr/config/prisma_criteria.yaml`."
     )
 
     cfg = _load_config()
@@ -179,7 +183,7 @@ if page == "📋  Configure":
             ],
         }
         _save_config(new_cfg)
-        st.success("✅ Configuration saved to sr/config/prisma_criteria.yaml")
+        st.success("✅ Configuration saved to SOURCE_CODE/pipelines/sr/config/prisma_criteria.yaml")
 
 
 # ---------------------------------------------------------------------------
@@ -188,11 +192,11 @@ if page == "📋  Configure":
 elif page == "📂  Upload PDFs":
     st.title("📂 Upload PDF Articles")
     st.markdown(
-        "Upload PDF files to `sr/data/uploads/`. "
+        "Upload PDF files to `input/sr/`. "
         "These will be processed by the pipeline."
     )
 
-    upload_dir = SR_DIR / "data" / "uploads"
+    upload_dir = PROJECT_ROOT / "input" / "sr"
     upload_dir.mkdir(parents=True, exist_ok=True)
 
     uploaded_files = st.file_uploader(
@@ -208,7 +212,7 @@ elif page == "📂  Upload PDFs":
             dest = upload_dir / uf.name
             dest.write_bytes(uf.read())
             saved.append(uf.name)
-        st.success(f"✅ Saved {len(saved)} file(s) to `sr/data/uploads/`")
+        st.success(f"✅ Saved {len(saved)} file(s) to `input/sr/`")
         for name in saved:
             st.markdown(f"- {name}")
 
@@ -238,7 +242,7 @@ elif page == "▶️  Run Pipeline":
     st.title("▶️ Run SR Pipeline")
 
     cfg = _load_config()
-    upload_dir = SR_DIR / "data" / "uploads"
+    upload_dir = PROJECT_ROOT / "input" / "sr"
     pdf_count  = len(list(upload_dir.glob("*.pdf"))) if upload_dir.exists() else 0
 
     # Pre-flight checks
@@ -283,26 +287,11 @@ elif page == "▶️  Run Pipeline":
             "⚠️ Anthropic may be geo-restricted in your region. "
             "Qwen or Groq are recommended alternatives."
         )
-    elif provider != "anthropic":
+    else:
         st.info(
             "ℹ️ PDF pages are converted to images for processing. "
             "Qwen (qwen3.7-plus) is recommended — fast, capable, and geo-unrestricted."
         )
-
-    MODEL_OPTIONS = {
-        "qwen":      ["qwen3.7-plus", "qwen3.7-max", "qwen3.6-flash"],
-        "groq":      ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "qwen/qwen3.6-27b"],
-        "deepseek":  ["deepseek-v4-flash", "deepseek-v4-pro"],
-        "openai":    ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo"],
-        "anthropic": ["claude-sonnet-5", "claude-opus-5"],
-        "ollama":    ["llama3.2", "llama3.1", "mistral", "phi3"],
-    }
-
-    model = st.selectbox(
-        "AI model",
-        ["claude-sonnet-5", "claude-opus-5"],
-        label_visibility="collapsed",
-    )
 
     effect_override = st.selectbox(
         "Override effect measure (optional)",
@@ -344,7 +333,7 @@ elif page == "▶️  Run Pipeline":
         try:
             # Import and run each stage with progress updates
             progress.progress(10, text="Stage 1: Uploading...")
-            from sr.src.upload.file_manager import FileManager
+            from pipelines.sr.src.upload.file_manager import FileManager
             fm   = FileManager()
             recs = fm.upload_directory(upload_dir)
             (SR_DIR / "data" / "uploads").mkdir(parents=True, exist_ok=True)
@@ -353,12 +342,13 @@ elif page == "▶️  Run Pipeline":
             )
 
             progress.progress(25, text="Stage 2: Screening...")
-            from sr.src.screening.relevance_screener import RelevanceScreener
+            from pipelines.sr.src.screening.relevance_screener import RelevanceScreener
             sr_results = RelevanceScreener(
                 pico_criteria=cfg["pico"],
                 inclusion_criteria=cfg.get("inclusion_criteria", []),
                 exclusion_criteria=cfg.get("exclusion_criteria", []),
                 model=model,
+                provider=provider,
             ).screen_batch(recs)
             (SR_DIR / "data" / "screened").mkdir(parents=True, exist_ok=True)
             pd.DataFrame(sr_results).to_csv(
@@ -376,7 +366,7 @@ elif page == "▶️  Run Pipeline":
                 st.stop()
 
             progress.progress(45, text="Stage 3: Extracting data...")
-            from sr.src.extraction.data_extractor import DataExtractor
+            from pipelines.sr.src.extraction.data_extractor import DataExtractor
             er = DataExtractor(
                 pico_criteria=cfg.get("pico", {}),
                 pico_outcome=cfg.get("pico", {}).get("outcome"),
@@ -391,14 +381,14 @@ elif page == "▶️  Run Pipeline":
             )
 
             progress.progress(55, text="Stage 3.5: RoB 2.0 assessment...")
-            from sr.src.screening.rob2_tool import RoB2Assessor
+            from pipelines.sr.src.screening.rob2_tool import RoB2Assessor
             rob = RoB2Assessor(model=model, provider=provider).assess_batch(included)
             pd.json_normalize(rob).to_csv(
                 SR_DIR / "data" / "extracted" / "rob2_assessment.csv", index=False
             )
 
             progress.progress(65, text="Stage 4: Meta-analysis...")
-            from sr.src.analysis.meta_analysis import MetaAnalyzer
+            from pipelines.sr.src.analysis.meta_analysis import MetaAnalyzer
             rows = []
             for r in er:
                 m_  = r.get("study_metadata", {})
@@ -436,24 +426,24 @@ elif page == "▶️  Run Pipeline":
             )
 
             progress.progress(75, text="Stage 5: Forest plot...")
-            from sr.src.visualization.forest_plot import ForestPlotGenerator
-            fp_path = str(SR_DIR / "outputs" / "figures" / "forest_plot.png")
-            (SR_DIR / "outputs" / "figures").mkdir(parents=True, exist_ok=True)
+            from pipelines.sr.src.visualization.forest_plot import ForestPlotGenerator
+            fp_path = str(PROJECT_ROOT / "output" / "sr" / "forest_plot.png")
+            (PROJECT_ROOT / "output" / "sr").mkdir(parents=True, exist_ok=True)
             ForestPlotGenerator().generate(
                 ma_result=ma, effect_measure=em, output_path=fp_path
             )
 
             progress.progress(90, text="Stage 6: Generating reports...")
-            from sr.src.reporting.report_generator import ReportGenerator
-            from sr.src.reporting.pdf_report import PDFReportGenerator
+            from pipelines.sr.src.reporting.report_generator import ReportGenerator
+            from pipelines.sr.src.reporting.pdf_report import PDFReportGenerator
             title_str = cfg.get("review_title", "Systematic Review")
-            (SR_DIR / "outputs" / "reports").mkdir(parents=True, exist_ok=True)
+            (PROJECT_ROOT / "reports" / "sr").mkdir(parents=True, exist_ok=True)
 
             ReportGenerator().generate(
                 title=title_str, authors="", pico=cfg.get("pico", {}),
                 ma_result=ma, extraction_results=er, screening_results=sr_results,
                 forest_plot_path=fp_path, effect_measure=em,
-                output_path=str(SR_DIR / "outputs" / "reports" / "systematic_review.docx"),
+                output_path=str(PROJECT_ROOT / "reports" / "sr" / "systematic_review.docx"),
             )
             PDFReportGenerator().generate(
                 title=title_str, authors="", pico=cfg.get("pico", {}),
@@ -462,7 +452,7 @@ elif page == "▶️  Run Pipeline":
                 ma_result=ma, extraction_results=er, screening_results=sr_results,
                 rob_results=rob, forest_plot_path=fp_path,
                 effect_measure=em, model_name=model,
-                output_path=str(SR_DIR / "outputs" / "reports" / "systematic_review.pdf"),
+                output_path=str(PROJECT_ROOT / "reports" / "sr" / "systematic_review.pdf"),
                 also_save_html=True,
             )
 
@@ -515,7 +505,7 @@ elif page == "📊  Results":
             SR_DIR / "data" / "results" / "meta_analysis_results.csv",
             "Meta-Analysis Results"
         )
-        fp = SR_DIR / "outputs" / "figures" / "forest_plot.png"
+        fp = PROJECT_ROOT / "output" / "sr" / "forest_plot.png"
         if fp.exists():
             st.subheader("Forest Plot")
             st.image(str(fp), use_container_width=True)
@@ -529,7 +519,7 @@ elif page == "📊  Results":
 elif page == "📄  Reports":
     st.title("📄 Reports")
 
-    reports_dir = SR_DIR / "outputs" / "reports"
+    reports_dir = PROJECT_ROOT / "reports" / "sr"
 
     # DOCX download
     docx_path = reports_dir / "systematic_review.docx"
