@@ -1,3 +1,4 @@
+﻿# SOURCE_CODE/ui/app.py
 from __future__ import annotations
 
 import base64
@@ -11,12 +12,16 @@ from pathlib import Path
 import streamlit as st
 
 # -- paths ---------------------------------------------------------------------
-BASE_DIR    = Path(__file__).resolve().parent.parent.parent
-ASSETS_DIR  = BASE_DIR / "assets"
-INPUT_DIR   = BASE_DIR / "input"
-OUTPUT_DIR  = BASE_DIR / "output"
-REPORTS_DIR = BASE_DIR / "reports"
-MAIN_PY     = BASE_DIR / "src" / "main.py"
+# Update for new structure
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+SOURCE_CODE_DIR = PROJECT_ROOT / "SOURCE_CODE"
+SR_DIR = SOURCE_CODE_DIR / "pipelines" / "sr"
+
+ASSETS_DIR  = PROJECT_ROOT / "assets"
+INPUT_DIR   = PROJECT_ROOT / "input"
+OUTPUT_DIR  = PROJECT_ROOT / "output"
+REPORTS_DIR = PROJECT_ROOT / "reports"
+MAIN_PY     = SOURCE_CODE_DIR / "main.py"
 
 # -- mode configuration --------------------------------------------------------
 MODES: dict[str, dict] = {
@@ -34,10 +39,10 @@ MODES: dict[str, dict] = {
             "1. Drop source files into `input/coding/`.\n"
             "2. Choose your provider and model below.\n"
             "3. Select a sub-mode:\n"
-            "   - **Builder**: Full pipeline (Builder → Reviewer → Tester)\n"
+            "   - **Builder**: Full pipeline (Builder ??Reviewer ??Tester)\n"
             "   - **Reviewer**: Standalone code review\n"
             "   - **Tester**: Standalone test generation\n"
-            "4. Click **Run Coding** — the AI will process your code.\n"
+            "4. Click **Run Coding** ??the AI will process your code.\n"
             "5. Outputs appear in `output/coding/`."
         ),
     },
@@ -52,7 +57,7 @@ MODES: dict[str, dict] = {
             "**How to use Writing mode**\n\n"
             "1. Drop `.txt`, `.md`, `.docx`, or `.pdf` files into `input/writing/`.\n"
             "2. Choose your provider and model below.\n"
-            "3. Click **Run Writing** — you will be prompted in the terminal to select:\n"
+            "3. Click **Run Writing** ??you will be prompted in the terminal to select:\n"
             "   - **Topic Track**: Editorial/opinion style (newspaper)\n"
             "   - **Article Track**: Medical journal article style\n"
             "4. A structured report is generated.\n"
@@ -70,7 +75,7 @@ MODES: dict[str, dict] = {
             "**How to use Appraisal mode**\n\n"
             "1. Drop article PDFs or text files into `input/appraisal/`.\n"
             "2. Choose your provider and model below.\n"
-            "3. Click **Run Appraisal** — you will be prompted in the terminal to select:\n"
+            "3. Click **Run Appraisal** ??you will be prompted in the terminal to select:\n"
             "   - **Appraiser**: Critical appraisal of methodology\n"
             "   - **Methodologist**: Statistical and design assessment\n"
             "   - **Summariser**: Concise article summary\n"
@@ -89,7 +94,7 @@ MODES: dict[str, dict] = {
             "1. Place a `topic.md` file in `input/rct_search/`, or enter your PICO topic "
             "when prompted in the terminal.\n"
             "2. Choose your provider and model below.\n"
-            "3. Click **Run RCT Search** — the pipeline builds, validates, and "
+            "3. Click **Run RCT Search** ??the pipeline builds, validates, and "
             "refines a search strategy.\n"
             "4. Outputs appear in `output/rct_search/`."
         ),
@@ -106,7 +111,7 @@ MODES: dict[str, dict] = {
             "1. Place a `topic.md` file in `input/search/`, or enter your clinical topic "
             "when prompted in the terminal.\n"
             "2. Choose your provider and model below.\n"
-            "3. Click **Run Search** — you will be prompted in the terminal to select:\n"
+            "3. Click **Run Search** ??you will be prompted in the terminal to select:\n"
             "   - **Topic Search**: Web synopsis with reference links\n"
             "   - **Article Search**: PubMed search by article type + comparison\n"
             "4. Results are saved to `output/search/`."
@@ -121,13 +126,13 @@ MODES: dict[str, dict] = {
         "extensions":  [".pdf"],
         "instructions": (
             "**How to use Systematic Review mode**\n\n"
-            "**Phase 1 — Discovery (optional):**\n"
+            "**Phase 1 ??Discovery (optional):**\n"
             "1. Run RCT Search mode first to generate a ranked article list.\n"
             "2. Use **Import PICO from RCT Search** below to pre-fill your PICO fields.\n\n"
-            "**Phase 2 — Synthesis:**\n"
+            "**Phase 2 ??Synthesis:**\n"
             "3. Upload your chosen article PDFs to `input/sr/`.\n"
             "4. Review or edit the imported PICO fields.\n"
-            "5. Click **Run Systematic Review** — results saved to `output/sr/`."
+            "5. Click **Run Systematic Review** ??results saved to `output/sr/`."
         ),
     },
 }
@@ -169,7 +174,7 @@ def _show_folder_contents(folder: Path, exts: list[str], label: str) -> None:
     files = sorted(
         [f for f in folder.iterdir() if f.is_file() and f.suffix.lower() in exts]
     ) if folder.exists() else []
-    with st.expander(f"\U0001f4c2 {label}  \u2014  `{folder.relative_to(BASE_DIR)}`", expanded=True):
+    with st.expander(f"\U0001f4c2 {label}  \u2014  `{folder.relative_to(PROJECT_ROOT)}`", expanded=True):
         if files:
             for f in files:
                 c1, c2 = st.columns([6, 1])
@@ -230,7 +235,7 @@ def _api_key_sidebar():
     """Simple sidebar for users to enter API keys - works with existing code"""
     
     with st.sidebar:
-        st.header("🔑 API Keys")
+        st.header("?? API Keys")
         st.caption("Enter your API keys here (optional)")
         
         # Check if env keys exist
@@ -243,7 +248,7 @@ def _api_key_sidebar():
         ])
         
         if has_env:
-            st.success("✅ Using environment API keys")
+            st.success("??Using environment API keys")
         
         # Store API keys in session
         if 'api_keys' not in st.session_state:
@@ -283,7 +288,7 @@ def _api_key_sidebar():
             st.divider()
             st.caption("Current session keys:")
             for key in st.session_state.api_keys:
-                st.caption(f"✅ {key.title()}: ********")
+                st.caption(f"??{key.title()}: ********")
 
 
 # -- Cloud / Local terminal launcher -------------------------------------------
@@ -333,7 +338,7 @@ def _run_cli_cloud(mode: str, provider: str, model: str, submode: str = "", prom
 
    
     # Build command with sub-mode support for search
-    cmd_parts = [sys.executable, "src/main.py", "--mode", mode, "--provider", provider]
+    cmd_parts = [sys.executable, str(SOURCE_CODE_DIR / "main.py"), "--mode", mode, "--provider", provider]
     
     # Add sub-mode for search mode
     if mode == "search" and submode:
@@ -370,8 +375,8 @@ def _run_cli_cloud(mode: str, provider: str, model: str, submode: str = "", prom
         has_key = session_keys.get(provider, '') or os.getenv(env_var, '')
         
         if not has_key:
-            st.warning(f"⚠️ {env_var} not set. Please enter it in the sidebar or add to environment.")
-            st.info("Go to sidebar → API Keys → Enter your key")
+            st.warning(f"?? {env_var} not set. Please enter it in the sidebar or add to environment.")
+            st.info("Go to sidebar ??API Keys ??Enter your key")
             return "error: missing API key"
 
     with st.spinner(f"Running {mode} mode..."):
@@ -390,7 +395,7 @@ def _run_cli_cloud(mode: str, provider: str, model: str, submode: str = "", prom
             # Run the command
             result = subprocess.run(
                 cmd_parts,
-                cwd=str(Path(__file__).resolve().parent.parent.parent),
+                cwd=str(PROJECT_ROOT),
                 capture_output=True,
                 text=True,
                 timeout=600,  # 10 minute timeout for Render
@@ -398,22 +403,22 @@ def _run_cli_cloud(mode: str, provider: str, model: str, submode: str = "", prom
             )
 
             if result.stdout:
-                st.text_area("📄 Output", result.stdout, height=300)
+                st.text_area("?? Output", result.stdout, height=300)
             if result.stderr:
-                st.text_area("⚠️ Errors/Warnings", result.stderr, height=100)
+                st.text_area("?? Errors/Warnings", result.stderr, height=100)
 
             if result.returncode == 0:
-                st.success("✅ Command completed successfully!")
+                st.success("??Command completed successfully!")
                 return "ok"
             else:
-                st.error(f"❌ Command failed with exit code {result.returncode}")
+                st.error(f"??Command failed with exit code {result.returncode}")
                 return f"error: code {result.returncode}"
 
         except subprocess.TimeoutExpired:
-            st.error("⏰ Command timed out after 10 minutes")
+            st.error("??Command timed out after 10 minutes")
             return "error: timeout"
         except Exception as exc:
-            st.error(f"❌ Error: {exc}")
+            st.error(f"??Error: {exc}")
             return f"error: {exc}"
 
 
@@ -426,7 +431,7 @@ def _launch_terminal_local(mode: str, provider: str, model: str, submode: str = 
 
     py = sys.executable
     mp = str(MAIN_PY)
-    base = str(BASE_DIR)
+    base = str(PROJECT_ROOT)
 
     cmd_parts = [py, mp, "--mode", mode, "--provider", provider]
     if model.strip():
@@ -513,7 +518,7 @@ def _exit_to_launcher() -> None:
     st.markdown(
         """
         <div style="text-align:center;padding:60px 20px;">
-            <h1 style="font-size:3rem;">👋</h1>
+            <h1 style="font-size:3rem;">??</h1>
             <h2 style="color:#1a1a2e;">Return to Launcher</h2>
             <p style="font-size:1.2rem;color:#555;margin-top:20px;">
                 Close this browser tab and return to the terminal where the launcher is running.
@@ -583,7 +588,7 @@ def _inject_css() -> None:
         .mode-card p.fcount { font-size: 1.05rem; color: #777; margin-top: .35rem; }
 
         /* Navigation buttons - more visible */
-        div[data-testid="stButton"] button:has(span:contains("🏠 Home")) {
+        div[data-testid="stButton"] button:has(span:contains("?? Home")) {
             background-color: #4A90D9 !important;
             color: white !important;
             font-weight: 700 !important;
@@ -592,10 +597,10 @@ def _inject_css() -> None:
             border-radius: 8px !important;
             border: none !important;
         }
-        div[data-testid="stButton"] button:has(span:contains("🏠 Home")):hover {
+        div[data-testid="stButton"] button:has(span:contains("?? Home")):hover {
             background-color: #357ABD !important;
         }
-        div[data-testid="stButton"] button:has(span:contains("🚪 Exit to Launcher")) {
+        div[data-testid="stButton"] button:has(span:contains("? Exit to Launcher")) {
             background-color: #E74C3C !important;
             color: white !important;
             font-weight: 700 !important;
@@ -604,7 +609,7 @@ def _inject_css() -> None:
             border-radius: 8px !important;
             border: none !important;
         }
-        div[data-testid="stButton"] button:has(span:contains("🚪 Exit to Launcher")):hover {
+        div[data-testid="stButton"] button:has(span:contains("? Exit to Launcher")):hover {
             background-color: #C0392B !important;
         }
 
@@ -669,7 +674,7 @@ def _home_page() -> None:
     st.markdown(
         '''
         <div style="background:#e8f4fd;border-left:5px solid #1a73e8;padding:1rem 1.4rem;border-radius:8px;margin-bottom:.5rem;">
-        <p style="margin:0;font-size:1.2rem;font-weight:700;color:#1a1a2e;">📂 Files uploaded to <strong>Input</strong> are automatically transferred to their respective input folder.</p>
+        <p style="margin:0;font-size:1.2rem;font-weight:700;color:#1a1a2e;">?? Files uploaded to <strong>Input</strong> are automatically transferred to their respective input folder.</p>
         </div>
         ''',
         unsafe_allow_html=True,
@@ -677,7 +682,7 @@ def _home_page() -> None:
     st.markdown(
         '''
         <div style="background:#e8f9f0;border-left:5px solid #34a853;padding:1rem 1.4rem;border-radius:8px;margin-bottom:1.2rem;">
-        <p style="margin:0;font-size:1.2rem;font-weight:700;color:#1a1a2e;">📤 Processed results are placed in their respective <strong>Output</strong> folder and available for download.</p>
+        <p style="margin:0;font-size:1.2rem;font-weight:700;color:#1a1a2e;">? Processed results are placed in their respective <strong>Output</strong> folder and available for download.</p>
         </div>
         ''',
         unsafe_allow_html=True,
@@ -790,11 +795,11 @@ def _mode_page(mode: str) -> None:
     # Navigation - Home and Exit only
     nav_l, nav_m, nav_spacer = st.columns([1, 1, 10])
     with nav_l:
-        if st.button("🏠 Home", use_container_width=True):
+        if st.button("?? Home", use_container_width=True):
             st.session_state["page"] = "home"
             st.rerun()
     with nav_m:
-        if st.button("🚪 Exit to Launcher", use_container_width=True):
+        if st.button("? Exit to Launcher", use_container_width=True):
             _exit_to_launcher()
     with nav_spacer:
         pass
@@ -867,7 +872,7 @@ def _mode_page(mode: str) -> None:
 
                 if st.button("\u2705 Apply PICO to SR config", key="pico_apply"):
                     import yaml as _yaml
-                    yaml_path = BASE_DIR / "sr" / "config" / "prisma_criteria.yaml"
+                    yaml_path = SR_DIR / "config" / "prisma_criteria.yaml"
                     cfg_yaml = _yaml.safe_load(yaml_path.read_text(encoding="utf-8")) if yaml_path.exists() else {}
                     cfg_yaml.setdefault("pico", {})
                     cfg_yaml["pico"]["population"] = p_pop
@@ -877,7 +882,7 @@ def _mode_page(mode: str) -> None:
                     cfg_yaml["effect_measure"] = p_eff
                     yaml_path.parent.mkdir(parents=True, exist_ok=True)
                     yaml_path.write_text(_yaml.dump(cfg_yaml, allow_unicode=True, sort_keys=False), encoding="utf-8")
-                    st.success(f"\u2705 PICO written to `sr/config/prisma_criteria.yaml`")
+                    st.success(f"\u2705 PICO written to `SOURCE_CODE/pipelines/sr/config/prisma_criteria.yaml`")
                     st.rerun()
     else:
         st.markdown(f"**Upload files to** `input/{mode}/`  \u2014  Accepted: {', '.join(cfg['extensions'])}")
