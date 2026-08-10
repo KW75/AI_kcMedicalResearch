@@ -1,0 +1,1 @@
+chmod +x docker/Docker_setup.sh docker/docker_menu.sh docker/docker_cli.sh
