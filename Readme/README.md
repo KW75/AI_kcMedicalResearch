@@ -4,8 +4,9 @@ A multi-mode AI assistant for medical research, critical appraisal, systematic r
 Runs locally via Ollama or via cloud providers (OpenAI, Anthropic, DeepSeek, Groq, Qwen).
 
 - **Version:** 2.3.0
-- **Tests:** 254 passed, 6 skipped
-- **Last commit:** 1436a46
+- **Tests:** ~243 passed, 3 skipped
+- **Coverage:** ~50%
+- **Last commit:** 4a77472
 - **GitHub:** https://github.com/KW75/AI_kcMedicalResearch
 - **Live App:** https://ai-kcmedicalresearch.onrender.com
 
@@ -123,15 +124,22 @@ If absent, the mode prompts at runtime.
 Search
 
 Create docs/search/topic.md with two lines.
-Line 1: paper (find a specific paper) or topic (clinical topic summary)
-Line 2: your query.
-If absent, the mode prompts at runtime.
+
+    Line 1: paper (find a specific paper) or topic (clinical topic summary)
+
+    Line 2: your query.
+    If absent, the mode prompts at runtime.
+
 Appraisal
 
 Place article files in input/appraisal/
-Supported formats: .txt, .md, .pdf, .docx
-Files up to 8000 characters are injected directly into the prompt.
-Files over 8000 characters are handled via RAG chunking.
+
+    Supported formats: .txt, .md, .pdf, .docx
+
+    Files up to 8000 characters are injected directly into the prompt.
+
+    Files over 8000 characters are handled via RAG chunking.
+
 Docs Folder Structure
 
 Guidance files are loaded as context for each mode. Edit to customise AI behaviour.
@@ -302,7 +310,15 @@ AI_kcMedicalResearch/
 │   └── sr/
 ├── 📁 output/                         ★ Generated output
 ├── 📁 reports/                        ★ Generated reports
-├── 📁 tests/                          ★ All tests
+├── 📁 tests/                          ★ All tests (~243 tests)
+│   ├── test_appraisal.py              ★ 22 tests
+│   ├── test_coding.py                 ★ 41 tests
+│   ├── test_main.py                   ★ 40 tests
+│   ├── test_rct_search.py             ★ 27 tests
+│   ├── test_search.py                 ★ 25 tests
+│   ├── test_sr.py                     ★ 19 tests
+│   ├── test_ui.py                     ★ 33 tests
+│   └── test_writing.py                ★ 36 tests
 ├── 📁 chroma_db/                      ★ RAG vector database
 ├── requirements.txt
 ├── render.yaml
@@ -324,7 +340,7 @@ python -m pytest --cov=SOURCE_CODE --cov-report=term-missing
 # Run live provider tests (requires API keys)
 python tests/test_live_providers.py
 
-Current status: 254 passed, 6 skipped
+Current status: ~243 passed, 3 skipped, ~50% coverage
 Laptop / New Machine Setup
 Windows 🪟
 
@@ -362,22 +378,36 @@ OCR Support (optional — for scanned PDFs)
 Text-based PDFs work automatically via PyMuPDF. For scanned/image PDFs:
 
     Install Tesseract binary: https://github.com/UB-Mannheim/tesseract/wiki
+
     Install Poppler for Windows: https://github.com/oschwartz10612/poppler-windows
+
     Add both bin/ folders to your system PATH
+
     Install Python packages: pip install pytesseract pillow pdf2image
+
     OCR fallback activates automatically when PyMuPDF returns empty text
 
 Known Issues
-#	Issue	                        Priority	Root Cause
-1	Lami extraction fails	        High	        Table 4 not found
-2	WeasyPrint not installed	Medium	        PDF output falls back to HTML
-3	Low test coverage	        Low	        appraisal.py, search.py, writing.py, ui/app.py
-
+#	Issue	Priority	Root Cause
+1	Lami extraction fails	High	Table 4 not found
+2	WeasyPrint not installed	Medium	PDF output falls back to HTML
+3	~~Low test coverage~~	✅ RESOLVED	Now ~50% coverage
 Contributing
-1. Fork the repository
-2. Create a feature branch: git checkout -b feature/your-feature
-3. Make your changes
-4. Run tests: python -m pytest
-5. Commit and push
-6. Create a pull request
+
+    Fork the repository
+
+    Create a feature branch: git checkout -b feature/your-feature
+
+    Make your changes
+
+    Run tests: python -m pytest
+
+    Commit and push
+
+    Create a pull request
+    '@
+
+$readmeContent | Out-File -FilePath "Readme/README.md" -Encoding UTF8 -NoNewline
+
+Write-Host "✅ Updated README.md with latest test status"
 

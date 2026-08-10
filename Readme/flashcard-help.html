@@ -1,9 +1,9 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>AI kcMedical Research - Help Guide</title>
+<title>AI kcMedicalResearch - Help Guide</title>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 body{font-family:"Segoe UI",Arial,sans-serif;background:#0f172a;color:#e2e8f0;min-height:100vh;padding:32px 20px}
@@ -50,22 +50,22 @@ footer{text-align:center;margin-top:48px;font-size:.76rem;color:#475569}
 </style>
 </head>
 <body>
-<h1>&#129302; AI kcMedical Research</h1>
-<p class="subtitle">Interactive Help Guide &nbsp;&middot;&nbsp; 291 tests &nbsp;&middot;&nbsp; 65% coverage (main.py) &nbsp;&middot;&nbsp; 6 modes &nbsp;&middot;&nbsp; 6 providers</p>
+<h1>🧬 AI kcMedicalResearch</h1>
+<p class="subtitle">Interactive Help Guide &nbsp;&middot;&nbsp; ~243 tests &nbsp;&middot;&nbsp; ~50% coverage &nbsp;&middot;&nbsp; 6 modes &nbsp;&middot;&nbsp; 6 providers &nbsp;&middot;&nbsp; v2.3.0</p>
 <button class="toggle-all" onclick="toggleAll()">Expand All</button>
 <div class="grid">
 
 <!-- CODING -->
 <div class="card" onclick="toggle(this)">
 <div class="card-header h-coding">
-  <div class="card-icon" style="background:#1e3a5f">&#128187;</div>
+  <div class="card-icon" style="background:#1e3a5f">💻</div>
   <div><div class="card-title">Coding Mode</div><div class="card-badge">--mode coding (default)</div></div>
 </div>
 <div class="card-body">
   <div class="section-label">Roles</div>
-  <span class="pill pill-blue">&#127959; Builder</span>
-  <span class="pill pill-blue">&#128269; Reviewer</span>
-  <span class="pill pill-blue">&#129514; Tester</span>
+  <span class="pill pill-blue">🏗️ Builder</span>
+  <span class="pill pill-blue">🔍 Reviewer</span>
+  <span class="pill pill-blue">🧪 Tester</span>
   <div class="section-label">What it does</div>
   <table>
     <tr><th>Role</th><th>Purpose</th></tr>
@@ -73,17 +73,17 @@ footer{text-align:center;margin-top:48px;font-size:.76rem;color:#475569}
     <tr><td>Reviewer</td><td>Reviews code quality, security, and best practices</td></tr>
     <tr><td>Tester</td><td>Generates pytest test cases for your code</td></tr>
   </table>
-  <div class="section-label">Input &mdash; place files here before starting</div>
+  <div class="section-label">Input — place files here before starting</div>
   <table>
     <tr><th>Folder</th><th>File types</th></tr>
-    <tr><td><code>input/coding/</code></td><td>.py .js .ts .json .yaml .md .txt</td></tr>
+    <tr><td><code>input/coding/</code></td><td>.py .js .ts .html .css .java .c .cpp .cs .rb .go .rs .txt .md</td></tr>
     <tr><td><code>docs/coding/</code></td><td>PRD.md, architecture.md, coding-standards.md</td></tr>
   </table>
   <div class="section-label">Run</div>
-  <pre>python src\main.py
-python src\main.py --provider deepseek
-python src\main.py --model llama3.2:3b
-python src\main.py --dry-run</pre>
+  <pre>python SOURCE_CODE/main.py
+python SOURCE_CODE/main.py --provider qwen
+python SOURCE_CODE/main.py --model llama3.2
+python SOURCE_CODE/main.py --dry-run</pre>
   <div class="section-label">Output</div>
   <table>
     <tr><td>Session transcript</td><td><code>reports/session_YYYYMMDD_HHMMSS.md</code></td></tr>
@@ -94,14 +94,14 @@ python src\main.py --dry-run</pre>
 <!-- WRITING -->
 <div class="card" onclick="toggle(this)">
 <div class="card-header h-writing">
-  <div class="card-icon" style="background:#14532d">&#9997;&#65039;</div>
+  <div class="card-icon" style="background:#14532d">✍️</div>
   <div><div class="card-title">Writing Mode</div><div class="card-badge">--mode writing</div></div>
 </div>
 <div class="card-body">
   <div class="section-label">Roles</div>
-  <span class="pill pill-green">&#9997; Writer</span>
-  <span class="pill pill-green">&#128196; Editor</span>
-  <span class="pill pill-green">&#9989; QA</span>
+  <span class="pill pill-green">✍️ Writer</span>
+  <span class="pill pill-green">📄 Editor</span>
+  <span class="pill pill-green">✅ QA</span>
   <div class="section-label">Tracks</div>
   <table>
     <tr><th>Track</th><th>Purpose</th></tr>
@@ -122,9 +122,9 @@ python src\main.py --dry-run</pre>
     <tr><td><code>docs/writing/</code></td><td>project-brief.md, style-guide.md, editorial-standards.md</td></tr>
   </table>
   <div class="section-label">Run</div>
-  <pre>python src\main.py --mode writing
-python src\main.py --mode writing --report
-python src\main.py --mode writing --provider openai</pre>
+  <pre>python SOURCE_CODE/main.py --mode writing
+python SOURCE_CODE/main.py --mode writing --report
+python SOURCE_CODE/main.py --mode writing --provider openai</pre>
   <div class="section-label">Output</div>
   <table>
     <tr><td>Session transcript</td><td><code>reports/session_*.md</code></td></tr>
@@ -135,106 +135,103 @@ python src\main.py --mode writing --provider openai</pre>
 <!-- RCT SEARCH -->
 <div class="card" onclick="toggle(this)">
 <div class="card-header h-rct">
-  <div class="card-icon" style="background:#3b1f6e">&#128300;</div>
+  <div class="card-icon" style="background:#3b1f6e">🔬</div>
   <div><div class="card-title">RCT Search Mode</div><div class="card-badge">--mode rct_search</div></div>
 </div>
 <div class="card-body">
   <div class="section-label">Roles</div>
-  <span class="pill pill-purple">&#128196; Formulator</span>
-  <span class="pill pill-purple">&#128269; Searcher</span>
-  <span class="pill pill-purple">&#9989; Validator</span>
+  <span class="pill pill-purple">📄 Formulator</span>
+  <span class="pill pill-purple">🔍 Searcher</span>
+  <span class="pill pill-purple">✅ Validator</span>
   <div class="section-label">Pipeline Stages</div>
   <table>
     <tr><th>#</th><th>Stage</th><th>What happens</th></tr>
     <tr><td>1</td><td>Formulator</td><td>Structures topic into formal PICO question</td></tr>
-    <tr><td>2</td><td>Searcher</td><td>Builds Boolean search strings for 7 SR databases</td></tr>
-    <tr><td>3</td><td>Validator</td><td>Validates PICO alignment, syntax, RCT filters &mdash; APPROVED or REQUIRES REFINEMENT</td></tr>
-    <tr><td>4</td><td>PubMed Fetch + AI Ranking</td><td>Fetches up to 20 articles from PubMed, AI scores each 1&ndash;10 for PICO relevance</td></tr>
+    <tr><td>2</td><td>Searcher</td><td>Builds Boolean search strings for SR databases</td></tr>
+    <tr><td>3</td><td>Validator</td><td>Validates PICO alignment, syntax, RCT filters</td></tr>
+    <tr><td>4</td><td>PubMed + Europe PMC Fetch</td><td>Fetches articles, AI scores 1-10 for PICO relevance</td></tr>
   </table>
   <div class="section-label">PICO Input Options</div>
   <table>
     <tr><th>Option</th><th>How</th></tr>
-    <tr><td>Import saved PICO</td><td>Place <code>pico_*.json</code> in <code>input/rct_search/</code> &mdash; offered at startup</td></tr>
+    <tr><td>Import saved PICO</td><td>Place <code>pico_*.json</code> in <code>input/rct_search/</code></td></tr>
     <tr><td>Enter manually</td><td>Interactive prompts for P, I, C, O at startup</td></tr>
     <tr><td>Topic file</td><td>Place topic in <code>docs/rct_search/topic.md</code></td></tr>
   </table>
   <div class="section-label">Run</div>
-  <pre>python src\main.py --mode rct_search
-python src\main.py --mode rct_search --provider qwen
-python src\main.py --mode rct_search --provider deepseek</pre>
+  <pre>python SOURCE_CODE/main.py --mode rct_search
+python SOURCE_CODE/main.py --mode rct_search --provider qwen</pre>
   <div class="section-label">Output</div>
   <table>
-    <tr><th>File</th><th>Location</th><th>Contents</th></tr>
-    <tr><td><code>rct_search_*.md</code></td><td><code>reports/rct_search/</code></td><td>Full transcript &mdash; Formulator, Searcher, Validator, Next Steps</td></tr>
-    <tr><td><code>rct_search_*.docx</code></td><td><code>reports/rct_search/</code></td><td>Full Word report</td></tr>
-    <tr><td><code>rct_search_*.md</code></td><td><code>output/rct_search/</code></td><td>Lean ranked article list + Final Status only</td></tr>
-    <tr><td><code>rct_search_*.docx</code></td><td><code>output/rct_search/</code></td><td>Ranked article list Word doc (easy review)</td></tr>
-    <tr><td><code>pico_*.json</code></td><td><code>output/rct_search/</code></td><td>PICO fields + ranked_articles list with scores</td></tr>
+    <tr><th>File</th><th>Location</th></tr>
+    <tr><td><code>rct_search_*.md</code></td><td><code>reports/rct_search/</code></td></tr>
+    <tr><td><code>rct_search_*.docx</code></td><td><code>reports/rct_search/</code></td></tr>
+    <tr><td><code>pico_*.json</code></td><td><code>output/rct_search/</code></td></tr>
   </table>
-  <div class="info">&#128161; After ranking: pick top articles, download PDFs, place in <code>input/sr/</code> to run the SR pipeline.</div>
+  <div class="info">💡 After ranking: pick top articles, download PDFs, place in <code>input/sr/</code> for SR pipeline.</div>
 </div></div>
 
 <!-- MEDICAL SEARCH -->
 <div class="card" onclick="toggle(this)">
 <div class="card-header h-search">
-  <div class="card-icon" style="background:#0c4a6e">&#128269;</div>
+  <div class="card-icon" style="background:#0c4a6e">🔍</div>
   <div><div class="card-title">Medical Search Mode</div><div class="card-badge">--mode search</div></div>
 </div>
 <div class="card-body">
   <div class="section-label">Roles</div>
-  <span class="pill pill-blue">&#128203; Researcher</span>
+  <span class="pill pill-blue">📋 Researcher</span>
   <div class="section-label">Two search types</div>
   <table>
-    <tr><th>Type</th><th>Use when</th><th>Output sections</th></tr>
-    <tr><td><strong>1 &mdash; Topic Search</strong></td><td>You want a summary of current evidence</td><td>Search Strategy, Evidence Summary, Clinical Implications, Reference List</td></tr>
-    <tr><td><strong>2 &mdash; Article Search</strong></td><td>You have a title, author, or PMID</td><td>Identification, Best Match, Relevance Assessment, Further Results</td></tr>
+    <tr><th>Type</th><th>Use when</th></tr>
+    <tr><td><strong>1 — Topic Search</strong></td><td>You want a summary of current evidence</td></tr>
+    <tr><td><strong>2 — Article Search</strong></td><td>You have a title, author, or PMID</td></tr>
   </table>
-  <div class="section-label">File-based input (optional &mdash; skips interactive prompt)</div>
+  <div class="section-label">File-based input (skips interactive prompt)</div>
   <p style="font-size:.82rem;color:#cbd5e1;margin-bottom:6px;">Create <code>docs/search/topic.md</code> with exactly two lines:</p>
   <pre>topic
 Effect of metformin on HbA1c in type 2 diabetes</pre>
   <div class="section-label">Run</div>
-  <pre>python src\main.py --mode search
-python src\main.py --mode search --provider groq</pre>
+  <pre>python SOURCE_CODE/main.py --mode search
+python SOURCE_CODE/main.py --mode search --provider groq</pre>
   <div class="section-label">Output</div>
   <table>
     <tr><td>Evidence report</td><td><code>reports/search_*.md</code></td></tr>
   </table>
-  <div class="info">&#128161; Use article links with Appraisal mode: download PDFs, place in <code>input/appraisal/</code>, then run <code>--mode appraisal</code>.</div>
+  <div class="info">💡 Use article links with Appraisal mode: download PDFs, place in <code>input/appraisal/</code>.</div>
 </div></div>
 
 <!-- APPRAISAL -->
 <div class="card" onclick="toggle(this)">
 <div class="card-header h-appraisal">
-  <div class="card-icon" style="background:#7c2d12">&#9878;&#65039;</div>
+  <div class="card-icon" style="background:#7c2d12">⚖️</div>
   <div><div class="card-title">Article Appraisal Mode</div><div class="card-badge">--mode appraisal</div></div>
 </div>
 <div class="card-body">
   <div class="section-label">Roles</div>
-  <span class="pill pill-orange">&#128203; Appraiser</span>
-  <span class="pill pill-orange">&#128200; Methodologist</span>
-  <span class="pill pill-orange">&#128466; Summariser</span>
+  <span class="pill pill-orange">📋 Appraiser</span>
+  <span class="pill pill-orange">📊 Methodologist</span>
+  <span class="pill pill-orange">📝 Summariser</span>
   <div class="section-label">What it does</div>
   <table>
     <tr><th>Role</th><th>Purpose</th></tr>
-    <tr><td>Appraiser</td><td>7-section critical appraisal: study design, PICO, methodology, results, bias, applicability, verdict</td></tr>
-    <tr><td>Methodologist</td><td>RoB 2 / CASP / AMSTAR 2 scoring; GRADE evidence quality rating</td></tr>
-    <tr><td>Summariser</td><td>Plain-language summary (max 150 words), key-findings table, evidence grade</td></tr>
+    <tr><td>Appraiser</td><td>7-section critical appraisal</td></tr>
+    <tr><td>Methodologist</td><td>RoB 2 / CASP / AMSTAR 2 scoring</td></tr>
+    <tr><td>Summariser</td><td>Plain-language summary</td></tr>
   </table>
   <div class="section-label">Scoring Tools</div>
-  <span class="pill pill-orange">RoB 2 &mdash; RCTs</span>
-  <span class="pill pill-orange">CASP &mdash; Observational</span>
-  <span class="pill pill-orange">AMSTAR 2 &mdash; Systematic Reviews</span>
-  <span class="pill pill-orange">GRADE &mdash; Evidence Quality</span>
-  <div class="section-label" style="margin-top:12px">Input &mdash; place articles here before starting</div>
+  <span class="pill pill-orange">RoB 2 — RCTs</span>
+  <span class="pill pill-orange">CASP — Observational</span>
+  <span class="pill pill-orange">AMSTAR 2 — SRs</span>
+  <span class="pill pill-orange">GRADE — Evidence Quality</span>
+  <div class="section-label" style="margin-top:12px">Input</div>
   <table>
     <tr><th>Folder</th><th>File types</th></tr>
     <tr><td><code>input/appraisal/</code></td><td>.pdf .txt .md .docx</td></tr>
     <tr><td><code>docs/appraisal/</code></td><td>appraisal-guide.md, scoring-criteria.md</td></tr>
   </table>
   <div class="section-label">Run</div>
-  <pre>python src\main.py --mode appraisal
-python src\main.py --mode appraisal --provider anthropic</pre>
+  <pre>python SOURCE_CODE/main.py --mode appraisal
+python SOURCE_CODE/main.py --mode appraisal --provider anthropic</pre>
   <div class="section-label">Output</div>
   <table>
     <tr><td>Appraisal report</td><td><code>output/appraisal/</code></td></tr>
@@ -245,148 +242,89 @@ python src\main.py --mode appraisal --provider anthropic</pre>
 <!-- SR PIPELINE -->
 <div class="card" onclick="toggle(this)">
 <div class="card-header h-sr">
-  <div class="card-icon" style="background:#134e4a">&#128202;</div>
+  <div class="card-icon" style="background:#134e4a">📊</div>
   <div><div class="card-title">Systematic Review Pipeline</div><div class="card-badge">--mode sr</div></div>
 </div>
 <div class="card-body">
-  <div class="warn">&#9888; Research accelerator only. All outputs require human verification. PRISMA 2020 requires dual independent reviewers.</div>
+  <div class="warn">⚠️ Research accelerator only. All outputs require human verification.</div>
   <div class="section-label">Pipeline Stages</div>
   <table>
     <tr><th>#</th><th>Stage</th><th>Output</th></tr>
-    <tr><td>1</td><td>Upload PDFs (local paths, SHA-256 dedup)</td><td><code>uploads/upload_manifest.csv</code></td></tr>
-    <tr><td>2</td><td>Relevance screening (INCLUDE / EXCLUDE / UNCERTAIN)</td><td><code>data/screened/screening_log.csv</code></td></tr>
-    <tr><td>3</td><td>Data extraction (PICO-anchored, three-tier OCR)</td><td><code>data/extracted/extracted_data.csv</code></td></tr>
-    <tr><td>3.5</td><td>RoB 2.0 (5 Cochrane domains)</td><td><code>data/extracted/rob2_assessment.csv</code></td></tr>
-    <tr><td>4</td><td>Meta-analysis (Hedges g / MD, DerSimonian-Laird RE)</td><td><code>data/results/meta_analysis_results.csv</code></td></tr>
-    <tr><td>5</td><td>Forest plot (weight-scaled PNG)</td><td><code>output/figures/forest_plot.png</code></td></tr>
-    <tr><td>6</td><td>Reports (DOCX + HTML; PDF needs WeasyPrint)</td><td><code>output/reports/</code></td></tr>
+    <tr><td>1</td><td>Upload PDFs</td><td><code>uploads/upload_manifest.csv</code></td></tr>
+    <tr><td>2</td><td>Relevance screening</td><td><code>data/screened/screening_log.csv</code></td></tr>
+    <tr><td>3</td><td>Data extraction</td><td><code>data/extracted/extracted_data.csv</code></td></tr>
+    <tr><td>4</td><td>Meta-analysis</td><td><code>data/results/meta_analysis_results.csv</code></td></tr>
+    <tr><td>5</td><td>Forest plot</td><td><code>output/figures/forest_plot.png</code></td></tr>
+    <tr><td>6</td><td>Reports</td><td><code>output/reports/</code></td></tr>
   </table>
   <div class="section-label">Project folder layout (per run)</div>
-  <pre>reports\sr\YYYYMMDD_HHMMSS\
-  uploads\              ← PDF copies for this run
-  data\
-    screened\           ← screening_log.csv
-    extracted\          ← extracted_data.csv, rob2_assessment.csv
-    results\            ← meta_analysis_results.csv
-  output\
-    figures\            ← forest_plot.png
-    reports\            ← systematic_review.docx / .html</pre>
-  <div class="ok">&#9989; Outputs are also mirrored to <code>output\sr\</code> and <code>sr\outputs\</code> after each run.</div>
-  <div class="section-label">Text extraction &mdash; three-tier fallback</div>
-  <table>
-    <tr><th>Tier</th><th>Method</th><th>Triggers when</th></tr>
-    <tr><td>1</td><td>pdfplumber</td><td>Always attempted first</td></tr>
-    <tr><td>2</td><td>pymupdf (fitz)</td><td>pdfplumber returns garbled / sparse text; rejects &#x00;-encoded (Caesar-shifted) PDFs</td></tr>
-    <tr><td>3</td><td>Tesseract OCR</td><td>pymupdf also garbled or contains null bytes</td></tr>
-  </table>
-  <div class="section-label">Stage 4 &mdash; effect-size fallbacks</div>
-  <table>
-    <tr><th>Situation</th><th>Fallback</th></tr>
-    <tr><td>Pre-computed CI present in paper</td><td>Used directly</td></tr>
-    <tr><td>mean + SD + N per arm present</td><td>Hedges g or MD computed</td></tr>
-    <tr><td>n_intervention / n_control absent but n_total present</td><td>n_total split evenly (n/2 per arm)</td></tr>
-    <tr><td>Means / SDs genuinely absent</td><td>Study skipped with warning</td></tr>
-  </table>
-  <div class="section-label">Current meta-analysis result (fibromyalgia / CBT / SMD)</div>
-  <table>
-    <tr><th>Study</th><th>Hedges g</th><th>95% CI</th><th>Note</th></tr>
-    <tr><td>Ang 2010</td><td>+0.057</td><td>[&minus;0.618, 0.733]</td><td>n_total fallback (n=16/arm)</td></tr>
-    <tr><td>McCrae (zsy234)</td><td>&minus;0.234</td><td>[&minus;0.687, 0.218]</td><td>OCR tier 3</td></tr>
-    <tr><td colspan="2"><strong>Pooled SMD</strong></td><td><strong>&minus;0.144 [&minus;0.520, 0.232]</strong></td><td>I&sup2; = 0.0%</td></tr>
-  </table>
-  <div class="section-label">Known limitations</div>
-  <table>
-    <tr><th>Study</th><th>Issue</th></tr>
-    <tr><td>Jensen (PDF 2)</td><td>VAS pain data genuinely absent from extracted text</td></tr>
-    <tr><td>Karlsson (PDF 3)</td><td>N values extracted but means/SDs not found in OCR text</td></tr>
-    <tr><td>Lami / s10608</td><td>N values extracted but means/SDs not found in OCR text</td></tr>
-    <tr><td>All PDFs</td><td>CID-font encoded &mdash; pdfplumber always garbled; pymupdf or OCR used</td></tr>
-    <tr><td>WeasyPrint</td><td>Not installed &mdash; PDF output falls back to HTML only</td></tr>
-  </table>
-  <div class="section-label">Install WeasyPrint (optional &mdash; enables PDF output)</div>
-  <pre>.venv\Scripts\python.exe -m pip install weasyprint
-# Also requires GTK3 runtime on Windows:
-# https://github.com/tschoonj/GTK-for-Windows-Runtime-Environment-Installer/releases</pre>
-  <div class="section-label">Key config fields (prisma_criteria.yaml)</div>
-  <pre>pico:
-  population:   "Adults (>=18 years) with fibromyalgia"
-  intervention: "Cognitive-Behavioral Therapy"
-  comparator:   "Placebo or active comparator"
-  outcome:      "Pain intensity at post intervention timepoint"
-  study_design: "Randomised controlled trials (RCTs)"
-effect_measure: SMD
-inclusion_criteria:
-  - "RCT study design"
-exclusion_criteria:
-  - "Non-randomised designs"</pre>
-  <div class="section-label">Effect measure guide</div>
-  <table>
-    <tr><th>Outcome type</th><th>Use</th><th>Notes</th></tr>
-    <tr><td>Continuous, same scale</td><td><code>MD</code></td><td>e.g. all studies use VAS 0&ndash;10</td></tr>
-    <tr><td>Continuous, mixed scales</td><td><code>SMD</code></td><td>Hedges g &mdash; safe default for mixed instruments</td></tr>
-    <tr><td>Binary / event</td><td><code>OR</code> or <code>RR</code></td><td>needs event counts</td></tr>
-  </table>
+  <pre>reports/sr/YYYYMMDD_HHMMSS/
+  uploads/              ← PDF copies
+  data/
+    screened/           ← screening_log.csv
+    extracted/          ← extracted_data.csv
+    results/            ← meta_analysis_results.csv
+  output/
+    figures/            ← forest_plot.png
+    reports/            ← systematic_review.docx / .html</pre>
+  <div class="ok">✅ Outputs mirrored to <code>output/sr/</code></div>
   <div class="section-label">Recommended workflow</div>
   <table>
     <tr><th>Step</th><th>Action</th></tr>
-    <tr><td>1</td><td>Run <code>--mode rct_search</code> &rarr; get ranked PubMed articles</td></tr>
-    <tr><td>2</td><td>Review <code>output/rct_search/rct_search_*.docx</code> &rarr; pick top articles</td></tr>
+    <tr><td>1</td><td>Run <code>--mode rct_search</code> → get ranked articles</td></tr>
+    <tr><td>2</td><td>Review <code>output/rct_search/rct_search_*.docx</code></td></tr>
     <tr><td>3</td><td>Download PDFs, place in <code>input/sr/</code></td></tr>
-    <tr><td>4</td><td>Run SR pipeline: <code>python src\main.py --mode sr --provider deepseek</code></td></tr>
+    <tr><td>4</td><td>Run <code>python SOURCE_CODE/main.py --mode sr --provider qwen</code></td></tr>
   </table>
 </div></div>
 
 <!-- PROVIDERS -->
 <div class="card" onclick="toggle(this)">
 <div class="card-header h-provider">
-  <div class="card-icon" style="background:#1c1917">&#9881;&#65039;</div>
+  <div class="card-icon" style="background:#1c1917">⚙️</div>
   <div><div class="card-title">Providers &amp; API Keys</div><div class="card-badge">--provider &lt;name&gt;</div></div>
 </div>
 <div class="card-body">
   <table>
     <tr><th>Provider</th><th>Flag</th><th>Env var (.env)</th><th>Notes</th></tr>
-    <tr><td>Ollama</td><td><code>--provider ollama</code></td><td>none</td><td>Default &mdash; runs locally, no API key needed</td></tr>
-    <tr><td>OpenAI</td><td><code>--provider openai</code></td><td><code>OPENAI_API_KEY</code></td><td>GPT-4o etc.</td></tr>
-    <tr><td>Anthropic</td><td><code>--provider anthropic</code></td><td><code>ANTHROPIC_API_KEY</code></td><td>Claude models; required for file upload in SR</td></tr>
-    <tr><td>DeepSeek</td><td><code>--provider deepseek</code></td><td><code>DEEPSEEK_API_KEY</code></td><td>Recommended for SR pipeline</td></tr>
+    <tr><td>Ollama</td><td><code>--provider ollama</code></td><td>none</td><td>Default — free, local</td></tr>
+    <tr><td>OpenAI</td><td><code>--provider openai</code></td><td><code>OPENAI_API_KEY</code></td><td>GPT-4 vision</td></tr>
+    <tr><td>Anthropic</td><td><code>--provider anthropic</code></td><td><code>ANTHROPIC_API_KEY</code></td><td>Claude vision</td></tr>
+    <tr><td>DeepSeek</td><td><code>--provider deepseek</code></td><td><code>DEEPSEEK_API_KEY</code></td><td>Cost-efficient</td></tr>
     <tr><td>Groq</td><td><code>--provider groq</code></td><td><code>GROQ_API_KEY</code></td><td>Fast inference</td></tr>
-    <tr><td>Qwen</td><td><code>--provider qwen</code></td><td><code>DASHSCOPE_API_KEY</code></td><td>Alibaba Cloud Model Studio</td></tr>
+    <tr><td>Qwen</td><td><code>--provider qwen</code></td><td><code>DASHSCOPE_API_KEY</code></td><td>Recommended for SR</td></tr>
   </table>
   <div class="section-label">.env file</div>
   <pre>OLLAMA_HOST=http://localhost:11434
 OLLAMA_MODEL=llama3.2
 OPENAI_API_KEY=sk-...
-OPENAI_MODEL=gpt-4o
 ANTHROPIC_API_KEY=sk-ant-...
-ANTHROPIC_MODEL=claude-sonnet-4-6
 DEEPSEEK_API_KEY=sk-...
-DEEPSEEK_MODEL=deepseek-chat
 GROQ_API_KEY=gsk_...
-GROQ_MODEL=llama-3.3-70b-versatile
 DASHSCOPE_API_KEY=sk-...
-QWEN_MODEL=qwen3.7-plus</pre>
+DASHSCOPE_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1</pre>
   <div class="section-label">Common CLI flags</div>
   <table>
     <tr><th>Flag</th><th>Effect</th></tr>
-    <tr><td><code>--provider &lt;name&gt;</code></td><td>Select AI provider</td></tr>
-    <tr><td><code>--model &lt;name&gt;</code></td><td>Override default model for this session</td></tr>
-    <tr><td><code>--dry-run</code></td><td>Run without AI calls (testing/offline)</td></tr>
-    <tr><td><code>--list-roles</code></td><td>Show roles and prompt files for current mode</td></tr>
-    <tr><td><code>--list-sessions</code></td><td>List saved transcripts in reports/</td></tr>
-    <tr><td><code>--help-guide</code></td><td>Open this HTML guide in browser</td></tr>
-    <tr><td><code>--report</code></td><td>Generate writing report (writing mode only)</td></tr>
-    <tr><td><code>--effect-measure</code></td><td>OR / RR / MD / SMD (SR mode only)</td></tr>
+    <tr><td><code>--provider</code></td><td>Select AI provider</td></tr>
+    <tr><td><code>--model</code></td><td>Override default model</td></tr>
+    <tr><td><code>--dry-run</code></td><td>Run without AI calls</td></tr>
+    <tr><td><code>--list-roles</code></td><td>Show roles and prompt files</td></tr>
+    <tr><td><code>--list-sessions</code></td><td>List saved transcripts</td></tr>
+    <tr><td><code>--help-guide</code></td><td>Open this HTML guide</td></tr>
+    <tr><td><code>--report</code></td><td>Generate writing report</td></tr>
+    <tr><td><code>--ui</code></td><td>Launch Streamlit UI</td></tr>
   </table>
 </div></div>
 
 <!-- RAG -->
 <div class="card" onclick="toggle(this)">
 <div class="card-header h-rag">
-  <div class="card-icon" style="background:#312e81">&#128190;</div>
-  <div><div class="card-title">RAG &mdash; File &amp; URL Indexing</div><div class="card-badge">Automatic at session start</div></div>
+  <div class="card-icon" style="background:#312e81">🧠</div>
+  <div><div class="card-title">RAG — File Indexing</div><div class="card-badge">Automatic at session start</div></div>
 </div>
 <div class="card-body">
-  <p style="font-size:.82rem;color:#cbd5e1;margin-bottom:12px;">Files placed in the input folder are automatically chunked, embedded, and stored in a per-session ChromaDB collection. Content is retrieved and injected into the AI context at each step.</p>
+  <p style="font-size:.82rem;color:#cbd5e1;margin-bottom:12px;">Files placed in input folders are automatically chunked, embedded, and stored in a per-session ChromaDB collection.</p>
   <div class="section-label">Supported file types</div>
   <span class="pill pill-purple">.txt</span>
   <span class="pill pill-purple">.md</span>
@@ -403,19 +341,19 @@ QWEN_MODEL=qwen3.7-plus</pre>
     <tr><th>Mode</th><th>Input folder</th></tr>
     <tr><td>coding</td><td><code>input/coding/</code></td></tr>
     <tr><td>writing</td><td><code>input/writing/</code></td></tr>
-    <tr><td>rct_search</td><td><code>input/rct_search/</code> (also accepts <code>pico_*.json</code>)</td></tr>
+    <tr><td>rct_search</td><td><code>input/rct_search/</code></td></tr>
     <tr><td>appraisal</td><td><code>input/appraisal/</code></td></tr>
     <tr><td>search</td><td><code>input/search/</code></td></tr>
-    <tr><td>sr</td><td><code>input/sr/</code> (PDF articles + <code>pico_*.json</code>)</td></tr>
+    <tr><td>sr</td><td><code>input/sr/</code> (PDFs + pico_*.json)</td></tr>
   </table>
   <div class="section-label">Embedding setup (.env)</div>
   <pre>EMBEDDING_PROVIDER=ollama
 EMBEDDING_MODEL=nomic-embed-text</pre>
-  <div class="info">&#128161; Pull the embedding model first: <code>ollama pull nomic-embed-text</code></div>
+  <div class="info">💡 Pull the embedding model: <code>ollama pull nomic-embed-text</code></div>
 </div></div>
 
 </div><!-- end grid -->
-<footer>AI kcMedical Research &nbsp;&middot;&nbsp; PRISMA 2020 / Cochrane Handbook v6.5 &nbsp;&middot;&nbsp; 291 tests passing &nbsp;&middot;&nbsp; Pooled SMD &minus;0.144 [&minus;0.520, 0.232] I&sup2;=0.0% (Ang 2010 + McCrae) &nbsp;&middot;&nbsp; All SR outputs require human verification.</footer>
+<footer>AI kcMedicalResearch v2.3.0 &nbsp;&middot;&nbsp; ~243 tests passing &nbsp;&middot;&nbsp; ~50% coverage &nbsp;&middot;&nbsp; All SR outputs require human verification.</footer>
 <script>
 function toggle(card){card.classList.toggle("open")}
 function toggleAll(){
