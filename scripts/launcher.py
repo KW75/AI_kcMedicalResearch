@@ -463,9 +463,8 @@ def _run_cmd(cmd: list, label: str = '') -> None:
     print(f'  {FRAME}║{RESET}  {ACCENT}python SOURCE_CODE/main.py {display:<33}{RESET}  {FRAME}║{RESET}')
     print(f'  {FRAME}╚══ Ctrl+C stops and returns to menu ════════════════════════════╝{RESET}')
     print()
-    creationflags = subprocess.CREATE_NEW_PROCESS_GROUP if os.name == 'nt' else 0
     try:
-        subprocess.run(cmd, cwd=str(BASE), creationflags=creationflags)
+        subprocess.run(cmd, cwd=str(BASE), stdin=sys.stdin, stdout=sys.stdout, stderr=sys.stderr)
     except (KeyboardInterrupt, EOFError):
         print(f'\n  {WARN}Session stopped.  Returning to menu...{RESET}\n')
 
