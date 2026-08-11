@@ -1,4 +1,4 @@
-﻿"""
+"""
 main.py  - AI Automation Tool  v2.2.0
 Supports six workflow modes: coding, writing, rct_search, appraisal, search, sr.
 Supports six AI providers: ollama (default), openai, anthropic, deepseek, groq, qwen.
@@ -76,6 +76,46 @@ except ModuleNotFoundError:
             return None
 
 load_dotenv()
+
+
+# ---------------------------------------------------------------------------
+# Ollama auto-detect best model
+# ---------------------------------------------------------------------------
+def _ollama_detect_best_model(host: str = "http://localhost:11434") -> str:
+    """Query Ollama /api/tags and return the largest non-embedding model available."""
+    import urllib.request, json
+    # Preference order: larger models first, skip embedding models
+    SKIP_PATTERNS = ("embed", "nomic", "all-minilm")
+    try:
+        req = urllib.request.Request(f"{host}/api/tags", method="GET")
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            data = json.loads(resp.read())
+        models = data.get("models", [])
+        if not models:
+            return "llama3.2"
+        # Filter out embedding models
+        candidates = []
+        for m in models:
+            name = m.get("name", "")
+            if any(skip in name.lower() for skip in SKIP_PATTERNS):
+                continue
+            # Parse parameter size (e.g. "36.0B" -> 36.0, "3.2B" -> 3.2)
+            param_str = m.get("details", {}).get("parameter_size", "0B")
+            try:
+                size = float(param_str.replace("B", "").replace("M", "e-3").replace("K", "e-6"))
+            except (ValueError, TypeError):
+                size = 0
+            candidates.append((name, size))
+        if not candidates:
+            return "llama3.2"
+        # Sort by size descending, pick the largest
+        candidates.sort(key=lambda x: x[1], reverse=True)
+        best = candidates[0][0]
+        print(f"[ollama] Auto-detected best model: {best} ({candidates[0][1]:.1f}B params)")
+        return best
+    except Exception:
+        return "llama3.2"
+
 
 
 # Ensure project root is on sys.path so `from utils import rag` works
@@ -197,7 +237,7 @@ def auto_load_input_files(mode: str) -> list[Path]:
 # Environment / provider config
 # ---------------------------------------------------------------------------
 OLLAMA_HOST         = os.getenv("OLLAMA_HOST",         "http://localhost:11434")
-OLLAMA_MODEL        = os.getenv("OLLAMA_MODEL",        "llama3.2")
+OLLAMA_MODEL        = os.getenv("OLLAMA_MODEL",        "")  # Empty = auto-detect
 OPENAI_API_KEY      = os.getenv("OPENAI_API_KEY",      "")
 OPENAI_MODEL        = os.getenv("OPENAI_MODEL",        "gpt-4o-mini")
 ANTHROPIC_API_KEY   = os.getenv("ANTHROPIC_API_KEY",   "")
@@ -211,8 +251,13 @@ DASHSCOPE_BASE_URL  = os.environ.get(
     "DASHSCOPE_BASE_URL",
     "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
 )
-QWEN_MODEL          = "qwen3.7-plus"
+QWEN_MODEL          = os.getenv("QWEN_MODEL", "qwen-plus-latest")  # Always uses latest
 EMBEDDING_PROVIDER  = os.getenv("EMBEDDING_PROVIDER",  "ollama")
+
+# Auto-detect Ollama model if not explicitly set
+if not OLLAMA_MODEL:
+    OLLAMA_MODEL = _ollama_detect_best_model(OLLAMA_HOST)
+
 EMBEDDING_MODEL     = os.getenv("EMBEDDING_MODEL",     "nomic-embed-text")
 
 
