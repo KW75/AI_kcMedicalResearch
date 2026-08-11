@@ -1,4 +1,4 @@
-﻿"""Tests for the coding pipeline module - Standard Way: Tests define the specification."""
+"""Tests for the coding pipeline module - Standard Way: Tests define the specification."""
 
 import sys
 from pathlib import Path
@@ -275,7 +275,7 @@ class TestCodingHelpers:
 
     def test_max_iterations(self):
         """MAX_ITERATIONS is defined."""
-        assert MAX_ITERATIONS == 5
+        assert MAX_ITERATIONS == 3
 
 
 class TestCodingIntegration:
