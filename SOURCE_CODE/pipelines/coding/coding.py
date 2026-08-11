@@ -1,4 +1,4 @@
-﻿"""
+"""
 coding.py  - Coding mode engine for AI kcMedicalResearch
 Provides three sub-modes: Builder (pipeline), Reviewer (standalone), Tester (standalone)
 """
@@ -364,11 +364,11 @@ def _call_llm(
     with _Spinner(spinner_message):
         t = threading.Thread(target=_run, daemon=True)
         t.start()
-        t.join(timeout=300)  # 5-minute hard timeout per LLM call
+        t.join(timeout=900)  # 15-minute timeout (large local models need more time)
 
     if t.is_alive():
         return (
-            "[ERROR] LLM call timed out after 5 minutes. "
+            "[ERROR] LLM call timed out after 15 minutes. "
             "Check that Ollama is running and the model is pulled, "
             "or switch to a cloud provider with --provider."
         )

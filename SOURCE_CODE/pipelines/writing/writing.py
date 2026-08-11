@@ -1,4 +1,4 @@
-﻿"""
+"""
 writing.py  - Writing Mode engine (v1.2 two-track system)
 Tracks:
   topic    - newspaper/editorial style, default 800 words
@@ -122,10 +122,10 @@ def _call_llm(
     with _Spinner(spinner_message):
         t = threading.Thread(target=_run, daemon=True)
         t.start()
-        t.join(timeout=300)
+        t.join(timeout=900)  # 15-minute timeout (large local models need more time)
 
     if t.is_alive():
-        return "[ERROR] LLM call timed out after 5 minutes."
+        return "[ERROR] LLM call timed out after 15 minutes."
     if error_holder:
         return f"[ERROR] LLM call failed: {error_holder[0]}"
     if not result_holder:
