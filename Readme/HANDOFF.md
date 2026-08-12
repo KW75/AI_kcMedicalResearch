@@ -209,6 +209,7 @@ docs/
     └── topic.md.example
 
 Note: The prompts/ folder contains 15 role definition markdown files but these are NOT loaded by any pipeline. Pipelines use hard-coded role definitions via _build_system_prompt(). The prompts/ folder serves as reference documentation only.
+
 9. TEST COVERAGE
 9.1 Summary
 
@@ -324,6 +325,13 @@ d42f82b fix: rewrite test_live_providers.py for pytest compatibility, move confi
 d8b99a3 docs: update documentation for v2.3.0 with test coverage improvements
 4a77472 test: improve main.py test coverage and finalize test suite
 5aa9c82 feat: major testing and code quality improvements
+5b1054b docs: replace dated handoff with combined HANDOFF.md, update README
+af488dd test: update MAX_ITERATIONS assertion from 5 to 3
+794416f docs: restructure docs/, add all mode guidelines, fix prompt paths
+90d6c3d fix: increase Ollama context to 32768, num_predict to 8192
+a0cde58 fix: increase LLM timeout from 5 to 15 minutes
+d42f82b fix: rewrite test_live_providers.py for pytest compatibility
+2d71bfc feat: auto-detect best Ollama model, make Qwen model configurable
 
 Note: Destructive commit 62e412c has been permanently purged from history.
 12. OLLAMA MODEL AUTO-DETECTION
