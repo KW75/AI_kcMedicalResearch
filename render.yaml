@@ -6,9 +6,9 @@ services:
     plan: free
     buildCommand: |
       pip install --upgrade pip
-      pip install -r requirements.txt
+      pip install -r requirements-render.txt
     startCommand: |
-      streamlit run src/ui/app.py --server.port $PORT --server.address 0.0.0.0 --server.enableCORS false --server.enableXsrfProtection false
+      streamlit run SOURCE_CODE/ui/app.py --server.port $PORT --server.address 0.0.0.0 --server.enableCORS false --server.enableXsrfProtection false
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.9
@@ -18,19 +18,5 @@ services:
         value: $PORT
       - key: STREAMLIT_BROWSER_GATHER_USAGE_STATS
         value: false
-      # Custom endpoints (for your Alibaba setup)
       - key: DASHSCOPE_BASE_URL
-        value: https://ws-uv5pi4kkqbrg1vpe.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1
-      - key: DASHSCOPE_ANTHROPIC_URL
-        value: https://ws-uv5pi4kkqbrg1vpe.ap-southeast-1.maas.aliyuncs.com/apps/anthropic
-      # API Keys - Add these in Render dashboard (not in this file!)
-      # - key: OPENAI_API_KEY
-      #   sync: false
-      # - key: ANTHROPIC_API_KEY
-      #   sync: false
-      # - key: GROQ_API_KEY
-      #   sync: false
-      # - key: DEEPSEEK_API_KEY
-      #   sync: false
-      # - key: DASHSCOPE_API_KEY
-      #   sync: false
+        value: https://dashscope-intl.aliyuncs.com/compatible-mode/v1
