@@ -1,10 +1,11 @@
-chromadb>=0.4.0
+# requirements-render.txt — Render deployment (no C++ build tools available)
+# chromadb removed: requires chroma-hnswlib compilation
+# pytest removed: not needed at runtime
 pypdf>=3.0.0
 python-dotenv>=1.0.0
 requests>=2.31.0
 pymupdf>=1.23.0
 python-docx>=1.0.0
-pytest>=7.0.0
 anyio>=3.0.0
 pandas>=2.0.0
 numpy>=1.24.0
