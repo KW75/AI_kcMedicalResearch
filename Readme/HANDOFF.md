@@ -1,12 +1,13 @@
+$handoff = @'
 # AI kcMedicalResearch - Combined Handoff Document
-## Version 2.3.1 - Stability, Auto-Detection & Documentation Update
+## Version 2.4.0 - Provider Fallback, Streaming, CI/CD Green
 
 **Date:** 2026-08-13
 **Repository:** https://github.com/KW75/AI_kcMedicalResearch
 **Live App:** https://ai-kcmedicalresearch.onrender.com
-**Tests:** 275 passed, 6 skipped, 0 warnings
-**Coverage:** ~48%
-**Last Commit:** 68ce91f
+**Tests:** 362 passed, 3 skipped, 11 deselected (live tests)
+**Coverage:** ~50%
+**Last Commit:** d983be1
 
 ---
 
@@ -17,6 +18,8 @@ AI kcMedicalResearch is a local-first Python application providing six specialis
 **Target Users:** Medical students, clinical researchers, academic writers.
 
 **Default Provider:** DeepSeek (configurable via .env DEFAULT_PROVIDER)
+
+**Fallback Chain:** DeepSeek → Qwen → Groq (configurable via FALLBACK_PROVIDERS env var)
 
 ---
 
@@ -45,6 +48,21 @@ AI kcMedicalResearch is a local-first Python application providing six specialis
 - **Render fix:** startCommand path corrected, lean requirements-render.txt created
 - **Tests:** 275 passed, 6 skipped, 0 warnings
 
+### Session 3 (2026-08-13) - v2.4.0: CI/CD, Fallback Chain, Streaming
+- **GitHub Actions CI fixed:** Pinned Python 3.11, added build-essential/cmake/python3-dev for chromadb/hnswlib compilation
+- **pysqlite3 monkey-patch:** Added to tests/conftest.py for chromadb compatibility on Linux
+- **pytesseract import made conditional:** Prevents CI collection errors (OCR not available on runners)
+- **5 network-dependent tests marked as `@pytest.mark.live`:** Skipped in CI (require real API/Ollama)
+- **Provider fallback chain:** `call_ai()` now retries on transient errors (timeout, 429, 502, 503); default chain: deepseek → qwen → groq
+- **Streaming enabled by default:** CLI now streams tokens live; use `--no-stream` to disable
+- **Render build fix:** Added `--no-cache-dir` to pip install for free-tier memory limits
+- **Documentation updated:** README.md, Setup_Instructions_for_Users.txt, HANDOFF.md all reflect DeepSeek default
+- **Root README.md added:** GitHub now displays project overview on landing page
+- **Duplicate Readme/README.md removed:** Single source of truth at repo root
+- **Tests:** 362 passed, 3 skipped, 11 deselected (live)
+- **CI:** Green (GitHub Actions passing)
+- **Render:** Live and serving
+
 ---
 
 ## 3. CURRENT STATUS
@@ -52,14 +70,16 @@ AI kcMedicalResearch is a local-first Python application providing six specialis
 ### What's Working
 | Component | Status | Details |
 |-----------|--------|---------|
-| Launcher | Fixed | stdin properly inherited by subprocess |
+| GitHub Actions CI | ✓ Green | 362 tests passing, Python 3.11 |
+| Render Deployment | ✓ Live | Auto-deploy, --no-cache-dir |
+| Provider Fallback | ✓ Active | deepseek → qwen → groq on transient errors |
+| Streaming CLI | ✓ Default | Tokens stream live; --no-stream to disable |
 | DeepSeek Provider | DEFAULT | Fast, cheap, reliable for all modes |
 | Ollama Provider | Fixed | Auto-detects best local model (offline/testing only) |
 | Qwen Provider | Fixed | Uses `qwen-plus-latest` |
 | LLM Timeouts | Fixed | 15 min for coding/writing pipelines |
 | Context Window | Fixed | 32768 tokens for Ollama |
-| All Tests | Passing | 275 passed, 6 skipped, 0 warnings |
-| Render Deployment | Live | Auto-deploy from main branch |
+| All Tests | Passing | 362 passed, 3 skipped, 11 deselected |
 | Docker Support | Complete | Windows + macOS scripts |
 | CLI/UI Launchers | Complete | Theme detection, error handling |
 | All Pipelines | Working | coding, writing, appraisal, search, rct_search, sr |
@@ -71,6 +91,8 @@ AI kcMedicalResearch is a local-first Python application providing six specialis
 | 1 | Lami extraction fails (Table 4) | High | Open |
 | 2 | WeasyPrint not installed | Medium | PDF falls back to HTML |
 | 3 | Anthropic geo-restricted | Low | Use VPN or skip |
+| 4 | Node.js 20 deprecation warning in CI | Low | Cosmetic; update to checkout@v5/setup-python@v6 |
+| 5 | DeprecationWarning: invalid escape sequence in project_layout.py | Low | Add raw-string prefix |
 
 ---
 
@@ -87,24 +109,22 @@ AI kcMedicalResearch is a local-first Python application providing six specialis
 | RCT Search | `--mode rct_search` | Formulator > Searcher > Validator | `input/rct_search/` | `output/rct_search/` |
 | SR | `--mode sr` | SR Methodologist (6-stage) | `input/sr/` (.pdf) | `output/sr/` + `reports/sr/` |
 
-**Common flags:** `--provider`, `--model`, `--report`, `--revise`, `--role`, `--sub`, `--dry-run`, `--help-guide`, `--ui`, `--list-sessions`, `--list-roles`, `--stats`
+**Common flags:** `--provider`, `--model`, `--report`, `--revise`, `--role`, `--sub`, `--dry-run`, `--no-stream`, `--resume`, `--help-guide`, `--ui`, `--list-sessions`, `--list-roles`, `--stats`, `--version`
 
 ---
 
 ## 5. AI PROVIDERS
 
-| Provider | Flag | Env Var | Default Model | Vision |
-|----------|------|---------|---------------|--------|
-| DeepSeek (DEFAULT) | `--provider deepseek` | `DEEPSEEK_API_KEY` | deepseek-v4-flash | No |
-| Qwen | `--provider qwen` | `DASHSCOPE_API_KEY` | qwen-plus-latest | Yes |
-| OpenAI | `--provider openai` | `OPENAI_API_KEY` | gpt-4o-mini | Yes |
-| Anthropic | `--provider anthropic` | `ANTHROPIC_API_KEY` | claude-haiku-4-5 | Yes |
-| Groq | `--provider groq` | `GROQ_API_KEY` | llama-3.1-8b-instant | Yes |
-| Ollama (local) | `--provider ollama` | `OLLAMA_HOST` | Auto-detected (largest non-embedding) | No |
+| Provider | Flag | Env Var | Default Model | Vision | Streaming |
+|----------|------|---------|---------------|--------|-----------|
+| DeepSeek (DEFAULT) | `--provider deepseek` | `DEEPSEEK_API_KEY` | deepseek-v4-flash | No | Yes |
+| Qwen | `--provider qwen` | `DASHSCOPE_API_KEY` | qwen-plus-latest | Yes | Yes |
+| OpenAI | `--provider openai` | `OPENAI_API_KEY` | gpt-4o-mini | Yes | Yes |
+| Anthropic | `--provider anthropic` | `ANTHROPIC_API_KEY` | claude-sonnet-5 | Yes | Yes |
+| Groq | `--provider groq` | `GROQ_API_KEY` | llama-3.3-70b-versatile | Yes | Yes |
+| Ollama (local) | `--provider ollama` | `OLLAMA_HOST` | Auto-detected (largest non-embedding) | No | Yes |
 
-**Note:** Ollama with large models (36B) is too slow for production use (timeouts on coding and writing pipelines). DeepSeek is the default. Use `--provider ollama` only for offline/testing scenarios with small models.
-
-**Ollama auto-detection:** If `OLLAMA_MODEL` is unset, queries `http://localhost:11434/api/tags` and selects the largest non-embedding model.
+**Fallback Chain:** On transient errors (timeout, 429, 502, 503), the system automatically tries the next provider in the chain. Auth errors (401, 403) raise immediately. Default chain: `deepseek,qwen,groq`. Configure via `FALLBACK_PROVIDERS` env var. Set to empty string to disable.
 
 **Vision requirement:** SR pipeline blocks non-vision providers (DeepSeek, Ollama).
 
@@ -115,6 +135,9 @@ AI kcMedicalResearch is a local-first Python application providing six specialis
 ```env
 # Default provider (change to ollama for offline use)
 DEFAULT_PROVIDER=deepseek
+
+# Fallback chain (comma-separated, empty to disable)
+FALLBACK_PROVIDERS=deepseek,qwen,groq
 
 # Local Ollama (for offline/testing)
 OLLAMA_HOST=http://localhost:11434
@@ -143,7 +166,11 @@ CLI_THEME=dark
 
 AI_kcMedicalResearch/
 |-- SOURCE_CODE/                     Main source code
-|   |-- main.py                      Core engine (2438 lines)
+|   |-- main.py                      Core engine (~2100 lines)
+|   |-- providers.py                 Provider registry, fallback chain
+|   |-- streaming.py                 SSE streaming for all providers
+|   |-- checkpoint.py                Pipeline checkpoint/resume
+|   |-- traice_integration.py        PRISMA-trAIce disclosure generator
 |   |-- pipelines/
 |   |   |-- coding/                  Builder > Reviewer > Tester
 |   |   |-- writing/                 Writer > Editor > QA
@@ -157,7 +184,7 @@ AI_kcMedicalResearch/
 |   +-- utils/
 |       |-- path_utils.py            Path management
 |       |-- document_reader.py       Multi-format reader (PDF, DOCX, images)
-|       +-- rag.py                   RAG utilities
+|       +-- rag.py                   RAG utilities (ChromaDB)
 |-- scripts/
 |   |-- launcher.py                  Interactive TUI launcher
 |   |-- windows/                     Windows batch scripts
@@ -179,52 +206,87 @@ AI_kcMedicalResearch/
 |-- input/                           Input files per mode
 |-- output/                          Generated output per mode
 |-- reports/                         Generated reports per mode
-|-- tests/                           275 tests across 9 files
+|-- tests/                           362 tests across 12 files
 |-- Readme/                          Documentation and help
+|   |-- HANDOFF.md                   This file (developer handoff)
+|   |-- Setup_Instructions_for_Users.txt  User setup guide
+|   +-- flashcard-help.html          Interactive help
+|-- .github/workflows/ci.yml         GitHub Actions CI pipeline
 |-- .env                             Local config (gitignored)
 |-- .env.template                    Template for colleagues
 |-- pytest.ini                       Pytest configuration
 |-- requirements.txt                 Python dependencies (local/Windows)
+|-- requirements-ci.txt              CI dependencies (Ubuntu/chromadb)
 |-- requirements-render.txt          Lean requirements (Render cloud)
 |-- render.yaml                      Render deployment config
-+-- README.md                        Project README
++-- README.md                        Project README (GitHub landing page)
 
-8. DOCUMENTATION STRUCTURE
+8. CI/CD PIPELINE
+GitHub Actions (.github/workflows/ci.yml)
 
-Guidelines are automatically loaded from docs/<mode>/ and injected into the LLM system prompt for each pipeline.
+    Trigger: Push/PR to main
+    Runner: ubuntu-latest, Python 3.11
+    System deps: build-essential, cmake, python3-dev (for chromadb)
+    Requirements: requirements-ci.txt (includes chromadb, pysqlite3-binary)
+    Tests: pytest -m "not live" (excludes 5 network-dependent tests + 6 live provider tests)
+    Coverage: ~50% reported via pytest-cov
 
-docs/
-|-- project/              (project-level, not injected)
-|   |-- PRD.md            Product requirements (all 6 modes, 6 providers)
-|   |-- architecture.md   Actual SOURCE_CODE/pipelines structure
-|   +-- decision-log.md   Key decisions from sessions
-|-- coding/               (injected into Builder/Reviewer/Tester)
-|   |-- coding-standards.md   Python, HTML/JS, AI agent rules, output format
-|   +-- test-strategy.md      Tester role, test plan, PASS/FAIL criteria
-|-- writing/              (injected into Writer/Editor/QA)
-|   |-- editorial-standards.md
-|   |-- style-guide.md
-|   |-- qa-checklist.md
-|   +-- project-brief.md
-|-- appraisal/            (injected into Appraiser/Methodologist/Summariser)
-|   |-- appraisal-guide.md
-|   +-- scoring-criteria.md
-|-- search/               (injected into Researcher)
-|   |-- search-guide.md
-|   +-- topic.md.example
-+-- rct_search/           (injected into Formulator/Searcher/Validator)
-    |-- database-guide.md
-    |-- pico-framework.md
-    |-- validation-criteria.md
-    +-- topic.md.example
+Render (render.yaml)
 
-Note: The prompts/ folder contains 15 role definition markdown files but these are NOT loaded by any pipeline. Pipelines use hard-coded role definitions via _build_system_prompt(). The prompts/ folder serves as reference documentation only.
-9. TEST COVERAGE
+    Trigger: Auto-deploy on push to main
+    Runtime: Python 3.11.9
+    Build: pip install --no-cache-dir -r requirements-render.txt
+    Start: streamlit run SOURCE_CODE/ui/app.py --server.port $PORT
+    Plan: Free tier
+
+Key CI Fixes Applied
+Fix 	Commit 	Issue
+Pin Python 3.11, add build-essential 	4ff2979 	chromadb wheel compilation
+Add cmake, python3-dev 	ad602d3 	hnswlib compilation
+pysqlite3 monkey-patch in conftest.py 	d298f71 	chromadb sqlite3 version
+Conditional pytesseract import 	fa2e618 	ModuleNotFoundError on CI
+Mark 5 tests as @pytest.mark.live 	e75ae6f 	Network-dependent tests
+Remove debug step, finalize 	ec72643 	Clean workflow
+--no-cache-dir for Render 	463b337 	Free-tier memory limits
+9. STREAMING
+Architecture
+
+    SOURCE_CODE/streaming.py provides stream_ai(), stream_to_console(), and tee_stream()
+    All six providers support SSE streaming (OpenAI-compatible format + Anthropic + Ollama native)
+    stream_to_console() prints tokens as they arrive, falls back to non-streaming on error
+    tee_stream() supports custom display functions (e.g., Streamlit st.write_stream)
+
+CLI Behavior
+
+    Default: Streaming enabled (tokens appear live in terminal)
+    Disable: --no-stream flag for batch output
+    Non-TTY: Automatically disabled when stdout is not a terminal (pipes, CI)
+    Fallback: If streaming connection fails, falls back to non-streaming call_ai()
+
+10. PROVIDER FALLBACK CHAIN
+How It Works
+
+    call_ai() in main.py reads FALLBACK_PROVIDERS env var (default: deepseek,qwen,groq)
+    On transient errors (timeout, 502, 503, 429, rate limit, connection refused), tries next provider
+    Auth errors (401, 403) raise immediately — no wasted retries
+    Prints [fallback] provider_x failed (...), trying next... warnings
+    If all providers fail, raises RuntimeError with full chain attempted
+
+Configuration
+
+# Default fallback chain
+FALLBACK_PROVIDERS=deepseek,qwen,groq
+
+# Disable fallback (single provider only)
+FALLBACK_PROVIDERS=
+
+# Custom chain
+FALLBACK_PROVIDERS=openai,anthropic,deepseek
+
+11. TEST COVERAGE
 Summary
 
-275 passed, 6 skipped in ~106s
-Overall coverage: ~48%
-
+362 passed, 3 skipped, 11 deselected in ~20s Overall coverage: ~50%
 By Module
 Module 	Coverage 	Tests
 writing.py 	89% 	36
@@ -233,12 +295,14 @@ coding.py 	78% 	41
 search.py 	72% 	25
 path_utils.py 	67% 	-
 rct_search.py 	63% 	27
-ui/app.py 	59% 	33
+ui/app.py 	58% 	33
 rag.py 	57% 	-
+providers.py 	~55% 	15
+streaming.py 	~45% 	12
 main.py 	39% 	40
 SR pipeline 	~16% 	19
-test_live_providers.py 	- 	6 (live)
-Total 	~48% 	275
+traice_integration.py 	~60% 	8
+Total 	~50% 	362
 Running Tests
 
 # Standard suite (excludes live provider tests)
@@ -253,8 +317,8 @@ Running Tests
 # With coverage report
 .\.venv\Scripts\python.exe -m pytest --cov=SOURCE_CODE --cov-report=html
 
-10. SETUP INSTRUCTIONS
-10.1 For Colleagues - Docker (Recommended)
+12. SETUP INSTRUCTIONS
+12.1 For Colleagues - Docker (Recommended)
 
 Windows:
 
@@ -270,37 +334,12 @@ chmod +x docker/mac_*.sh
 ./docker/mac_docker_setup.sh
 
 Total setup ~5 minutes. No Python install needed - just Docker Desktop.
-10.2 Docker Manual Commands
-
-# Build image
-docker build -f docker/Dockerfile -t ai-kcmedicalresearch .
-
-# CLI mode
-docker run -it --rm \
-    -v $(pwd)/input:/app/input \
-    -v $(pwd)/output:/app/output \
-    -v $(pwd)/reports:/app/reports \
-    --env-file .env \
-    --add-host host.docker.internal:host-gateway \
-    ai-kcmedicalresearch \
-    python SOURCE_CODE/main.py
-
-# UI mode (Streamlit)
-docker run -it --rm -p 8501:8501 \
-    -v $(pwd)/input:/app/input \
-    -v $(pwd)/output:/app/output \
-    -v $(pwd)/reports:/app/reports \
-    --env-file .env \
-    --add-host host.docker.internal:host-gateway \
-    ai-kcmedicalresearch \
-    streamlit run SOURCE_CODE/ui/app.py --server.port=8501 --server.address=0.0.0.0
-
-10.3 Local Development (No Docker)
+12.2 Local Development (No Docker)
 
 # Via launcher menu
 .\.venv\Scripts\python.exe scripts\launcher.py
 
-# Direct mode execution (DeepSeek is default provider)
+# Direct mode execution (DeepSeek default, streaming enabled)
 .\.venv\Scripts\python.exe SOURCE_CODE\main.py --mode coding
 .\.venv\Scripts\python.exe SOURCE_CODE\main.py --mode writing
 .\.venv\Scripts\python.exe SOURCE_CODE\main.py --mode rct_search
@@ -312,55 +351,52 @@ docker run -it --rm -p 8501:8501 \
 .\.venv\Scripts\python.exe SOURCE_CODE\main.py --provider qwen
 .\.venv\Scripts\python.exe SOURCE_CODE\main.py --provider ollama
 
+# Disable streaming
+.\.venv\Scripts\python.exe SOURCE_CODE\main.py --no-stream
+
+# Resume from checkpoint
+.\.venv\Scripts\python.exe SOURCE_CODE\main.py --resume
+
 # Dry run (no LLM call)
 .\.venv\Scripts\python.exe SOURCE_CODE\main.py --dry-run
 
 # Help
 .\.venv\Scripts\python.exe SOURCE_CODE\main.py --help-guide
 
-10.4 Render.com (Cloud Web App)
+12.3 Render.com (Cloud Web App)
 
     Live URL: https://ai-kcmedicalresearch.onrender.com
     Auto-deploy: Enabled (push to main triggers deploy)
     API Keys: Set in Render dashboard > Environment Variables
     Users: Enter their own keys in sidebar, or use admin-configured keys
 
-11. COMMIT HISTORY
+13. COMMIT HISTORY (Session 3)
 
-68ce91f (HEAD -> main) feat: change default provider from ollama to deepseek
-5f944cc docs: replace dated handoff with combined HANDOFF.md, update README
-5b1054b docs: replace dated handoff with combined HANDOFF.md, update README
-af488dd test: update MAX_ITERATIONS assertion from 5 to 3
-794416f docs: restructure docs/, add all mode guidelines, fix prompt paths
-90d6c3d fix: increase Ollama context to 32768, num_predict to 8192
-a0cde58 fix: increase LLM timeout from 5 to 15 minutes
-d42f82b fix: rewrite test_live_providers.py for pytest compatibility
-2d71bfc feat: auto-detect best Ollama model, make Qwen model configurable
-428e190 fix: remove CREATE_NEW_PROCESS_GROUP from launcher
-9aef3e6 fix: resolve path issues, encoding, launcher, and UI frame alignment
+d983be1 (HEAD -> main) feat: enable streaming by default in CLI (use --no-stream to disable)
+463b337 fix(render): add --no-cache-dir to prevent free-tier memory exhaustion
+6755b49 feat: enable provider fallback chain by default (deepseek,qwen,groq)
+ec72643 ci: remove debug step, finalize green CI workflow
+e75ae6f ci: mark 5 network-dependent tests as live (skipped in CI)
+fa2e618 ci: make pytesseract import conditional - fixes CI collection error
+d298f71 ci: add pysqlite3 monkey-patch in conftest.py for chromadb on Linux
+ad602d3 ci: add cmake and python3-dev for chromadb/hnswlib compilation
+4ff2979 ci: pin Python 3.11, add build-essential, fix chromadb for CI
+dad8f75 docs: update HANDOFF.md - DeepSeek default provider
+b20a20c docs: update Setup Instructions - DeepSeek default, Ollama opt-in
+910f465 docs: add README.md to repo root for GitHub display
+73a43c2 docs: remove duplicate Readme/README.md (now at repo root)
 
-Note: Destructive commit 62e412c has been permanently purged from history.
-12. KEY CONFIGURATION
+14. KEY CONFIGURATION
 Setting 	Value 	Location
-DEFAULT_PROVIDER 	deepseek 	.env (override with --provider flag)
+DEFAULT_PROVIDER 	deepseek 	.env
+FALLBACK_PROVIDERS 	deepseek,qwen,groq 	.env
 OLLAMA_CONTEXT 	32768 	.env
 OLLAMA_NUM_PREDICT 	8192 	.env
 OLLAMA_TEMPERATURE 	0.3 	.env
 MAX_ITERATIONS 	3 	SOURCE_CODE/pipelines/coding/coding.py
 LLM Timeout 	900s (15 min) 	coding.py, writing.py
-13. OLLAMA MODEL AUTO-DETECTION
-
-The system queries http://localhost:11434/api/tags at startup and selects the largest non-embedding model:
-Model 	Size 	Selected?
-qwen3.6:latest 	36.0B 	Yes (largest)
-llama3.2:latest 	3.2B 	Skipped
-nomic-embed-text:latest 	137M 	Skipped (embedding)
-qwen2.5-coder:3b 	3.1B 	Skipped
-
-Override: Set OLLAMA_MODEL=your-model-name in .env
-
-Warning: Ollama with 36B models times out on coding (Builder+Reviewer+Tester iterations) and writing (long-form generation). Use DeepSeek or Qwen for production work.
-14. TROUBLESHOOTING
+Streaming 	Enabled by default 	--no-stream to disable
+15. TROUBLESHOOTING
 Issue 	Solution
 Docker not found 	Install Docker Desktop
 Docker not running 	Start Docker Desktop
@@ -368,21 +404,25 @@ Ollama timeout 	Use --provider deepseek instead; or reduce model size
 Empty LLM response 	Increase OLLAMA_NUM_PREDICT in .env
 Launcher stdin broken 	Ensure no CREATE_NEW_PROCESS_GROUP in launcher.py
 Theme wrong colours 	Set CLI_THEME=dark or CLI_THEME=light
-Tests fail on MAX_ITERATIONS 	Ensure test asserts == 3 not == 5
-Tests fail on default provider 	Ensure test asserts == "deepseek" not == "ollama"
+CI fails: pytesseract 	Already conditional; check document_reader.py
+CI fails: chromadb sqlite 	pysqlite3 patch in conftest.py handles this
+CI fails: network tests 	Marked @pytest.mark.live, excluded with -m "not live"
 Pipeline timeout 	36B models need 15 min; use cloud provider instead
 App not loading on Render 	Check render.yaml uses SOURCE_CODE/ui/app.py
-Render build fails 	Uses requirements-render.txt (no pywin32/textract/easyocr)
+Render build fails 	Uses requirements-render.txt + --no-cache-dir
 API key not working 	Check for extra spaces; verify env var name
-15. NEXT SESSION PRIORITIES
+Fallback not working 	Check FALLBACK_PROVIDERS is not empty in .env
+Streaming not working 	Ensure stdout is a TTY; check --no-stream not set
+16. NEXT SESSION PRIORITIES
 Priority 	Task 	Details
 1 	Fix Lami Extraction 	SR pipeline - Table 4 not found (pages 12-13)
-2 	Install WeasyPrint 	pip install weasyprint + GTK3 runtime for PDF
-3 	Improve main.py coverage 	Largest file at 39%, biggest impact
-4 	Push Docker image 	Docker Hub for easier colleague sharing
-5 	Target 60% overall coverage 	Focus on SR pipeline modules
-6 	Integrate prompts/ into pipeline 	Load role definitions from .md files instead of hard-coding
-16. LESSONS LEARNED
+2 	Raise test coverage to 60% 	Focus on main.py dispatch logic
+3 	Install WeasyPrint 	pip install weasyprint + GTK3 runtime for PDF
+4 	Fix Node.js 20 deprecation 	Update actions/checkout@v5, setup-python@v6
+5 	Fix escape sequence warning 	Add raw-string prefix in project_layout.py
+6 	Push Docker image 	Docker Hub for easier colleague sharing
+7 	Integrate prompts/ into pipeline 	Load role definitions from .md files
+17. LESSONS LEARNED
 
     Never use CREATE_NEW_PROCESS_GROUP for interactive CLI tools on Windows - it detaches stdin
     Never hardcode model versions - use auto-detection or *-latest aliases
@@ -392,30 +432,41 @@ Priority 	Task 	Details
     Large local models (36B) need longer timeouts - 5 min is too short for complex prompts
     Context window must accommodate full prompt - 8192 tokens is too small; 32768 works
     Reduce iteration count for local models - 3 iterations sufficient; 5 causes timeouts
-    Documentation belongs in docs/<mode>/ - project-level docs go in docs/project/
+    Documentation belongs in docs// - project-level docs go in docs/project/
     prompts/ folder is dead weight unless explicitly loaded by pipeline code
     Ollama 36B is NOT viable for production - use DeepSeek as default provider
     Render requires lean requirements - no pywin32, textract, easyocr, opencv on Linux
+    CI requires conditional imports for system-level packages (pytesseract, easyocr, cv2)
+    chromadb on Linux CI needs cmake + python3-dev + pysqlite3-binary monkey-patch
+    Mark network-dependent tests as @pytest.mark.live to avoid CI flakes
+    Provider fallback prevents single-point-of-failure outages
+    Streaming should be opt-out (default on) for better UX
+    Use --no-cache-dir on memory-constrained build environments (Render free tier)
+    Multi-line string replacement in PowerShell is unreliable; use line-by-line edits
 
-17. ENVIRONMENT SUMMARY
+18. ENVIRONMENT SUMMARY
 Item 	Value
 Python 	3.11.9
 Virtual env 	D:\AI_kcMedicalResearch.venv
 Default Provider 	DeepSeek (deepseek-v4-flash)
+Fallback Chain 	deepseek → qwen → groq
+Streaming 	Enabled by default (--no-stream to disable)
 Ollama model 	qwen3.6:latest (36B, offline/testing only)
 Qwen model 	qwen-plus-latest
 OS 	Windows 11 (PowerShell 7)
 Render 	Free tier, auto-deploy enabled
 Docker 	Available (containerized deployment)
-Tests 	275 passed, 6 skipped
-Coverage 	~48%
+Tests 	362 passed, 3 skipped, 11 deselected
+Coverage 	~50%
+CI 	GitHub Actions - Green
 Repository 	https://github.com/KW75/AI_kcMedicalResearch
 Live App 	https://ai-kcmedicalresearch.onrender.com
 
-Handoff prepared: 2026-08-13 Version: v2.3.1-stable Combines all prior handoff documents into a single source of truth. '@
+Handoff prepared: 2026-08-13 Version: v2.4.0 Combines all prior handoff documents into a single source of truth. '@
 
 [System.IO.File]::WriteAllText("PWD\Readme\HANDOFF.md", $handoff, [System.Text.UTF8Encoding]::new(false))
 Verify
 
 Write-Host "HANDOFF.md written: $((Get-Item 'Readme\HANDOFF.md').Length) bytes"
+
 
