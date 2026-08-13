@@ -42,7 +42,7 @@ jobs:
           OLLAMA_HOST: http://localhost:11434
           DEFAULT_PROVIDER: deepseek
         run: |
-          python -m pytest -m "not live" --tb=short -q
+          python -m pytest -m "not live" --tb=long -v 2>&1 | tail -100
 
       - name: Coverage report
         env:
