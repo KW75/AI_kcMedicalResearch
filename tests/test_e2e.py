@@ -1,5 +1,5 @@
 """
-test_e2e.py — End-to-end mode tests using --dry-run.
+test_e2e.py ??End-to-end mode tests using --dry-run.
 
 Each test exercises a full mode pipeline without making real AI calls.
 Verifies: no exceptions raised, output file created, output file non-empty.
@@ -47,7 +47,7 @@ def _fake_input(responses: list[str]):
 
 
 # ---------------------------------------------------------------------------
-# Writing mode — --report flag (single-pass, no input() calls)
+# Writing mode ??--report flag (single-pass, no input() calls)
 # ---------------------------------------------------------------------------
 
 class TestE2EWritingReport:
@@ -77,7 +77,7 @@ class TestE2EWritingReport:
 
 
 # ---------------------------------------------------------------------------
-# RCT Search mode — single-pass pipeline
+# RCT Search mode ??single-pass pipeline
 # ---------------------------------------------------------------------------
 
 class TestE2ERctSearch:
@@ -120,7 +120,7 @@ class TestE2ERctSearch:
 
 
 # ---------------------------------------------------------------------------
-# Appraisal mode — article injection
+# Appraisal mode ??article injection
 # ---------------------------------------------------------------------------
 
 class TestE2EAppraisal:
@@ -171,7 +171,7 @@ class TestE2EAppraisal:
 
 
 # ---------------------------------------------------------------------------
-# Code revision mode — --revise flag
+# Code revision mode ??--revise flag
 # ---------------------------------------------------------------------------
 
 class TestE2ECodeRevision:
@@ -254,7 +254,7 @@ class TestE2EValidation:
         """parse_args returns correct defaults."""
         args = parse_args([])
         assert args.mode == "coding"
-        assert args.provider == "ollama"
+        assert args.provider == "deepseek"
         assert args.dry_run is False
         assert args.report is False
         assert args.revise is False

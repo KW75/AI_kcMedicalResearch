@@ -1,7 +1,7 @@
 """
 main.py  - AI Automation Tool  v2.2.0
 Supports six workflow modes: coding, writing, rct_search, appraisal, search, sr.
-Supports six AI providers: ollama (default), openai, anthropic, deepseek, groq, qwen.
+Supports six AI providers: deepseek (default), openai, anthropic, ollama, groq, qwen.
 RAG layer: per-session, mode-specific input/ folder indexing via rag.py.
 Coding mode: Builder (pipeline), Reviewer (standalone), Tester (standalone).
 """
@@ -71,7 +71,7 @@ except ModuleNotFoundError:
         from modes.rct_search import run_rct_search_pipeline
     except ModuleNotFoundError:
         # Define fallback if module doesn't exist
-        def run_rct_search_pipeline(provider="ollama", model=None, dry_run=False, reports_dir=None):
+        def run_rct_search_pipeline(provider="deepseek", model=None, dry_run=False, reports_dir=None):
             print("[RCT Search] Module not available. Please ensure src/modes/rct_search.py exists.")
             return None
 
@@ -253,6 +253,7 @@ DASHSCOPE_BASE_URL  = os.environ.get(
 )
 QWEN_MODEL          = os.getenv("QWEN_MODEL", "qwen-plus-latest")  # Always uses latest
 EMBEDDING_PROVIDER  = os.getenv("EMBEDDING_PROVIDER",  "ollama")
+DEFAULT_PROVIDER    = os.getenv("DEFAULT_PROVIDER",    "deepseek")
 
 # Auto-detect Ollama model if not explicitly set
 if not OLLAMA_MODEL:
@@ -603,7 +604,7 @@ PROVIDERS: dict[str, callable] = {
 
 def call_ai(
     prompt: str,
-    provider: str = "ollama",
+    provider: str = "deepseek",
     model: str | None = None,
 ) -> str:
     """Dispatch an AI call to the correct provider function."""
@@ -1072,7 +1073,7 @@ def _ranked_articles_to_docx(
 def generate_writing_report(
     docs_dir: Path = DOCS_WRITING,
     reports_dir: Path = REPORTS_DIR,
-    provider: str = "ollama",
+    provider: str = "deepseek",
     model: str | None = None,
     input_dir: Path | None = None,
 ) -> Path:
@@ -1183,7 +1184,7 @@ def generate_code_revision(
     start_role: str = "Builder",
     docs_dir: Path = DOCS_CODING,
     reports_dir: Path = REPORTS_DIR,
-    provider: str = "ollama",
+    provider: str = "deepseek",
     model: str | None = None,
     dry_run: bool = False,
 ) -> Path:
@@ -1540,7 +1541,7 @@ def run_sr_launcher(provider: str = "", model: str = "") -> None:
                     print(f"   - Modified PICO saved to: {new_path.name}")
                     
             except Exception as e:
-                print(f"  ????? Could not load PICO: {e}")
+                print(f"  ??雓??? Could not load PICO: {e}")
                 pico_data = None
         
         elif choice == "0":
@@ -1571,7 +1572,7 @@ def run_sr_launcher(provider: str = "", model: str = "") -> None:
             )
             print(f"   - New PICO saved to: {pico_path.name}")
         else:
-            print("  ????? No PICO configured. Using existing config.")
+            print("  ??雓??? No PICO configured. Using existing config.")
     
     # -- Step 3: Update prisma_criteria.yaml with PICO data -----------------
     cfg_yaml: dict = {}
@@ -1599,7 +1600,7 @@ def run_sr_launcher(provider: str = "", model: str = "") -> None:
         print(f"\n   - prisma_criteria.yaml updated with PICO")
         print(f"     PubMed query: {cfg_yaml.get('pubmed_query_cleaned', 'n/a')}")
     else:
-        print("\n  ????? Using existing prisma_criteria.yaml")
+        print("\n  ??雓??? Using existing prisma_criteria.yaml")
 
     # -- Step 4: resolve provider and model ------------------------------------
     _DEFAULT_MODELS = {
@@ -1616,7 +1617,7 @@ def run_sr_launcher(provider: str = "", model: str = "") -> None:
     # --- Provider check for vision support ---
     if _provider == "deepseek":
         print("\n" + "=" * 58)
-        print("  ?????  WARNING: DeepSeek does NOT support vision API")
+        print("  ??雓???  WARNING: DeepSeek does NOT support vision API")
         print("=" * 58)
         print("  The SR pipeline uses vision-based extraction (images of PDF pages).")
         print("  DeepSeek's API only accepts text, not images.")
@@ -1738,7 +1739,7 @@ def list_roles(mode: str = "coding") -> None:
 # Coding mode dispatcher  (Builder pipeline / Reviewer / Tester standalone)
 # ---------------------------------------------------------------------------
 def handle_coding_mode(
-    provider: str = "ollama",
+    provider: str = "deepseek",
     model: str | None = None,
     dry_run: bool = False,
 ) -> None:
@@ -1845,7 +1846,7 @@ def handle_coding_mode(
 # Appraisal mode dispatcher
 # ---------------------------------------------------------------------------
 def handle_appraisal_mode(
-    provider: str = "ollama",
+    provider: str = "deepseek",
     model: str | None = None,
     dry_run: bool = False,
 ) -> None:
@@ -1912,7 +1913,7 @@ def handle_search_mode(provider: str, model: str, sub_mode: str = None) -> None:
         print(f"   - Using sub-mode: {sub}")
     elif is_cloud:
         # Cloud environment - use default
-        print("  ?????  Cloud environment detected. Defaulting to Topic Search (1).")
+        print("  ??雓???  Cloud environment detected. Defaulting to Topic Search (1).")
         sub = "1"
     else:
         # Local - interactive
@@ -1921,7 +1922,7 @@ def handle_search_mode(provider: str, model: str, sub_mode: str = None) -> None:
             if not sub:
                 sub = "1"
         except (EOFError, KeyboardInterrupt):
-            print("\n  ????? No input received. Defaulting to Topic Search (1).")
+            print("\n  ??雓??? No input received. Defaulting to Topic Search (1).")
             sub = "1"
 
     if sub not in ("1", "2"):
@@ -1972,7 +1973,7 @@ def handle_search_mode(provider: str, model: str, sub_mode: str = None) -> None:
         )
 
 def handle_writing_mode(
-    provider: str = "ollama",
+    provider: str = "deepseek",
     model: str | None = None,
     dry_run: bool = False,
 ) -> None:
@@ -2116,7 +2117,7 @@ def main(
     model_override: str | None = None,
     dry_run: bool = False,
     mode: str = "coding",
-    provider: str = "ollama",
+    provider: str = "deepseek",
 ) -> None:
     """Run an interactive AI session."""
     session_id  = uuid.uuid4().hex[:8]
@@ -2343,7 +2344,7 @@ def parse_args(args: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--role",           type=str, default="Builder",
                         choices=["Builder", "Reviewer", "Tester"],
                         help="Starting role for --revise pipeline (default: Builder)")
-    parser.add_argument("--provider",       type=str, default="ollama",
+    parser.add_argument("--provider",       type=str, default=DEFAULT_PROVIDER,
                         choices=["ollama", "openai", "anthropic", "deepseek", "groq", "qwen"])
     parser.add_argument("--list-sessions",  action="store_true", default=False)
     parser.add_argument("--read-session",   type=str, default=None, metavar="FILENAME")

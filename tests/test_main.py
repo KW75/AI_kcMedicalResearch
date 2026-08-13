@@ -1,4 +1,4 @@
-﻿"""Comprehensive tests for main.py - Tests define the specification."""
+"""Comprehensive tests for main.py - Tests define the specification."""
 
 import sys
 import os
@@ -276,7 +276,7 @@ class TestMainParsing:
     def test_parse_args_default(self):
         args = main.parse_args([])
         assert args.mode == "coding"
-        assert args.provider == "ollama"
+        assert args.provider == "deepseek"
         assert args.model is None
 
     def test_parse_args_with_provider(self):

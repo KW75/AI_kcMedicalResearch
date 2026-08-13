@@ -1,4 +1,4 @@
-﻿"""
+"""
 RCT Search Mode - PICO-driven multi-database search and AI ranking
 Supports: PubMed + Europe PMC
 """
@@ -274,7 +274,7 @@ def merge_search_results(
     return merged
 
 
-def call_ai(prompt: str, provider: str = "ollama", model: Optional[str] = None) -> str:
+def call_ai(prompt: str, provider: str = "deepseek", model: Optional[str] = None) -> str:
     """
     Call AI provider with prompt.
     Uses the main module's call_ai function.
@@ -485,7 +485,7 @@ def _ranked_articles_to_docx(
 
 
 def run_rct_search_pipeline(
-    provider: str = "ollama",
+    provider: str = "deepseek",
     model: str | None = None,
     reports_dir: Path = REPORTS_DIR,
     dry_run: bool = False,
