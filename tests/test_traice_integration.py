@@ -1,4 +1,4 @@
-"""Tests for traice_integration.py — pipeline tracing and auto-disclosure."""
+"""Tests for traice_integration.py ??pipeline tracing and auto-disclosure."""
 import json
 import os
 import sys
@@ -235,7 +235,7 @@ class TestDetectSovereignty:
     """Tests for auto-detection of sovereignty settings."""
 
     def test_local_provider(self):
-        env = {"DEFAULT_PROVIDER": "ollama", "OLLAMA_MODEL": "qwen3.6:latest"}
+        env = {"DEFAULT_PROVIDER": "ollama", "OLLAMA_MODEL": "qwen3.6:latest", "FALLBACK_PROVIDERS": ""}
         with patch.dict(os.environ, env, clear=False):
             with PipelineTracer(auto_save=False) as tracer:
                 pass

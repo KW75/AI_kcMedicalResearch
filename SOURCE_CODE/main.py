@@ -198,7 +198,7 @@ def auto_load_input_files(mode: str) -> list[Path]:
 
 
 # ---------------------------------------------------------------------------
-# Environment / provider config — sourced from providers.py + local overrides
+# Environment / provider config ??sourced from providers.py + local overrides
 # ---------------------------------------------------------------------------
 from providers import (
     OLLAMA_HOST, OLLAMA_MODEL, OPENAI_API_KEY, OPENAI_MODEL,
@@ -298,7 +298,7 @@ DOC_FILES_BY_ROLE: dict[str, list[Path]] = {
 # Provider registry
 # ---------------------------------------------------------------------------
 # ---------------------------------------------------------------------------
-# Provider functions — delegated to providers.py (backward-compatible names)
+# Provider functions ??delegated to providers.py (backward-compatible names)
 # ---------------------------------------------------------------------------
 from providers import (
     call_openai_provider,
@@ -307,10 +307,11 @@ from providers import (
     call_deepseek_provider,
     call_groq_provider,
     call_qwen_provider,
+    call_ai_with_fallback,
 )
 
 
-# PROVIDERS dict — re-exported from providers.py
+# PROVIDERS dict ??re-exported from providers.py
 from providers import PROVIDERS
 
 
@@ -326,7 +327,7 @@ def call_ai(
     If stream=True and running in a terminal, streams tokens to console.
     Uses fallback chain from FALLBACK_PROVIDERS env var on transient errors.
     """
-    fallback_raw = os.getenv("FALLBACK_PROVIDERS", "")
+    fallback_raw = os.getenv("FALLBACK_PROVIDERS", "deepseek,qwen,groq")
     fallback_chain = [p.strip() for p in fallback_raw.split(",") if p.strip()]
 
     if stream and sys.stdout.isatty():
@@ -342,7 +343,7 @@ def call_ai(
     if fallback_chain:
         return call_ai_with_fallback(
             prompt=prompt,
-            preferred_provider=provider,
+            provider=provider,
             model=model,
             fallback_chain=fallback_chain,
         )
@@ -1280,7 +1281,7 @@ def run_sr_launcher(provider: str = "", model: str = "") -> None:
                     print(f"   - Modified PICO saved to: {new_path.name}")
                     
             except Exception as e:
-                print(f"  ??雓??? Could not load PICO: {e}")
+                print(f"  ?????? Could not load PICO: {e}")
                 pico_data = None
         
         elif choice == "0":
@@ -1311,7 +1312,7 @@ def run_sr_launcher(provider: str = "", model: str = "") -> None:
             )
             print(f"   - New PICO saved to: {pico_path.name}")
         else:
-            print("  ??雓??? No PICO configured. Using existing config.")
+            print("  ?????? No PICO configured. Using existing config.")
     
     # -- Step 3: Update prisma_criteria.yaml with PICO data -----------------
     cfg_yaml: dict = {}
@@ -1339,7 +1340,7 @@ def run_sr_launcher(provider: str = "", model: str = "") -> None:
         print(f"\n   - prisma_criteria.yaml updated with PICO")
         print(f"     PubMed query: {cfg_yaml.get('pubmed_query_cleaned', 'n/a')}")
     else:
-        print("\n  ??雓??? Using existing prisma_criteria.yaml")
+        print("\n  ?????? Using existing prisma_criteria.yaml")
 
     # -- Step 4: resolve provider and model ------------------------------------
     _DEFAULT_MODELS = {
@@ -1356,7 +1357,7 @@ def run_sr_launcher(provider: str = "", model: str = "") -> None:
     # --- Provider check for vision support ---
     if _provider == "deepseek":
         print("\n" + "=" * 58)
-        print("  ??雓???  WARNING: DeepSeek does NOT support vision API")
+        print("  ??????  WARNING: DeepSeek does NOT support vision API")
         print("=" * 58)
         print("  The SR pipeline uses vision-based extraction (images of PDF pages).")
         print("  DeepSeek's API only accepts text, not images.")
@@ -1660,7 +1661,7 @@ def handle_search_mode(provider: str, model: str, sub_mode: str = None) -> None:
         print(f"   - Using sub-mode: {sub}")
     elif is_cloud:
         # Cloud environment - use default
-        print("  ??雓???  Cloud environment detected. Defaulting to Topic Search (1).")
+        print("  ??????  Cloud environment detected. Defaulting to Topic Search (1).")
         sub = "1"
     else:
         # Local - interactive
@@ -1669,7 +1670,7 @@ def handle_search_mode(provider: str, model: str, sub_mode: str = None) -> None:
             if not sub:
                 sub = "1"
         except (EOFError, KeyboardInterrupt):
-            print("\n  ??雓??? No input received. Defaulting to Topic Search (1).")
+            print("\n  ?????? No input received. Defaulting to Topic Search (1).")
             sub = "1"
 
     if sub not in ("1", "2"):
