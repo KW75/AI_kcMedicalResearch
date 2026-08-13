@@ -1,5 +1,5 @@
-# CI-only requirements (Ubuntu-compatible, no native Windows deps)
-chromadb>=0.4.0
+# CI-only requirements (Ubuntu-compatible, no native Windows deps, no C++ build tools)
+# chromadb removed: requires chroma-hnswlib C++ compilation, not exercised in unit tests
 pypdf>=3.0.0
 python-dotenv>=1.0.0
 requests>=2.31.0
