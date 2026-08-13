@@ -25,7 +25,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install -r requirements-ci.txt
 
       - name: Run tests
         env:
@@ -33,9 +33,11 @@ jobs:
           OPENAI_API_KEY: dummy-ci-key
           DEEPSEEK_API_KEY: dummy-ci-key
           GROQ_API_KEY: dummy-ci-key
-          OLLAMA_URL: http://localhost:11434
+          DASHSCOPE_API_KEY: dummy-ci-key
+          OLLAMA_HOST: http://localhost:11434
+          DEFAULT_PROVIDER: deepseek
         run: |
-          python -m pytest --tb=short -q
+          python -m pytest -m "not live" --tb=short -q
 
       - name: Coverage report
         env:
@@ -43,7 +45,8 @@ jobs:
           OPENAI_API_KEY: dummy-ci-key
           DEEPSEEK_API_KEY: dummy-ci-key
           GROQ_API_KEY: dummy-ci-key
-          OLLAMA_URL: http://localhost:11434
+          DASHSCOPE_API_KEY: dummy-ci-key
+          OLLAMA_HOST: http://localhost:11434
+          DEFAULT_PROVIDER: deepseek
         run: |
-          python -m pytest --cov=src --cov-report=term-missing -q
-
+          python -m pytest -m "not live" --cov=SOURCE_CODE --cov-report=term-missing -q
