@@ -1,13 +1,15 @@
 $handoff = @'
 # AI kcMedicalResearch - Combined Handoff Document
-## Version 2.4.0 - Provider Fallback, Streaming, CI/CD Green
+## Version 2.4.1 - Health Check, UptimeRobot, Render Stability
 
 **Date:** 2026-08-13
 **Repository:** https://github.com/KW75/AI_kcMedicalResearch
 **Live App:** https://ai-kcmedicalresearch.onrender.com
+**Health Check:** https://ai-kcmedicalresearch.onrender.com/_stcore/health
+**Uptime Monitor:** UptimeRobot (5-min interval, keeps free-tier instance warm)
 **Tests:** 362 passed, 3 skipped, 11 deselected (live tests)
 **Coverage:** ~50%
-**Last Commit:** d983be1
+**Last Commit:** 361cdd5
 
 ---
 
@@ -48,20 +50,23 @@ AI kcMedicalResearch is a local-first Python application providing six specialis
 - **Render fix:** startCommand path corrected, lean requirements-render.txt created
 - **Tests:** 275 passed, 6 skipped, 0 warnings
 
-### Session 3 (2026-08-13) - v2.4.0: CI/CD, Fallback Chain, Streaming
+### Session 3 (2026-08-13) - v2.4.0 → v2.4.1: CI/CD, Fallback Chain, Streaming, Monitoring
 - **GitHub Actions CI fixed:** Pinned Python 3.11, added build-essential/cmake/python3-dev for chromadb/hnswlib compilation
 - **pysqlite3 monkey-patch:** Added to tests/conftest.py for chromadb compatibility on Linux
 - **pytesseract import made conditional:** Prevents CI collection errors (OCR not available on runners)
 - **5 network-dependent tests marked as `@pytest.mark.live`:** Skipped in CI (require real API/Ollama)
 - **Provider fallback chain:** `call_ai()` now retries on transient errors (timeout, 429, 502, 503); default chain: deepseek → qwen → groq
 - **Streaming enabled by default:** CLI now streams tokens live; use `--no-stream` to disable
-- **Render build fix:** Added `--no-cache-dir` to pip install for free-tier memory limits
+- **Render build fixes:** Added `--no-cache-dir` and `--prefer-binary` to pip install for free-tier memory limits
+- **Render health check:** Added `healthCheckPath: /_stcore/health` to render.yaml (Streamlit built-in endpoint)
+- **UptimeRobot configured:** Pings health endpoint every 5 min; prevents free-tier cold starts (30-60s sleep)
+- **CI actions updated:** checkout@v5, setup-python@v6 (fixes Node.js 20 deprecation)
 - **Documentation updated:** README.md, Setup_Instructions_for_Users.txt, HANDOFF.md all reflect DeepSeek default
 - **Root README.md added:** GitHub now displays project overview on landing page
 - **Duplicate Readme/README.md removed:** Single source of truth at repo root
 - **Tests:** 362 passed, 3 skipped, 11 deselected (live)
 - **CI:** Green (GitHub Actions passing)
-- **Render:** Live and serving
+- **Render:** Live and serving (health check: ok)
 
 ---
 
@@ -71,7 +76,9 @@ AI kcMedicalResearch is a local-first Python application providing six specialis
 | Component | Status | Details |
 |-----------|--------|---------|
 | GitHub Actions CI | ✓ Green | 362 tests passing, Python 3.11 |
-| Render Deployment | ✓ Live | Auto-deploy, --no-cache-dir |
+| Render Deployment | ✓ Live | Auto-deploy, --no-cache-dir --prefer-binary |
+| Health Check | ✓ Active | /_stcore/health returns "ok" |
+| UptimeRobot | ✓ Monitoring | 5-min pings, prevents cold starts, 100% uptime |
 | Provider Fallback | ✓ Active | deepseek → qwen → groq on transient errors |
 | Streaming CLI | ✓ Default | Tokens stream live; --no-stream to disable |
 | DeepSeek Provider | DEFAULT | Fast, cheap, reliable for all modes |
@@ -91,8 +98,7 @@ AI kcMedicalResearch is a local-first Python application providing six specialis
 | 1 | Lami extraction fails (Table 4) | High | Open |
 | 2 | WeasyPrint not installed | Medium | PDF falls back to HTML |
 | 3 | Anthropic geo-restricted | Low | Use VPN or skip |
-| 4 | Node.js 20 deprecation warning in CI | Low | Cosmetic; update to checkout@v5/setup-python@v6 |
-| 5 | DeprecationWarning: invalid escape sequence in project_layout.py | Low | Add raw-string prefix |
+| 4 | DeprecationWarning: invalid escape sequence in project_layout.py | Low | Add raw-string prefix |
 
 ---
 
@@ -109,7 +115,7 @@ AI kcMedicalResearch is a local-first Python application providing six specialis
 | RCT Search | `--mode rct_search` | Formulator > Searcher > Validator | `input/rct_search/` | `output/rct_search/` |
 | SR | `--mode sr` | SR Methodologist (6-stage) | `input/sr/` (.pdf) | `output/sr/` + `reports/sr/` |
 
-**Common flags:** `--provider`, `--model`, `--report`, `--revise`, `--role`, `--sub`, `--dry-run`, `--no-stream`, `--resume`, `--help-guide`, `--ui`, `--list-sessions`, `--list-roles`, `--stats`, `--version`
+**Common flags:** `--provider`, `--model`, `--mode`, `--report`, `--revise`, `--role`, `--sub`, `--dry-run`, `--no-stream`, `--resume`, `--help-guide`, `--ui`, `--list-sessions`, `--list-roles`, `--stats`, `--version`
 
 ---
 
@@ -230,16 +236,27 @@ GitHub Actions (.github/workflows/ci.yml)
     Requirements: requirements-ci.txt (includes chromadb, pysqlite3-binary)
     Tests: pytest -m "not live" (excludes 5 network-dependent tests + 6 live provider tests)
     Coverage: ~50% reported via pytest-cov
+    Actions: checkout@v5, setup-python@v6
 
 Render (render.yaml)
 
     Trigger: Auto-deploy on push to main
     Runtime: Python 3.11.9
-    Build: pip install --no-cache-dir -r requirements-render.txt
+    Build: pip install --no-cache-dir --prefer-binary -r requirements-render.txt
     Start: streamlit run SOURCE_CODE/ui/app.py --server.port $PORT
+    Health check: /_stcore/health (Streamlit built-in, returns "ok")
     Plan: Free tier
+    Uptime: UptimeRobot pings every 5 min to prevent cold-start sleep
 
-Key CI Fixes Applied
+UptimeRobot Configuration
+
+    Monitor type: HTTP(s)
+    URL: https://ai-kcmedicalresearch.onrender.com/_stcore/health
+    Interval: 5 minutes
+    Purpose: Keeps free-tier instance warm (prevents 30-60s cold start after inactivity)
+    Status: 100% uptime
+
+Key CI/Render Fixes Applied
 Fix 	Commit 	Issue
 Pin Python 3.11, add build-essential 	4ff2979 	chromadb wheel compilation
 Add cmake, python3-dev 	ad602d3 	hnswlib compilation
@@ -248,6 +265,9 @@ Conditional pytesseract import 	fa2e618 	ModuleNotFoundError on CI
 Mark 5 tests as @pytest.mark.live 	e75ae6f 	Network-dependent tests
 Remove debug step, finalize 	ec72643 	Clean workflow
 --no-cache-dir for Render 	463b337 	Free-tier memory limits
+Update actions to v5/v6 	555674f 	Node.js 20 deprecation
+Health check endpoint 	239ecae 	Zero-downtime deploys
+--prefer-binary for Render 	361cdd5 	Prevent OOM source compilation
 9. STREAMING
 Architecture
 
@@ -286,7 +306,7 @@ FALLBACK_PROVIDERS=openai,anthropic,deepseek
 11. TEST COVERAGE
 Summary
 
-362 passed, 3 skipped, 11 deselected in ~20s Overall coverage: ~50%
+362 passed, 3 skipped, 11 deselected in ~20s. Overall coverage: ~50%
 By Module
 Module 	Coverage 	Tests
 writing.py 	89% 	36
@@ -366,13 +386,20 @@ Total setup ~5 minutes. No Python install needed - just Docker Desktop.
 12.3 Render.com (Cloud Web App)
 
     Live URL: https://ai-kcmedicalresearch.onrender.com
+    Health: https://ai-kcmedicalresearch.onrender.com/_stcore/health
     Auto-deploy: Enabled (push to main triggers deploy)
     API Keys: Set in Render dashboard > Environment Variables
     Users: Enter their own keys in sidebar, or use admin-configured keys
+    Uptime: UptimeRobot monitors every 5 min (prevents cold starts)
 
 13. COMMIT HISTORY (Session 3)
 
-d983be1 (HEAD -> main) feat: enable streaming by default in CLI (use --no-stream to disable)
+361cdd5 (HEAD -> main) fix(render): add --prefer-binary to pip install to prevent OOM on free tier
+239ecae ops: add health check endpoint for Render (/_stcore/health)
+555674f ci: update actions to v5/v6 - fix Node.js 20 deprecation failure
+d6f0833 docs: update HANDOFF.md to v2.4.0 - CI/CD, fallback, streaming
+7c1707e docs: update README.md to v2.4.0 - fallback chain, streaming, updated test counts
+d983be1 feat: enable streaming by default in CLI (use --no-stream to disable)
 463b337 fix(render): add --no-cache-dir to prevent free-tier memory exhaustion
 6755b49 feat: enable provider fallback chain by default (deepseek,qwen,groq)
 ec72643 ci: remove debug step, finalize green CI workflow
@@ -396,6 +423,8 @@ OLLAMA_TEMPERATURE 	0.3 	.env
 MAX_ITERATIONS 	3 	SOURCE_CODE/pipelines/coding/coding.py
 LLM Timeout 	900s (15 min) 	coding.py, writing.py
 Streaming 	Enabled by default 	--no-stream to disable
+Health Check 	/_stcore/health 	render.yaml
+Uptime Monitor 	UptimeRobot (5 min) 	External service
 15. TROUBLESHOOTING
 Issue 	Solution
 Docker not found 	Install Docker Desktop
@@ -409,19 +438,20 @@ CI fails: chromadb sqlite 	pysqlite3 patch in conftest.py handles this
 CI fails: network tests 	Marked @pytest.mark.live, excluded with -m "not live"
 Pipeline timeout 	36B models need 15 min; use cloud provider instead
 App not loading on Render 	Check render.yaml uses SOURCE_CODE/ui/app.py
-Render build fails 	Uses requirements-render.txt + --no-cache-dir
+Render build OOM 	Uses --no-cache-dir --prefer-binary (commit 361cdd5)
+Render cold start 	UptimeRobot pings every 5 min to keep instance warm
 API key not working 	Check for extra spaces; verify env var name
 Fallback not working 	Check FALLBACK_PROVIDERS is not empty in .env
 Streaming not working 	Ensure stdout is a TTY; check --no-stream not set
 16. NEXT SESSION PRIORITIES
 Priority 	Task 	Details
 1 	Fix Lami Extraction 	SR pipeline - Table 4 not found (pages 12-13)
-2 	Raise test coverage to 60% 	Focus on main.py dispatch logic
-3 	Install WeasyPrint 	pip install weasyprint + GTK3 runtime for PDF
-4 	Fix Node.js 20 deprecation 	Update actions/checkout@v5, setup-python@v6
-5 	Fix escape sequence warning 	Add raw-string prefix in project_layout.py
-6 	Push Docker image 	Docker Hub for easier colleague sharing
-7 	Integrate prompts/ into pipeline 	Load role definitions from .md files
+2 	Raise test coverage to 60% 	Focus on main.py dispatch logic and SR pipeline
+3 	Install WeasyPrint or fpdf2 	PDF export (fpdf2 is pure-Python, no GTK3 needed)
+4 	Fix escape sequence warning 	Add raw-string prefix in project_layout.py
+5 	Push Docker image 	Docker Hub for easier colleague sharing
+6 	Integrate prompts/ into pipeline 	Load role definitions from .md files
+7 	Track token usage/cost 	Display totals per session
 17. LESSONS LEARNED
 
     Never use CREATE_NEW_PROCESS_GROUP for interactive CLI tools on Windows - it detaches stdin
@@ -432,7 +462,7 @@ Priority 	Task 	Details
     Large local models (36B) need longer timeouts - 5 min is too short for complex prompts
     Context window must accommodate full prompt - 8192 tokens is too small; 32768 works
     Reduce iteration count for local models - 3 iterations sufficient; 5 causes timeouts
-    Documentation belongs in docs// - project-level docs go in docs/project/
+    Documentation belongs in docs/<mode>/ - project-level docs go in docs/project/
     prompts/ folder is dead weight unless explicitly loaded by pipeline code
     Ollama 36B is NOT viable for production - use DeepSeek as default provider
     Render requires lean requirements - no pywin32, textract, easyocr, opencv on Linux
@@ -441,32 +471,42 @@ Priority 	Task 	Details
     Mark network-dependent tests as @pytest.mark.live to avoid CI flakes
     Provider fallback prevents single-point-of-failure outages
     Streaming should be opt-out (default on) for better UX
-    Use --no-cache-dir on memory-constrained build environments (Render free tier)
+    Use --no-cache-dir --prefer-binary on memory-constrained build environments (Render free tier)
     Multi-line string replacement in PowerShell is unreliable; use line-by-line edits
+    UptimeRobot free tier (50 monitors, 5-min interval) keeps Render instances warm
+    Streamlit has a built-in health endpoint at /_stcore/health - no code changes needed
+    Render health checks enable zero-downtime deploys (waits for healthy before routing traffic)
 
 18. ENVIRONMENT SUMMARY
 Item 	Value
 Python 	3.11.9
-Virtual env 	D:\AI_kcMedicalResearch.venv
+Virtual env 	D:\AI_kcMedicalResearch\.venv
 Default Provider 	DeepSeek (deepseek-v4-flash)
 Fallback Chain 	deepseek → qwen → groq
 Streaming 	Enabled by default (--no-stream to disable)
 Ollama model 	qwen3.6:latest (36B, offline/testing only)
 Qwen model 	qwen-plus-latest
 OS 	Windows 11 (PowerShell 7)
-Render 	Free tier, auto-deploy enabled
+Render 	Free tier, auto-deploy enabled, health check active
+UptimeRobot 	5-min monitoring, 100% uptime
 Docker 	Available (containerized deployment)
 Tests 	362 passed, 3 skipped, 11 deselected
 Coverage 	~50%
-CI 	GitHub Actions - Green
+CI 	GitHub Actions - Green (checkout@v5, setup-python@v6)
 Repository 	https://github.com/KW75/AI_kcMedicalResearch
 Live App 	https://ai-kcmedicalresearch.onrender.com
+Health Check 	https://ai-kcmedicalresearch.onrender.com/_stcore/health
 
-Handoff prepared: 2026-08-13 Version: v2.4.0 Combines all prior handoff documents into a single source of truth. '@
+Handoff prepared: 2026-08-13 Version: v2.4.1 Combines all prior handoff documents into a single source of truth. '@
 
-[System.IO.File]::WriteAllText("PWD\Readme\HANDOFF.md", $handoff, [System.Text.UTF8Encoding]::new(false))
-Verify
-
-Write-Host "HANDOFF.md written: $((Get-Item 'Readme\HANDOFF.md').Length) bytes"
+[System.IO.File]::WriteAllText("PWD\Readme\HANDOFF.md", $handoff, [System.Text.UTF8Encoding]::new(false)) Write-Host "HANDOFF.md written: $((Get-Item 'Readme\HANDOFF.md').Length) bytes"
 
 
+After verifying the file size, commit and push:
+
+```powershell
+git add Readme/HANDOFF.md
+git commit -m "docs: update HANDOFF.md to v2.4.1 - health check, UptimeRobot, --prefer-binary"
+git push origin main
+
+This gives you a clean handoff for a new chat session. All current state is captured, including UptimeRobot monitoring, the --prefer-binary fix, health check endpoint, updated commit history, and the resolved Node.js deprecation issue.
