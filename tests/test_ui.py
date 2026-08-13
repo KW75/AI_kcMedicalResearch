@@ -1,4 +1,4 @@
-﻿"""Comprehensive tests for the Streamlit UI (app.py)."""
+"""Comprehensive tests for the Streamlit UI (app.py)."""
 
 import sys
 import os
@@ -214,6 +214,7 @@ class TestAppTerminal:
                     call_env = mock_run.call_args[1].get("env", {})
                     assert call_env.get("OPENAI_API_KEY") == "test-key"
 
+    @pytest.mark.live
     def test_run_cli_cloud_missing_api_key(self):
         """Test _run_cli_cloud shows warning for missing API key."""
         with patch("streamlit.session_state", {"api_keys": {}}):

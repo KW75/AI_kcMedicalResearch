@@ -202,6 +202,7 @@ class TestMainProviderCalls:
     def test_call_ollama_provider_handles_error(self):
         pass
 
+    @pytest.mark.live
     def test_call_openai_provider_missing_key(self):
         with patch("SOURCE_CODE.main.OPENAI_API_KEY", ""):
             with pytest.raises(RuntimeError) as exc:
@@ -225,6 +226,7 @@ class TestMainProviderCalls:
         finally:
             _prov.ANTHROPIC_API_KEY = orig
 
+    @pytest.mark.live
     def test_call_groq_provider_missing_key(self):
         with patch("SOURCE_CODE.main.GROQ_API_KEY", ""):
             with pytest.raises(RuntimeError) as exc:
@@ -252,6 +254,7 @@ class TestMainProviderCalls:
             mock_provider.assert_called_once()
             assert result == "Ollama response"
 
+    @pytest.mark.live
     def test_call_ai_fallback_to_ollama(self):
         """call_ai falls back to ollama for unknown provider."""
         # This test verifies the fallback behavior by checking the provider
@@ -267,6 +270,7 @@ class TestMainValidation:
     def test_validate_api_keys_ollama(self):
         main.validate_api_keys("ollama")
 
+    @pytest.mark.live
     def test_validate_api_keys_openai_missing(self):
         with patch("SOURCE_CODE.main.OPENAI_API_KEY", ""):
             with pytest.raises(EnvironmentError) as exc:
