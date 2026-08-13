@@ -77,6 +77,24 @@ except ModuleNotFoundError:
 
 load_dotenv()
 
+# ---------------------------------------------------------------------------
+# Path B: Import refactored modules (Session 3 & 4)
+# ---------------------------------------------------------------------------
+from providers import (
+    PROVIDERS as _PROVIDERS_MODULE,
+    call_ai as _call_ai_module,
+    call_ai_with_fallback,
+    validate_provider,
+    get_provider_capabilities,
+    _ollama_detect_best_model as _ollama_detect_best_module,
+    ollama_probe_performance,
+    get_default_model,
+    PROVIDER_CAPABILITIES,
+)
+from streaming import stream_to_console, tee_stream
+from checkpoint import PipelineCheckpoint, find_resumable_checkpoint, prompt_resume
+
+
 
 # ---------------------------------------------------------------------------
 # Ollama auto-detect best model
@@ -127,7 +145,7 @@ if str(_ROOT) not in sys.path:
 # ---------------------------------------------------------------------------
 # Version
 # ---------------------------------------------------------------------------
-VERSION = "2.2.0"
+VERSION = "2.3.0"
 
 # ---------------------------------------------------------------------------
 # Paths
@@ -606,8 +624,34 @@ def call_ai(
     prompt: str,
     provider: str = "deepseek",
     model: str | None = None,
+    stream: bool = False,
 ) -> str:
-    """Dispatch an AI call to the correct provider function."""
+    """
+    Dispatch an AI call to the correct provider function.
+    If stream=True and running in a terminal, streams tokens to console.
+    Uses fallback chain from FALLBACK_PROVIDERS env var on transient errors.
+    """
+    fallback_raw = os.getenv("FALLBACK_PROVIDERS", "")
+    fallback_chain = [p.strip() for p in fallback_raw.split(",") if p.strip()]
+
+    if stream and sys.stdout.isatty():
+        try:
+            return stream_to_console(
+                prompt=prompt,
+                provider=provider,
+                model=model,
+            )
+        except Exception:
+            pass  # Fall through to non-streaming
+
+    if fallback_chain:
+        return call_ai_with_fallback(
+            prompt=prompt,
+            preferred_provider=provider,
+            model=model,
+            fallback_chain=fallback_chain,
+        )
+
     fn = PROVIDERS.get(provider, call_ollama_provider)
     return fn(prompt, model=model)
 
@@ -1839,6 +1883,14 @@ def handle_coding_mode(
             verbose=True,
         )
 
+    # Clear checkpoint on successful completion
+    try:
+        from checkpoint import PipelineCheckpoint
+        cp = PipelineCheckpoint(mode="coding", provider=provider)
+        cp.clear()
+    except Exception:
+        pass
+
     print(f"\n{colour}[{sub_mode.upper()}]{RESET} Done. "
           "Check output/coding/ and reports/coding/ for results.\n")
 
@@ -2220,6 +2272,7 @@ def main(
                         prompt=full_prompt,
                         provider=provider,
                         model=model_override,
+                        stream=getattr(args, 'stream', False) if 'args' in dir() else False,
                     )
                 except RuntimeError as exc:
                     response = f"[ERROR] {exc}"
@@ -2353,6 +2406,10 @@ def parse_args(args: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--rename-session", type=str, default=None, metavar="FILENAME")
     parser.add_argument("--stats",          action="store_true", default=False)
     parser.add_argument("--dry-run",        action="store_true", default=False)
+    parser.add_argument("--stream",         action="store_true", default=False,
+                        help="Stream AI output token-by-token in terminal")
+    parser.add_argument("--resume",         action="store_true", default=False,
+                        help="Resume from last checkpoint if available")
     parser.add_argument("--version",        action="version",
                         version=f"AI Automation Tool v{VERSION}")
     parser.add_argument("--list-roles",     action="store_true", default=False)
