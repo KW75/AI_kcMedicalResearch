@@ -1,4 +1,4 @@
-AI kcMedicalResearch - Setup Instructions for Users
+﻿AI kcMedicalResearch - Setup Instructions for Users
 
 ============================================
 Setup
@@ -10,11 +10,20 @@ Install Docker Desktop:
         macOS: https://www.docker.com/products/docker-desktop
         Linux: https://docs.docker.com/engine/install/
 
-Install Local AI (Free, No API Key)
+Default AI Provider: DeepSeek
 
-    ✅ Good for security - No internet connection required after initial model download!
+    The default provider is now DeepSeek (fast, cheap, reliable for all modes).
+    You need a DeepSeek API key to get started: https://platform.deepseek.com
+    Add it to your .env file: DEEPSEEK_API_KEY=your_key_here
 
-    Note: Ollama works for all modes except SR mode, which requires Qwen (or other vision provider) for OCR parsing of PDF images.
+    You can override the provider at any time with the --provider flag.
+
+Install Local AI (Optional - Free, No API Key)
+
+    Note: Ollama is available for offline/local use but is NOT the default.
+    Large models (36B+) are too slow for production pipelines (coding, writing).
+    Ollama works best with small models for quick local testing only.
+    Ollama does NOT work for SR mode (requires vision provider: Qwen, OpenAI, Anthropic, or Groq).
 
     Install Ollama: https://ollama.com/download (See below for details)
 
@@ -29,9 +38,12 @@ Install Local AI (Free, No API Key)
 
     Ollama will run locally on your machine at http://localhost:11434
 
-    Note: If you prefer cloud providers (Groq, Qwen, OpenAI, etc.), you need to add respective API keys to .env file.
+    To use Ollama instead of DeepSeek:
+    bash
 
-🪟 Windows Users
+    python SOURCE_CODE/main.py --provider ollama
+
+Windows Users
 One-Click Setup (Recommended)
 
     Open Command Prompt or PowerShell
@@ -47,7 +59,7 @@ One-Click Setup (Recommended)
     Follow the prompts:
 
         Choose C: or D: drive
-        Add API keys (or later)
+        Add API keys (DeepSeek recommended as minimum)
         Choose CLI or UI mode
 
     Start working!
@@ -57,7 +69,7 @@ Quick Launch (After Setup)
     CLI Mode: Double-click AI_kcMedicalResearch_CLI.bat
     UI Mode: Double-click AI_kcMedicalResearch_UI.bat
 
-🍎 macOS Users
+macOS Users
 One-Click Setup (Recommended)
 
     Open Terminal
@@ -81,7 +93,7 @@ One-Click Setup (Recommended)
     Follow the prompts:
 
         Choose install location (Projects, Documents, Desktop, or Custom)
-        Add API keys (or later)
+        Add API keys (DeepSeek recommended as minimum)
         Choose CLI or UI mode
 
     Start working!
@@ -95,23 +107,30 @@ Quick Launch (After Setup)
 Configuration
 ============================================
 
-🔧 API Keys Setup
+API Keys Setup
 
 After running the setup script, edit the .env file and add your API keys:
 bash
 
-# Local Ollama (free, no API key needed)
-OLLAMA_HOST=http://localhost:11434
-OLLAMA_MODEL=llama3.2
+# Default provider (change if desired)
+DEFAULT_PROVIDER=deepseek
 
-# Cloud Providers (optional - add keys if you want to use them)
+# DeepSeek (default - recommended)
+DEEPSEEK_API_KEY=your_key_here      # Get from: https://platform.deepseek.com
+
+# Local Ollama (optional - free, no API key needed)
+OLLAMA_HOST=http://localhost:11434
+OLLAMA_CONTEXT=32768
+OLLAMA_NUM_PREDICT=8192
+OLLAMA_TEMPERATURE=0.3
+
+# Other Cloud Providers (optional - add keys if you want to use them)
 GROQ_API_KEY=your_key_here          # Get from: https://console.groq.com
 DASHSCOPE_API_KEY=your_key_here     # Get from: https://dashscope.aliyuncs.com
 OPENAI_API_KEY=your_key_here        # Optional: https://platform.openai.com
 ANTHROPIC_API_KEY=your_key_here     # Optional: https://console.anthropic.com
-DEEPSEEK_API_KEY=your_key_here      # Optional: https://platform.deepseek.com
 
-🔧 Ollama Setup (For Local AI)
+Ollama Setup (Optional - For Local/Offline AI)
 
     Install Ollama: https://ollama.com/download
 
@@ -119,9 +138,9 @@ DEEPSEEK_API_KEY=your_key_here      # Optional: https://platform.deepseek.com
     bash
 
     # Recommended models (small to large)
-    ollama pull llama3.2:3b      # Small, fast (3B parameters)
+    ollama pull llama3.2:3b      # Small, fast (3B parameters) - best for local use
     ollama pull llama3.2         # Medium (8B parameters)
-    ollama pull llama3.2:70b     # Large (70B parameters - requires good GPU)
+    ollama pull qwen3.6:latest   # Large (36B parameters - auto-detected, requires good GPU)
 
     Verify Ollama is running:
     bash
@@ -130,6 +149,9 @@ DEEPSEEK_API_KEY=your_key_here      # Optional: https://platform.deepseek.com
     ollama run llama3.2 "Hello"  # Test the model
 
     Ollama runs completely offline after the model is downloaded!
+
+    Important: Large models (36B+) frequently timeout on coding and writing pipelines.
+    For production work, use DeepSeek or another cloud provider.
 
     Auto-start Ollama (optional):
 
@@ -141,7 +163,7 @@ DEEPSEEK_API_KEY=your_key_here      # Optional: https://platform.deepseek.com
 Operation Guideline
 ============================================
 
-🔧 Input Folder
+Input Folder
 
 Place your input files in the appropriate folders:
 
@@ -154,7 +176,7 @@ input/
 └── sr/              # For SR pipeline (PDFs + pico_*.json)
 
 
-🔧 Output Folder
+Output Folder
 
 Outputs generated will appear in:
 
@@ -166,7 +188,7 @@ output/
 ├── rct_search/
 └── sr/
 
-🔧Reports Folders
+Reports Folders
 
 Running commentary and explanations will appear in:
 
@@ -178,11 +200,14 @@ reports/
 ├── rct_search/
 └── sr/
 
-🚀 Running the App
+Running the App
 CLI Mode
 
     Windows: Double-click AI_kcMedicalResearch_CLI.bat or run python launcher.py
     macOS: Run ./Mac_kcMedicalResearch_CLI.sh or python launcher.py
+
+    Default provider: DeepSeek (no extra flags needed)
+    For Ollama: python SOURCE_CODE/main.py --provider ollama
 
 UI Mode (Streamlit)
 
@@ -192,13 +217,13 @@ UI Mode (Streamlit)
     Browser opens automatically at: http://localhost:8501
 
 ============================================
-For Docker Users  (All Platforms)
+For Docker Users (All Platforms)
 ============================================
 *** Windows: Double-click the file in docker\ folder ***
-File	                Purpose	                        When to Use
-docker\Docker_setup.bat	Complete one-click setup	First time only
-docker\docker_menu.bat	Interactive menu (CLI/UI)	Everyday use
-docker\docker_cli.bat	Quick CLI launch	        Power users
+File                        Purpose                     When to Use
+docker\Docker_setup.bat     Complete one-click setup    First time only
+docker\docker_menu.bat      Interactive menu (CLI/UI)   Everyday use
+docker\docker_cli.bat       Quick CLI launch            Power users
 
 
 *** macOS/Linux ***
@@ -207,7 +232,7 @@ Setup
        chmod +x docker/*.sh
 # Run setup
       ./docker/Docker_setup.sh
-# Follow prompts → START WORKING!
+# Follow prompts - START WORKING!
 
 Everyday Use
 # Interactive menu
@@ -228,32 +253,44 @@ python -m venv .venv
 source .venv/bin/activate  # macOS/Linux
 pip install -r requirements.txt
 
-# Run CLI
+# Run CLI (uses DeepSeek by default)
 python SOURCE_CODE/main.py
+
+# Run with a specific provider
+python SOURCE_CODE/main.py --provider ollama
+python SOURCE_CODE/main.py --provider qwen
+python SOURCE_CODE/main.py --provider openai
 
 # Run UI
 streamlit run SOURCE_CODE/ui/app.py
 
 ============================================
-🆘 Troubleshooting
+Troubleshooting
 ============================================
-# Mac_Setup.sh fails	Ensure scripts are executable: chmod +x Mac_*.sh
+# Mac_Setup.sh fails    Ensure scripts are executable: chmod +x Mac_*.sh
 
 # Docker Issues
-Issue	                Solution
-Docker not found	Install Docker Desktop from https://www.docker.com/products/docker-desktop
-Docker not running	Start Docker Desktop from system tray/menu bar
-Build fails	        Check internet connection and Docker logs
-Volume mount errors	Ensure folders exist: input/, output/, data/, reports/
-Docker_setup.bat fails	Run as Administrator, check internet connection
+Issue                       Solution
+Docker not found            Install Docker Desktop from https://www.docker.com/products/docker-desktop
+Docker not running          Start Docker Desktop from system tray/menu bar
+Build fails                 Check internet connection and Docker logs
+Volume mount errors         Ensure folders exist: input/, output/, data/, reports/
+Docker_setup.bat fails      Run as Administrator, check internet connection
 
-# Ollama Issues
-Issue	                Solution
-Ollama not found	Install from https://ollama.com/download
-Ollama not running	Start Ollama from Applications (macOS) or Start Menu (Windows)
-Model not found	        Run ollama pull llama3.2 to download the model
-Out of memory	        Use a smaller model: ollama pull llama3.2:3b
-Slow performance	Check if GPU is being used; smaller models run faster
+# DeepSeek Issues
+Issue                       Solution
+API key not working         Verify key at https://platform.deepseek.com
+Rate limited                Wait a moment and retry; check account balance
+Timeout on large tasks      Increase LLM timeout in .env or try --provider qwen
+
+# Ollama Issues (if using --provider ollama)
+Issue                       Solution
+Ollama not found            Install from https://ollama.com/download
+Ollama not running          Start Ollama from Applications (macOS) or Start Menu (Windows)
+Model not found             Run ollama pull llama3.2 to download the model
+Out of memory               Use a smaller model: ollama pull llama3.2:3b
+Slow/timeout                Use DeepSeek instead (default); large models are too slow for pipelines
+Coding pipeline fails       Switch to --provider deepseek (Ollama 36B cannot complete Builder/Reviewer/Tester loops)
 
 # API Key Issues
 
@@ -262,12 +299,11 @@ Slow performance	Check if GPU is being used; smaller models run faster
     For Ollama: No API key needed!
     Check Render env variables are saved
 
-#Pipeline Fails
+# Pipeline Fails
 
     Check logs in the UI output area
     Verify input files are in correct folder
     Check API key is valid for selected provider
-
     For SR mode: Ensure provider supports vision (Qwen, OpenAI, Anthropic, Groq)
 
 # Theme Not Detected (CLI)
@@ -282,24 +318,25 @@ Slow performance	Check if GPU is being used; smaller models run faster
     Close and reopen terminal for changes to take effect
 
 ============================================
-📚 Documentation
+Documentation
 ============================================
     Full Documentation: Readme/HANDOFF.md
-    Quick Start: Readme/README.md
+    Quick Start: README.md (repo root)
     Help Guide: Readme/flashcard-help.html (open in browser)
 
 ============================================
-✅ Setup Complete!
+Setup Complete!
 ============================================
 You're now ready to use AI kcMedicalResearch!
 
 Provider Options Summary
-Provider	Cost	        Setup	                        Internet Required
-Ollama	        Free	        Install Ollama, pull model	No (after download)
-Qwen	        Pay-per-use	Add API key to .env	        Yes
-Groq	        Pay-per-use	Add API key to .env	        Yes
-OpenAI	        Pay-per-use	Add API key to .env	        Yes
-Anthropic	Pay-per-use	Add API key to .env	        Yes
+Provider        Cost            Setup                           Internet Required   Notes
+DeepSeek        Pay-per-use     Add API key to .env (DEFAULT)   Yes                 Fast, cheap, all modes
+Qwen            Pay-per-use     Add API key to .env             Yes                 Recommended for SR (vision)
+Groq            Pay-per-use     Add API key to .env             Yes                 Fast inference
+OpenAI          Pay-per-use     Add API key to .env             Yes                 GPT-4 vision
+Anthropic       Pay-per-use     Add API key to .env             Yes                 Claude vision (geo-restricted)
+Ollama          Free            Install Ollama, pull model      No (after download) Offline only; slow on large models
 
 Total setup time: ~5 minutes!
 
