@@ -20,3 +20,4 @@ services:
         value: false
       - key: DASHSCOPE_BASE_URL
         value: https://dashscope-intl.aliyuncs.com/compatible-mode/v1
+    healthCheckPath: /_stcore/health
