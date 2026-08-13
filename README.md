@@ -3,12 +3,14 @@
 A multi-mode AI assistant for medical research, critical appraisal, systematic review, coding, and writing.
 Uses cloud providers by default (DeepSeek, Qwen, OpenAI, Anthropic, Groq) with optional local Ollama support.
 
-- **Version:** 2.4.0
+- **Version:** 2.4.1
 - **Tests:** 362 passed, 3 skipped
 - **Coverage:** ~50%
 - **CI:** GitHub Actions - Green
 - **GitHub:** https://github.com/KW75/AI_kcMedicalResearch
 - **Live App:** https://ai-kcmedicalresearch.onrender.com
+- **Health Check:** https://ai-kcmedicalresearch.onrender.com/_stcore/health
+- **Uptime:** UptimeRobot (5-min monitoring, prevents cold starts)
 
 ---
 
@@ -116,13 +118,13 @@ Groq 	--provider groq 	GROQ_API_KEY 	Fast inference
 Ollama (local) 	--provider ollama 	OLLAMA_HOST 	Free but slow; offline/testing only
 Provider Fallback Chain
 
-On transient errors (timeout, 429, 502, 503), the system automatically tries the next provider. Default chain: DeepSeek → Qwen → Groq. Configure via FALLBACK_PROVIDERS env var.
+On transient errors (timeout, 429, 502, 503), the system automatically tries the next provider. Default chain: DeepSeek -> Qwen -> Groq. Configure via FALLBACK_PROVIDERS env var.
 Streaming
 
 All providers support live token streaming. Enabled by default in CLI terminals. Use --no-stream to disable. Non-TTY environments (pipes, CI) automatically use batch mode.
+Environment Variables (.env)
 
 Set keys in .env at the project root.
-Environment Variables (.env)
 
 # Default provider
 DEFAULT_PROVIDER=deepseek
@@ -168,7 +170,7 @@ SR 	input/sr/ 	.pdf
 Project Structure
 
 AI_kcMedicalResearch/
-|-- SOURCE_CODE/                     <- Main source code
+|-- SOURCE_CODE/
 |   |-- main.py                      <- Core engine
 |   |-- providers.py                 <- Provider registry, fallback chain
 |   |-- streaming.py                 <- SSE streaming for all providers
@@ -196,6 +198,7 @@ AI_kcMedicalResearch/
 |-- output/                          <- Per-mode generated output
 |-- reports/                         <- Session transcripts and logs
 |-- tests/                           <- pytest test suite (362 tests)
+|-- Readme/                          <- HANDOFF.md, Setup_Instructions
 |-- .github/workflows/ci.yml         <- GitHub Actions CI pipeline
 |-- .env                             <- API keys and model config (gitignored)
 |-- pytest.ini                       <- Test configuration with custom marks
@@ -246,6 +249,15 @@ Anthropic 	Yes 	Claude vision
 Groq 	Yes 	Vision models
 DeepSeek 	No 	Blocked for SR
 Ollama 	No 	Blocked for SR
+Deployment
+Render (Live)
+
+    URL: https://ai-kcmedicalresearch.onrender.com
+    Health: https://ai-kcmedicalresearch.onrender.com/_stcore/health
+    Auto-deploy: Push to main triggers deploy
+    Build: pip install --no-cache-dir --prefer-binary -r requirements-render.txt
+    Monitoring: UptimeRobot pings every 5 min (prevents free-tier cold starts)
+
 Known Issues
 # 	Issue 	Priority 	Status
 1 	Lami extraction fails (Table 4) 	High 	Open
@@ -260,9 +272,6 @@ Contributing
     Commit and push
     Create a pull request '@
 
-[System.IO.File]::WriteAllText("PWD\README.md", $readme, [System.Text.UTF8Encoding]::new(false))
-Verify
-
-Write-Host "README.md written: $((Get-Item 'README.md').Length) bytes"
+[System.IO.File]::WriteAllText("PWD\README.md", $readme, [System.Text.UTF8Encoding]::new(false)) Write-Host "README.md written: $((Get-Item 'README.md').Length) bytes"
 
 
