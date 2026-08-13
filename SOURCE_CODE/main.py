@@ -1968,7 +1968,7 @@ def main(
                         prompt=full_prompt,
                         provider=provider,
                         model=model_override,
-                        stream=getattr(args, 'stream', False) if 'args' in dir() else False,
+                        stream=(not getattr(args, 'no_stream', False)) if 'args' in dir() else True,
                     )
                 except RuntimeError as exc:
                     response = f"[ERROR] {exc}"
@@ -2102,8 +2102,8 @@ def parse_args(args: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--rename-session", type=str, default=None, metavar="FILENAME")
     parser.add_argument("--stats",          action="store_true", default=False)
     parser.add_argument("--dry-run",        action="store_true", default=False)
-    parser.add_argument("--stream",         action="store_true", default=False,
-                        help="Stream AI output token-by-token in terminal")
+    parser.add_argument("--no-stream",      action="store_true", default=False,
+                        help="Disable streaming (show output all at once)")
     parser.add_argument("--resume",         action="store_true", default=False,
                         help="Resume from last checkpoint if available")
     parser.add_argument("--version",        action="version",
