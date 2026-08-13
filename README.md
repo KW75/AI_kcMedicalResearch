@@ -3,10 +3,10 @@
 A multi-mode AI assistant for medical research, critical appraisal, systematic review, coding, and writing.
 Uses cloud providers by default (DeepSeek, Qwen, OpenAI, Anthropic, Groq) with optional local Ollama support.
 
-- **Version:** 2.3.1
-- **Tests:** 275 passed, 6 skipped
-- **Coverage:** ~48%
-- **Last commit:** 68ce91f
+- **Version:** 2.4.0
+- **Tests:** 362 passed, 3 skipped
+- **Coverage:** ~50%
+- **CI:** GitHub Actions - Green
 - **GitHub:** https://github.com/KW75/AI_kcMedicalResearch
 - **Live App:** https://ai-kcmedicalresearch.onrender.com
 
@@ -59,7 +59,7 @@ Local Development (Without Docker)
 
 Run all commands from the project root.
 
-# CLI mode (DeepSeek is the default provider)
+# CLI mode (DeepSeek default, streaming enabled)
 python SOURCE_CODE/main.py                            # coding mode
 python SOURCE_CODE/main.py --mode writing             # writing mode
 python SOURCE_CODE/main.py --mode rct_search          # RCT search pipeline
@@ -70,7 +70,8 @@ python SOURCE_CODE/main.py --mode sr --provider qwen  # systematic review (needs
 # With options
 python SOURCE_CODE/main.py --provider qwen            # use Qwen instead
 python SOURCE_CODE/main.py --provider ollama          # use local Ollama (slow with large models)
-python SOURCE_CODE/main.py --model qwen3.6:latest     # specify model
+python SOURCE_CODE/main.py --no-stream                # disable live streaming output
+python SOURCE_CODE/main.py --resume                   # resume from last checkpoint
 python SOURCE_CODE/main.py --dry-run                  # test without API calls
 python SOURCE_CODE/main.py --help-guide               # open interactive HTML help
 
@@ -92,6 +93,8 @@ Flag 	Description
 --mode 	Select mode: coding, writing, rct_search, search, appraisal, sr
 --provider 	AI provider: deepseek (default), ollama, openai, anthropic, groq, qwen
 --model 	Specify model name (provider-specific)
+--no-stream 	Disable live streaming output (batch mode)
+--resume 	Resume from last checkpoint if available
 --report 	Writing mode: single-pass report from input/writing/ files
 --revise 	Coding mode: Builder, Reviewer, Tester pipeline
 --role 	Override the starting role for coding mode
@@ -102,6 +105,7 @@ Flag 	Description
 --list-sessions 	List all session transcripts
 --list-roles 	Show available roles and their docs
 --stats 	Show session statistics
+--version 	Show version number
 Providers
 Provider 	Flag 	Environment Variable 	Notes
 DeepSeek (DEFAULT) 	--provider deepseek 	DEEPSEEK_API_KEY 	Fast, cost-efficient
@@ -110,17 +114,21 @@ OpenAI 	--provider openai 	OPENAI_API_KEY 	GPT-4 vision
 Anthropic 	--provider anthropic 	ANTHROPIC_API_KEY 	Claude vision
 Groq 	--provider groq 	GROQ_API_KEY 	Fast inference
 Ollama (local) 	--provider ollama 	OLLAMA_HOST 	Free but slow; offline/testing only
-Ollama Auto-Detection
+Provider Fallback Chain
 
-When no OLLAMA_MODEL is set in .env, the tool automatically queries http://localhost:11434/api/tags and selects the largest non-embedding model.
+On transient errors (timeout, 429, 502, 503), the system automatically tries the next provider. Default chain: DeepSeek → Qwen → Groq. Configure via FALLBACK_PROVIDERS env var.
+Streaming
 
-Warning: Ollama with large models (36B) times out on coding and writing pipelines. Use DeepSeek or Qwen for production work.
+All providers support live token streaming. Enabled by default in CLI terminals. Use --no-stream to disable. Non-TTY environments (pipes, CI) automatically use batch mode.
 
 Set keys in .env at the project root.
 Environment Variables (.env)
 
 # Default provider
 DEFAULT_PROVIDER=deepseek
+
+# Fallback chain (comma-separated, empty to disable)
+FALLBACK_PROVIDERS=deepseek,qwen,groq
 
 # Local Ollama (for offline/testing)
 OLLAMA_HOST=http://localhost:11434
@@ -151,46 +159,21 @@ File-Based Input
 
 Avoid interactive prompts by placing input files in the relevant folder before running.
 Mode 	Input Folder 	Supported Formats
-Coding 	input/coding/ 	.py, .js, .ts, .html, .css, .java, .c, .cpp, .cs, .rb, .go, .rs, .txt, .md, .php, .swift, .kt, .r, .sh, .sql, .svg
+Coding 	input/coding/ 	.py, .js, .ts, .html, .css, .java, .c, .cpp, .cs, .rb, .go, .rs, .txt, .md
 Writing 	input/writing/ 	.txt, .md, .docx, .pdf
 Appraisal 	input/appraisal/ 	.pdf, .txt, .md, .docx
 RCT Search 	input/rct_search/ 	.txt, .md
 Search 	input/search/ 	.txt, .md
 SR 	input/sr/ 	.pdf
-Docs Folder Structure
-
-Guidance files are loaded as context for each mode. Edit to customise AI behaviour.
-
-docs/
-|-- project/                         <- Project-level documentation (not injected into LLM)
-|   |-- PRD.md                       <- Product requirements
-|   |-- architecture.md              <- System architecture
-|   +-- decision-log.md              <- Technical decisions record
-|-- appraisal/
-|   |-- appraisal-guide.md           <- 7-section structure, per-section word limits
-|   +-- scoring-criteria.md          <- RoB 2, CASP, AMSTAR 2, GRADE tables
-|-- coding/
-|   |-- coding-standards.md          <- Python/HTML/JS rules, output format (CRITICAL)
-|   +-- test-strategy.md             <- Tester role responsibilities and standards
-|-- rct_search/
-|   |-- database-guide.md            <- 7 SR databases, Boolean logic, syntax
-|   |-- pico-framework.md            <- PICO structure and workflow
-|   |-- topic.md.example             <- Copy to topic.md and edit
-|   +-- validation-criteria.md       <- Alignment checklist
-|-- search/
-|   |-- search-guide.md              <- Output format for paper/topic search
-|   +-- topic.md.example             <- Copy to topic.md and edit
-+-- writing/
-    |-- editorial-standards.md       <- Accuracy, structure, ethics
-    |-- project-brief.md             <- Topic, audience, format, key message
-    |-- qa-checklist.md              <- Content, language, structure, references
-    +-- style-guide.md               <- Voice, tone, medical accuracy, referencing
-
 Project Structure
 
 AI_kcMedicalResearch/
 |-- SOURCE_CODE/                     <- Main source code
-|   |-- main.py                      <- Core engine (2438 lines)
+|   |-- main.py                      <- Core engine
+|   |-- providers.py                 <- Provider registry, fallback chain
+|   |-- streaming.py                 <- SSE streaming for all providers
+|   |-- checkpoint.py                <- Pipeline checkpoint/resume
+|   |-- traice_integration.py        <- PRISMA-trAIce disclosure
 |   |-- pipelines/
 |   |   |-- coding/coding.py        <- Builder->Reviewer->Tester (max 3 iterations)
 |   |   |-- writing/writing.py      <- Writer->Editor->QA
@@ -204,21 +187,22 @@ AI_kcMedicalResearch/
 |   +-- utils/
 |       |-- path_utils.py            <- PATH_MANAGER, directory resolution
 |       |-- document_reader.py       <- Multi-format reader (PDF, DOCX, images)
-|       +-- rag.py                   <- RAG embedding and retrieval
-|-- scripts/
-|   |-- launcher.py                  <- Interactive CLI menu
-|   |-- windows/                     <- Windows setup scripts
-|   +-- macos/                       <- macOS setup scripts
-|-- prompts/                         <- Role prompt definitions (15 files, reference only)
+|       +-- rag.py                   <- RAG embedding and retrieval (ChromaDB)
+|-- scripts/                         <- Launcher and setup scripts
+|-- docker/                          <- Docker configuration
 |-- docs/                            <- Mode guidelines (injected into LLM prompts)
+|-- prompts/                         <- Role prompt definitions (reference only)
 |-- input/                           <- Per-mode input files
 |-- output/                          <- Per-mode generated output
 |-- reports/                         <- Session transcripts and logs
-|-- tests/                           <- pytest test suite (275 tests)
+|-- tests/                           <- pytest test suite (362 tests)
+|-- .github/workflows/ci.yml         <- GitHub Actions CI pipeline
 |-- .env                             <- API keys and model config (gitignored)
 |-- pytest.ini                       <- Test configuration with custom marks
 |-- requirements.txt                 <- Python dependencies (local/Windows)
+|-- requirements-ci.txt              <- CI dependencies (Ubuntu/chromadb)
 |-- requirements-render.txt          <- Lean requirements (Render cloud)
+|-- render.yaml                      <- Render deployment config
 +-- README.md
 
 Running Tests
@@ -238,7 +222,7 @@ python -m pytest --cov=SOURCE_CODE --cov-report=html
 # Run only live provider smoke tests
 python -m pytest -m live -v
 
-Current status: 275 passed, 6 skipped, 0 warnings
+Current status: 362 passed, 3 skipped, 11 deselected
 SR Pipeline
 
 # 1. Edit configuration
@@ -276,16 +260,9 @@ Contributing
     Commit and push
     Create a pull request '@
 
-[System.IO.File]::WriteAllText("PWD\Readme\README.md", $readme, [System.Text.UTF8Encoding]::new(false))
-Verify both files
+[System.IO.File]::WriteAllText("PWD\README.md", $readme, [System.Text.UTF8Encoding]::new(false))
+Verify
 
-Get-ChildItem "Readme\HANDOFF.md", "Readme\README.md" | Select-Object Name, Length
+Write-Host "README.md written: $((Get-Item 'README.md').Length) bytes"
 
-
-Then commit:
-
-```powershell
-git add Readme/
-git commit -m "docs: update HANDOFF.md and README.md - DeepSeek default, fix encoding, add Render fix notes"
-git push origin main
 
