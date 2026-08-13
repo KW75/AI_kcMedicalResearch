@@ -5,7 +5,10 @@ from pathlib import Path
 from typing import List, Dict, Optional, Union, Any
 import json
 from PIL import Image
-import pytesseract
+try:
+    import pytesseract
+except ImportError:
+    pytesseract = None  # OCR unavailable (CI/server)
 import io
 
 # Document-specific imports
