@@ -1,4 +1,4 @@
-name: CI
+﻿name: CI
 
 on:
   push:
@@ -32,6 +32,12 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements-ci.txt
 
+      - name: Debug imports
+        run: |
+          python -c "import pysqlite3; print('pysqlite3 OK')" || echo "pysqlite3 NOT available"
+          python -c "import chromadb; print('chromadb OK')" || echo "chromadb FAILED"
+          python -m pytest --collect-only -m "not live" -q 2>&1 | tail -40
+
       - name: Run tests
         env:
           ANTHROPIC_API_KEY: dummy-ci-key
@@ -42,9 +48,10 @@ jobs:
           OLLAMA_HOST: http://localhost:11434
           DEFAULT_PROVIDER: deepseek
         run: |
-          python -m pytest -m "not live" --tb=long -v 2>&1 | tail -100
+          python -m pytest -m "not live" --tb=long -v 2>&1 | tail -80
 
       - name: Coverage report
+        if: success()
         env:
           ANTHROPIC_API_KEY: dummy-ci-key
           OPENAI_API_KEY: dummy-ci-key
