@@ -6,9 +6,10 @@ services:
     plan: free
     buildCommand: |
       pip install --upgrade pip
-      pip install --no-cache-dir -r requirements-render.txt
+      pip install --no-cache-dir --prefer-binary -r requirements-render.txt
     startCommand: |
       streamlit run SOURCE_CODE/ui/app.py --server.port $PORT --server.address 0.0.0.0 --server.enableCORS false --server.enableXsrfProtection false
+    healthCheckPath: /_stcore/health
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.9
@@ -20,4 +21,3 @@ services:
         value: false
       - key: DASHSCOPE_BASE_URL
         value: https://dashscope-intl.aliyuncs.com/compatible-mode/v1
-    healthCheckPath: /_stcore/health
