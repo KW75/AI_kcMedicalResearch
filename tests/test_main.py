@@ -213,10 +213,17 @@ class TestMainProviderCalls:
         pass
 
     def test_call_anthropic_provider_missing_key(self):
-        with patch("SOURCE_CODE.main.ANTHROPIC_API_KEY", ""):
+        # Patch the module where the function actually looks up the variable
+        import sys
+        _prov = sys.modules[main.call_anthropic_provider.__module__]
+        orig = _prov.ANTHROPIC_API_KEY
+        _prov.ANTHROPIC_API_KEY = ""
+        try:
             with pytest.raises(RuntimeError) as exc:
                 main.call_anthropic_provider("Test prompt")
             assert "ANTHROPIC_API_KEY" in str(exc.value)
+        finally:
+            _prov.ANTHROPIC_API_KEY = orig
 
     def test_call_groq_provider_missing_key(self):
         with patch("SOURCE_CODE.main.GROQ_API_KEY", ""):
@@ -225,10 +232,16 @@ class TestMainProviderCalls:
             assert "GROQ_API_KEY" in str(exc.value)
 
     def test_call_deepseek_provider_missing_key(self):
-        with patch("SOURCE_CODE.main.DEEPSEEK_API_KEY", ""):
+        import sys
+        _prov = sys.modules[main.call_deepseek_provider.__module__]
+        orig = _prov.DEEPSEEK_API_KEY
+        _prov.DEEPSEEK_API_KEY = ""
+        try:
             with pytest.raises(RuntimeError) as exc:
                 main.call_deepseek_provider("Test prompt")
             assert "DEEPSEEK_API_KEY" in str(exc.value)
+        finally:
+            _prov.DEEPSEEK_API_KEY = orig
 
     def test_call_ai_routes_to_correct_provider(self):
         """call_ai routes to correct provider using PROVIDERS dict."""

@@ -78,74 +78,20 @@ except ModuleNotFoundError:
 load_dotenv()
 
 # ---------------------------------------------------------------------------
-# Path B: Import refactored modules (Session 3 & 4)
+# Session 4 modules
 # ---------------------------------------------------------------------------
-from providers import (
-    PROVIDERS as _PROVIDERS_MODULE,
-    call_ai as _call_ai_module,
-    call_ai_with_fallback,
-    validate_provider,
-    get_provider_capabilities,
-    _ollama_detect_best_model as _ollama_detect_best_module,
-    ollama_probe_performance,
-    get_default_model,
-    PROVIDER_CAPABILITIES,
-)
 from streaming import stream_to_console, tee_stream
 from checkpoint import PipelineCheckpoint, find_resumable_checkpoint, prompt_resume
 
 
 
-# ---------------------------------------------------------------------------
-# Ollama auto-detect best model
-# ---------------------------------------------------------------------------
-def _ollama_detect_best_model(host: str = "http://localhost:11434") -> str:
-    """Query Ollama /api/tags and return the largest non-embedding model available."""
-    import urllib.request, json
-    # Preference order: larger models first, skip embedding models
-    SKIP_PATTERNS = ("embed", "nomic", "all-minilm")
-    try:
-        req = urllib.request.Request(f"{host}/api/tags", method="GET")
-        with urllib.request.urlopen(req, timeout=5) as resp:
-            data = json.loads(resp.read())
-        models = data.get("models", [])
-        if not models:
-            return "llama3.2"
-        # Filter out embedding models
-        candidates = []
-        for m in models:
-            name = m.get("name", "")
-            if any(skip in name.lower() for skip in SKIP_PATTERNS):
-                continue
-            # Parse parameter size (e.g. "36.0B" -> 36.0, "3.2B" -> 3.2)
-            param_str = m.get("details", {}).get("parameter_size", "0B")
-            try:
-                size = float(param_str.replace("B", "").replace("M", "e-3").replace("K", "e-6"))
-            except (ValueError, TypeError):
-                size = 0
-            candidates.append((name, size))
-        if not candidates:
-            return "llama3.2"
-        # Sort by size descending, pick the largest
-        candidates.sort(key=lambda x: x[1], reverse=True)
-        best = candidates[0][0]
-        print(f"[ollama] Auto-detected best model: {best} ({candidates[0][1]:.1f}B params)")
-        return best
-    except Exception:
-        return "llama3.2"
 
-
-
-# Ensure project root is on sys.path so `from utils import rag` works
-_ROOT = Path(__file__).resolve().parent.parent
-if str(_ROOT) not in sys.path:
-    sys.path.insert(0, str(_ROOT))
 
 
 # ---------------------------------------------------------------------------
 # Version
 # ---------------------------------------------------------------------------
-VERSION = "2.3.0"
+VERSION = "2.3.1"
 
 # ---------------------------------------------------------------------------
 # Paths
@@ -252,32 +198,17 @@ def auto_load_input_files(mode: str) -> list[Path]:
 
 
 # ---------------------------------------------------------------------------
-# Environment / provider config
+# Environment / provider config — sourced from providers.py + local overrides
 # ---------------------------------------------------------------------------
-OLLAMA_HOST         = os.getenv("OLLAMA_HOST",         "http://localhost:11434")
-OLLAMA_MODEL        = os.getenv("OLLAMA_MODEL",        "")  # Empty = auto-detect
-OPENAI_API_KEY      = os.getenv("OPENAI_API_KEY",      "")
-OPENAI_MODEL        = os.getenv("OPENAI_MODEL",        "gpt-4o-mini")
-ANTHROPIC_API_KEY   = os.getenv("ANTHROPIC_API_KEY",   "")
-ANTHROPIC_MODEL     = os.getenv("ANTHROPIC_MODEL",     "claude-sonnet-5")
-DEEPSEEK_API_KEY    = os.getenv("DEEPSEEK_API_KEY",    "")
-DEEPSEEK_MODEL      = os.getenv("DEEPSEEK_MODEL",      "deepseek-v4-flash")
-GROQ_API_KEY        = os.getenv("GROQ_API_KEY",        "")
-GROQ_MODEL          = os.getenv("GROQ_MODEL",          "llama-3.3-70b-versatile")
-DASHSCOPE_API_KEY   = os.environ.get("DASHSCOPE_API_KEY", "")
-DASHSCOPE_BASE_URL  = os.environ.get(
-    "DASHSCOPE_BASE_URL",
-    "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
+from providers import (
+    OLLAMA_HOST, OLLAMA_MODEL, OPENAI_API_KEY, OPENAI_MODEL,
+    ANTHROPIC_API_KEY, ANTHROPIC_MODEL, DEEPSEEK_API_KEY, DEEPSEEK_MODEL,
+    GROQ_API_KEY, GROQ_MODEL, DASHSCOPE_API_KEY, DASHSCOPE_BASE_URL,
+    QWEN_MODEL, DEFAULT_PROVIDER,
 )
-QWEN_MODEL          = os.getenv("QWEN_MODEL", "qwen-plus-latest")  # Always uses latest
-EMBEDDING_PROVIDER  = os.getenv("EMBEDDING_PROVIDER",  "ollama")
-DEFAULT_PROVIDER    = os.getenv("DEFAULT_PROVIDER",    "deepseek")
+EMBEDDING_PROVIDER = os.getenv("EMBEDDING_PROVIDER", "ollama")
+EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "nomic-embed-text")
 
-# Auto-detect Ollama model if not explicitly set
-if not OLLAMA_MODEL:
-    OLLAMA_MODEL = _ollama_detect_best_model(OLLAMA_HOST)
-
-EMBEDDING_MODEL     = os.getenv("EMBEDDING_MODEL",     "nomic-embed-text")
 
 
 # ---------------------------------------------------------------------------
@@ -366,258 +297,22 @@ DOC_FILES_BY_ROLE: dict[str, list[Path]] = {
 # ---------------------------------------------------------------------------
 # Provider registry
 # ---------------------------------------------------------------------------
-def call_openai_provider(
-    prompt: str,
-    model: str | None = None,
-    max_tokens: int = 8192,
-) -> str:
-    """Send a prompt to the OpenAI chat completions endpoint."""
-    if not OPENAI_API_KEY:
-        raise RuntimeError("OPENAI_API_KEY is not set. Add it to your .env file.")
-    model   = model or OPENAI_MODEL
-    url     = "https://api.openai.com/v1/chat/completions"
-    payload = json.dumps({
-        "model":      model,
-        "messages":   [{"role": "user", "content": prompt}],
-        "max_tokens": max_tokens,
-    }).encode()
-    req = urllib.request.Request(
-        url,
-        data=payload,
-        headers={
-            "Content-Type":  "application/json",
-            "Authorization": f"Bearer {OPENAI_API_KEY}",
-        },
-        method="POST",
-    )
-    try:
-        with urlopen(req, timeout=180) as resp:
-            data = json.loads(resp.read())
-        choices = data.get("choices", [])
-        if not choices or not choices[0].get("message", {}).get("content"):
-            raise RuntimeError("OpenAI returned an empty response.")
-        return choices[0]["message"]["content"]
-    except urllib.error.HTTPError as exc:
-        raise RuntimeError(f"OpenAI HTTP error {exc.code}: {exc.reason}") from exc
-    except urllib.error.URLError as exc:
-        raise RuntimeError(f"OpenAI connection error: {exc.reason}") from exc
-    except (KeyError, IndexError) as exc:
-        raise RuntimeError(f"OpenAI unexpected response format: {exc}") from exc
+# ---------------------------------------------------------------------------
+# Provider functions — delegated to providers.py (backward-compatible names)
+# ---------------------------------------------------------------------------
+from providers import (
+    call_openai_provider,
+    call_anthropic_provider,
+    call_ollama_provider,
+    call_deepseek_provider,
+    call_groq_provider,
+    call_qwen_provider,
+)
 
 
-def call_anthropic_provider(
-    prompt: str,
-    model: str | None = None,
-    max_tokens: int = 8192,
-) -> str:
-    """Send a prompt to the Anthropic messages endpoint."""
-    if not ANTHROPIC_API_KEY:
-        raise RuntimeError("ANTHROPIC_API_KEY is not set. Add it to your .env file.")
-    model   = model or ANTHROPIC_MODEL
-    url     = "https://api.anthropic.com/v1/messages"
-    payload = json.dumps({
-        "model":      model,
-        "messages":   [{"role": "user", "content": prompt}],
-        "max_tokens": max_tokens,
-    }).encode()
-    req = urllib.request.Request(
-        url,
-        data=payload,
-        headers={
-            "Content-Type":      "application/json",
-            "x-api-key":         ANTHROPIC_API_KEY,
-            "anthropic-version": "2023-06-01",
-        },
-        method="POST",
-    )
-    try:
-        with urlopen(req, timeout=180) as resp:
-            data = json.loads(resp.read())
-        content = data.get("content", [])
-        if not content or not content[0].get("text"):
-            raise RuntimeError("Anthropic returned an empty response.")
-        return content[0]["text"]
-    except urllib.error.HTTPError as exc:
-        raise RuntimeError(f"Anthropic HTTP error {exc.code}: {exc.reason}") from exc
-    except urllib.error.URLError as exc:
-        raise RuntimeError(f"Anthropic connection error: {exc.reason}") from exc
-    except (KeyError, IndexError) as exc:
-        raise RuntimeError(f"Anthropic unexpected response format: {exc}") from exc
+# PROVIDERS dict — re-exported from providers.py
+from providers import PROVIDERS
 
-
-def call_ollama_provider(
-    prompt: str,
-    model: str | None = None,
-    max_tokens: int = 8192,
-) -> str:
-    """Send a prompt to the local Ollama generate endpoint."""
-    model   = model or OLLAMA_MODEL
-    url     = f"{OLLAMA_HOST}/api/generate"
-    payload = json.dumps({
-        "model":   model,
-        "prompt":  prompt,
-        "stream":  False,
-        "options": {
-            "num_predict": max_tokens,
-            "num_ctx": int(os.getenv("OLLAMA_CONTEXT", "8192")),
-            "temperature": float(os.getenv("OLLAMA_TEMPERATURE", "0.3")),
-            "top_p": 0.9,
-            "repeat_penalty": 1.1,
-        },
-    }).encode()
-    req = urllib.request.Request(
-        url,
-        data=payload,
-        headers={"Content-Type": "application/json"},
-        method="POST",
-    )
-    try:
-        with urlopen(req, timeout=600) as resp:
-            data = json.loads(resp.read())
-        response_text = data.get("response", "")
-        if not response_text:
-            raise RuntimeError("Ollama returned an empty response.")
-        return response_text
-    except urllib.error.HTTPError as exc:
-        raise RuntimeError(f"Ollama HTTP error {exc.code}: {exc.reason}") from exc
-    except urllib.error.URLError as exc:
-        raise RuntimeError(f"Ollama connection error: {exc.reason}") from exc
-
-
-def call_deepseek_provider(
-    prompt: str,
-    model: str | None = None,
-    max_tokens: int = 8192,
-) -> str:
-    """Send a prompt to the DeepSeek chat completions endpoint."""
-    if not DEEPSEEK_API_KEY:
-        raise RuntimeError("DEEPSEEK_API_KEY is not set. Add it to your .env file.")
-    model   = model or DEEPSEEK_MODEL
-    url     = "https://api.deepseek.com/chat/completions"
-    payload = json.dumps({
-        "model":      model,
-        "messages":   [{"role": "user", "content": prompt}],
-        "max_tokens": max_tokens,
-        "stream":     False,
-        "thinking":   {"type": "disabled"},
-    }).encode()
-    req = urllib.request.Request(
-        url,
-        data=payload,
-        headers={
-            "Content-Type":  "application/json",
-            "Authorization": f"Bearer {DEEPSEEK_API_KEY}",
-        },
-        method="POST",
-    )
-    try:
-        with urlopen(req, timeout=180) as resp:
-            data = json.loads(resp.read())
-        choices = data.get("choices", [])
-        if not choices:
-            raise RuntimeError("DeepSeek returned an empty response.")
-        msg     = choices[0].get("message", {})
-        content = msg.get("content") or msg.get("reasoning_content", "")
-        if not content:
-            raise RuntimeError("DeepSeek returned an empty response.")
-        return content
-    except urllib.error.HTTPError as exc:
-        raise RuntimeError(f"DeepSeek HTTP error {exc.code}: {exc.reason}") from exc
-    except urllib.error.URLError as exc:
-        raise RuntimeError(f"DeepSeek connection error: {exc.reason}") from exc
-    except (KeyError, IndexError) as exc:
-        raise RuntimeError(f"DeepSeek unexpected response format: {exc}") from exc
-
-
-def call_groq_provider(
-    prompt: str,
-    model: str | None = None,
-    max_tokens: int = 8192,
-) -> str:
-    """Send a prompt to the Groq inference endpoint."""
-    if not GROQ_API_KEY:
-        raise RuntimeError("GROQ_API_KEY is not set. Add it to your .env file.")
-    model   = model or GROQ_MODEL
-    url     = "https://api.groq.com/openai/v1/chat/completions"
-    payload = json.dumps({
-        "model":      model,
-        "messages":   [{"role": "user", "content": prompt}],
-        "max_tokens": max_tokens,
-        "stream":     False,
-    }).encode()
-    req = urllib.request.Request(
-        url,
-        data=payload,
-        headers={
-            "Content-Type":  "application/json",
-            "Authorization": f"Bearer {GROQ_API_KEY}",
-        },
-        method="POST",
-    )
-    try:
-        with urlopen(req, timeout=180) as resp:
-            data = json.loads(resp.read())
-        choices = data.get("choices", [])
-        if not choices or not choices[0].get("message", {}).get("content"):
-            raise RuntimeError("Groq returned an empty response.")
-        return choices[0]["message"]["content"]
-    except urllib.error.HTTPError as exc:
-        raise RuntimeError(f"Groq HTTP error {exc.code}: {exc.reason}") from exc
-    except urllib.error.URLError as exc:
-        raise RuntimeError(f"Groq connection error: {exc.reason}") from exc
-    except (KeyError, IndexError) as exc:
-        raise RuntimeError(f"Groq unexpected response format: {exc}") from exc
-
-
-def call_qwen_provider(
-    prompt: str,
-    model: str | None = None,
-    max_tokens: int = 8192,
-) -> str:
-    """Send a prompt to Alibaba Cloud Model Studio (Qwen) via OpenAI-compatible API."""
-    if not DASHSCOPE_API_KEY:
-        raise RuntimeError("DASHSCOPE_API_KEY is not set. Add it to your .env file.")
-    model   = model or QWEN_MODEL
-    url     = f"{DASHSCOPE_BASE_URL.rstrip('/')}/chat/completions"
-    payload = json.dumps({
-        "model":           model,
-        "messages":        [{"role": "user", "content": prompt}],
-        "max_tokens":      max_tokens,
-        "stream":          False,
-        "enable_thinking": False,
-    }).encode()
-    req = urllib.request.Request(
-        url,
-        data=payload,
-        headers={
-            "Content-Type":  "application/json",
-            "Authorization": f"Bearer {DASHSCOPE_API_KEY}",
-        },
-        method="POST",
-    )
-    try:
-        with urlopen(req, timeout=180) as resp:
-            data = json.loads(resp.read())
-        choices = data.get("choices", [])
-        if not choices or not choices[0].get("message", {}).get("content"):
-            raise RuntimeError("Qwen returned an empty response.")
-        return choices[0]["message"]["content"]
-    except urllib.error.HTTPError as exc:
-        raise RuntimeError(f"Qwen HTTP error {exc.code}: {exc.reason}") from exc
-    except urllib.error.URLError as exc:
-        raise RuntimeError(f"Qwen connection error: {exc.reason}") from exc
-    except (KeyError, IndexError) as exc:
-        raise RuntimeError(f"Qwen unexpected response format: {exc}") from exc
-
-
-PROVIDERS: dict[str, callable] = {
-    "ollama":    call_ollama_provider,
-    "openai":    call_openai_provider,
-    "anthropic": call_anthropic_provider,
-    "deepseek":  call_deepseek_provider,
-    "groq":      call_groq_provider,
-    "qwen":      call_qwen_provider,
-}
 
 
 def call_ai(
