@@ -2,7 +2,6 @@
 
 [theme]
 base = "dark"           # "dark", "light", or "auto"
-baseFontSize = 18       # Font size in pixels
 
 [server]
 runOnSave = false       # Don't auto-reload on file save

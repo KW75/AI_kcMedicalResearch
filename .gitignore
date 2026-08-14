@@ -1,4 +1,4 @@
-﻿.venv/
+.venv/
 venv/
 __pycache__/
 *.pyc
@@ -20,13 +20,5 @@ dist/
 build/
 chroma_db/
 htmlcov/
-
-
-
-
-
-
-
-
-
-
+# Local scratch/data folder - not used by repo
+data/
