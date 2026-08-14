@@ -9,8 +9,9 @@
 **Uptime Monitor:** UptimeRobot, 5-minute interval, keeps free-tier Render instance warm  
 **Tests:** 362 passed, 3 skipped, 11 deselected/live tests  
 **Coverage:** ~50%  
-**Latest GitHub Commit:** 139d42d  
-**Latest Commit Message:** fix(render): install docx2txt separately from binary-only deps  
+**Latest Render Fix Commit:** 139d42d  
+**Latest Documentation Commit:** 035eee1
+**Latest Documentation Commit Message:** docs: update HANDOFF.md to v2.4.2 with Render recovery  
 **Current Status:** CI green, Render live, health endpoint returns ok  
 
 ---
