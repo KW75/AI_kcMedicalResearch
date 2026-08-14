@@ -6,7 +6,7 @@ services:
     plan: free
     buildCommand: |
       pip install --upgrade pip
-      pip install --no-cache-dir --prefer-binary -r requirements-render.txt
+      pip install --no-cache-dir --only-binary=:all: -r requirements-render.txt
     startCommand: |
       streamlit run SOURCE_CODE/ui/app.py --server.port $PORT --server.address 0.0.0.0 --server.enableCORS false --server.enableXsrfProtection false
     healthCheckPath: /_stcore/health
