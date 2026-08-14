@@ -1,5 +1,5 @@
 ﻿# =============================================================================
-#  launcher.py  |  AI kcMedicalResearch  |  v2.3.0
+#  launcher.py  |  AI kcMedicalResearch  |  v2.4.3
 # =============================================================================
 
 import subprocess
@@ -196,7 +196,7 @@ def section_header(title: str) -> None:
 
 
 # -----------------------------------------------------------------------------
-#  Banner  v2.3.0
+#  Banner  v2.4.3
 # -----------------------------------------------------------------------------
 def banner() -> None:
     W = _W
@@ -210,9 +210,9 @@ def banner() -> None:
     print(f'  {FRAME}║{RESET}   {LOGO}██║ ██╔╝██╔════╝{RESET}{W(4)}'
           f'{INFO}─────────────────────{RESET}{W(11)}{FRAME}║{RESET}')
     print(f'  {FRAME}║{RESET}   {LOGO}█████╔╝ ██║{RESET}{W(9)}'
-          f'{ACCENT}Version  {RESET}{HILITE}2.3.0{RESET}{W(14)}{FRAME}    ║{RESET}')
+          f'{ACCENT}Version  {RESET}{HILITE}2.4.3{RESET}{W(14)}{FRAME}    ║{RESET}')
     print(f'  {FRAME}║{RESET}   {LOGO}██╔═██╗ ██║{RESET}{W(9)}'
-          f'{ACCENT}Tests    {RESET}{GOOD}254 passed - 6 skipped{RESET}{W(1)}{FRAME}║{RESET}')
+          f'{ACCENT}Tests    {RESET}{GOOD}400 passed - 3 skipped{RESET}{W(1)}{FRAME}║{RESET}')
     print(f'  {FRAME}║{RESET}   {LOGO}██║  ██╗╚██████╗{RESET}{W(4)}'
           f'{ACCENT}Deploy   {RESET}{INFO}render.com / local{RESET}{W(5)}{FRAME}║{RESET}')
     print(f'  {FRAME}║{RESET}   {LOGO}╚═╝  ╚═╝ ╚═════╝{RESET}{W(36)}{FRAME}║{RESET}')
@@ -246,7 +246,7 @@ def banner() -> None:
 
 
 # -----------------------------------------------------------------------------
-#  Mode selection menu  v2.3.0
+#  Mode selection menu  v2.4.3
 # -----------------------------------------------------------------------------
 def pick_mode():
     while True:
@@ -487,10 +487,10 @@ def run_custom() -> None:
 def run_ui() -> None:
     cmd = [PYTHON, str(BASE / "SOURCE_CODE" / 'main.py'), '--ui']
     print()
-    print(f'  {FRAME}╔══ Streamlit UI ═══════════════════════════════════════╗{RESET}')
+    print(f'  {FRAME}╔══ Streamlit UI ══════════════════════════════════════════╗{RESET}')
     print(f'  {FRAME}║{RESET}  {GOOD}Opening :{RESET}  {ACCENT}http://localhost:8501{RESET}{"  " * 12}{FRAME}║{RESET}')
-    print(f'  {FRAME}║{RESET}  {INFO}Stop    :{RESET}  {INFO}Close browser tab then press Ctrl+C{RESET}  {FRAME}║{RESET}')
-    print(f'  {FRAME}╚═══════════════════════════════════════════════════════╝{RESET}')
+    print(f'  {FRAME}║{RESET}  {INFO}Stop    :{RESET}  {INFO}Close browser tab then press Ctrl+C{RESET}  {FRAME}        ║{RESET}')
+    print(f'  {FRAME}╚══════════════════════════════════════════════════════════╝{RESET}')
     print()
     try:
         proc = subprocess.Popen(cmd, cwd=str(BASE))
