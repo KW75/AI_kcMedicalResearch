@@ -8,7 +8,7 @@
 **Health Check:** https://ai-kcmedicalresearch.onrender.com/_stcore/health
 **Uptime Monitor:** UptimeRobot, 5-minute interval, keeps free-tier Render instance warm
 **Tests:** 400 passed, 3 skipped, 11 deselected/live tests
-**Coverage:** ~52%
+**Coverage:** 53%
 **Latest Render Fix Commit:** 139d42d
 **Current Status:** CI green, Render live, health endpoint returns ok
 
@@ -57,7 +57,8 @@ Final fixes: `PYTHON_VERSION=3.11.9`; Build Command uses `requirements-render.tx
 - Fixed 7 failing tests in `test_main_coverage.py`. They blocked on `input()` (main() runs an interactive REPL) and asserted on `run_*` functions that `main()` never calls (the loop calls `call_ai` directly). Fixed by mocking `input` with a task + `KeyboardInterrupt`, and asserting on `call_ai`.
 - Mocked `utils.rag.index_uploads` in tests, removing ~113 seconds of real PDF embedding (SR/appraisal modes). File runtime dropped 121s -> 8s.
 - Added `TestSessionManagement` (16 tests) covering `list_sessions`, `read_session`, `delete_session`, `export_session`, `rename_session`, `show_stats`, plus interactive-loop tests for all six modes.
-- `main.py` coverage 36% -> 41%; suite 362 -> 400 passing; overall ~52%.
+- `main.py` coverage 36% -> 41%; suite 362 -> 400 passing; overall ~53%.
+- Removed dead code `cli.py` and `session.py` (abandoned refactor, superseded by main.py); coverage 52% -> 53%.
 - Removed dead duplicate files `sr/src/ui/__init__.py` and `sr/src/ui/app.py`.
 - Fully resolved the `project_layout.py` escape-sequence DeprecationWarning (5 docstrings now raw-strings).
 - Removed scratch files (`create_*.py`, `fix_*.py`) and the empty gitignored `data/` folder.
@@ -90,7 +91,8 @@ Final fixes: `PYTHON_VERSION=3.11.9`; Build Command uses `requirements-render.tx
 | 3 | Anthropic geo-restricted | Low | Use VPN or skip |
 | 4 | DeprecationWarning: escape sequence in `project_layout.py` | Low | RESOLVED (Session 5) |
 | 5 | Streamlit warning: `theme.baseFontSize` invalid config option | Low | Non-blocking |
-| 6 | `cli.py` (0%) and `session.py` (0%) appear untested/possibly dead | Low | Investigate |
+| 6 | `cli.py` and `session.py` dead code | Low | RESOLVED (Session 5) - deleted |
+
 
 ---
 
@@ -128,8 +130,7 @@ Fallback: transient errors (timeout, 429, 502, 503) trigger next provider; auth 
 | main.py | 41% |
 | document_reader.py | 24% |
 | SR pipeline (src/*) | ~10-53% (low) |
-| cli.py / session.py | 0% (possibly dead) |
-| TOTAL | ~52% (400 tests) |
+| TOTAL | 53% (400 tests) |
 
 ---
 
@@ -138,13 +139,12 @@ Fallback: transient errors (timeout, 429, 502, 503) trigger next provider; auth 
 | Priority | Task | Details |
 |----------|------|---------|
 | 1 | Fix Lami extraction | SR pipeline Table 4, pages 12-13 |
-| 2 | Investigate cli.py / session.py | 0% coverage; delete if dead code |
-| 3 | Raise SR pipeline coverage | Core screening/extraction logic (currently very low) |
-| 4 | Add visible app version/commit | Streamlit sidebar |
-| 5 | PDF export via fpdf2 | Pure-Python, no GTK3 dependency |
-| 6 | Remove invalid Streamlit config key | `theme.baseFontSize` warning |
-| 7 | Push Docker image | Docker Hub for colleague sharing |
-| 8 | Track token usage/cost | Per-session totals |
+| 2 | Raise SR pipeline coverage | Core screening/extraction logic (currently very low) |
+| 3 | Add visible app version/commit | Streamlit sidebar |
+| 4 | PDF export via fpdf2 | Pure-Python, no GTK3 dependency |
+| 5 | Remove invalid Streamlit config key | `theme.baseFontSize` warning |
+| 6 | Push Docker image | Docker Hub for colleague sharing |
+| 7 | Track token usage/cost | Per-session totals |
 
 ---
 
