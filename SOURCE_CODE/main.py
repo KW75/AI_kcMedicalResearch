@@ -1397,14 +1397,19 @@ def run_sr_launcher(provider: str = "", model: str = "") -> None:
 
 
     if result.returncode == 0:
-        out_base = SOURCE_CODE_DIR / "pipelines" / "sr" / "outputs"
+        mirror_reports = BASE_DIR / "output" / "sr" / "reports"
+        mirror_figures = BASE_DIR / "output" / "sr" / "figures"
+        runs_root      = BASE_DIR / "reports" / "sr"
         print("\n[SR] Pipeline complete.")
-        print(f"[SR] DOCX   -> {out_base / 'reports' / 'systematic_review.docx'}")
-        print(f"[SR] PDF    -> {out_base / 'reports' / 'systematic_review.pdf'}")
-        print(f"[SR] Plot   -> {out_base / 'figures' / 'forest_plot.png'}")
+        print(f"[SR] DOCX   -> {mirror_reports / 'systematic_review.docx'}")
+        print(f"[SR] PDF    -> {mirror_reports / 'systematic_review.pdf'}")
+        print(f"[SR] HTML   -> {mirror_reports / 'systematic_review.html'}")
+        print(f"[SR] Plot   -> {mirror_figures / 'forest_plot.png'}")
+        print(f"[SR] Full run (with audit CSVs) -> {runs_root}\\<run_id>\\")
     else:
         print(f"\n[SR] Pipeline exited with code {result.returncode}.")
         print("[SR] Check the output above for errors.")
+
 
 
 def _create_pico() -> dict:
