@@ -1342,13 +1342,14 @@ def run_sr_launcher(provider: str = "", model: str = "") -> None:
         print("\n  ?????? Using existing prisma_criteria.yaml")
 
     # -- Step 4: resolve provider and model ------------------------------------
+
     _DEFAULT_MODELS = {
-        "qwen":      "qwen3.7-plus",
-        "deepseek":  "deepseek-v4-flash",
-        "openai":    "gpt-4o-mini",
-        "anthropic": "claude-sonnet-4-5",
-        "groq":      "llama-3.3-70b-versatile",
-        "ollama":    "llama3.2",
+        "qwen":      QWEN_MODEL,
+        "deepseek":  DEEPSEEK_MODEL,
+        "openai":    OPENAI_MODEL,
+        "anthropic": ANTHROPIC_MODEL,
+        "groq":      GROQ_MODEL,
+        "ollama":    OLLAMA_MODEL,
     }
     
     _provider = provider or "qwen"
@@ -1379,7 +1380,8 @@ def run_sr_launcher(provider: str = "", model: str = "") -> None:
             print("\nAborting.")
             return
     
-    _model = model or _DEFAULT_MODELS.get(_provider, "qwen3.7-plus")
+    _model = model or _DEFAULT_MODELS.get(_provider, QWEN_MODEL)
+
 
     # -- Step 5: run sr/main.py (as a module so relative imports resolve) -----
     cmd = [

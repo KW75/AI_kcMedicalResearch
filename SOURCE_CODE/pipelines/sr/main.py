@@ -49,7 +49,8 @@ def main():
                     help="Path to prisma_criteria.yaml")
     ap.add_argument("--effect-measure", default=None,
                     choices=["OR", "RR", "MD", "SMD"])
-    ap.add_argument("--model",          default="qwen3.7-plus")
+    ap.add_argument("--model",          default=None,
+                    help="Model name (default: provider's configured model)")
     ap.add_argument("--provider",       default="qwen",
                     choices=["ollama", "openai", "anthropic",
                              "deepseek", "groq", "qwen"],
