@@ -114,6 +114,6 @@ class SRProjectLayout:
         shutil.copy2(src, dst_dir / src.name)
 
     def mirror_all(self) -> None:
-        """Mirror every finished output file to output\sr\."""
+        r"""Mirror every finished output file to output\sr\."""
         for f in (self.forest_png, self.docx, self.html, self.pdf):
             self.mirror(f)
