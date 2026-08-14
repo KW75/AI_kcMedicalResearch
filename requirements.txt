@@ -1,3 +1,13 @@
+# requirements.txt - Local/full development requirements
+#
+# Used for local development and Docker/full installs.
+# Do NOT use this file for Render.
+# Render uses requirements-render.txt.
+# GitHub Actions uses requirements-ci.txt.
+#
+# Notes:
+# - This file may include heavier optional dependencies.
+# - Windows-only dependencies must use platform markers.
 chromadb>=0.4.0
 pypdf>=3.0.0
 python-dotenv>=1.0.0
@@ -22,7 +32,7 @@ groq>=0.4.0
 # DOC/DOCX Support
 python-docx==1.1.0          # DOCX reading/writing
 docx2txt==0.8               # Simple DOCX extraction
-pywin32==306                # Windows DOC support (optional)
+pywin32==306; platform_system == "Windows"  # Windows DOC support only
 textract==1.6.5             # Universal document extraction
 
 # Image Support

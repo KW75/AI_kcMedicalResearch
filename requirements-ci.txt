@@ -1,3 +1,9 @@
+# requirements-ci.txt - GitHub Actions CI requirements
+#
+# Used only by .github/workflows/ci.yml on Ubuntu/Python 3.11.
+# Includes CI-specific packages such as pysqlite3-binary for ChromaDB.
+# Do NOT use this file for Render.
+# Render uses requirements-render.txt.
 # CI-only requirements (Ubuntu + Python 3.11)
 # chromadb pinned to version with pre-built wheels for linux/py311
 chromadb==0.5.23

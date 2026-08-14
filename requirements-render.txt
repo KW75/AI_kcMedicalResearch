@@ -1,5 +1,9 @@
-# requirements-render.txt ??Render deployment, pinned for free-tier stability
-
+# requirements-render.txt - Render runtime requirements
+#
+# Used by Render dashboard Build Command.
+# Keep this file lean and pinned for free-tier stability.
+# Do NOT include Windows-only packages such as pywin32.
+# docx2txt==0.8 is installed separately in Render because it has no published wheel.
 pypdf==4.3.1
 python-dotenv==1.0.1
 requests==2.32.3
