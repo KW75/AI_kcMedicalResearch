@@ -1,4 +1,4 @@
-# requirements-render.txt — Render deployment, pinned for free-tier stability
+# requirements-render.txt ??Render deployment, pinned for free-tier stability
 
 pypdf==4.3.1
 python-dotenv==1.0.1
@@ -16,4 +16,3 @@ streamlit==1.38.0
 anthropic==0.34.2
 openai==1.43.0
 groq==0.11.0
-docx2txt==0.8
