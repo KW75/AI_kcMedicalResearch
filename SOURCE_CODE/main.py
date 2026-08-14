@@ -146,7 +146,6 @@ for _d in [
     REPORTS_DIR / "appraisal",
     REPORTS_DIR / "rct_search",
     REPORTS_DIR / "search",
-    REPORTS_DIR / "systematic_review",
     REPORTS_DIR / "transcripts",
 ]:
     _d.mkdir(parents=True, exist_ok=True)
@@ -1382,10 +1381,9 @@ def run_sr_launcher(provider: str = "", model: str = "") -> None:
     
     _model = model or _DEFAULT_MODELS.get(_provider, "qwen3.7-plus")
 
-    # -- Step 5: run sr/main.py -----------------------------------------------
-    sr_main = SOURCE_CODE_DIR / "pipelines" / "sr" / "main.py"
+    # -- Step 5: run sr/main.py (as a module so relative imports resolve) -----
     cmd = [
-        sys.executable, str(sr_main),
+        sys.executable, "-m", "SOURCE_CODE.pipelines.sr.main",
         "--pdf-dir",        str(INPUT_SR),
         "--provider",       _provider,
         "--model",          _model,
@@ -1394,6 +1392,7 @@ def run_sr_launcher(provider: str = "", model: str = "") -> None:
     ]
     print(f"\n[SR] Running: {' '.join(cmd)}\n")
     result = _sp.run(cmd, cwd=str(BASE_DIR))
+
 
     if result.returncode == 0:
         out_base = SOURCE_CODE_DIR / "pipelines" / "sr" / "outputs"
@@ -1991,7 +1990,8 @@ def main(
             previous_response = response
 
             if mode == "rct_search" and not dry_run:
-                save_rct_search_links(response=response, reports_dir=REPORTS_DIR)
+                save_rct_search_links(response=response, reports_dir=REPORTS_DIR / "rct_search")
+
 
     except KeyboardInterrupt:
         print(f"\n\n{colour}Session ended.{RESET}")
