@@ -183,12 +183,17 @@ class TestSRIntegration:
     """Integration tests for SR pipeline."""
 
     def test_sr_pipeline_dry_run(self, tmp_path):
-        """Test SR pipeline with dry run."""
-        # Create mock config
-        config_dir = SOURCE_CODE_DIR / "pipelines" / "sr" / "config"
+        """Test SR pipeline with dry run.
+
+        Uses an isolated tmp_path config so the real
+        SOURCE_CODE/pipelines/sr/config/prisma_criteria.yaml is never
+        touched by the test suite.
+        """
+        # Write the mock config into the pytest tmp dir, NOT the repo.
+        config_dir = tmp_path / "config"
         config_dir.mkdir(parents=True, exist_ok=True)
         config_file = config_dir / "prisma_criteria.yaml"
-        
+
         yaml_content = """
 review_title: Test Review
 effect_measure: SMD
@@ -203,14 +208,19 @@ exclusion_criteria:
   - Non-RCT
 """
         config_file.write_text(yaml_content, encoding="utf-8")
-        
-        # Mock the main function to avoid actual execution
-        # The main function in sr/main.py is the entry point
+
+        # Sanity-check the isolated config loads, then confirm the entry
+        # point is importable/patchable without real execution.
+        import yaml
+        loaded = yaml.safe_load(config_file.read_text(encoding="utf-8"))
+        assert loaded["review_title"] == "Test Review"
+
         with patch("pipelines.sr.main.main") as mock_main:
             mock_main.return_value = True
-            # Test that the module can be imported
             import pipelines.sr.main
             assert pipelines.sr.main is not None
+
+
 
     def test_sr_config_validation(self, tmp_path):
         """Test SR configuration validation."""
