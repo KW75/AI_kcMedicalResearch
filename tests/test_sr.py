@@ -261,6 +261,39 @@ class TestSREdgeCases:
         valid_measures = ["SMD", "MD", "OR", "RR"]
         assert invalid_measure not in valid_measures
 
+class TestSRModuleInvocation:
+    """Regression guard for the Session 6 relative-import crash.
+
+    SR must be launchable via `python -m SOURCE_CODE.pipelines.sr.main`
+    with cwd=repo root, NOT by file path. A file-path launch makes the
+    script top-level __main__ with no parent package, breaking
+    `from .src... import ...`. `--help` exercises the full import chain
+    with zero network calls, so this stays in the standard (non-live) suite.
+    """
+
+    def test_sr_module_help_imports_cleanly(self):
+        import subprocess
+        result = subprocess.run(
+            [sys.executable, "-m", "SOURCE_CODE.pipelines.sr.main", "--help"],
+            cwd=PROJECT_ROOT,
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+        combined = result.stdout + result.stderr
+
+        # Exact Session 6 failure signature must never reappear.
+        assert "attempted relative import with no known parent package" not in combined, combined
+        assert "ImportError" not in combined, combined
+        assert "ModuleNotFoundError" not in combined, combined
+
+        # argparse --help exits 0 after printing usage; confirms we reached
+        # argparse rather than crashing earlier in the import chain.
+        assert result.returncode == 0, (
+            f"SR -m invocation failed (rc={result.returncode}):\n{combined}"
+        )
+        assert "usage:" in combined.lower(), combined
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
