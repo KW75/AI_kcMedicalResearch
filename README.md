@@ -2,9 +2,9 @@
 
 A multi-mode AI assistant for medical research, critical appraisal, systematic review, coding, and writing. Uses cloud providers by default (DeepSeek, Qwen, OpenAI, Anthropic, Groq) with optional local Ollama support.
 
-- **Version:** 2.4.3
+- **Version:** 2.4.4
 - **Tests:** 400 passed, 3 skipped
-- **Coverage:** ~52%
+- **Coverage:** ~53%
 - **CI:** GitHub Actions - Green
 - **GitHub:** https://github.com/KW75/AI_kcMedicalResearch
 - **Live App:** https://ai-kcmedicalresearch.onrender.com
@@ -107,10 +107,22 @@ Current status: 400 passed, 3 skipped, 11 deselected.
 
 ## SR Pipeline
 
-    copy *.pdf input/sr/                                  # place PDFs
-    python SOURCE_CODE/main.py --mode sr --provider qwen  # run (needs vision provider)
+Place your PDFs in the SR input folder:
 
-SR outputs: forest_plot.png, systematic_review.docx/.html/.pdf, full audit trail.
+    Windows:        copy *.pdf input\sr\
+    macOS/Linux:    cp *.pdf input/sr/
+
+Run the pipeline directly (not via the launcher menu) so the interactive PICO prompts receive a real TTY:
+
+    python SOURCE_CODE/main.py --mode sr --provider qwen  # needs vision provider
+
+Outputs are written to a timestamped run folder and mirrored to the output tree:
+
+    reports/sr/<run_id>/    # systematic_review.docx/.html, forest_plot.png, audit CSVs
+    output/sr/figures/      # mirror of forest_plot.png
+    output/sr/reports/      # mirror of report files
+
+Note: the .env value QWEN_MODEL=qwen-plus-latest is correct, but the code still hard-codes qwen3.7-plus in _DEFAULT_MODELS (see Known Issues #4).
 
 ## Deployment (Render)
 
@@ -127,6 +139,7 @@ SR outputs: forest_plot.png, systematic_review.docx/.html/.pdf, full audit trail
 | 1 | Lami extraction fails (Table 4) | High | Open |
 | 2 | WeasyPrint not installed | Medium | PDF falls back to HTML |
 | 3 | Anthropic geo-restricted | Low | Use VPN or skip |
+| 4 | Hard-coded qwen3.7-plus in _DEFAULT_MODELS overrides QWEN_MODEL | Low | Open |
 
 ## Contributing
 
