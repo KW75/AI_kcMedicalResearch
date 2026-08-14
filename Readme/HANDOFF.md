@@ -90,7 +90,7 @@ Final fixes: `PYTHON_VERSION=3.11.9`; Build Command uses `requirements-render.tx
 | 2 | WeasyPrint not installed; PDF falls back to HTML | Medium | Open |
 | 3 | Anthropic geo-restricted | Low | Use VPN or skip |
 | 4 | DeprecationWarning: escape sequence in `project_layout.py` | Low | RESOLVED (Session 5) |
-| 5 | Streamlit warning: `theme.baseFontSize` invalid config option | Low | Non-blocking |
+| 5 | Streamlit warning: `theme.baseFontSize` invalid config option | Low | RESOLVED (Session 5) |
 | 6 | `cli.py` and `session.py` dead code | Low | RESOLVED (Session 5) - deleted |
 
 
@@ -141,10 +141,9 @@ Fallback: transient errors (timeout, 429, 502, 503) trigger next provider; auth 
 | 1 | Fix Lami extraction | SR pipeline Table 4, pages 12-13 |
 | 2 | Raise SR pipeline coverage | Core screening/extraction logic (currently very low) |
 | 3 | Add visible app version/commit | Streamlit sidebar |
-| 4 | PDF export via fpdf2 | Pure-Python, no GTK3 dependency |
-| 5 | Remove invalid Streamlit config key | `theme.baseFontSize` warning |
-| 6 | Push Docker image | Docker Hub for colleague sharing |
-| 7 | Track token usage/cost | Per-session totals |
+| 4 | PDF export via fpdf2 | Pure-Python, no GTK3 dependen |
+| 5 | Push Docker image | Docker Hub for colleague sharing |
+| 6 | Track token usage/cost | Per-session totals |
 
 ---
 
