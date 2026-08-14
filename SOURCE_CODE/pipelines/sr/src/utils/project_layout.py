@@ -1,5 +1,5 @@
 ﻿# SOURCE_CODE/pipelines/sr/src/utils/project_layout.py
-"""
+r"""
 project_layout.py
 -----------------
 Single source of truth for all runtime paths used by the SR pipeline.
@@ -53,7 +53,7 @@ def make_run_id() -> str:
 
 
 class SRProjectLayout:
-    """
+    r"""
     Created once per pipeline run.  Builds the full reports\sr\<RUN_ID>\
     tree, copies input PDFs into uploads\, and exposes every path the
     pipeline needs as a plain pathlib.Path attribute.
@@ -82,7 +82,7 @@ class SRProjectLayout:
         self.pdf            = self.reports   / "systematic_review.pdf"
 
     def initialise(self, pdf_sources: list[Path]) -> list[Path]:
-        """
+        r"""
         Create all directories, copy input PDFs into uploads\,
         and return the list of paths inside uploads\.
         """
@@ -100,7 +100,7 @@ class SRProjectLayout:
         return copied
 
     def mirror(self, src: Path) -> None:
-        """
+        r"""
         Copy a finished output file into the output\sr\ mirror folder.
         Silently skips if src does not exist.
         """
