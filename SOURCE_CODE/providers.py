@@ -37,6 +37,7 @@ DASHSCOPE_BASE_URL = os.environ.get(
     "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
 )
 QWEN_MODEL = os.getenv("QWEN_MODEL", "qwen-plus-latest")
+QWEN_VISION_MODEL = os.getenv("QWEN_VISION_MODEL", "qwen-vl-max")
 DEFAULT_PROVIDER = os.getenv("DEFAULT_PROVIDER", "deepseek")
 
 # Fallback chain (configurable via .env)

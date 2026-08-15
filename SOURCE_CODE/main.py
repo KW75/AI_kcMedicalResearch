@@ -203,7 +203,7 @@ from providers import (
     OLLAMA_HOST, OLLAMA_MODEL, OPENAI_API_KEY, OPENAI_MODEL,
     ANTHROPIC_API_KEY, ANTHROPIC_MODEL, DEEPSEEK_API_KEY, DEEPSEEK_MODEL,
     GROQ_API_KEY, GROQ_MODEL, DASHSCOPE_API_KEY, DASHSCOPE_BASE_URL,
-    QWEN_MODEL, DEFAULT_PROVIDER,
+    QWEN_MODEL,QWEN_VISION_MODEL,DEFAULT_PROVIDER,
 )
 EMBEDDING_PROVIDER = os.getenv("EMBEDDING_PROVIDER", "ollama")
 EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "nomic-embed-text")
@@ -1344,7 +1344,7 @@ def run_sr_launcher(provider: str = "", model: str = "") -> None:
     # -- Step 4: resolve provider and model ------------------------------------
 
     _DEFAULT_MODELS = {
-        "qwen":      QWEN_MODEL,
+        "qwen":      QWEN_VISION_MODEL,
         "deepseek":  DEEPSEEK_MODEL,
         "openai":    OPENAI_MODEL,
         "anthropic": ANTHROPIC_MODEL,
@@ -1380,7 +1380,8 @@ def run_sr_launcher(provider: str = "", model: str = "") -> None:
             print("\nAborting.")
             return
     
-    _model = model or _DEFAULT_MODELS.get(_provider, QWEN_MODEL)
+
+    _model = model or _DEFAULT_MODELS.get(_provider, QWEN_VISION_MODEL)
 
 
     # -- Step 5: run sr/main.py (as a module so relative imports resolve) -----
