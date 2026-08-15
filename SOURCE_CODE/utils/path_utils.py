@@ -113,9 +113,6 @@ class PathManager:
         """Get AI reference doc path for a specific mode"""
         return self.doc_dir / "modes" / f"{mode}.md"
     
-    def get_prompt_path(self, prompt_name: str) -> Path:
-        """Get prompt file path"""
-        return self.prompts_dir / f"{prompt_name}-prompt.md"
     
     # Utility methods
     def get_project_root(self) -> Path:
@@ -163,9 +160,6 @@ def get_docs_mode(mode: str) -> Path:
 
 def get_mode_reference(mode: str) -> Path:
     return PATH_MANAGER.get_mode_reference_path(mode)
-
-def get_prompt(prompt_name: str) -> Path:
-    return PATH_MANAGER.get_prompt_path(prompt_name)
 
 def get_assets(asset_name: str) -> Path:
     return PATH_MANAGER.get_assets_path(asset_name)

@@ -22,3 +22,5 @@ chroma_db/
 htmlcov/
 # Local scratch/data folder - not used by repo
 data/
+
+sr_*.log
