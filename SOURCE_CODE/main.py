@@ -8,6 +8,42 @@ Coding mode: Builder (pipeline), Reviewer (standalone), Tester (standalone).
 
 from __future__ import annotations
 
+# --- Supported Python versions ---------------------------------------------
+# This gate must run BEFORE any third-party import (dotenv, numpy, chromadb).
+# Otherwise an unsupported interpreter produces a ModuleNotFoundError or a
+# pip build failure instead of an actionable message.
+#
+# 3.13+ is excluded because several pinned dependencies have no wheels for it.
+# Docker supplies its own interpreter and is unaffected.
+import sys
+
+MIN_PYTHON = (3, 11)
+MAX_PYTHON_EXCLUSIVE = (3, 13)
+
+if not (MIN_PYTHON <= sys.version_info[:2] < MAX_PYTHON_EXCLUSIVE):
+    _found = ".".join(str(part) for part in sys.version_info[:3])
+    sys.stderr.write(
+        "\n"
+        "  This project requires Python 3.11 or 3.12.\n"
+        f"  You are running Python {_found}\n"
+        f"  ({sys.executable})\n"
+        "\n"
+        "  Options:\n"
+        "\n"
+        "  1. Install Python 3.12 and rebuild the virtual environment:\n"
+        "       https://www.python.org/downloads/release/python-3129/\n"
+        "       py -3.12 -m venv .venv          (Windows)\n"
+        "       python3.12 -m venv .venv        (macOS/Linux)\n"
+        "\n"
+        "  2. Use Docker, which supplies its own Python:\n"
+        "       cd docker && docker compose run --rm cli\n"
+        "\n"
+        "  See Readme/Setup_Instructions_for_Users.txt for details.\n"
+        "\n"
+    )
+    raise SystemExit(1)
+
+
 import argparse
 import json
 import os
