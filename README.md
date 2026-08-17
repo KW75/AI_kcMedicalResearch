@@ -37,6 +37,12 @@ Local Development (Without Docker)
 Requires Python 3.11 or 3.12. Newer versions are rejected at startup with a
 download link - several pinned dependencies have no wheels for 3.13+.
 
+Convenience launchers create .venv, install dependencies and start the app.
+Windows and macOS behave identically; both use the virtualenv, not Docker:
+
+    scripts\windows\AI_kcMedicalResearch_CLI.bat   /  scripts/macos/Mac_kcMedicalResearch_CLI.sh
+    scripts\windows\AI_kcMedicalResearch_UI.bat    /  scripts/macos/Mac_kcMedicalResearch_UI.sh
+
 Run all commands from the project root.
 
 python SOURCE_CODE/main.py                            # coding mode (default)
@@ -241,7 +247,7 @@ Known Issues
 16 	Streamlit UI override fields place API keys in st.session_state, i.e. the server process. Safe locally; a shared deployment would hold user keys in a multi-user process 	Medium 	Open
 17 	providers.py probes Ollama at module scope, so the auto-detect line fires on import for every run and every test regardless of --provider. A network call during import is also a latent hang 	Medium 	Open
 18 	pipelines.sr.main (scipy, matplotlib, pymupdf; ~2.8s) is imported even for coding mode 	Low 	Open
-19 	macOS launcher changes are untested on macOS; the health-poll loop and lsof port check need a real run 	Medium 	Open
+19 	macOS launchers are untested on macOS. They changed from Docker-based to venv-based in v2.4.8; the lsof port check and the Python 3.11/3.12 discovery loop need a real run 	Medium 	Open
 20 	Old %TEMP%\ai_km_run_*.bat files from before v2.4.7 contain API keys in plaintext on any machine that ran the UI 	High 	Action required — delete and rotate keys
 21 	call_ai_with_fallback sent prompts to cloud providers even when --provider ollama was requested, because the chain was built as [requested] + FALLBACK_PROVIDERS and a timeout counts as transient. Confidential input could reach a third party 	CRITICAL 	RESOLVED (v2.4.8) — LOCAL_ONLY_PROVIDERS never falls back
 22 	23 Python source files began with a UTF-8 BOM. Python tolerates it on import but ast.parse() rejects it, and with an encoding mismatch it renders as garbage — previously misdiagnosed as corrupted comments 	Medium 	RESOLVED (v2.4.8) — stripped; scripts/check_no_bom.py guards
@@ -249,6 +255,8 @@ Known Issues
 24 	OCR packages were installed but unusable: the image never provided Tesseract, Poppler or libGL, so ~2GB of PyTorch via easyocr bought nothing 	Medium 	RESOLVED (v2.4.8) — moved to requirements-ocr.txt
 25 	_is_transient_error matches substrings, so an auth error mentioning "connection" is treated as retryable 	Low 	Open
 26 	No regression test asserting that --provider ollama never reaches a cloud API 	Medium 	Open — the fix for #21 is untested
+27 	Windows and macOS launchers used matching filenames but different mechanisms: the .bat files ran the virtualenv while the .sh files ran docker run 	Medium 	RESOLVED (v2.4.8) — both are now venv-based; Docker goes through docker compose
+28 	Docker route has never been executed: not the build, not either compose service, not the .env-exclusion check. Docker is not installed on the dev machine 	High 	Open — gate before pointing colleagues at it
 Contributing
 
     Fork the repository

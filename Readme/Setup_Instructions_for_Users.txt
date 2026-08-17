@@ -1,5 +1,5 @@
 AI kcMedicalResearch - Setup Instructions for Users
-Version 2.4.7 | 2026-08-17
+Version 2.4.8 | 2026-08-17
 
 
 ============================================
@@ -12,8 +12,13 @@ Health Check:  https://ai-kcmedicalresearch.onrender.com/_stcore/health
 Open the link in any browser. No Docker, no Python, no setup, no API key.
 First load may take ~30 seconds if the service was asleep.
 
-This is the right choice for most people. Use Option 2 only if you need to
+This is the right choice for most people. Use Option 2 or 3 if you need to
 process your own PDFs locally, or need to work offline.
+
+DO NOT USE THE HOSTED APP FOR CONFIDENTIAL OR PATIENT-IDENTIFIABLE DATA.
+Anything you enter is sent to a third-party host and then to a cloud AI
+provider. For confidential work install locally and use --provider ollama,
+which keeps everything on your own machine. See the Providers section.
 
 Note: the hosted app does not include the RAG / embedding features, and the
 systematic review pipeline is best run locally where its interactive prompts
@@ -125,6 +130,28 @@ For developers. Needs Python 3.11 or 3.12.
 
     Startup takes about 7 seconds while dependencies load.
 
+    If the interpreter is unsupported, main.py stops with the supported range,
+    a Python 3.12 download link, and the Docker alternative - rather than a
+    pip or import error.
+
+Convenience launchers (do the venv setup for you)
+
+    These create .venv on first run, install dependencies, and start the app.
+    Both platforms behave identically; both use the virtualenv, not Docker.
+
+    Windows:
+        scripts\windows\AI_kcMedicalResearch_CLI.bat     menu launcher
+        scripts\windows\AI_kcMedicalResearch_UI.bat      Streamlit UI
+        scripts\windows\activate_venv.bat                venv shell
+
+    macOS/Linux:
+        chmod +x scripts/macos/*.sh                      first time only
+        ./scripts/macos/Mac_kcMedicalResearch_CLI.sh     menu launcher
+        ./scripts/macos/Mac_kcMedicalResearch_UI.sh      Streamlit UI
+
+    NOT YET VERIFIED on macOS: the launchers changed from Docker-based to
+    venv-based in v2.4.8 and have not been run on a Mac.
+
 Optional OCR support (scanned PDFs, legacy .doc)
 
     pip install -r requirements-ocr.txt
@@ -146,6 +173,27 @@ Optional OCR support (scanned PDFs, legacy .doc)
 ============================================
 Providers
 ============================================
+
+CONFIDENTIALITY - READ THIS BEFORE PROCESSING PATIENT DATA
+
+    Ollama is the ONLY provider that keeps your input on your own machine.
+    Every other provider transmits the prompt to an external API.
+
+    For confidential or patient-identifiable data, use:
+
+        python SOURCE_CODE/main.py --provider ollama
+
+    Requests to Ollama never fall back to a cloud provider, even if Ollama
+    times out. The run fails and tells you nothing was sent externally.
+
+    Before v2.4.8 this was not true: --provider ollama produced the chain
+    [ollama, deepseek, qwen, groq], so an Ollama timeout silently sent the
+    prompt to DeepSeek and printed a success line. If you processed
+    confidential data with an earlier version, treat it as having left the
+    machine.
+
+    Ollama cannot run SR mode - no vision support. SR works on published
+    papers, so a cloud provider is appropriate there.
 
 Default is DeepSeek. On transient errors (timeout, 429, 502, 503) the app
 automatically tries the next provider in FALLBACK_PROVIDERS
@@ -229,8 +277,15 @@ Auth error from provider    Check .env has no quotes around the key value
 Ollama unreachable          In Docker use host.docker.internal, not localhost
 SR extracts nothing         Use a vision provider (qwen). DeepSeek cannot
                               read page images
-pip install fails           You are probably on Python 3.13+. Use Docker
-Python 3.11 unavailable     Use Docker; it supplies its own Python
+pip install fails           You are probably on Python 3.13+. Use Docker,
+                              or install Python 3.12
+Python 3.11 unavailable     Use Docker; it supplies its own Python. Or:
+                              macOS  brew install python@3.12
+                              Win    https://www.python.org/downloads/release/python-3129/
+"Requires Python 3.11 or     Expected. Rebuild .venv with a supported
+  3.12" on startup            interpreter, or use Docker
+Garbled source / SyntaxError Run python scripts/check_no_bom.py
+Mac .sh will not run         chmod +x scripts/macos/*.sh
 
 
 ============================================

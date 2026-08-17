@@ -109,7 +109,9 @@ Session 10 — 2026-08-17 — v2.4.8: Confidentiality Fix, BOM Cleanup, Python G
     Docker consolidation (resolved) — Nine files in docker/ reduced to two: Dockerfile and docker-compose.yml. The six deleted run scripts each carried their own copy of the docker run command, which is why the same bugs appeared six times over. Dockerfile now installs requirements-base.txt. Discovered in the process that Docker_setup.bat — the advertised one-click Windows setup — was non-functional: unescaped parentheses in echo text inside if-blocks (lines 110, 256, 288, 289) close the block early, so cmd exits with "was unexpected at this time" before any Docker command runs. mac_docker_setup.sh called goto_run_app, a leftover from batch translation that is not a bash construct and, under set -e, exited the script on the update path. Neither could ever have completed a setup.
     Docker still UNVERIFIED — Docker is not installed on the dev machine, which is why none of the above was ever caught. Nothing Docker-related has been executed: not the build, not either compose service, not the .env-exclusion check. This is the gate before pointing colleagues at that route (Issue #19).
     Windows/macOS launchers (resolved in Session 9, verified Session 10) — activate_venv.bat now prints the resolved interpreter after activating; confirmed D:\AI_kcMedicalResearch\.venv\Scripts\python.exe, 3.11.9. The earlier sighting of C:\Users\user\...Python311 was a non-activated shell, not a broken venv.
-    Commit trail: f0b678e (local-provider fallback) -> 1541b09 (requirements split, compose, docs) -> c851259 (delete broken setup scripts) -> 5439ede (BOM strip + guards) -> f64d84d (Python version gate).
+    Launcher parity (resolved) — Windows and macOS launchers shared filenames but not mechanisms: AI_kcMedicalResearch_CLI.bat ran the project virtualenv while Mac_kcMedicalResearch_CLI.sh ran `docker run`. Anyone comparing or documenting them together was describing two different things, and the setup instructions did exactly that. Both macOS launchers are now venv-based mirrors of their Windows counterparts: they create .venv from the first available Python 3.11/3.12, refuse with a `brew install python@3.12` hint plus the Docker alternative if neither is present, warn when .env is missing, run in the foreground so PICO prompts get a TTY, and return the real exit code. The UI launcher also checks port 8501 with lsof and lets Streamlit open the browser itself. Deleted Mac_Setup.sh, the macOS half of the Docker setup pair whose Windows half was already gone. Confirmed no setup script is needed at all: PATH_MANAGER creates input/, output/, reports/ and docs/ per mode via mkdir(parents=True, exist_ok=True) on import (path_utils.py:74-89), and everything else the scripts did is three documented commands.
+    Documentation (resolved) — Setup_Instructions_for_Users.txt previously led with the hosted app as "the right choice for most people" with no confidentiality warning, in a tool intended for patient data. It now states plainly that the hosted app must not be used for confidential or patient-identifiable input, and the Providers section carries the Ollama local-only guarantee, the pre-v2.4.8 caveat, and the note that SR works on published papers so a cloud provider is appropriate there. Also documents the platform launchers, the version-gate message, and the BOM check.
+    Commit trail: f0b678e (local-provider fallback) -> 1541b09 (requirements split, compose, docs) -> c851259 (delete broken setup scripts) -> 5439ede (BOM strip + guards) -> f64d84d (Python version gate) -> e332b3b (v2.4.8 docs) -> 8d2e110 (launcher parity, delete Mac_Setup.sh).
 
 ======================================
 3. CURRENT STATUS
@@ -182,6 +184,9 @@ Documentation 	                      CURRENT 	                README.md, HANDOFF
 34 	_is_transient_error matches substrings, so an auth error mentioning "connection" is treated as retryable and triggers fallback 	Low 	Open
 35 	No regression test asserting --provider ollama never reaches a cloud API. The fix for #29 is verified only by a manual check 	Medium 	Open
 36 	check_no_bom.py is not wired into CI, so BOMs can return silently 	Low 	Open
+37 	Windows and macOS launchers used matching filenames but different mechanisms: the .bat files ran the virtualenv, the .sh files ran docker run 	Medium 	RESOLVED (Session 10) — both venv-based; Docker via docker compose only
+38 	Setup instructions led with the hosted app and carried no confidentiality warning, in a tool intended for patient data 	High 	RESOLVED (Session 10) — explicit warning added to Option 1 and the Providers section
+39 	macOS launchers are untested on macOS. Rewritten from Docker-based to venv-based in v2.4.8; the lsof port check and the Python 3.11/3.12 discovery loop need a real run 	Medium 	Open
 ======================================
 5. AI PROVIDERS
 ======================================
@@ -224,13 +229,14 @@ TOTAL 	~53% (401 tests)
 Priority 	Task 	Details
 1 	Regression test for #29 	Assert that call_ai_with_fallback("...", provider="ollama") attempts only ollama. The manual check in Session 10 is most of the test already. Highest value: it protects a confidentiality guarantee that currently rests on one uncommitted-to-test code path.
 2 	Test Docker on the laptop (#19) 	docker compose build; docker compose run --rm cli; docker images for size; and the .env-exclusion check: docker run --rm <img> sh -c "ls /app/.env && echo LEAK || echo OK". Nothing Docker-related has ever been executed.
-3 	Resolve zsy234.pdf (#19 in README) 	Still in SR results as a valid study at g=-2.36 despite the paper reporting no between-group pain effect. Exclude with a documented PRISMA reason, or extract correct group-level values.
-4 	Fix font CMap decode 	All five test PDFs decode cleanly with a fixed +1 character offset yet are OCR'd unnecessarily. Likely upstream cause of extraction non-determinism.
-5 	Add semantic validators 	SD-vs-SE, within-vs-between-group, |g| > 1.5 plausibility bound. These three would have caught the zsy234 failure.
-6 	Wire check_no_bom.py into CI (#36) 	One step in the workflow.
-7 	Add regression fixtures for the five-paper corpus 	Including expected FAILURES: zsy234 must not be silently included with a large effect.
-8 	Gate the module-scope Ollama probe (#25 in README) 	Network call at import time, every run and every test, regardless of --provider.
-9 	Raise SR pipeline coverage 	Core screening/extraction still ~10-53%
+3 	Verify the macOS launchers (#39) 	They were rewritten from Docker-based to venv-based without ever running on a Mac. Check the Python discovery loop finds 3.11/3.12, the lsof port check works, and .venv creation succeeds.
+4 	Resolve zsy234.pdf (#19 in README) 	Still in SR results as a valid study at g=-2.36 despite the paper reporting no between-group pain effect. Exclude with a documented PRISMA reason, or extract correct group-level values.
+5 	Fix font CMap decode 	All five test PDFs decode cleanly with a fixed +1 character offset yet are OCR'd unnecessarily. Likely upstream cause of extraction non-determinism.
+6 	Add semantic validators 	SD-vs-SE, within-vs-between-group, |g| > 1.5 plausibility bound. These three would have caught the zsy234 failure.
+7 	Wire check_no_bom.py into CI (#36) 	One step in the workflow.
+8 	Add regression fixtures for the five-paper corpus 	Including expected FAILURES: zsy234 must not be silently included with a large effect.
+9 	Gate the module-scope Ollama probe (#25 in README) 	Network call at import time, every run and every test, regardless of --provider.
+10 	Raise SR pipeline coverage 	Core screening/extraction still ~10-53%
 
 8. LESSONS LEARNED
 ======================================
@@ -272,6 +278,8 @@ Priority 	Task 	Details
     (Session 9) set -e makes subsequent `if [ $? -ne 0 ]` handlers dead code — the script exits before reaching them. Use set -uo pipefail when the script does its own error checking.
     (Session 9) .gitattributes must force LF on *.sh. With core.autocrlf=true, a Windows commit stores CRLF and the shebang breaks on macOS. Check with git check-attr text eol -- path, not by reading the warnings.
     (Session 9) git check-ignore reports a file as tracked (not ignored) once it is in the index; use --no-index to test the rule itself. And a bare ! negation cannot re-include a file inside an excluded directory — git never descends into it.
+    (Session 10) Matching filenames across platforms imply matching behaviour. Mac_kcMedicalResearch_CLI.sh and AI_kcMedicalResearch_CLI.bat looked like a pair and were not - one ran the venv, the other ran Docker. Parity in naming without parity in mechanism is worse than obviously different names, because the documentation then describes both as one thing.
+    (Session 10) Check what the default path in the documentation actually recommends. The setup instructions led with a third-party hosted app as "the right choice for most people" in a tool built so that patient data could stay local. Nobody had reread that sentence against the tool's purpose.
     (Session 10) A fallback chain that ignores WHY a provider was chosen will eventually violate the reason it was chosen. Ollama was selected for confidentiality; the chain treated it as merely first in a list. Any mechanism that substitutes one provider for another must know which properties of the original were load-bearing.
     (Session 10) A timeout is not consent. Retry logic that changes WHERE data goes is not the same as retry logic that changes WHEN it is sent.
     (Session 10) The most dangerous failures print a success message. "[fallback] Succeeded with deepseek" scrolled past in a 200-line log while patient data left the machine. Compare Session 8's zsy234: a confident g=-2.36 with a clean CI. Neither looked like an error.
