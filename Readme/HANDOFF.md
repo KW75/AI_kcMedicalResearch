@@ -1,7 +1,7 @@
 ﻿AI kcMedicalResearch — Combined Handoff Document
-Version 2.4.6 — SR Extraction Provenance, Generic Study Overrides, Reviewer Guide
+Version 2.4.7 — API Key Leak Fix, Startup Performance, Cross-Platform Launchers
 
-Date: 2026-08-17 Repository: https://github.com/KW75/AI_kcMedicalResearch Live App: https://ai-kcmedicalresearch.onrender.com Health Check: https://ai-kcmedicalresearch.onrender.com/_stcore/health Uptime Monitor: UptimeRobot, 5-minute interval, keeps free-tier Render instance warm Tests: 401 passed, 3 skipped, 11 deselected/live tests (410 passed, 5 skipped with no marker filter) Coverage: ~53% Current Status: CI green, Render live, health endpoint returns ok
+Date: 2026-08-17 (Sessions 8-9) Repository: https://github.com/KW75/AI_kcMedicalResearch Live App: https://ai-kcmedicalresearch.onrender.com Health Check: https://ai-kcmedicalresearch.onrender.com/_stcore/health Uptime Monitor: UptimeRobot, 5-minute interval, keeps free-tier Render instance warm Tests: 401 passed, 3 skipped, 11 deselected/live tests (410 passed, 5 skipped with no marker filter) Coverage: ~53% Current Status: CI green, Render live, health endpoint returns ok
 
 CRITICAL READ FIRST: Session 8 found that SR extraction can produce a confident, precisely-quantified, entirely invalid effect size with no warning at any stage. See Session 8 notes, Known Issues #15 and #16, and Readme/REVIEWER_GUIDE.md. Do not report any pooled estimate from this pipeline without manual source verification.
 
@@ -84,6 +84,19 @@ Session 8 — 2026-08-17 — v2.4.6: SR Extraction Provenance, Generic Overrides
     Repo hygiene — .gitignore rewritten so input/ stays ignored but input/sr/study_overrides.yaml and input/sr/pico_sample.json are tracked (a bare negation does not work when the parent directory is excluded; git never descends into it). Test corpus PDFs removed from input/sr/ as copyrighted. Debug logs cleared.
     Tests: 401 passed, 3 skipped, 11 deselected throughout.
 
+
+Session 9 — 2026-08-17 — v2.4.7: API Key Leak, Startup Performance, Launcher Repair
+
+    SECURITY (resolved) — The Streamlit UI wrote every API key into a generated .bat as `set "KEY=value"` lines. cmd echoes each line, so all keys were printed on screen at every launch, and the file persisted in %TEMP% in plaintext. Popen was ALREADY passing env=env_vars, so the child inherited the keys regardless — the set lines were pure redundancy. Removed them, added @echo off, changed cmd /k to cmd /c (the script already ends with pause). The same redundant interpolation existed in the macOS and Linux launchers, where keys were additionally visible in ps output; removed there too. NOTE: keys exposed during this session must be rotated at the provider consoles — clearing .env does not invalidate them.
+    Startup performance (resolved) — Startup was 15-20s. Profiled with `python -X importtime`: utils/__init__.py eagerly imported .rag (chromadb) and .document_reader (pymupdf, docx2txt), so `from utils.path_utils import ...` — three trivial path helpers — pulled the entire RAG and document stack, ~2.2s, on every run including every test. Converted to lazy loading via PEP 562 __getattr__. Public API unchanged; `from utils import DocumentReader` still works. Startup ~20s -> ~7s; test suite ~45s -> ~19s. Remaining chunks: providers ~2.2s (includes the module-scope Ollama probe, Issue #10) and pipelines.sr.main ~2.8s imported even for coding mode — same lazy treatment applies.
+    Windows launchers (resolved) — UI launcher opened TWO browser tabs: --server.headless=false makes Streamlit open one itself, and the script also ran `start "" "http://localhost:8501"` after a fixed 3s ping wait — well before the ~7s startup, so that tab hit connection-refused. Removed the manual start. Both launchers now propagate the real exit code instead of always 0, check for the target script before venv setup, and upgrade pip before installing requirements.
+    macOS launchers (resolved) — Three fixes. (1) OLLAMA_HOST was http://localhost:11434 while running inside Docker, where localhost is the container, not the Mac; Ollama was unreachable from all three scripts despite --add-host host.docker.internal:host-gateway. Now overridden per-container with -e OLLAMA_HOST=http://host.docker.internal:11434. (2) Mac_Setup.sh baked a private DashScope workspace endpoint (ws-uv5pi4kkqbrg1vpe...) into every colleague's generated .env; replaced with the generic intl endpoint. (3) QWEN_VISION_MODEL was absent from the generated .env, so any Mac user running SR would hit the Session 7 vision regression. Also: browser now polls /_stcore/health before opening instead of firing `open` immediately; `set -e` replaced with `set -uo pipefail` so the existing `if [ $? -ne 0 ]` handlers actually run (with set -e the script exited first, making them dead code); added Docker-daemon and port-in-use checks; switched `docker images | grep` to `docker image inspect` (grep matched substrings).
+    .gitattributes (resolved) — Every rule still targeted the pre-v2.3.0 src/ tree and none covered *.sh. With core.autocrlf=true, shell scripts were being stored CRLF, which breaks the shebang on macOS ("bad interpreter: /bin/bash^M"). Rewritten for the SOURCE_CODE layout: LF forced on *.sh and source/config files, CRLF on *.bat/*.cmd/*.ps1, binaries marked binary. Applied repo-wide with git add --renormalize.
+    .env.example (resolved) — Was 14 variables and stale. Missing the entire DashScope block, QWEN_VISION_MODEL, DEFAULT_PROVIDER, FALLBACK_PROVIDERS, SR_STUDY_OVERRIDES, and the Ollama tuning vars. Now 24 variables with comments on the vision-model requirement and the Docker localhost trap. Removed stale OLLAMA_MODEL=qwen2.5-coder:3b (the app auto-detects).
+    Renamed scripts/windows/"PWD_activate virtual enviroment.bat" -> activate_venv.bat (space in filename, misspelling). Now fails clearly if .venv is absent, narrows -ExecutionPolicy Bypass to RemoteSigned, drops the dead pause (-NoExit already holds the window), and prints the resolved interpreter after activating — a direct diagnostic for the observed case where the prompt showed (.venv) while python resolved to C:\Users\user\...Python311.
+    Tests: 401 passed, 3 skipped, 11 deselected throughout.
+    Commit trail: 190ec9e (v2.4.6 docs + SR overrides) -> fb7b5ce (Windows launchers) -> ab77bb5 (lazy imports, key leak, macOS launchers, .gitattributes).
+
 ======================================
 3. CURRENT STATUS
 ======================================
@@ -142,6 +155,11 @@ Documentation 	                      CURRENT 	                README.md, HANDOFF
 23 	No regression fixtures for the five-paper test corpus. Ground truth exists only in REVIEWER_GUIDE.md prose
                                                                                                Medium 	                Open
 
+24 	Streamlit UI override fields put API keys into st.session_state, i.e. into the server process. Safe locally; a shared/Render deployment would place user keys in a multi-user process 	Medium 	Open — verify Render exposure; consider disabling override inputs when not localhost
+25 	providers.py probes Ollama at MODULE scope: the "[ollama] Auto-detected best model" line fires on import, on every run and every test, regardless of --provider. A network call during import is also a latent hang if Ollama is installed but unresponsive 	Medium 	Open — gate behind provider == "ollama" (supersedes the cosmetic framing of #10)
+26 	pipelines.sr.main (~2.8s: scipy.stats, matplotlib, pymupdf) is imported even for coding mode 	Low 	Open — same lazy-import treatment as utils
+27 	macOS launcher changes are untested on macOS. The curl /_stcore/health poll loop and the lsof port check need a real run 	Medium 	Open — verify before relying on them
+28 	Old %TEMP%\ai_km_run_*.bat files from before the v2.4.7 fix still contain API keys in plaintext on any machine that ran the UI 	High 	Action required — delete them and rotate affected keys
 ======================================
 5. AI PROVIDERS
 ======================================
@@ -227,6 +245,15 @@ Priority 	                                                        Task 	Details
     (Session 8) A bare negation in .gitignore cannot re-include a file inside an excluded directory; git never descends into it. Use input/*, !input/sr/, input/sr/*, !input/sr/file.
     (Session 8) git check-ignore reports the matching rule whether it excludes or re-includes; a leading ! means the file is tracked. Use --no-index to test the rule rather than the index state.
     (Session 8) Do not paste Python at a PowerShell prompt. Use @' ... '@ | Set-Content file.py, then run the file.
+    (Session 9) Popen's env= already passes variables to the child. Writing them into a generated script as well is redundant AND leaks them — cmd echoes every line, and the file persists on disk. Secrets belong in env=, never on a command line or in a script body (a command line is also visible in ps / Task Manager details).
+    (Session 9) Clearing .env does not revoke a key. Anything that reached a screen, a screenshot, a temp file, or shell history must be rotated at the provider.
+    (Session 9) An unescaped ( or ) in echo text inside a batch if ( ... ) block closes the block early. cmd parses the whole block before executing it, so "... was unexpected at this time" appears before the block would even run — and the parenthetical text can be far from where the error is reported. Escape as ^( / ^) or reword.
+    (Session 9) A package __init__.py that eagerly imports heavy submodules makes every consumer pay for them. Importing three path helpers cost 2.2s of chromadb and pymupdf. PEP 562 __getattr__ gives lazy loading with no API change. Verify mock.patch targets still resolve — patch("utils.rag.X") works because patch imports the submodule; patch("utils.X") would not.
+    (Session 9) Inside a container, localhost is the container. --add-host host.docker.internal:host-gateway only creates the route; the app still needs the host-facing URL. This silently broke Ollama on macOS.
+    (Session 9) set -e makes subsequent `if [ $? -ne 0 ]` handlers dead code — the script exits before reaching them. Use set -uo pipefail when the script does its own error checking.
+    (Session 9) .gitattributes must force LF on *.sh. With core.autocrlf=true, a Windows commit stores CRLF and the shebang breaks on macOS. Check with git check-attr text eol -- path, not by reading the warnings.
+    (Session 9) git check-ignore reports a file as tracked (not ignored) once it is in the index; use --no-index to test the rule itself. And a bare ! negation cannot re-include a file inside an excluded directory — git never descends into it.
+    (Session 9) Profile before optimising. The 15-20s startup was assumed to be an Ollama network probe; importtime showed it was eager imports. Measured 3.2s of imports against 15-20s observed, so filesystem/AV cold cache accounts for the remainder — no code change fixes that part.
 
 ======================================
 9. FINAL VERIFIED RENDER SETTINGS
@@ -272,4 +299,23 @@ Overrides affect extraction and meta-analysis only. Screening (Stage 2) and RoB 
 
 Reviewer rules (full version in Readme/REVIEWER_GUIDE.md): read the source table before entering a value; always fill note with table, page, and date; verify symmetrically rather than only checking studies whose results surprise you; never edit the override file after looking at the forest plot.
 
-Handoff prepared: 2026-08-17 · Version: v2.4.6 · Single source of truth for next session.
+======================================
+12. IMMEDIATE ACTIONS BEFORE NEXT SESSION
+======================================
+
+1. ROTATE API KEYS. Anthropic, DeepSeek, and DashScope keys were displayed in
+   plaintext by the pre-v2.4.7 UI launcher and appeared in screenshots.
+   Clearing .env does not revoke them. Rotate at each provider console, then
+   put the new keys in .env (which is gitignored).
+
+2. Delete stale temp files: Remove-Item "$env:TEMP\ai_km_run_*.bat"
+
+3. Set spend limits at each provider so a future leak is bounded.
+
+4. Verify the venv: python -c "import sys; print(sys.executable)" should
+   resolve under .venv\Scripts\. It was observed resolving to
+   C:\Users\user\...Python311 while the prompt showed (.venv).
+
+5. Test the macOS launchers on an actual Mac (Issue #27).
+
+Handoff prepared: 2026-08-17 · Version: v2.4.7 · Single source of truth for next session.

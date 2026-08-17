@@ -2,7 +2,7 @@ AI kcMedical Research
 
 A multi-mode AI assistant for medical research, critical appraisal, systematic review, coding, and writing. Uses cloud providers by default (DeepSeek, Qwen, OpenAI, Anthropic, Groq) with optional local Ollama support.
 
-    Version: 2.4.6
+    Version: 2.4.7
     Tests: 401 passed, 3 skipped
     Coverage: ~53%
     CI: GitHub Actions - Green
@@ -63,12 +63,22 @@ Ollama (local) 	        --provider ollama 	OLLAMA_HOST 	Free but slow; offline/t
 
 On transient errors (timeout, 429, 502, 503), the system automatically tries the next provider. Default chain: DeepSeek -> Qwen -> Groq. Configure via FALLBACK_PROVIDERS.
 
+Note on Ollama in Docker: inside a container, localhost is the container, not your machine. The Docker launchers set OLLAMA_HOST=http://host.docker.internal:11434 for you; if you run a container by hand, set it yourself or Ollama will be unreachable.
+
 Note on Qwen and vision: the Qwen text model (QWEN_MODEL, default qwen-plus-latest) is text-only. The SR pipeline requires image understanding, so it now automatically uses a separate vision model (QWEN_VISION_MODEL, default qwen-vl-max) — you do not need to pass a --model flag for SR.
 Streaming
 
 All providers support live token streaming, enabled by default in CLI terminals. Use --no-stream to disable. Non-TTY environments (pipes, CI) automatically use batch mode.
 
 Environment Variables (.env)
+
+Copy .env.example to .env and fill in the keys you need. .env is gitignored.
+
+SECURITY: before v2.4.7 the Streamlit UI printed every API key into the
+launched terminal window. If you used the UI before v2.4.7, rotate your keys
+at the provider consoles and delete any leftover %TEMP%\ai_km_run_*.bat files.
+Clearing .env does not revoke a key.
+
 DEFAULT_PROVIDER=deepseek
 FALLBACK_PROVIDERS=deepseek,qwen,groq
 
@@ -91,6 +101,14 @@ SR_STUDY_OVERRIDES=input/sr/study_overrides.yaml
 EMBEDDING_PROVIDER=ollama
 EMBEDDING_MODEL=nomic-embed-text
 CLI_THEME=dark
+
+Startup Time
+
+Cold start is roughly 7 seconds while dependencies load. The launchers print a
+wait notice. Most of the remaining cost is providers.py (~2.2s, including a
+module-scope Ollama probe) and pipelines.sr.main (~2.8s), both tracked as known
+issues. On Windows, first-run antivirus scanning of native extension modules
+adds noticeably more than subsequent runs.
 
 Running Tests
 
@@ -200,6 +218,11 @@ Known Issues
 13 	No effect-size plausibility bound. Implausible values (e.g. |g| > 1.5 from a psychotherapy trial) pass through unflagged 	Medium 	Open
 14 	PICO file discovery differs between interfaces: the Streamlit UI globs output/rct_search/, the CLI globs input/sr/. A PICO saved in one is invisible to the other 	Low 	Open
 15 	RoB 2.0 assessment runs independently of study_overrides.yaml and may assess OCR text for a study whose outcome data was hand-entered 	Low 	Open — review RoB judgements separately
+16 	Streamlit UI override fields place API keys in st.session_state, i.e. the server process. Safe locally; a shared deployment would hold user keys in a multi-user process 	Medium 	Open
+17 	providers.py probes Ollama at module scope, so the auto-detect line fires on import for every run and every test regardless of --provider. A network call during import is also a latent hang 	Medium 	Open
+18 	pipelines.sr.main (scipy, matplotlib, pymupdf; ~2.8s) is imported even for coding mode 	Low 	Open
+19 	macOS launcher changes are untested on macOS; the health-poll loop and lsof port check need a real run 	Medium 	Open
+20 	Old %TEMP%\ai_km_run_*.bat files from before v2.4.7 contain API keys in plaintext on any machine that ran the UI 	High 	Action required — delete and rotate keys
 Contributing
 
     Fork the repository
