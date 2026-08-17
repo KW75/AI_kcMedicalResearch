@@ -10,9 +10,13 @@ RUN apt-get update && apt-get install -y \
 # Set working directory
 WORKDIR /app
 
-# Copy requirements first (for better caching)
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Copy requirements first (for better caching).
+# requirements-base.txt only: excludes dev tools (pytest), Windows-only
+# packages (pywin32), and the optional OCR stack (easyocr pulls ~2GB of
+# PyTorch, and OCR also needs Tesseract/Poppler system binaries that are
+# not installed in this image).
+COPY requirements-base.txt .
+RUN pip install --no-cache-dir -r requirements-base.txt
 
 # Copy the rest of the application
 COPY . .

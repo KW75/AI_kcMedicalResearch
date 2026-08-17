@@ -1,7 +1,7 @@
 @echo off
 :: =============================================================================
 ::  activate_venv.bat
-::  v2.4.6  |  Open a PowerShell prompt with the project virtualenv active
+::  v2.4.7  |  Open a PowerShell prompt with the project virtualenv active
 ::
 ::  Location: scripts\windows\   (resolves project root two levels up)
 :: =============================================================================

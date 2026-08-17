@@ -1,433 +1,241 @@
 AI kcMedicalResearch - Setup Instructions for Users
-Version 2.4.1 | 2026-08-13
+Version 2.4.7 | 2026-08-17
+
 
 ============================================
-Quick Access (No Install Required)
+Option 1: Use the Web App (No Install)
 ============================================
 
 Live Web App:  https://ai-kcmedicalresearch.onrender.com
 Health Check:  https://ai-kcmedicalresearch.onrender.com/_stcore/health
-Monitoring:    UptimeRobot pings every 5 min (prevents cold starts)
 
-The Streamlit UI is deployed on Render's free tier. Open the link above
-in any browser to use the app immediately — no Docker, no Python, no setup.
+Open the link in any browser. No Docker, no Python, no setup, no API key.
+First load may take ~30 seconds if the service was asleep.
 
-Note: First load may take ~30 seconds if the service was sleeping.
+This is the right choice for most people. Use Option 2 only if you need to
+process your own PDFs locally, or need to work offline.
 
-============================================
-Local Setup (Full Features)
-============================================
+Note: the hosted app does not include the RAG / embedding features, and the
+systematic review pipeline is best run locally where its interactive prompts
+have a real terminal.
 
-Install Docker Desktop:
-
-    Windows: https://www.docker.com/products/docker-desktop
-    macOS:   https://www.docker.com/products/docker-desktop
-    Linux:   https://docs.docker.com/engine/install/
-
-Default AI Provider: DeepSeek
-
-    The default provider is DeepSeek (fast, cheap, reliable for all modes).
-    Get a DeepSeek API key: https://platform.deepseek.com
-    Add it to your .env file: DEEPSEEK_API_KEY=your_key_here
-
-    Provider Fallback Chain (automatic on transient errors):
-        DeepSeek -> Qwen -> Groq
-    Configure via: FALLBACK_PROVIDERS=deepseek,qwen,groq in .env
-
-    You can override the provider at any time with the --provider flag.
-
-Install Local AI (Optional - Free, No API Key)
-
-    Note: Ollama is available for offline/local use but is NOT the default.
-    Large models (36B+) are too slow for production pipelines (coding, writing).
-    Ollama works best with small models for quick local testing only.
-    Ollama does NOT work for SR mode (requires vision provider: Qwen, OpenAI, Anthropic, or Groq).
-
-    Install Ollama: https://ollama.com/download
-
-        Windows: Download and run the installer
-        macOS:   Download and run the installer
-        Linux:   curl -fsSL https://ollama.com/install.sh | sh
-
-    Pull a model (first time only, requires internet):
-
-        ollama pull llama3.2
-
-    Ollama will run locally on your machine at http://localhost:11434
-
-    To use Ollama instead of DeepSeek:
-
-        python SOURCE_CODE/main.py --provider ollama
 
 ============================================
-Windows Users
+Option 2: Run Locally with Docker
 ============================================
 
-One-Click Setup (Recommended)
+You need: Docker Desktop, and an API key for at least one provider.
 
-    1. Open Command Prompt or PowerShell
-    2. Clone the repository:
+    Docker Desktop
+        Windows / macOS : https://www.docker.com/products/docker-desktop
+        Linux           : https://docs.docker.com/engine/install/
 
-        git clone https://github.com/KW75/AI_kcMedicalResearch.git
-        cd AI_kcMedicalResearch
+    API keys - you need your OWN. Keys are never included in the image.
+        DeepSeek (default, cheap)     https://platform.deepseek.com
+        Qwen / DashScope (needed for  https://dashscope.aliyuncs.com
+          the SR pipeline - vision)
+        Groq (free tier, optional)    https://console.groq.com
 
-    3. Double-click docker\Docker_setup.bat
-    4. Follow the prompts:
-        - Choose C: or D: drive
-        - Add API keys (DeepSeek recommended as minimum)
-        - Choose CLI or UI mode
-    5. Start working!
+    Set a spending limit in each provider's console.
 
-Quick Launch (After Setup)
 
-    CLI Mode: Double-click AI_kcMedicalResearch_CLI.bat
-    UI Mode:  Double-click AI_kcMedicalResearch_UI.bat
+Step 1 - Get the code
 
-============================================
-macOS Users
-============================================
+    git clone https://github.com/KW75/AI_kcMedicalResearch.git
+    cd AI_kcMedicalResearch
 
-One-Click Setup (Recommended)
 
-    1. Open Terminal
-    2. Clone the repository:
+Step 2 - Create your .env
 
-        git clone https://github.com/KW75/AI_kcMedicalResearch.git
-        cd AI_kcMedicalResearch
+    Windows:      copy .env.example .env
+    macOS/Linux:  cp .env.example .env
 
-    3. Make scripts executable (first time only):
+    Then open .env in a text editor and fill in the keys you have.
+    At minimum set DEEPSEEK_API_KEY, plus DASHSCOPE_API_KEY if you want to
+    run systematic reviews.
 
-        chmod +x Mac_*.sh
+    IMPORTANT - no quotes around values:
+        correct    DEEPSEEK_API_KEY=sk-abc123
+        wrong      DEEPSEEK_API_KEY="sk-abc123"
+    Docker passes the quotes through as part of the key.
 
-    4. Run the setup:
+    .env stays on your machine. It is excluded from git and from the Docker
+    image, so your keys are never shared.
 
-        ./Mac_Setup.sh
 
-    5. Follow the prompts:
-        - Choose install location (Projects, Documents, Desktop, or Custom)
-        - Add API keys (DeepSeek recommended as minimum)
-        - Choose CLI or UI mode
-    6. Start working!
+Step 3 - Run
 
-Quick Launch (After Setup)
+    From the docker/ folder:
 
-    CLI Mode: ./Mac_kcMedicalResearch_CLI.sh
-    UI Mode:  ./Mac_kcMedicalResearch_UI.sh
+        cd docker
 
-============================================
-Configuration
-============================================
+    Interactive CLI menu (all six pipelines):
 
-API Keys Setup
+        docker compose run --rm cli
 
-After running the setup script, edit the .env file and add your API keys:
+    Streamlit web UI, then open http://localhost:8501:
 
-    # Default provider (change if desired)
-    DEFAULT_PROVIDER=deepseek
+        docker compose up ui
 
-    # Fallback chain (comma-separated; auto-tries next on transient errors)
-    FALLBACK_PROVIDERS=deepseek,qwen,groq
+    Stop the UI with Ctrl+C.
 
-    # DeepSeek (default - recommended)
-    DEEPSEEK_API_KEY=your_key_here      # Get from: https://platform.deepseek.com
+    The first run builds the image and takes 5-10 minutes. Later runs start
+    in seconds.
 
-    # Local Ollama (optional - free, no API key needed)
-    OLLAMA_HOST=http://localhost:11434
-    OLLAMA_CONTEXT=32768
-    OLLAMA_NUM_PREDICT=8192
-    OLLAMA_TEMPERATURE=0.3
+    After pulling code changes, rebuild:
 
-    # Other Cloud Providers (optional - add keys if you want to use them)
-    GROQ_API_KEY=your_key_here          # Get from: https://console.groq.com
-    DASHSCOPE_API_KEY=your_key_here     # Get from: https://dashscope.aliyuncs.com
-    OPENAI_API_KEY=your_key_here        # Optional: https://platform.openai.com
-    ANTHROPIC_API_KEY=your_key_here     # Optional: https://console.anthropic.com
+        docker compose build
 
-    # RAG (optional)
-    EMBEDDING_PROVIDER=ollama
-    EMBEDDING_MODEL=nomic-embed-text
 
-    # CLI theme (auto-detected; override if needed)
-    CLI_THEME=dark
+Where your files go
+-------------------
 
-Ollama Setup (Optional - For Local/Offline AI)
+    Put input files in    input/<mode>/     e.g. input/sr/ for review PDFs
+    Results appear in     output/<mode>/
+    Full audit trail in   reports/
 
-    1. Install Ollama: https://ollama.com/download
+    These folders are mounted into the container, so files you add on your
+    machine appear inside it immediately, and results are written back out.
 
-    2. Pull a model (first time only, requires internet):
-
-        # Recommended models (small to large)
-        ollama pull llama3.2:3b      # Small, fast (3B) - best for local use
-        ollama pull llama3.2         # Medium (8B)
-        ollama pull qwen2.5:32b     # Large (32B - requires good GPU)
-
-    3. Verify Ollama is running:
-
-        ollama list                  # Show installed models
-        ollama run llama3.2 "Hello"  # Test the model
-
-    Ollama runs completely offline after the model is downloaded!
-
-    Important: Large models (32B+) frequently timeout on coding and writing pipelines.
-    For production work, use DeepSeek or another cloud provider.
-
-    Auto-start Ollama (optional):
-        Windows: Add to Startup folder
-        macOS:   Add to Login Items
-        Linux:   Use systemd service
 
 ============================================
-Operation Guideline
+Option 3: Run Locally without Docker
 ============================================
 
-Input Folders
+For developers. Needs Python 3.11 or 3.12.
 
-Place your input files in the appropriate folders:
+    NOTE: Python 3.13 and 3.14 are not currently supported. Several pinned
+    dependencies do not build on them. If python.org offers only a newer
+    version, use Option 2 (Docker) instead - Docker supplies its own Python
+    and ignores whatever you have installed.
 
-    input/
-      coding/      # .py, .js, .ts, .html, .css, .java, .c, .cpp, .cs, .rb, .go, .rs, .txt, .md, .php, .swift, .kt, .r, .sh, .sql, .svg
-      writing/     # .txt, .md, .docx, .pdf
-      appraisal/   # .pdf, .txt, .md, .docx
-      search/      # .txt, .md
-      rct_search/  # .txt, .md
-      sr/          # PDFs + pico_*.json
+    git clone https://github.com/KW75/AI_kcMedicalResearch.git
+    cd AI_kcMedicalResearch
 
-Output Folders
-
-    output/
-      coding/
-      writing/
-      appraisal/
-      search/
-      rct_search/
-      sr/
-
-Reports Folders (session transcripts and logs)
-
-    reports/
-      coding/
-      writing/
-      appraisal/
-      search/
-      rct_search/
-      sr/
-
-============================================
-Running the App
-============================================
-
-CLI Mode
-
-    Windows: Double-click AI_kcMedicalResearch_CLI.bat or run python launcher.py
-    macOS:   Run ./Mac_kcMedicalResearch_CLI.sh or python launcher.py
-
-    Default provider: DeepSeek (no extra flags needed)
-    Streaming: Enabled by default (live token output); use --no-stream to disable
-    For Ollama: python SOURCE_CODE/main.py --provider ollama
-
-UI Mode (Streamlit)
-
-    Windows: Double-click AI_kcMedicalResearch_UI.bat
-    macOS:   Run ./Mac_kcMedicalResearch_UI.sh
-
-    Browser opens automatically at: http://localhost:8501
-
-    Or use the live deployed version:
-        https://ai-kcmedicalresearch.onrender.com
-
-============================================
-Modes
-============================================
-
-    Mode            Flag                            Roles                               Output
-    Coding          --mode coding                   Builder, Reviewer, Tester           output/coding/
-    Coding Revise   --mode coding --revise          Builder, Reviewer, Tester           output/coding/
-    Writing         --mode writing                  Writer, Editor, QA                  output/writing/
-    Writing Report  --mode writing --report         Writer, Editor, QA                  output/writing/
-    RCT Search      --mode rct_search               Formulator, Searcher, Validator     output/rct_search/
-    Search          --mode search                   Researcher                          output/search/
-    Appraisal       --mode appraisal                Appraiser, Methodologist, Summariser output/appraisal/
-    SR              --mode sr                       SR Methodologist                    output/sr/
-
-============================================
-CLI Flags
-============================================
-
-    Flag              Description
-    --mode            Select mode: coding, writing, rct_search, search, appraisal, sr
-    --provider        AI provider: deepseek (default), ollama, openai, anthropic, groq, qwen
-    --model           Specify model name (provider-specific)
-    --no-stream       Disable live streaming output (batch mode)
-    --resume          Resume from last checkpoint if available
-    --report          Writing mode: single-pass report from input/writing/ files
-    --revise          Coding mode: Builder, Reviewer, Tester pipeline
-    --role            Override the starting role for coding mode
-    --sub             Sub-mode for search: 1=Topic Search, 2=Article Search
-    --dry-run         Run without making real API calls
-    --help-guide      Open interactive HTML help guide in browser
-    --ui              Launch Streamlit UI
-    --list-sessions   List all session transcripts
-    --list-roles      Show available roles and their docs
-    --stats           Show session statistics
-    --version         Show version number
-
-============================================
-For Docker Users (All Platforms)
-============================================
-
-Windows: Double-click the file in docker\ folder
-
-    File                        Purpose                     When to Use
-    docker\Docker_setup.bat     Complete one-click setup    First time only
-    docker\docker_menu.bat      Interactive menu (CLI/UI)   Everyday use
-    docker\docker_cli.bat       Quick CLI launch            Power users
-
-macOS/Linux:
-
-    # Make scripts executable (once)
-    chmod +x docker/*.sh
-
-    # Run setup
-    ./docker/Docker_setup.sh
-    # Follow prompts - START WORKING!
-
-    # Everyday Use
-    ./docker/docker_menu.sh     # Interactive menu
-    ./docker/docker_cli.sh      # Quick CLI launch
-
-============================================
-For CLI Users (Without Docker)
-============================================
-
-    # Install dependencies
     python -m venv .venv
-    .venv\Scripts\activate         # Windows
-    source .venv/bin/activate      # macOS/Linux
+    .venv\Scripts\activate            # Windows
+    source .venv/bin/activate         # macOS/Linux
+
     pip install -r requirements.txt
 
-    # Run CLI (uses DeepSeek by default, streaming enabled)
-    python SOURCE_CODE/main.py
+    copy .env.example .env            # then add your keys
 
-    # Run with a specific provider
+    python scripts/launcher.py        # menu
+    python SOURCE_CODE/main.py        # direct
+
+    Startup takes about 7 seconds while dependencies load.
+
+Optional OCR support (scanned PDFs, legacy .doc)
+
+    pip install -r requirements-ocr.txt
+
+    This also needs system binaries that pip cannot install:
+
+        Tesseract  Windows: https://github.com/UB-Mannheim/tesseract/wiki
+                   macOS:   brew install tesseract
+                   Linux:   sudo apt-get install tesseract-ocr
+
+        Poppler    Windows: https://github.com/oschwartz10612/poppler-windows/releases
+                   macOS:   brew install poppler
+                   Linux:   sudo apt-get install poppler-utils
+
+    Then set TESSERACT_PATH and POPPLER_PATH in .env.
+    Without OCR the app runs normally and reports OCR as unavailable.
+
+
+============================================
+Providers
+============================================
+
+Default is DeepSeek. On transient errors (timeout, 429, 502, 503) the app
+automatically tries the next provider in FALLBACK_PROVIDERS
+(default: deepseek,qwen,groq). Authentication errors do not fall back.
+
+Override per run with --provider:
+
+    python SOURCE_CODE/main.py --mode writing --provider groq
+
+Systematic review needs a vision-capable provider: qwen, openai, anthropic
+or groq. DeepSeek and Ollama cannot do SR.
+
+Qwen uses two models: QWEN_MODEL (qwen-plus-latest) for text, and
+QWEN_VISION_MODEL (qwen-vl-max) for SR page images. SR selects the vision
+model automatically; no --model flag needed.
+
+
+Local AI with Ollama (free, offline, optional)
+---------------------------------------------
+
+    Install: https://ollama.com/download
+    Pull a model:  ollama pull llama3.2
+
     python SOURCE_CODE/main.py --provider ollama
-    python SOURCE_CODE/main.py --provider qwen
-    python SOURCE_CODE/main.py --provider openai
 
-    # Run UI locally
-    streamlit run SOURCE_CODE/ui/app.py
+    The app auto-detects the best installed model.
+
+    Limitations: slow with large models, frequent timeouts on the coding and
+    writing pipelines, and no vision - so Ollama cannot run SR.
+
+    In Docker, the container reaches Ollama on your machine via
+    host.docker.internal; docker-compose.yml already sets this.
+
 
 ============================================
-Deployment & Monitoring
+Systematic Review Pipeline - READ FIRST
 ============================================
 
-Render (Live Cloud Deployment)
+Before using SR output in an actual review, read:
 
-    URL:         https://ai-kcmedicalresearch.onrender.com
-    Health:      https://ai-kcmedicalresearch.onrender.com/_stcore/health
-    Auto-deploy: Push to main branch triggers automatic deployment
-    Build:       pip install --no-cache-dir --prefer-binary -r requirements-render.txt
-    Runtime:     Python 3.11.9, Streamlit
+    Readme/REVIEWER_GUIDE.md
 
-UptimeRobot (Uptime Monitoring)
+Extraction is LLM-based and cannot verify its own semantics. It will produce
+a confident, precisely-quantified effect size whether or not it understood
+the paper. Two failure modes are documented and unfixed:
 
-    Purpose:     Pings the health endpoint every 5 minutes to prevent free-tier
-                 cold starts (Render spins down after 15 min of inactivity)
-    Monitor URL: https://ai-kcmedicalresearch.onrender.com/_stcore/health
-    Alerts:      Email notification if site goes down; recovery alert when back up
-    Dashboard:   https://uptimerobot.com (login: your UptimeRobot account)
+    - a reported standard error can be read as a standard deviation
+    - a within-subject before/after change can be extracted as though it
+      were an intervention-versus-control comparison
 
-    Note: Occasional "Connection Timeout" alerts are normal on the free tier.
-    The service auto-recovers within 60 seconds. If downtime persists > 5 min,
-    check the Render dashboard for build failures.
+Both have been observed producing a large, entirely invalid effect size that
+passed every stage of the pipeline without a warning.
+
+Extraction is also non-deterministic: the same PDF can yield different
+numbers on consecutive runs.
+
+Therefore: every mean, SD and sample size must be checked against the source
+PDF before any pooled estimate is reported. Reviewer-verified corrections go
+in input/sr/study_overrides.yaml, and every one is logged so it can be
+declared in your methods section.
+
+Run SR directly rather than through a menu, so the interactive PICO prompts
+get a real terminal:
+
+    python SOURCE_CODE/main.py --mode sr --provider qwen
+
 
 ============================================
 Troubleshooting
 ============================================
 
-Mac_Setup.sh fails
-    Ensure scripts are executable: chmod +x Mac_*.sh
+Docker not found            Install Docker Desktop
+Docker not running          Start Docker Desktop and wait for the whale icon
+Build fails                 Check your internet connection; retry - transient
+                              PyPI failures are common
+Port 8501 in use            Another instance is running; stop it or open
+                              http://localhost:8501
+UI shows a blank page       Wait ~15 seconds and refresh; the server starts
+                              after the container does
+Auth error from provider    Check .env has no quotes around the key value
+Ollama unreachable          In Docker use host.docker.internal, not localhost
+SR extracts nothing         Use a vision provider (qwen). DeepSeek cannot
+                              read page images
+pip install fails           You are probably on Python 3.13+. Use Docker
+Python 3.11 unavailable     Use Docker; it supplies its own Python
 
-Docker Issues
-    Issue                       Solution
-    Docker not found            Install Docker Desktop from https://www.docker.com/products/docker-desktop
-    Docker not running          Start Docker Desktop from system tray/menu bar
-    Build fails                 Check internet connection and Docker logs
-    Volume mount errors         Ensure folders exist: input/, output/, data/, reports/
-    Docker_setup.bat fails      Run as Administrator, check internet connection
-
-DeepSeek Issues
-    Issue                       Solution
-    API key not working         Verify key at https://platform.deepseek.com
-    Rate limited                Wait a moment and retry; check account balance
-    Timeout on large tasks      Increase LLM timeout in .env or try --provider qwen
-
-Ollama Issues (if using --provider ollama)
-    Issue                       Solution
-    Ollama not found            Install from https://ollama.com/download
-    Ollama not running          Start Ollama from Applications (macOS) or Start Menu (Windows)
-    Model not found             Run: ollama pull llama3.2
-    Out of memory               Use a smaller model: ollama pull llama3.2:3b
-    Slow/timeout                Use DeepSeek instead (default); large models are too slow
-    Coding pipeline fails       Switch to --provider deepseek (large Ollama models cannot complete Builder/Reviewer/Tester loops)
-
-API Key Issues
-    - Check if entered correctly (no extra spaces)
-    - For Qwen: Use DASHSCOPE_API_KEY env var
-    - For Ollama: No API key needed
-    - Check Render env variables are saved
-
-Pipeline Fails
-    - Check logs in the UI output area
-    - Verify input files are in correct folder
-    - Check API key is valid for selected provider
-    - For SR mode: Ensure provider supports vision (Qwen, OpenAI, Anthropic, Groq)
-
-Theme Not Detected (CLI)
-    - Launcher auto-detects on first run
-    - Override with:
-        Windows:     setx CLI_THEME dark  (or light)
-        macOS/Linux: export CLI_THEME=dark (or light)
-    - Close and reopen terminal for changes to take effect
-
-Render/UptimeRobot Issues
-    Issue                           Solution
-    "Connection Timeout" alert      Normal on free tier; service auto-recovers in ~60s
-    Build fails on Render           Check Render dashboard logs; likely OOM or dependency issue
-    Site loads slowly first time    Free tier spins down after 15 min; UptimeRobot keeps it warm
-    Persistent downtime > 5 min     Check Render dashboard for failed deploy or suspended service
 
 ============================================
-Documentation
+Getting Help
 ============================================
 
-    Full Documentation:   Readme/HANDOFF.md
-    Quick Start:          README.md (repo root)
-    Help Guide:           Readme/flashcard-help.html (open in browser)
-    Setup Instructions:   Readme/Setup_Instructions_for_Users.txt (this file)
-    GitHub Repository:    https://github.com/KW75/AI_kcMedicalResearch
-
-============================================
-Setup Complete!
-============================================
-
-You're now ready to use AI kcMedicalResearch!
-
-Provider Options Summary
-
-    Provider        Cost            Setup                           Internet    Notes
-    DeepSeek        Pay-per-use     Add API key to .env (DEFAULT)   Yes         Fast, cheap, all modes
-    Qwen            Pay-per-use     Add API key to .env             Yes         Recommended for SR (vision)
-    Groq            Pay-per-use     Add API key to .env             Yes         Fast inference
-    OpenAI          Pay-per-use     Add API key to .env             Yes         GPT-4 vision
-    Anthropic       Pay-per-use     Add API key to .env             Yes         Claude vision (geo-restricted)
-    Ollama          Free            Install Ollama, pull model      No*         Offline only; slow on large models
-
-    * Requires internet for initial model download only.
-
-    Fallback Chain: DeepSeek -> Qwen -> Groq (automatic on transient errors)
-    Streaming:      Enabled by default (live token output in terminal)
-
-Total setup time: ~5 minutes!
-
-For more help, check the documentation or open an issue on GitHub:
-https://github.com/KW75/AI_kcMedicalResearch/issues
+GitHub Issues:  https://github.com/KW75/AI_kcMedicalResearch/issues
+Documentation:  README.md, Readme/HANDOFF.md, Readme/REVIEWER_GUIDE.md

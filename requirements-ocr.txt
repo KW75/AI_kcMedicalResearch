@@ -1,0 +1,35 @@
+# requirements-ocr.txt - OPTIONAL OCR support
+#
+# Only needed for scanned or image-only PDFs and legacy .doc files.
+# Everything here is imported defensively; without it the app runs normally
+# and simply reports OCR as unavailable.
+#
+# Install:  pip install -r requirements-ocr.txt
+#
+# SYSTEM BINARIES ARE ALSO REQUIRED - pip cannot install these:
+#
+#   Tesseract OCR engine
+#     Windows : https://github.com/UB-Mannheim/tesseract/wiki
+#     macOS   : brew install tesseract
+#     Linux   : sudo apt-get install tesseract-ocr
+#
+#   Poppler (for pdf2image)
+#     Windows : https://github.com/oschwartz10612/poppler-windows/releases
+#     macOS   : brew install poppler
+#     Linux   : sudo apt-get install poppler-utils
+
+pytesseract>=0.3.10
+pdf2image>=1.16.0
+
+# NumPy 2.x compatible. 4.8.x was built against NumPy 1.x and crashes.
+opencv-python>=4.10.0
+
+# Alternative OCR engine. WARNING: pulls PyTorch, roughly 2 GB.
+# Used only as a fallback when pytesseract returns under 50 characters
+# (document_reader.py:240). Drop this line if disk space matters.
+easyocr>=1.7.1
+
+# Legacy .doc extraction on non-Windows. textract 1.6.5 has broken metadata
+# and does not install on Python 3.13+; leave commented unless you need it
+# and are on an older interpreter.
+# textract==1.6.5

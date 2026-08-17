@@ -1,39 +1,65 @@
-# docker/docker-compose.yml
-version: '3.8'
+﻿# docker/docker-compose.yml
+#
+# Single definition of how to run AI kcMedicalResearch in Docker.
+# Replaces docker_cli.bat, docker_menu.bat, mac_docker_cli.sh and
+# mac_docker_menu.sh, which each carried their own copy of the run command.
+#
+# Run from the docker/ folder:
+#     docker compose run --rm cli      # interactive CLI menu
+#     docker compose up ui             # Streamlit UI on http://localhost:8501
+#     docker compose build             # rebuild after code changes
+#
+# API keys come from ../.env on YOUR machine at run time. They are never
+# baked into the image (.dockerignore excludes .env).
+
+x-common: &common
+  # Building locally is the default. To use a published image instead,
+  # comment out `build:` and uncomment `image:`.
+  build:
+    context: ..
+    dockerfile: docker/Dockerfile
+  # image: ghcr.io/kw75/ai-kcmedicalresearch:2.4.7
+
+  env_file:
+    - ../.env
+
+  environment:
+    # Inside a container, localhost is the container - not your machine.
+    # host.docker.internal reaches the host, where Ollama listens.
+    - OLLAMA_HOST=http://host.docker.internal:11434
+    - PYTHONPATH=/app:/app/SOURCE_CODE
+    - PYTHONUNBUFFERED=1
+
+  volumes:
+    - ../input:/app/input
+    - ../output:/app/output
+    - ../reports:/app/reports
+    - ../data:/app/data
+
+  extra_hosts:
+    - "host.docker.internal:host-gateway"
 
 services:
-  ai-kcmedicalresearch:
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile
-    container_name: ai-kcmedicalresearch
-    ports:
-      - "8501:8501"   # Streamlit UI
-      - "8000:8000"   # API if needed
-    volumes:
-      # Mount local directories for input/output
-      - ../input:/app/input
-      - ../output:/app/output
-      - ../data:/app/data
-      - ../reports:/app/reports
-      # Mount .env if it exists
-      - ../.env:/app/.env:ro
-    environment:
-      - CLI_THEME=${CLI_THEME:-dark}
-      - OLLAMA_HOST=${OLLAMA_HOST:-http://host.docker.internal:11434}
-      # Pass through API keys from host .env
-      - GROQ_API_KEY=${GROQ_API_KEY}
-      - DASHSCOPE_API_KEY=${DASHSCOPE_API_KEY}
-      - DASHSCOPE_BASE_URL=${DASHSCOPE_BASE_URL}
-      - DASHSCOPE_ANTHROPIC_URL=${DASHSCOPE_ANTHROPIC_URL}
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
-      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
-      - PYTHONPATH=/app:/app/SOURCE_CODE
+
+  # Interactive CLI. Use `docker compose run --rm cli` (not `up`) so the
+  # menu and the SR pipeline PICO prompts get a real TTY.
+  cli:
+    <<: *common
+    container_name: ai-kcm-cli
     stdin_open: true
     tty: true
-    # For Windows, connect to host's Ollama
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    # Command for UI mode (overrides default)
-    # command: streamlit run SOURCE_CODE/ui/app.py --server.port=8501 --server.address=0.0.0.0
+    command: python SOURCE_CODE/main.py
+
+  # Streamlit UI. Use `docker compose up ui`, then open
+  # http://localhost:8501 once the log says the server is running.
+  ui:
+    <<: *common
+    container_name: ai-kcm-ui
+    ports:
+      - "8501:8501"
+    command: >
+      streamlit run SOURCE_CODE/ui/app.py
+      --server.port=8501
+      --server.address=0.0.0.0
+      --server.headless=true
+      --browser.gatherUsageStats=false

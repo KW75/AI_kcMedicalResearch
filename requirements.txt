@@ -1,44 +1,31 @@
-# requirements.txt - Local/full development requirements
+# requirements.txt - local development and Docker installs
 #
-# Used for local development and Docker/full installs.
-# Do NOT use this file for Render.
-# Render uses requirements-render.txt.
-# GitHub Actions uses requirements-ci.txt.
+# Shared deps live in requirements-base.txt. This file adds developer tools
+# and platform-specific packages.
 #
-# Notes:
-# - This file may include heavier optional dependencies.
-# - Windows-only dependencies must use platform markers.
-chromadb>=0.4.0
-pypdf>=3.0.0
-python-dotenv>=1.0.0
-requests>=2.31.0
-pymupdf>=1.23.0
-python-docx>=1.0.0
+#   Render : requirements-render.txt  (standalone, pinned)
+#   CI     : requirements-ci.txt
+#   OCR    : requirements-ocr.txt     (optional, see note below)
+#
+# Install:  pip install -r requirements.txt
+
+-r requirements-base.txt
+
+# --- Developer tooling ---
 pytest>=7.0.0
 pytest-cov>=4.0.0
-anyio>=3.0.0
-pandas>=2.0.0
-numpy>=1.24.0
-scipy>=1.10.0
-matplotlib>=3.7.0
-pyyaml>=6.0
-pdf2image>=1.16.0
-pillow>=9.0.0
-streamlit>=1.28.0
-anthropic>=0.18.0
-openai>=1.0.0
-groq>=0.4.0
 
-# DOC/DOCX Support
-python-docx==1.1.0          # DOCX reading/writing
-docx2txt==0.8               # Simple DOCX extraction
-pywin32==306; platform_system == "Windows"  # Windows DOC support only
-textract==1.6.5             # Universal document extraction
+# --- Windows-only ---
+# Legacy .doc support. pywin32 306 does not build on Python 3.13+.
+pywin32>=312; platform_system == "Windows"
 
-# Image Support
-Pillow==10.1.0              # Image processing
-pytesseract==0.3.10         # OCR for images
-easyocr==1.7.1              # Alternative OCR (supports multiple languages)
-
-# Enhanced OCR
-opencv-python==4.8.1.78     # Image preprocessing for OCR
+# --- OCR is OPTIONAL and NOT installed here -------------------------------
+# document_reader.py and rag.py import pytesseract / easyocr / cv2 /
+# pdf2image inside try/except and degrade gracefully when absent.
+#
+# The OCR stack pulls PyTorch via easyocr (~2 GB) and also needs system
+# binaries that pip cannot install (Tesseract, Poppler).
+#
+# To enable OCR:
+#     pip install -r requirements-ocr.txt
+# plus the system binaries listed in that file.

@@ -1,0 +1,39 @@
+# requirements-base.txt - shared runtime dependencies
+#
+# Single source of truth for packages every install needs.
+# Referenced by requirements.txt and requirements-ci.txt via -r.
+#
+# NOT referenced by requirements-render.txt: that file stays standalone and
+# fully pinned for free-tier stability, and deliberately omits chromadb.
+#
+# Platform-specific and optional packages do NOT belong here.
+
+# --- Core ---
+python-dotenv>=1.0.0
+requests>=2.31.0
+pyyaml>=6.0
+anyio>=3.0.0
+
+# --- Documents ---
+pypdf>=3.0.0
+pymupdf>=1.23.0
+python-docx>=1.1.0
+docx2txt>=0.8
+
+# --- Data / analysis ---
+pandas>=2.0.0
+numpy>=1.24.0
+scipy>=1.10.0
+matplotlib>=3.7.0
+pillow>=10.4.0
+
+# --- UI ---
+streamlit>=1.28.0
+
+# --- Providers ---
+anthropic>=0.18.0
+openai>=1.0.0
+groq>=0.4.0
+
+# --- RAG / vector store ---
+chromadb>=0.4.0
