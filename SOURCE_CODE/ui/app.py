@@ -540,13 +540,11 @@ def _launch_terminal_local(mode: str, provider: str, model: str, submode: str = 
 
 def _launch_windows(cmd_str: str, base: str, env_vars: Dict, mode: str, provider: str) -> str:
     """Launch on Windows."""
-    script_lines = []
-    
-    # Set API keys from session
-    for key, value in env_vars.items():
-        if key.endswith('_API_KEY') or key in ['DASHSCOPE_BASE_URL', 'DASHSCOPE_ANTHROPIC_URL']:
-            script_lines.append(f'set "{key}={value}"')
-    
+    # NOTE: API keys are inherited via env= on the Popen call below. Never write
+    # them into this script: cmd echoes each line to the console, and the file
+    # persists in %TEMP%.
+    script_lines = ['@echo off']
+
     script_lines.append(f'cd /d "{base}"')
     script_lines.append(cmd_str)
     script_lines.append('')
@@ -559,7 +557,7 @@ def _launch_windows(cmd_str: str, base: str, env_vars: Dict, mode: str, provider
     temp_bat.write_text(script_content, encoding='utf-8')
     
     subprocess.Popen(
-        ["cmd", "/k", str(temp_bat)],
+        ["cmd", "/c", str(temp_bat)],
         creationflags=subprocess.CREATE_NEW_CONSOLE,
         cwd=base,
         env=env_vars
@@ -568,20 +566,22 @@ def _launch_windows(cmd_str: str, base: str, env_vars: Dict, mode: str, provider
 
 def _launch_macos(cmd_str: str, base: str, env_vars: Dict) -> str:
     """Launch on macOS."""
-    env_exports = " && ".join([f'export {k}="{v}"' for k, v in env_vars.items() if k.endswith('_API_KEY')])
+    # API keys are inherited via env= below; never interpolate them into the
+    # shell string, which is visible in ps output.
     subprocess.Popen(
         ["osascript", "-e",
-         f'tell app "Terminal" to do script "cd \'{base}\' && {env_exports} && {cmd_str} && echo \'Session completed. Press any key to close...\' && read"'],
+         f'tell app "Terminal" to do script "cd \'{base}\' && {cmd_str} && echo \'Session completed. Press any key to close...\' && read"'],
         env=env_vars
     )
     return "ok"
 
 def _launch_linux(cmd_str: str, base: str, env_vars: Dict) -> str:
     """Launch on Linux."""
-    env_exports = " && ".join([f'export {k}="{v}"' for k, v in env_vars.items() if k.endswith('_API_KEY')])
+    # API keys are inherited via env= below; never interpolate them into the
+    # shell string, which is visible in ps output.
     subprocess.Popen(
         ["x-terminal-emulator", "-e", "bash", "-c",
-         f"cd '{base}' && {env_exports} && {cmd_str} && echo 'Session completed. Press any key to close...' && read"],
+         f"cd '{base}' && {cmd_str} && echo 'Session completed. Press any key to close...' && read"],
         cwd=base,
         env=env_vars
     )

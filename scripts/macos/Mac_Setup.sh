@@ -1,10 +1,10 @@
 #!/bin/bash
 # =============================================================================
 #  Mac_Setup.sh - AI kcMedicalResearch Complete Setup for Mac
-#  v2.0.0  |  Updated for SOURCE_CODE structure
+#  v2.4.6
 # =============================================================================
 
-set -e
+set -uo pipefail
 
 # Colors for output
 RED='\033[0;31m'
@@ -20,7 +20,7 @@ NC='\033[0m' # No Color
 clear
 echo ""
 echo "============================================================"
-echo " AI kcMedicalResearch - Setup & Run (macOS)"
+echo " AI kcMedicalResearch - Setup & Run (macOS)  |  v2.4.6"
 echo "============================================================"
 echo ""
 echo "This will:"
@@ -181,26 +181,45 @@ if [ ! -f ".env" ]; then
     echo -e "${BLUE}[CONFIG]${NC} Creating .env file..."
 
     cat > .env << 'EOF'
-# AI kcMedicalResearch - API Keys
-# ================================
+# AI kcMedicalResearch - configuration
+# ===================================
 
-# Local Ollama
+DEFAULT_PROVIDER=deepseek
+FALLBACK_PROVIDERS=deepseek,qwen,groq
+
+# --- Local Ollama ---------------------------------------------------------
+# Inside Docker, localhost is the container. host.docker.internal reaches
+# the Mac, where Ollama listens. The launchers set this for you; the value
+# here is for running outside Docker.
 OLLAMA_HOST=http://localhost:11434
-OLLAMA_MODEL=llama3.2
+OLLAMA_CONTEXT=32768
+OLLAMA_NUM_PREDICT=8192
+OLLAMA_TEMPERATURE=0.3
 
-# Cloud Providers - Add your API keys below
-# Get free key from: https://console.groq.com
+# --- Cloud providers: add your own keys -----------------------------------
+# Groq (free tier): https://console.groq.com
 GROQ_API_KEY=
 
-# Get key from: https://dashscope.aliyuncs.com
-DASHSCOPE_API_KEY=
-DASHSCOPE_BASE_URL=https://ws-uv5pi4kkqbrg1vpe.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1
-DASHSCOPE_ANTHROPIC_URL=https://ws-uv5pi4kkqbrg1vpe.ap-southeast-1.maas.aliyuncs.com/apps/anthropic
+# DeepSeek: https://platform.deepseek.com
+DEEPSEEK_API_KEY=
 
-# Optional: OpenAI, Anthropic, DeepSeek
-# OPENAI_API_KEY=
-# ANTHROPIC_API_KEY=
-# DEEPSEEK_API_KEY=
+# Qwen / DashScope: https://dashscope.aliyuncs.com
+# Replace DASHSCOPE_BASE_URL if your account uses a dedicated endpoint.
+DASHSCOPE_API_KEY=
+DASHSCOPE_BASE_URL=https://dashscope-intl.aliyuncs.com/compatible-mode/v1
+QWEN_MODEL=qwen-plus-latest
+# SR extraction needs a vision model; the text model above cannot read pages.
+QWEN_VISION_MODEL=qwen-vl-max
+
+# Optional
+OPENAI_API_KEY=
+ANTHROPIC_API_KEY=
+
+# --- Systematic review ----------------------------------------------------
+SR_STUDY_OVERRIDES=input/sr/study_overrides.yaml
+
+EMBEDDING_PROVIDER=ollama
+EMBEDDING_MODEL=nomic-embed-text
 EOF
 
     echo ""
@@ -291,6 +310,9 @@ echo "============================================================"
 echo ""
 echo "Installation location: $INSTALL_DIR"
 echo ""
+echo "Before using SR (systematic review) output in a real review, read:"
+echo "  $INSTALL_DIR/Readme/REVIEWER_GUIDE.md"
+echo ""
 echo "Choose how to run:"
 echo ""
 echo "  [1]  CLI Mode  (interactive menu)"
@@ -310,7 +332,19 @@ if [ "$RUN_CHOICE" == "2" ]; then
     echo "Press Ctrl+C to stop"
     echo ""
 
-    open http://localhost:8501
+    # Open the browser only once Streamlit is actually listening. Calling
+    # `open` immediately lands on a connection-refused page.
+    (
+        for _ in $(seq 1 60); do
+            sleep 1
+            if curl -s -o /dev/null http://localhost:8501/_stcore/health 2>/dev/null; then
+                open http://localhost:8501
+                exit 0
+            fi
+        done
+        echo ""
+        echo -e "${YELLOW}[WARNING]${NC} Server did not respond in 60s. Open http://localhost:8501 manually."
+    ) &
 
     docker run -it --rm \
         -p 8501:8501 \
@@ -319,9 +353,10 @@ if [ "$RUN_CHOICE" == "2" ]; then
         -v "$INSTALL_DIR/data:/app/data" \
         -v "$INSTALL_DIR/reports:/app/reports" \
         --env-file .env \
+        -e OLLAMA_HOST=http://host.docker.internal:11434 \
         --add-host host.docker.internal:host-gateway \
         ai-kcmedicalresearch \
-        streamlit run SOURCE_CODE/ui/app.py --server.port=8501 --server.address=0.0.0.0
+        streamlit run SOURCE_CODE/ui/app.py --server.port=8501 --server.address=0.0.0.0 --server.headless=true --browser.gatherUsageStats=false
 else
     echo -e "${BLUE}CLI Mode starting...${NC}"
     echo "Use the menu to select pipeline and provider"
@@ -333,6 +368,7 @@ else
         -v "$INSTALL_DIR/data:/app/data" \
         -v "$INSTALL_DIR/reports:/app/reports" \
         --env-file .env \
+        -e OLLAMA_HOST=http://host.docker.internal:11434 \
         --add-host host.docker.internal:host-gateway \
         ai-kcmedicalresearch \
         python SOURCE_CODE/main.py

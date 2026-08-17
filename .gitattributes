@@ -1,13 +1,33 @@
+﻿# Default: normalise text files in the repo, native in the working tree.
+* text=auto
+
+# Shell scripts MUST be LF. CRLF breaks the shebang on macOS/Linux
+# ("bad interpreter: /bin/bash^M").
+*.sh text eol=lf
+
+# Windows scripts are happier with CRLF.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# Source and config: LF for consistency across platforms.
+*.py   text eol=lf
+*.md   text eol=lf
+*.yml  text eol=lf
+*.yaml text eol=lf
 *.toml text eol=lf
+*.json text eol=lf
+*.html text eol=lf
+*.css  text eol=lf
+*.js   text eol=lf
 
-# Normalise line endings for new source files
-src/modes/*.py text eol=lf
-
-src/**/*.py  text eol=lf
-
-docs/writing/**/*.md  text eol=lf
-
-src/modes/*.py  text eol=lf
-
-docs/**/*.md  text eol=lf
-launcher.py   text eol=lf
+# Never touch binaries.
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.pdf  binary
+*.docx binary
+*.xlsx binary
+*.pptx binary
+*.ico  binary

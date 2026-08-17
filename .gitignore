@@ -27,3 +27,7 @@ htmlcov/
 # Local scratch/data folder - not used by repo
 data/
 sr_*.log
+
+# patch backups
+*.py.bak
+*.py.bak[0-9]
