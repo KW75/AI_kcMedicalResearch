@@ -1,4 +1,4 @@
-﻿# SOURCE_CODE/pipelines/coding/__init__.py
+# SOURCE_CODE/pipelines/coding/__init__.py
 """
 Coding pipeline for AI kcMedicalResearch
 """

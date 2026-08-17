@@ -1,4 +1,4 @@
-﻿# SOURCE_CODE/pipelines/search/__init__.py
+# SOURCE_CODE/pipelines/search/__init__.py
 """Search pipeline for AI kcMedicalResearch"""
 
 from .search import run_topic_search, run_article_search

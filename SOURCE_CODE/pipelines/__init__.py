@@ -1,4 +1,4 @@
-﻿# pipelines/__init__.py
+# pipelines/__init__.py
 """
 Pipelines module for AI kcMedicalResearch.
 

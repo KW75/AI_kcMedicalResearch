@@ -1,4 +1,4 @@
-﻿"""
+"""
 src/modes/search.py
 Search mode engine for AI kcMedicalResearch.
 

@@ -1,4 +1,4 @@
-﻿"""
+"""
 rag.py  - Retrieval-Augmented Generation support for ai-automation-tool.
 
 Design decisions:

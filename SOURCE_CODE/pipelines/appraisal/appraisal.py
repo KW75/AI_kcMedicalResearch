@@ -1,4 +1,4 @@
-﻿"""
+"""
 src/modes/appraisal.py
 ======================
 Appraisal mode engine  - critical appraisal of medical literature.

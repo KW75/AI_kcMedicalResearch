@@ -1,4 +1,4 @@
-﻿# SOURCE_CODE/pipelines/sr/src/screening/rob2_tool.py
+# SOURCE_CODE/pipelines/sr/src/screening/rob2_tool.py
 import json, logging, os, time
 from typing import Optional
 import anthropic

@@ -1,4 +1,4 @@
-﻿# SOURCE_CODE/pipelines/sr/src/utils/project_layout.py
+# SOURCE_CODE/pipelines/sr/src/utils/project_layout.py
 r"""
 project_layout.py
 -----------------

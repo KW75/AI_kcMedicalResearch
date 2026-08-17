@@ -1,4 +1,4 @@
-﻿# SOURCE_CODE/pipelines/sr/main.py
+# SOURCE_CODE/pipelines/sr/main.py
 import argparse, logging, sys
 import pandas as pd
 from pathlib import Path

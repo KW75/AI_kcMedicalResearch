@@ -1,4 +1,4 @@
-﻿# SOURCE_CODE/pipelines/sr/src/screening/relevance_screener.py
+# SOURCE_CODE/pipelines/sr/src/screening/relevance_screener.py
 import json, logging, os, time
 from pathlib import Path
 from typing import Optional

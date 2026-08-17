@@ -1,4 +1,4 @@
-﻿# SOURCE_CODE/ui/app.py
+# SOURCE_CODE/ui/app.py
 from __future__ import annotations
 
 import base64

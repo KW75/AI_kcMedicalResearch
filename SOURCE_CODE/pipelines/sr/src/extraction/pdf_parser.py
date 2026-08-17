@@ -1,4 +1,4 @@
-﻿from pathlib import Path
+from pathlib import Path
 import fitz
 
 def extract_text(pdf_path: Path, max_chars: int = 30_000) -> str:

@@ -1,4 +1,4 @@
-﻿# SOURCE_CODE/pipelines/writing/__init__.py
+# SOURCE_CODE/pipelines/writing/__init__.py
 """Writing pipeline for AI kcMedicalResearch"""
 
 from .writing import run_writer, run_editor, run_qa

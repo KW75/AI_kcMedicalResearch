@@ -1,4 +1,4 @@
-﻿# SOURCE_CODE/pipelines/sr/src/extraction/data_extractor.py
+# SOURCE_CODE/pipelines/sr/src/extraction/data_extractor.py
 import json, logging, os, time
 import base64
 import io
