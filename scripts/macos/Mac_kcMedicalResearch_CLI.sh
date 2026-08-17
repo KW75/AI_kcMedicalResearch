@@ -1,100 +1,120 @@
 #!/bin/bash
 # =============================================================================
-#  Mac_kcMedicalResearch_CLI.sh - CLI Launcher for macOS (Docker)
-#  v2.4.6
+#  Mac_kcMedicalResearch_CLI.sh
+#  v2.4.8  |  Menu-driven CLI launcher (scripts/launcher.py)
 #
-#  Location: scripts/mac/   (resolves project root two levels up)
+#  Mirrors scripts/windows/AI_kcMedicalResearch_CLI.bat - runs in the project
+#  virtualenv, NOT in Docker. For Docker use:  cd docker && docker compose run --rm cli
+#
+#  Location: scripts/macos/   (resolves project root two levels up)
 # =============================================================================
 
 set -uo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-IMAGE="ai-kcmedicalresearch"
-
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; BLUE='\033[0;34m'; NC='\033[0m'
 
+PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+cd "$PROJECT_DIR"
+
+PY="$PROJECT_DIR/.venv/bin/python"
+PIP="$PROJECT_DIR/.venv/bin/pip"
+LAUNCHER="$PROJECT_DIR/scripts/launcher.py"
+
 echo ""
-echo "============================================================"
-echo " AI kcMedicalResearch - CLI Mode (macOS)  |  v2.4.6"
-echo "============================================================"
-echo " Project : $SCRIPT_DIR"
-echo "============================================================"
+echo "  ============================================================"
+echo "   AI kcMedical Research  |  CLI Launcher  |  v2.4.8"
+echo "  ============================================================"
+echo "   Project : $PROJECT_DIR"
+echo "  ============================================================"
 echo ""
 
-# --- .env present? -----------------------------------------------------------
-if [ ! -f "$SCRIPT_DIR/.env" ]; then
-    echo -e "${YELLOW}[WARNING]${NC} .env file not found."
-    for tmpl in .env.example .env.template; do
-        if [ -f "$SCRIPT_DIR/$tmpl" ]; then
-            echo "Copy $tmpl to .env and add your API keys:"
-            echo "  cp \"$SCRIPT_DIR/$tmpl\" \"$SCRIPT_DIR/.env\""
-            break
+# --- Guard: launcher present -------------------------------------------------
+if [ ! -f "$LAUNCHER" ]; then
+    echo -e "  ${RED}[ERROR]${NC} Launcher not found at scripts/launcher.py"
+    echo "   Expected: $LAUNCHER"
+    echo ""
+    read -r -p "Press Enter to exit..."
+    exit 1
+fi
+
+# --- Create .venv if missing --------------------------------------------------
+if [ ! -x "$PY" ]; then
+    echo -e "  ${BLUE}[SETUP]${NC} .venv not found. Looking for a supported Python..."
+
+    PYBIN=""
+    for candidate in python3.12 python3.11 python3; do
+        if command -v "$candidate" &> /dev/null; then
+            if "$candidate" -c 'import sys; raise SystemExit(0 if (3,11) <= sys.version_info[:2] < (3,13) else 1)' 2>/dev/null; then
+                PYBIN="$candidate"
+                break
+            fi
         fi
     done
-    echo ""
-    read -r -p "Press Enter to exit..."
-    exit 1
-fi
 
-# --- Docker installed and running? -------------------------------------------
-if ! command -v docker &> /dev/null; then
-    echo -e "${RED}[ERROR]${NC} Docker not found."
-    echo "Install Docker Desktop: https://www.docker.com/products/docker-desktop"
-    echo ""
-    read -r -p "Press Enter to exit..."
-    exit 1
-fi
-
-if ! docker info &> /dev/null; then
-    echo -e "${RED}[ERROR]${NC} Docker is installed but not running."
-    echo "Start Docker Desktop (whale icon in the menu bar), then re-run this script."
-    echo ""
-    read -r -p "Press Enter to exit..."
-    exit 1
-fi
-
-# --- Build image if missing --------------------------------------------------
-if ! docker image inspect "$IMAGE" &> /dev/null; then
-    echo -e "${BLUE}[BUILD]${NC} Building Docker image (first time only, 5-10 minutes)..."
-    echo ""
-    if ! docker build -f "$SCRIPT_DIR/docker/Dockerfile" -t "$IMAGE" "$SCRIPT_DIR"; then
+    if [ -z "$PYBIN" ]; then
+        echo -e "  ${RED}[ERROR]${NC} No Python 3.11 or 3.12 found."
         echo ""
-        echo -e "${RED}[ERROR]${NC} Docker build failed."
+        echo "   This project does not support Python 3.13+ - several pinned"
+        echo "   dependencies have no wheels for it."
+        echo ""
+        echo "   Install 3.12:  brew install python@3.12"
+        echo "              or  https://www.python.org/downloads/release/python-3129/"
+        echo ""
+        echo "   Or use Docker, which supplies its own Python:"
+        echo "     cd docker && docker compose run --rm cli"
+        echo ""
         read -r -p "Press Enter to exit..."
         exit 1
     fi
+
+    echo -e "  ${BLUE}[SETUP]${NC} Using $("$PYBIN" -c 'import sys; print(sys.executable)')"
     echo ""
-    echo -e "${GREEN}[OK]${NC} Image built."
+    if ! "$PYBIN" -m venv .venv; then
+        echo -e "  ${RED}[ERROR]${NC} Failed to create .venv."
+        read -r -p "Press Enter to exit..."
+        exit 1
+    fi
+
+    echo -e "  ${BLUE}[SETUP]${NC} Installing dependencies - this takes a few minutes..."
+    "$PIP" install --upgrade pip --quiet
+    if ! "$PIP" install -r requirements.txt --quiet; then
+        echo -e "  ${RED}[ERROR]${NC} Failed to install dependencies."
+        read -r -p "Press Enter to exit..."
+        exit 1
+    fi
+    echo -e "  ${GREEN}[OK]${NC} Dependencies installed."
     echo ""
 fi
 
-echo -e "${BLUE}[RUN]${NC} Starting CLI. Startup takes ~10 seconds while dependencies load."
-echo "Use the menu to select a pipeline and provider."
+# --- Warn if .env missing ----------------------------------------------------
+if [ ! -f "$PROJECT_DIR/.env" ]; then
+    echo "  ------------------------------------------------------------"
+    echo -e "   ${YELLOW}NOTE${NC}: no .env file found in the project root."
+    echo "   Cloud providers need API keys:  cp .env.example .env"
+    echo "   Or run offline with:  --provider ollama"
+    echo "  ------------------------------------------------------------"
+    echo ""
+fi
+
+# --- Launch ------------------------------------------------------------------
+echo "  ------------------------------------------------------------"
+echo "   Starting menu launcher"
+echo "   Startup : ~7 seconds while dependencies load - please wait"
+echo "   Stop    : Ctrl+C inside a session returns to the menu"
+echo "   Args    : any flags given to this script are forwarded"
+echo "  ------------------------------------------------------------"
 echo ""
 
-# -it gives the container a real TTY, which the interactive PICO and sub-mode
-# prompts require. Do not remove.
-#
-# OLLAMA_HOST is overridden here because inside a container "localhost" is the
-# container itself, not the Mac. host.docker.internal reaches the host, where
-# Ollama is listening.
-docker run -it --rm \
-    -v "$SCRIPT_DIR/input:/app/input" \
-    -v "$SCRIPT_DIR/output:/app/output" \
-    -v "$SCRIPT_DIR/data:/app/data" \
-    -v "$SCRIPT_DIR/reports:/app/reports" \
-    --env-file "$SCRIPT_DIR/.env" \
-    -e OLLAMA_HOST=http://host.docker.internal:11434 \
-    --add-host host.docker.internal:host-gateway \
-    "$IMAGE" \
-    python SOURCE_CODE/main.py
-
+# Foreground, same terminal, so interactive prompts (PICO selection, sub-mode
+# choices) get a real TTY.
+"$PY" "$LAUNCHER" "$@"
 RC=$?
+
 echo ""
 if [ "$RC" -ne 0 ]; then
-    echo -e "${YELLOW}[EXIT]${NC} CLI exited with code $RC."
+    echo -e "  ${YELLOW}[EXIT]${NC} Launcher exited with code $RC."
 else
-    echo "CLI session ended."
+    echo "  Session ended."
 fi
 echo ""
 exit "$RC"
