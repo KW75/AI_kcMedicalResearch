@@ -13,7 +13,11 @@ __pycache__/
 sr/data/
 reports/
 output/
-input/
+input/*
+!input/sr/
+input/sr/*
+!input/sr/study_overrides.yaml
+!input/sr/pico_sample.json
 debug/
 patch_main.py
 dist/
@@ -22,5 +26,4 @@ chroma_db/
 htmlcov/
 # Local scratch/data folder - not used by repo
 data/
-
 sr_*.log

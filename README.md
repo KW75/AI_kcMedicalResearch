@@ -2,7 +2,7 @@ AI kcMedical Research
 
 A multi-mode AI assistant for medical research, critical appraisal, systematic review, coding, and writing. Uses cloud providers by default (DeepSeek, Qwen, OpenAI, Anthropic, Groq) with optional local Ollama support.
 
-    Version: 2.4.5
+    Version: 2.4.6
     Tests: 401 passed, 3 skipped
     Coverage: ~53%
     CI: GitHub Actions - Green
@@ -44,21 +44,22 @@ python SOURCE_CODE/main.py --dry-run                  # test without API calls
 python scripts/launcher.py                            # menu-driven launcher
 
 Modes
-Mode 	Flag 	Roles
-Coding 	--mode coding 	Builder, Reviewer, Tester
-Writing 	--mode writing 	Writer, Editor, QA
+Mode 	        Flag 	                Roles
+Coding 	        --mode coding 	        Builder, Reviewer, Tester
+Writing 	--mode writing 	        Writer, Editor, QA
 RCT Search 	--mode rct_search 	Formulator, Searcher, Validator
-Search 	--mode search 	Researcher
+Search 	        --mode search 	        Researcher
 Appraisal 	--mode appraisal 	Appraiser, Methodologist, Summariser
-SR 	--mode sr 	SR Methodologist
+SR 	        --mode sr 	        SR Methodologist
+
 Providers
-Provider 	Flag 	Environment Variable 	Notes
+Provider 	        Flag 	                Environment Variable 	Notes
 DeepSeek (DEFAULT) 	--provider deepseek 	DEEPSEEK_API_KEY 	Fast, cost-efficient
-Qwen 	--provider qwen 	DASHSCOPE_API_KEY 	Recommended for SR (auto-uses vision model)
-OpenAI 	--provider openai 	OPENAI_API_KEY 	GPT-4 vision
-Anthropic 	--provider anthropic 	ANTHROPIC_API_KEY 	Claude vision
-Groq 	--provider groq 	GROQ_API_KEY 	Fast inference
-Ollama (local) 	--provider ollama 	OLLAMA_HOST 	Free but slow; offline/testing only
+Qwen 	                --provider qwen 	DASHSCOPE_API_KEY 	Recommended for SR (auto-uses vision model)
+OpenAI 	                --provider openai 	OPENAI_API_KEY 	GPT-4 vision
+Anthropic 	        --provider anthropic 	ANTHROPIC_API_KEY 	Claude vision
+Groq 	                --provider groq 	GROQ_API_KEY 	Fast inference
+Ollama (local) 	        --provider ollama 	OLLAMA_HOST 	Free but slow; offline/testing only
 
 On transient errors (timeout, 429, 502, 503), the system automatically tries the next provider. Default chain: DeepSeek -> Qwen -> Groq. Configure via FALLBACK_PROVIDERS.
 
@@ -66,8 +67,8 @@ Note on Qwen and vision: the Qwen text model (QWEN_MODEL, default qwen-plus-late
 Streaming
 
 All providers support live token streaming, enabled by default in CLI terminals. Use --no-stream to disable. Non-TTY environments (pipes, CI) automatically use batch mode.
-Environment Variables (.env)
 
+Environment Variables (.env)
 DEFAULT_PROVIDER=deepseek
 FALLBACK_PROVIDERS=deepseek,qwen,groq
 
@@ -85,6 +86,8 @@ QWEN_VISION_MODEL=qwen-vl-max
 OPENAI_API_KEY=sk-...
 ANTHROPIC_API_KEY=sk-ant-...
 
+SR_STUDY_OVERRIDES=input/sr/study_overrides.yaml
+
 EMBEDDING_PROVIDER=ollama
 EMBEDDING_MODEL=nomic-embed-text
 CLI_THEME=dark
@@ -92,11 +95,21 @@ CLI_THEME=dark
 Running Tests
 
 python -m pytest -m "not live" --tb=short -q          # standard suite
+python -m pytest -q                                   # all markers (410 passed, 5 skipped)
 python -m pytest --cov=SOURCE_CODE --cov-report=html  # with coverage
 python -m pytest -m live -v                           # live provider smoke tests
 
 Current status: 401 passed, 3 skipped, 11 deselected.
+
 SR Pipeline
+
+READ Readme/REVIEWER_GUIDE.md BEFORE USING SR OUTPUT IN A REVIEW.
+
+Extraction is LLM-based and cannot verify its own semantics. It will emit a
+confident, precise effect size whether or not it understood the source paper.
+Every extracted mean, SD, and N must be checked against the source PDF before
+any pooled estimate is reported. See Known Issues #9 and #10 for documented
+failure modes.
 
 Place your PDFs in the SR input folder:
 
@@ -114,6 +127,45 @@ output/sr/figures/      # mirror of forest_plot.png
 output/sr/reports/      # mirror of report files
 
 To override the SR extraction model, set QWEN_VISION_MODEL in .env (default qwen-vl-max). Text-mode Qwen continues to use QWEN_MODEL (qwen-plus-latest).
+Study Metadata and Manual Overrides (v2.4.6)
+
+Study metadata (first author, year, DOI) is resolved in three stages, each
+overriding the last:
+
+    1. metadata returned by the extraction model
+    2. metadata derived from the PDF itself (PyMuPDF metadata, DOI regex,
+       copyright-line year). Best-effort only; flagged in the output as
+       metadata_source = "pdf_auto (verify)"
+    3. reviewer overrides from input/sr/study_overrides.yaml
+
+Overrides are keyed by PDF filename. Metadata fields fill only when extraction
+left them blank; numeric outcome fields REPLACE whatever extraction produced,
+because the reason to record them is that extraction got them wrong.
+
+"some_paper.pdf":
+  first_author: Nguyen
+  year: 2021
+  n_intervention: 42
+  n_control: 40
+  mean_intervention: 4.10
+  sd_intervention: 1.85
+  note: "Table 2, 12-week endpoint. Verified from PDF p.7, 2026-08-17."
+
+Extraction still runs in full when an override exists, so the log distinguishes:
+
+  field(7.32->7.35)      extraction was wrong, override corrected it
+  field(confirmed 7.35)  extraction independently agreed with the reviewer
+  field(absent->7.35)    extraction produced nothing for this field
+
+The "confirmed" case is a genuine cross-check. Do not disable extraction for
+overridden studies or you lose it.
+
+Overrides affect extraction and meta-analysis only. Screening (Stage 2) and
+RoB 2.0 (Stage 3.5) re-read the PDF independently and are unaffected.
+
+At the end of Stage 3 the log prints a DATA PROVENANCE SUMMARY listing every
+study whose values were manually overridden or whose metadata was
+auto-derived. Both must be described in the review's data-collection methods.
 Deployment (Render)
 
     URL: https://ai-kcmedicalresearch.onrender.com
@@ -123,15 +175,31 @@ Deployment (Render)
     Monitoring: UptimeRobot pings every 5 min (prevents free-tier cold starts)
 
 Known Issues
-# 	Issue 	Priority 	Status
-1 	Lami extraction fails — paper s10608 (Table 4, pages 12-13); 4/5 papers extract 	High 	Open
-2 	WeasyPrint not installed 	Medium 	PDF falls back to HTML
-3 	Anthropic geo-restricted 	Low 	Use VPN or skip
-4 	Hard-coded qwen3.7-plus in _DEFAULT_MODELS overrides QWEN_MODEL 	Low 	RESOLVED (v2.4.5)
-5 	SR vision regression: launcher defaulted qwen to text-only qwen-plus-latest 	High 	RESOLVED (v2.4.5) — now uses QWEN_VISION_MODEL (qwen-vl-max)
-6 	Cosmetic [ollama] Auto-detected line prints on Qwen SR runs; no effect on provider used 	Low 	Open
-7 	Inner sr/main.py argparse model default may still hardcode qwen3.7-plus 	Low 	Open — verify
-8 	test_main_coverage.py references a nonexistent nested prompts/coding/*.txt layout (actual files are flat prompts/-prompt.md) 	Low 	Open
+# 	Issue 	                        Priority 	                               Status
+1 	Lami extraction fails — paper s10608 (Table 4, pages 12-13); 4/5 papers extract
+                                        High 	                                       RESOLVED (v2.4.6) — text fallback + study_overrides.yaml; see #11 for the underlying instability
+2 	WeasyPrint not installed 	Medium 	                                       PDF falls back to HTML
+3 	Anthropic geo-restricted 	Low 	                                       Use VPN or skip
+4 	Hard-coded qwen3.7-plus in _DEFAULT_MODELS overrides QWEN_MODEL
+                                        Low 	                                       RESOLVED (v2.4.5)
+5 	SR vision regression: launcher defaulted qwen to text-only qwen-plus-latest
+                                        High 	                                       RESOLVED (v2.4.5) — now uses QWEN_VISION_MODEL (qwen-vl-max)
+6 	Cosmetic [ollama] Auto-detected line prints on Qwen SR runs; no effect on provider used
+                                        Low 	                                        Open
+7 	Inner sr/main.py argparse model default may still hardcode qwen3.7-plus
+                                        Low 	                                        Open — verify
+8 	test_main_coverage.py references a nonexistent nested prompts/coding/*.txt layout (actual files are flat prompts/-prompt.md)
+                                        Low 	                                        Open
+9 	No SD/SE disambiguation. Extraction reads a reported SE as an SD, understating dispersion by up to ~sqrt(n) and inflating the effect size
+                                        CRITICAL 	                                Open — manual check required (REVIEWER_GUIDE.md 3.1)
+10 	No within- vs between-group detection. A within-subject pre/post contrast can be extracted as if it were intervention-vs-control, producing a large invalid effect with no warning
+                                        CRITICAL 	                                Open — manual check required (REVIEWER_GUIDE.md 2.2)
+11 	Extraction is non-deterministic. The same PDF can yield different means/SDs/Ns on consecutive runs; observed in 2 of 5 test papers
+                                        High 	                                        Open — run 3x and diff before trusting output
+12 	Broken font CMaps misdetected as garbled text. Affected PDFs have a clean text layer recoverable with a fixed character-code offset, but the pipeline falls back to OCR, losing fidelity 	High 	Open — likely upstream cause of #11
+13 	No effect-size plausibility bound. Implausible values (e.g. |g| > 1.5 from a psychotherapy trial) pass through unflagged 	Medium 	Open
+14 	PICO file discovery differs between interfaces: the Streamlit UI globs output/rct_search/, the CLI globs input/sr/. A PICO saved in one is invisible to the other 	Low 	Open
+15 	RoB 2.0 assessment runs independently of study_overrides.yaml and may assess OCR text for a study whose outcome data was hand-entered 	Low 	Open — review RoB judgements separately
 Contributing
 
     Fork the repository

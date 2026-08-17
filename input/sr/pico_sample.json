@@ -1,0 +1,156 @@
+{
+  "timestamp": "2026-07-30 09:22:37",
+  "topic": "Effect of Cognitive-Behavioral Therapy on Pain",
+  "formulator_output": "**Research topic:** Effect of Cognitive-Behavioral Therapy on Pain\n\n**Structured PICO question:**\n\n- P (Population)    : Adults with fibromyalgia\n- I (Intervention)  : Cognitive-Behavioral Therapy\n- C (Comparison)    : Placebo or active comparator\n- O (Outcome)       : Pain intensity at post intervention\n\n**Clinical question:** In adults with fibromyalgia, does Cognitive-Behavioral Therapy compared with placebo or active comparator improve pain intensity at post intervention?",
+  "population": "Adults with fibromyalgia",
+  "intervention": "Cognitive-Behavioral Therapy",
+  "comparator": "Placebo or active comparator",
+  "outcome": "Pain intensity at post intervention",
+  "study_design": "RCT",
+  "effect_measure": "SMD",
+  "source_mode": "rct_search",
+  "pubmed_query_raw": "Adults with fibromyalgia AND Cognitive-Behavioral Therapy AND Pain intensity at post intervention",
+  "pubmed_query_cleaned": "Adults with fibromyalgia AND Cognitive-Behavioral Therapy AND Pain intensity AND randomized controlled trial[pt]",
+  "ranked_articles": [
+    {
+      "rank": 1,
+      "score": 20,
+      "pmid": "42372252",
+      "title": "Combined Internet-Based Cognitive Behavioral Therapy and Face-to-Face Physiotherapy in Primary Health Care for Chronic Widespread Pain: Randomized Controlled Trial.",
+      "url": "https://pubmed.ncbi.nlm.nih.gov/42372252/"
+    },
+    {
+      "rank": 2,
+      "score": 19,
+      "pmid": "41925517",
+      "title": "Anterior midcingulate cortex activity during pain catastrophizing predicts and sequentially tracks reduction in pain interference after cognitive behavioral therapy in fibromyalgia.",
+      "url": "https://pubmed.ncbi.nlm.nih.gov/41925517/"
+    },
+    {
+      "rank": 3,
+      "score": 18,
+      "pmid": "40964970",
+      "title": "Individual-Level Effects of a Digital Behavioural Treatment for Chronic Pain: Proof-of-Concept of a Single-Case Experimental Design Study.",
+      "url": "https://pubmed.ncbi.nlm.nih.gov/40964970/"
+    },
+    {
+      "rank": 4,
+      "score": 17,
+      "pmid": "40774114",
+      "title": "A randomised pilot study comparing brief psychodynamic therapy with cognitive-behavioural therapy in the treatment of patients with fibromyalgia.",
+      "url": "https://pubmed.ncbi.nlm.nih.gov/40774114/"
+    },
+    {
+      "rank": 5,
+      "score": 16,
+      "pmid": "38901112",
+      "title": "No add-on therapeutic benefit of at-home anodal tDCS of the primary motor cortex to mindfulness meditation in patients with fibromyalgia.",
+      "url": "https://pubmed.ncbi.nlm.nih.gov/38901112/"
+    },
+    {
+      "rank": 6,
+      "score": 15,
+      "pmid": "38685153",
+      "title": "Shared and distinct effect mediators in exposure-based and traditional cognitive behavior therapy for fibromyalgia: Secondary analysis of a randomized controlled trial.",
+      "url": "https://pubmed.ncbi.nlm.nih.gov/38685153/"
+    },
+    {
+      "rank": 7,
+      "score": 14,
+      "pmid": "37280637",
+      "title": "Global posture reeducation compared with segmental muscle stretching exercises in the treatment of fibromyalgia: a randomized controlled trial.",
+      "url": "https://pubmed.ncbi.nlm.nih.gov/37280637/"
+    },
+    {
+      "rank": 8,
+      "score": 13,
+      "pmid": "33123304",
+      "title": "Brief Acceptance and Commitment Therapy for Fibromyalgia: Feasibility and Effectiveness of a Replicated Single-Case Design.",
+      "url": "https://pubmed.ncbi.nlm.nih.gov/33123304/"
+    },
+    {
+      "rank": 9,
+      "score": 12,
+      "pmid": "30496533",
+      "title": "Cognitive behavioral treatments for insomnia and pain in adults with comorbid chronic insomnia and fibromyalgia: clinical outcomes from the SPIN randomized controlled trial.",
+      "url": "https://pubmed.ncbi.nlm.nih.gov/30496533/"
+    },
+    {
+      "rank": 10,
+      "score": 11,
+      "pmid": "30326271",
+      "title": "Operant Learning Versus Energy Conservation Activity Pacing Treatments in a Sample of Patients With Fibromyalgia Syndrome: A Pilot Randomized Controlled Trial.",
+      "url": "https://pubmed.ncbi.nlm.nih.gov/30326271/"
+    },
+    {
+      "rank": 11,
+      "score": 10,
+      "pmid": "28796118",
+      "title": "Emotional awareness and expression therapy, cognitive behavioral therapy, and education for fibromyalgia: a cluster-randomized controlled trial.",
+      "url": "https://pubmed.ncbi.nlm.nih.gov/28796118/"
+    },
+    {
+      "rank": 12,
+      "score": 9,
+      "pmid": "27885763",
+      "title": "Meditation awareness training for the treatment of fibromyalgia syndrome: A randomized controlled trial.",
+      "url": "https://pubmed.ncbi.nlm.nih.gov/27885763/"
+    },
+    {
+      "rank": 13,
+      "score": 8,
+      "pmid": "27518489",
+      "title": "Mindfulness-Based Intervention Does Not Influence Cardiac Autonomic Control or the Pattern of Physical Activity in Fibromyalgia During Daily Life: An Ambulatory, Multimeasure Randomized Controlled Trial.",
+      "url": "https://pubmed.ncbi.nlm.nih.gov/27518489/"
+    },
+    {
+      "rank": 14,
+      "score": 7,
+      "pmid": "27302744",
+      "title": "Differential psychophysiological effects of operant and cognitive behavioural treatments in women with fibromyalgia.",
+      "url": "https://pubmed.ncbi.nlm.nih.gov/27302744/"
+    },
+    {
+      "rank": 15,
+      "score": 6,
+      "pmid": "27055444",
+      "title": "The effects of long- and short-term interdisciplinary treatment approaches in women with fibromyalgia: a randomized controlled trial.",
+      "url": "https://pubmed.ncbi.nlm.nih.gov/27055444/"
+    },
+    {
+      "rank": 16,
+      "score": 5,
+      "pmid": "26921267",
+      "title": "Cost-utility and biological underpinnings of Mindfulness-Based Stress Reduction (MBSR) versus a psychoeducational programme (FibroQoL) for fibromyalgia: a 12-month randomised controlled trial (EUDAIMON study).",
+      "url": "https://pubmed.ncbi.nlm.nih.gov/26921267/"
+    },
+    {
+      "rank": 17,
+      "score": 4,
+      "pmid": "26335989",
+      "title": "Effect of Milnacipran Treatment on Ventricular Lactate in Fibromyalgia: A Randomized, Double-Blind, Placebo-Controlled Trial.",
+      "url": "https://pubmed.ncbi.nlm.nih.gov/26335989/"
+    },
+    {
+      "rank": 18,
+      "score": 3,
+      "pmid": "26228408",
+      "title": "Internet versus face-to-face group cognitive-behavioral therapy for fibromyalgia: A randomized control trial.",
+      "url": "https://pubmed.ncbi.nlm.nih.gov/26228408/"
+    },
+    {
+      "rank": 19,
+      "score": 2,
+      "pmid": "26088940",
+      "title": "Empowering Patients with Persistent Pain Using an Internet-based Self-Management Program.",
+      "url": "https://pubmed.ncbi.nlm.nih.gov/26088940/"
+    },
+    {
+      "rank": 20,
+      "score": 1,
+      "pmid": "25786050",
+      "title": "Web/Internet-based telemonitoring of a randomized controlled trial evaluating the time-integrated effects of a 24-week multicomponent intervention on key health outcomes in patients with fibromyalgia.",
+      "url": "https://pubmed.ncbi.nlm.nih.gov/25786050/"
+    }
+  ]
+}

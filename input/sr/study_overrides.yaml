@@ -1,0 +1,24 @@
+# Reviewer-verified corrections, keyed by PDF filename.
+#
+# Metadata fields (first_author, year, doi, study, study_id) fill in only
+# when extraction left them blank.
+#
+# Numeric fields (n_intervention, n_control, mean_*, sd_*) REPLACE whatever
+# the extractor produced. Use them only for values you have read yourself
+# from the source table, and always record where they came from in `note`.
+#
+# Every applied override appears in extracted_data.csv under
+# override_fields / override_note.
+
+"s10608-017-9875-4.pdf":
+  first_author: Lami
+  year: 2018
+  n_intervention: 28
+  n_control: 36
+  mean_intervention: 7.35
+  sd_intervention: 2.08
+  mean_control: 7.40
+  sd_control: 1.29
+  note: >-
+    Table 4, post-intervention CBT-P vs UMC. Ns are post-intervention
+    (28/36), not baseline (34/41). Verified from PDF pages 12-13.

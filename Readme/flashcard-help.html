@@ -52,7 +52,7 @@ footer{text-align:center;margin-top:48px;font-size:.76rem;color:#475569}
 </head>
 <body>
 <h1>&#129516; AI kcMedicalResearch</h1>
-<p class="subtitle">Interactive Help Guide &middot; 362 tests &middot; ~50% coverage &middot; 6 modes &middot; 6 providers &middot; v2.4.1</p>
+<p class="subtitle">Interactive Help Guide &middot; 401 tests &middot; ~53% coverage &middot; 6 modes &middot; 6 providers &middot; v2.4.6</p>
 <button class="toggle-all" onclick="toggleAll()">Expand All</button>
 <div class="grid">
 
@@ -247,35 +247,90 @@ python SOURCE_CODE/main.py --mode appraisal --provider anthropic</pre>
   <div><div class="card-title">Systematic Review Pipeline</div><div class="card-badge">--mode sr</div></div>
 </div>
 <div class="card-body">
-  <div class="warn">&#9888;&#65039; Research accelerator only. All outputs require human verification.</div>
+  <div class="warn"><strong>&#9888;&#65039; Read <code>REVIEWER_GUIDE.md</code> before using SR output in a review.</strong><br/>
+  Extraction is LLM-based and cannot verify its own semantics. It emits a confident, precise effect size whether or not it understood the paper. <strong>Plausibility is not evidence of correctness.</strong> Every mean, SD and N must be checked against the source PDF before any pooled estimate is reported.</div>
+
+  <div class="section-label">Known blind spots</div>
+  <table>
+    <tr><th>Gap</th><th>Consequence</th></tr>
+    <tr><td><span class="pill pill-red">CRITICAL</span> SD vs SE not distinguished</td><td>A reported SE read as an SD understates dispersion by up to &radic;n and inflates the effect size</td></tr>
+    <tr><td><span class="pill pill-red">CRITICAL</span> Within- vs between-group not detected</td><td>A pre/post contrast can be extracted as intervention-vs-control, giving a large invalid effect with no warning</td></tr>
+    <tr><td><span class="pill pill-orange">HIGH</span> Extraction is non-deterministic</td><td>Same PDF can yield different means/SDs/Ns across runs. Run 3&times; and diff before trusting output</td></tr>
+    <tr><td><span class="pill pill-yellow">MED</span> No plausibility bound</td><td>|g| &gt; 1.5 from a psychotherapy trial passes unflagged</td></tr>
+  </table>
+
   <div class="section-label">Pipeline Stages</div>
   <table>
     <tr><th>#</th><th>Stage</th><th>Output</th></tr>
     <tr><td>1</td><td>Upload PDFs</td><td><code>uploads/upload_manifest.csv</code></td></tr>
     <tr><td>2</td><td>Relevance screening</td><td><code>data/screened/screening_log.csv</code></td></tr>
     <tr><td>3</td><td>Data extraction</td><td><code>data/extracted/extracted_data.csv</code></td></tr>
+    <tr><td>3.5</td><td>RoB 2.0 assessment</td><td><code>data/extracted/rob2_assessment.csv</code></td></tr>
     <tr><td>4</td><td>Meta-analysis</td><td><code>data/results/meta_analysis_results.csv</code></td></tr>
     <tr><td>5</td><td>Forest plot</td><td><code>output/figures/forest_plot.png</code></td></tr>
     <tr><td>6</td><td>Reports</td><td><code>output/reports/</code></td></tr>
   </table>
+
   <div class="section-label">Project folder layout (per run)</div>
   <pre>reports/sr/YYYYMMDD_HHMMSS/
-  uploads/              <- PDF copies
+  uploads/              &lt;- PDF copies
   data/
-    screened/           <- screening_log.csv
-    extracted/          <- extracted_data.csv
-    results/            <- meta_analysis_results.csv
+    screened/           &lt;- screening_log.csv
+    extracted/          &lt;- extracted_data.csv, rob2_assessment.csv
+    results/            &lt;- meta_analysis_results.csv
   output/
-    figures/            <- forest_plot.png
-    reports/            <- systematic_review.docx / .html</pre>
+    figures/            &lt;- forest_plot.png
+    reports/            &lt;- systematic_review.docx / .html</pre>
   <div class="ok">&#9989; Outputs mirrored to <code>output/sr/</code></div>
+
+  <div class="section-label">Vision model</div>
+  <div class="info">&#128161; SR uses <code>QWEN_VISION_MODEL</code> (default <code>qwen-vl-max</code>) automatically. The Qwen text model <code>qwen-plus-latest</code> is text-only and cannot extract from page images. No <code>--model</code> flag needed.</div>
+
+  <div class="section-label">Study metadata &amp; manual overrides</div>
+  <p style="font-size:.78rem;color:#cbd5e1;margin-bottom:10px">Metadata resolves in three stages, each overriding the last:</p>
+  <table>
+    <tr><th>#</th><th>Source</th><th>Flagged as</th></tr>
+    <tr><td>1</td><td>Extraction model output</td><td>&mdash;</td></tr>
+    <tr><td>2</td><td>Derived from the PDF (metadata, DOI, copyright year)</td><td><code>pdf_auto (verify)</code></td></tr>
+    <tr><td>3</td><td>Reviewer overrides &mdash; <code>input/sr/study_overrides.yaml</code></td><td><code>override_fields</code></td></tr>
+  </table>
+  <pre>"some_paper.pdf":
+  first_author: Nguyen
+  year: 2021
+  n_intervention: 42
+  n_control: 40
+  mean_intervention: 4.10
+  sd_intervention: 1.85
+  note: "Table 2, 12-week endpoint. Verified from PDF p.7."</pre>
+  <p style="font-size:.78rem;color:#cbd5e1;margin-bottom:10px">Metadata fields fill only when blank. <strong>Numeric fields replace</strong> extraction output. Extraction still runs in full, so the log reports:</p>
+  <table>
+    <tr><th>Log entry</th><th>Meaning</th></tr>
+    <tr><td><code>field(7.32-&gt;7.35)</code></td><td>Extraction was wrong; override corrected it</td></tr>
+    <tr><td><code>field(confirmed 7.35)</code></td><td>Extraction independently agreed &mdash; a real cross-check</td></tr>
+    <tr><td><code>field(absent-&gt;7.35)</code></td><td>Extraction produced nothing for this field</td></tr>
+  </table>
+  <div class="info">&#128161; End of Stage 3 prints a <strong>DATA PROVENANCE SUMMARY</strong> listing every study using overrides or auto-derived metadata. Both must be described in the review's data-collection methods.</div>
+  <div class="warn">&#9888;&#65039; Overrides affect extraction and meta-analysis only. Screening and RoB 2.0 re-read the PDF independently.</div>
+
+  <div class="section-label">Reviewer rules</div>
+  <table>
+    <tr><th>#</th><th>Rule</th></tr>
+    <tr><td>1</td><td>Read the source table first. Never enter a value inferred from what the pooled estimate "should" look like</td></tr>
+    <tr><td>2</td><td>Always fill <code>note</code> with table number, page, and date</td></tr>
+    <tr><td>3</td><td>Verify symmetrically &mdash; checking only studies that surprise you introduces selection bias</td></tr>
+    <tr><td>4</td><td><strong>Never edit the override file after looking at the forest plot</strong></td></tr>
+    <tr><td>5</td><td>Overrides are data, not code &mdash; commit them with a message explaining the verification</td></tr>
+  </table>
+
   <div class="section-label">Recommended workflow</div>
   <table>
     <tr><th>Step</th><th>Action</th></tr>
-    <tr><td>1</td><td>Run <code>--mode rct_search</code> -> get ranked articles</td></tr>
+    <tr><td>1</td><td>Run <code>--mode rct_search</code> -&gt; get ranked articles</td></tr>
     <tr><td>2</td><td>Review <code>output/rct_search/rct_search_*.docx</code></td></tr>
     <tr><td>3</td><td>Download PDFs, place in <code>input/sr/</code></td></tr>
-    <tr><td>4</td><td>Run <code>python SOURCE_CODE/main.py --mode sr --provider qwen</code></td></tr>
+    <tr><td>4</td><td>Run <code>python SOURCE_CODE/main.py --mode sr --provider qwen</code> (run directly, not via the menu launcher, so PICO prompts get a real TTY)</td></tr>
+    <tr><td>5</td><td><strong>Verify every included study against its source PDF</strong>; record corrections in <code>study_overrides.yaml</code></td></tr>
+    <tr><td>6</td><td>Re-run 3&times; and diff <code>meta_analysis_results.csv</code> before reporting</td></tr>
   </table>
 </div></div>
 
@@ -289,7 +344,8 @@ python SOURCE_CODE/main.py --mode appraisal --provider anthropic</pre>
   <table>
     <tr><th>Provider</th><th>Flag</th><th>Env var (.env)</th><th>Notes</th></tr>
     <tr><td><strong>DeepSeek (DEFAULT)</strong></td><td><code>--provider deepseek</code></td><td><code>DEEPSEEK_API_KEY</code></td><td>Fast, cost-efficient</td></tr>
-    <tr><td>Qwen</td><td><code>--provider qwen</code></td><td><code>DASHSCOPE_API_KEY</code></td><td>Recommended for SR (vision)</td></tr>
+    <tr><td>Qwen (text)</td><td><code>--provider qwen</code></td><td><code>DASHSCOPE_API_KEY</code><br/><code>QWEN_MODEL</code></td><td>Default <code>qwen-plus-latest</code> &mdash; text only</td></tr>
+    <tr><td>Qwen (vision / SR)</td><td><code>--provider qwen</code></td><td><code>DASHSCOPE_API_KEY</code><br/><code>QWEN_VISION_MODEL</code></td><td>Default <code>qwen-vl-max</code>. Used automatically for SR &mdash; no <code>--model</code> flag needed</td></tr>
     <tr><td>OpenAI</td><td><code>--provider openai</code></td><td><code>OPENAI_API_KEY</code></td><td>GPT-4 vision</td></tr>
     <tr><td>Anthropic</td><td><code>--provider anthropic</code></td><td><code>ANTHROPIC_API_KEY</code></td><td>Claude vision</td></tr>
     <tr><td>Groq</td><td><code>--provider groq</code></td><td><code>GROQ_API_KEY</code></td><td>Fast inference</td></tr>
@@ -399,7 +455,7 @@ EMBEDDING_MODEL=nomic-embed-text</pre>
 </div></div>
 
 </div><!-- end grid -->
-<footer>AI kcMedicalResearch v2.4.1 &middot; 362 tests passing &middot; ~50% coverage &middot; DeepSeek default &middot; Fallback: DeepSeek -> Qwen -> Groq &middot; All SR outputs require human verification.</footer>
+<footer>AI kcMedicalResearch v2.4.6 &middot; 401 tests passing &middot; ~53% coverage &middot; DeepSeek default &middot; Fallback: DeepSeek -&gt; Qwen -&gt; Groq &middot; SR extraction cannot validate its own semantics &mdash; every mean, SD and N must be checked against the source PDF.</footer>
 <script>
 function toggle(card){card.classList.toggle("open")}
 function toggleAll(){
