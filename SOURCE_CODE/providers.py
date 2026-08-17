@@ -47,6 +47,10 @@ FALLBACK_PROVIDERS = [
     if p.strip()
 ]
 
+# Providers that run on the user's own machine. Requests to these are never
+# retried against a cloud provider, because the input may be confidential.
+LOCAL_ONLY_PROVIDERS = {"ollama"}
+
 # Ollama performance thresholds
 OLLAMA_MIN_TOKENS_PER_SECOND = float(os.getenv("OLLAMA_MIN_TOKENS_PER_SECOND", "10"))
 
@@ -471,7 +475,16 @@ def call_ai_with_fallback(
     """
     provider = provider or DEFAULT_PROVIDER
     chain = fallback_chain or FALLBACK_PROVIDERS
-    ordered = [provider] + [p for p in chain if p != provider]
+
+    # Never fall back away from a locally-hosted provider. Ollama is the only
+    # provider that keeps the prompt on the user's machine, so it is the only
+    # one usable for confidential or patient-identifiable input. Falling back
+    # to a cloud API would transmit data the user chose to keep local.
+    # A timeout is not consent to send data elsewhere.
+    if provider in LOCAL_ONLY_PROVIDERS:
+        ordered = [provider]
+    else:
+        ordered = [provider] + [p for p in chain if p != provider]
 
     last_error = None
     for attempt_provider in ordered:
@@ -484,8 +497,19 @@ def call_ai_with_fallback(
             last_error = exc
             if not _is_transient_error(exc):
                 raise
-            print(f"[fallback] {attempt_provider} failed ({exc}), trying next...")
+            if attempt_provider == ordered[-1]:
+                print(f"[fallback] {attempt_provider} failed ({exc}); "
+                      f"no fallback available.")
+            else:
+                print(f"[fallback] {attempt_provider} failed ({exc}), trying next...")
             continue
+
+    if provider in LOCAL_ONLY_PROVIDERS:
+        raise RuntimeError(
+            f"{provider} failed and no fallback was attempted: it is a "
+            f"local-only provider, so the request was NOT sent to any cloud "
+            f"API. Last error: {last_error}"
+        )
 
     raise RuntimeError(
         f"All providers failed. Last error: {last_error}. "
