@@ -1,9 +1,11 @@
 ﻿AI kcMedicalResearch — Combined Handoff Document
-Version 2.4.7 — API Key Leak Fix, Startup Performance, Cross-Platform Launchers
+Version 2.4.8 — Local-Provider Confidentiality Fix, BOM Cleanup, Python Version Gate
 
-Date: 2026-08-17 (Sessions 8-9) Repository: https://github.com/KW75/AI_kcMedicalResearch Live App: https://ai-kcmedicalresearch.onrender.com Health Check: https://ai-kcmedicalresearch.onrender.com/_stcore/health Uptime Monitor: UptimeRobot, 5-minute interval, keeps free-tier Render instance warm Tests: 401 passed, 3 skipped, 11 deselected/live tests (410 passed, 5 skipped with no marker filter) Coverage: ~53% Current Status: CI green, Render live, health endpoint returns ok
+Date: 2026-08-17 (Sessions 8-10) Repository: https://github.com/KW75/AI_kcMedicalResearch Live App: https://ai-kcmedicalresearch.onrender.com Health Check: https://ai-kcmedicalresearch.onrender.com/_stcore/health Uptime Monitor: UptimeRobot, 5-minute interval, keeps free-tier Render instance warm Tests: 401 passed, 3 skipped, 11 deselected/live tests (410 passed, 5 skipped with no marker filter) Coverage: ~53% Current Status: CI green, Render live, health endpoint returns ok
 
-CRITICAL READ FIRST: Session 8 found that SR extraction can produce a confident, precisely-quantified, entirely invalid effect size with no warning at any stage. See Session 8 notes, Known Issues #15 and #16, and Readme/REVIEWER_GUIDE.md. Do not report any pooled estimate from this pipeline without manual source verification.
+CRITICAL READ FIRST (1): Session 10 found and fixed a confidentiality defect. An explicit --provider ollama could silently send the prompt to DeepSeek on a timeout, because the fallback chain ignored which provider was requested. Ollama is the only provider that keeps input local, so this affected exactly the case where it mattered. Fixed in v2.4.8; no regression test yet (Issue #26).
+
+CRITICAL READ FIRST (2): Session 8 found that SR extraction can produce a confident, precisely-quantified, entirely invalid effect size with no warning at any stage. See Session 8 notes, Known Issues #15 and #16, and Readme/REVIEWER_GUIDE.md. Do not report any pooled estimate from this pipeline without manual source verification.
 
 ======================================
 1. PROJECT OVERVIEW
@@ -97,6 +99,18 @@ Session 9 — 2026-08-17 — v2.4.7: API Key Leak, Startup Performance, Launcher
     Tests: 401 passed, 3 skipped, 11 deselected throughout.
     Commit trail: 190ec9e (v2.4.6 docs + SR overrides) -> fb7b5ce (Windows launchers) -> ab77bb5 (lazy imports, key leak, macOS launchers, .gitattributes).
 
+
+Session 10 — 2026-08-17 — v2.4.8: Confidentiality Fix, BOM Cleanup, Python Gate
+
+    CONFIDENTIALITY (resolved, most serious defect found to date) — The app is intended to let clinicians process patient data locally via Ollama; every other provider transmits the prompt to an external API. But call_ai_with_fallback built its chain as `[provider] + [p for p in chain if p != provider]`, so an explicit --provider ollama became [ollama, deepseek, qwen, groq]. "timeout" and "connection" are both in _TRANSIENT_INDICATORS, and the project's own notes record that large Ollama models time out frequently on the coding and writing pipelines. So a routine local timeout sent patient data to DeepSeek, printed "[fallback] Succeeded with deepseek" among hundreds of log lines, and completed as though the run were normal. Fixed by introducing LOCAL_ONLY_PROVIDERS = {"ollama"}: requests to a local provider never fall back, and the resulting error states explicitly that nothing was sent to a cloud API. The "trying next..." log line is now conditional on a next provider existing. Verified by injecting a failing call_ai: ollama tried ['ollama'], deepseek tried ['deepseek','qwen','groq'].
+    UTF-8 BOMs (resolved) — 23 files under SOURCE_CODE/ began with EF BB BF. Python tolerates a BOM on import so the code ran, but ast.parse() rejects it and, combined with an encoding mismatch, it renders as garbage characters. This is what earlier notes recorded as "corrupted Chinese comments" in sr/main.py and project_layout.py — not corruption, a BOM. Note some were self-inflicted: PowerShell 5 `Set-Content -Encoding UTF8` writes a BOM, and files generated that way during Sessions 8-9 acquired one. Added scripts/check_no_bom.py and scripts/strip_bom.py; check_no_bom.py should be wired into CI.
+    Python version gate (resolved) — A clean install on Python 3.14 (now the python.org default) fails across pywin32 306, textract 1.6.5, pillow, opencv-python 4.8 and pymupdf, taking hours to diagnose from pip and import errors. main.py now checks the interpreter before any third-party import — critically, above `from dotenv import load_dotenv`, or the user hits ModuleNotFoundError first — and exits with the supported range, the detected version and path, a Python 3.12 download link, and the Docker alternative. Decision: support 3.11-3.12 rather than raise floors on numpy/scipy/pillow/pymupdf and gamble on chromadb wheels for an interpreter that cannot be tested here.
+    Requirements split (resolved) — requirements-base.txt now holds the 18 shared runtime deps, referenced by requirements.txt and requirements-ci.txt via -r. requirements-render.txt deliberately left standalone and pinned: it had just recovered from a failed deploy and mixing floors with pins for marginal DRY benefit was not worth destabilising it. New requirements-ocr.txt holds the optional OCR stack. Key finding: the OCR packages were installed but could not work — the Dockerfile apt-gets only curl and wget, so no Tesseract, no Poppler, no libGL for cv2 — meaning ~2GB of PyTorch via easyocr bought nothing. Also resolved duplicate conflicting pins (python-docx >=1.0.0 vs ==1.1.0; pillow >=9.0.0 vs Pillow==10.1.0, where last-wins made the floors decorative) and dropped textract.
+    Docker consolidation (resolved) — Nine files in docker/ reduced to two: Dockerfile and docker-compose.yml. The six deleted run scripts each carried their own copy of the docker run command, which is why the same bugs appeared six times over. Dockerfile now installs requirements-base.txt. Discovered in the process that Docker_setup.bat — the advertised one-click Windows setup — was non-functional: unescaped parentheses in echo text inside if-blocks (lines 110, 256, 288, 289) close the block early, so cmd exits with "was unexpected at this time" before any Docker command runs. mac_docker_setup.sh called goto_run_app, a leftover from batch translation that is not a bash construct and, under set -e, exited the script on the update path. Neither could ever have completed a setup.
+    Docker still UNVERIFIED — Docker is not installed on the dev machine, which is why none of the above was ever caught. Nothing Docker-related has been executed: not the build, not either compose service, not the .env-exclusion check. This is the gate before pointing colleagues at that route (Issue #19).
+    Windows/macOS launchers (resolved in Session 9, verified Session 10) — activate_venv.bat now prints the resolved interpreter after activating; confirmed D:\AI_kcMedicalResearch\.venv\Scripts\python.exe, 3.11.9. The earlier sighting of C:\Users\user\...Python311 was a non-activated shell, not a broken venv.
+    Commit trail: f0b678e (local-provider fallback) -> 1541b09 (requirements split, compose, docs) -> c851259 (delete broken setup scripts) -> 5439ede (BOM strip + guards) -> f64d84d (Python version gate).
+
 ======================================
 3. CURRENT STATUS
 ======================================
@@ -160,6 +174,14 @@ Documentation 	                      CURRENT 	                README.md, HANDOFF
 26 	pipelines.sr.main (~2.8s: scipy.stats, matplotlib, pymupdf) is imported even for coding mode 	Low 	Open — same lazy-import treatment as utils
 27 	macOS launcher changes are untested on macOS. The curl /_stcore/health poll loop and the lsof port check need a real run 	Medium 	Open — verify before relying on them
 28 	Old %TEMP%\ai_km_run_*.bat files from before the v2.4.7 fix still contain API keys in plaintext on any machine that ran the UI 	High 	Action required — delete them and rotate affected keys
+29 	call_ai_with_fallback sent prompts to cloud providers even when --provider ollama was requested. Confidential input could reach a third party on a routine timeout 	CRITICAL 	RESOLVED (Session 10) — LOCAL_ONLY_PROVIDERS never falls back
+30 	23 source files began with a UTF-8 BOM; previously misdiagnosed as corrupted comments 	Medium 	RESOLVED (Session 10) — stripped; check_no_bom.py guards
+31 	Clean install on Python 3.14 fails across five packages 	High 	RESOLVED (Session 10) — main.py gates 3.11-3.12 with a download link
+32 	OCR packages installed but unusable: no Tesseract/Poppler/libGL in the image, so ~2GB of PyTorch bought nothing 	Medium 	RESOLVED (Session 10) — moved to requirements-ocr.txt
+33 	Docker_setup.bat and mac_docker_setup.sh were both non-functional and were the advertised one-click setup routes 	High 	RESOLVED (Session 10) — deleted; replaced by docker compose
+34 	_is_transient_error matches substrings, so an auth error mentioning "connection" is treated as retryable and triggers fallback 	Low 	Open
+35 	No regression test asserting --provider ollama never reaches a cloud API. The fix for #29 is verified only by a manual check 	Medium 	Open
+36 	check_no_bom.py is not wired into CI, so BOMs can return silently 	Low 	Open
 ======================================
 5. AI PROVIDERS
 ======================================
@@ -199,20 +221,17 @@ TOTAL 	~53% (401 tests)
 
 ======================================
 7. NEXT SESSION PRIORITIES
-======================================
-Priority 	                                                        Task 	Details
-1 	Fix font CMap decode (Issue #18) 	                        Highest value remaining. All five test PDFs decode cleanly with a fixed +1 character-code offset yet are OCR'd unnecessarily. Detect the offset (decode a sample and score against common English words), apply it, and only fall back to OCR if the decoded text still scores poorly. Likely resolves or reduces #17. Entry point: the "Garbled text detected" check in relevance_screener.py and rob2_tool.py.
-2 	Resolve zsy234.pdf (Issue #19) 	                                Either exclude with a documented PRISMA reason ("no between-group effect estimate available for the review outcome") or extract correct group-level post-treatment pain values from Table 3 / Figure 4. Record the decision in study_overrides.yaml with the page reference.
-3 	Add semantic validators (Issues #15, #16, #20) 	                Prompt the model to return the dispersion measure verbatim (SD/SE/SEM/CI) and refuse SE without conversion; require distinct intervention_group_label and control_group_label and reject when equal or empty; flag |g| > 1.5 for review. These three would have caught the zsy234 failure.
-4 	Add regression fixtures (Issue #23) 	                        Encode expected outcomes for the five-paper corpus, including expected FAILURES (zsy234 must not be silently included with a large effect). Turns Session 8 debugging into a permanent test.
-5 	Raise SR pipeline coverage 	                                Core screening/extraction logic still ~10-53%
-6 	Verify inner sr/main.py model default (Issue #13) 	        Confirm the inner argparse default reads a model constant, not hardcoded qwen3.7-plus
-7 	Silence Ollama auto-detect on non-Ollama runs (Issue #10) 	Cosmetic [ollama] line in inner SR package
-8 	Reconcile test_main_coverage.py prompt paths (Issue #14) 	Tests reference nonexistent nested prompts/coding/*.txt
-9 	PDF export via fpdf2 	                                        Pure-Python, no GTK3 dependency (addresses Issue #2)
-10 	Add visible app version/commit 	                                Streamlit sidebar
+Priority 	Task 	Details
+1 	Regression test for #29 	Assert that call_ai_with_fallback("...", provider="ollama") attempts only ollama. The manual check in Session 10 is most of the test already. Highest value: it protects a confidentiality guarantee that currently rests on one uncommitted-to-test code path.
+2 	Test Docker on the laptop (#19) 	docker compose build; docker compose run --rm cli; docker images for size; and the .env-exclusion check: docker run --rm <img> sh -c "ls /app/.env && echo LEAK || echo OK". Nothing Docker-related has ever been executed.
+3 	Resolve zsy234.pdf (#19 in README) 	Still in SR results as a valid study at g=-2.36 despite the paper reporting no between-group pain effect. Exclude with a documented PRISMA reason, or extract correct group-level values.
+4 	Fix font CMap decode 	All five test PDFs decode cleanly with a fixed +1 character offset yet are OCR'd unnecessarily. Likely upstream cause of extraction non-determinism.
+5 	Add semantic validators 	SD-vs-SE, within-vs-between-group, |g| > 1.5 plausibility bound. These three would have caught the zsy234 failure.
+6 	Wire check_no_bom.py into CI (#36) 	One step in the workflow.
+7 	Add regression fixtures for the five-paper corpus 	Including expected FAILURES: zsy234 must not be silently included with a large effect.
+8 	Gate the module-scope Ollama probe (#25 in README) 	Network call at import time, every run and every test, regardless of --provider.
+9 	Raise SR pipeline coverage 	Core screening/extraction still ~10-53%
 
-======================================
 8. LESSONS LEARNED
 ======================================
     Tests must mock utils.rag.index_uploads rather than doing real embedding (slow + non-deterministic).
@@ -253,6 +272,13 @@ Priority 	                                                        Task 	Details
     (Session 9) set -e makes subsequent `if [ $? -ne 0 ]` handlers dead code — the script exits before reaching them. Use set -uo pipefail when the script does its own error checking.
     (Session 9) .gitattributes must force LF on *.sh. With core.autocrlf=true, a Windows commit stores CRLF and the shebang breaks on macOS. Check with git check-attr text eol -- path, not by reading the warnings.
     (Session 9) git check-ignore reports a file as tracked (not ignored) once it is in the index; use --no-index to test the rule itself. And a bare ! negation cannot re-include a file inside an excluded directory — git never descends into it.
+    (Session 10) A fallback chain that ignores WHY a provider was chosen will eventually violate the reason it was chosen. Ollama was selected for confidentiality; the chain treated it as merely first in a list. Any mechanism that substitutes one provider for another must know which properties of the original were load-bearing.
+    (Session 10) A timeout is not consent. Retry logic that changes WHERE data goes is not the same as retry logic that changes WHEN it is sent.
+    (Session 10) The most dangerous failures print a success message. "[fallback] Succeeded with deepseek" scrolled past in a 200-line log while patient data left the machine. Compare Session 8's zsy234: a confident g=-2.36 with a clean CI. Neither looked like an error.
+    (Session 10) Code paths nobody executes do not work. Both advertised one-click setup scripts were broken, unnoticed, because Docker was never installed on the dev machine. Documentation asserting that an untested path works is worse than no documentation.
+    (Session 10) PowerShell 5 `Set-Content -Encoding UTF8` writes a BOM. Use `-Encoding utf8NoBOM` (PS7), `Out-File -Encoding ascii`, or [System.IO.File]::WriteAllText with UTF8Encoding($false). Files generated during Sessions 8-9 acquired BOMs this way.
+    (Session 10) Put a version gate above the first third-party import, not merely near the top. Below `from dotenv import load_dotenv` the user gets ModuleNotFoundError and never sees the message.
+    (Session 10) When a dependency needs system binaries pip cannot install, installing the Python package alone is worse than not installing it: it looks supported, costs disk, and fails at runtime. The image carried ~2GB of PyTorch for OCR it could not perform.
     (Session 9) Profile before optimising. The 15-20s startup was assumed to be an Ollama network probe; importtime showed it was eager imports. Measured 3.2s of imports against 15-20s observed, so filesystem/AV cold cache accounts for the remainder — no code change fixes that part.
 
 ======================================
@@ -303,7 +329,7 @@ Reviewer rules (full version in Readme/REVIEWER_GUIDE.md): read the source table
 12. IMMEDIATE ACTIONS BEFORE NEXT SESSION
 ======================================
 
-1. ROTATE API KEYS. Anthropic, DeepSeek, and DashScope keys were displayed in
+1. ROTATE API KEYS. (Still outstanding as of Session 10.) Anthropic, DeepSeek, and DashScope keys were displayed in
    plaintext by the pre-v2.4.7 UI launcher and appeared in screenshots.
    Clearing .env does not revoke them. Rotate at each provider console, then
    put the new keys in .env (which is gitignored).
@@ -318,4 +344,4 @@ Reviewer rules (full version in Readme/REVIEWER_GUIDE.md): read the source table
 
 5. Test the macOS launchers on an actual Mac (Issue #27).
 
-Handoff prepared: 2026-08-17 · Version: v2.4.7 · Single source of truth for next session.
+Handoff prepared: 2026-08-17 · Version: v2.4.8 · Single source of truth for next session.

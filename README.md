@@ -2,7 +2,7 @@ AI kcMedical Research
 
 A multi-mode AI assistant for medical research, critical appraisal, systematic review, coding, and writing. Uses cloud providers by default (DeepSeek, Qwen, OpenAI, Anthropic, Groq) with optional local Ollama support.
 
-    Version: 2.4.7
+    Version: 2.4.8
     Tests: 401 passed, 3 skipped
     Coverage: ~53%
     CI: GitHub Actions - Green
@@ -12,23 +12,30 @@ A multi-mode AI assistant for medical research, critical appraisal, systematic r
     Uptime: UptimeRobot (5-min monitoring, prevents cold starts)
 
 Quick Start
-One-Click Setup (Recommended for Colleagues)
 
-Windows:
+Nothing to install - use the hosted app:
 
-git clone https://github.com/KW75/AI_kcMedicalResearch.git
-cd AI_kcMedicalResearch
-docker\docker_setup.bat
+    https://ai-kcmedicalresearch.onrender.com
 
-macOS:
+To run locally with Docker (supplies its own Python, so your installed
+version does not matter):
 
-git clone https://github.com/KW75/AI_kcMedicalResearch.git
-cd AI_kcMedicalResearch
-chmod +x docker/mac_*.sh
-./docker/mac_docker_setup.sh
+    git clone https://github.com/KW75/AI_kcMedicalResearch.git
+    cd AI_kcMedicalResearch
+    copy .env.example .env          # then add your API keys
+    cd docker
+    docker compose run --rm cli     # interactive CLI
+    docker compose up ui            # Streamlit UI on :8501
 
-Total time: ~5 minutes. No Python setup required.
+NOT YET VERIFIED: the Docker route has not been executed end to end. See
+Known Issue #19.
+
+Full instructions, including the venv route: Readme/Setup_Instructions_for_Users.txt
+
 Local Development (Without Docker)
+
+Requires Python 3.11 or 3.12. Newer versions are rejected at startup with a
+download link - several pinned dependencies have no wheels for 3.13+.
 
 Run all commands from the project root.
 
@@ -61,7 +68,17 @@ Anthropic 	        --provider anthropic 	ANTHROPIC_API_KEY 	Claude vision
 Groq 	                --provider groq 	GROQ_API_KEY 	Fast inference
 Ollama (local) 	        --provider ollama 	OLLAMA_HOST 	Free but slow; offline/testing only
 
-On transient errors (timeout, 429, 502, 503), the system automatically tries the next provider. Default chain: DeepSeek -> Qwen -> Groq. Configure via FALLBACK_PROVIDERS.
+On transient errors (timeout, 429, 502, 503), the system automatically tries the next provider. Default chain: DeepSeek -> Qwen -> Groq. Configure via FALLBACK_PROVIDERS. Authentication errors (401, 403) raise immediately and never fall back.
+
+CONFIDENTIALITY: Ollama is the only provider that keeps your input on your own
+machine. Every other provider transmits the prompt to an external API. If your
+input contains patient-identifiable or otherwise confidential data, use
+--provider ollama.
+
+Requests to Ollama NEVER fall back to a cloud provider, even on a timeout.
+Before v2.4.8 they did: an explicit --provider ollama produced the chain
+[ollama, deepseek, qwen, groq], so an Ollama timeout silently sent the prompt
+to DeepSeek and printed a success line. Ollama cannot run SR mode (no vision).
 
 Note on Ollama in Docker: inside a container, localhost is the container, not your machine. The Docker launchers set OLLAMA_HOST=http://host.docker.internal:11434 for you; if you run a container by hand, set it yourself or Ollama will be unreachable.
 
@@ -118,6 +135,9 @@ python -m pytest --cov=SOURCE_CODE --cov-report=html  # with coverage
 python -m pytest -m live -v                           # live provider smoke tests
 
 Current status: 401 passed, 3 skipped, 11 deselected.
+
+python scripts/check_no_bom.py                        # fail on UTF-8 BOMs in source
+python scripts/strip_bom.py                           # remove them
 
 SR Pipeline
 
@@ -223,6 +243,12 @@ Known Issues
 18 	pipelines.sr.main (scipy, matplotlib, pymupdf; ~2.8s) is imported even for coding mode 	Low 	Open
 19 	macOS launcher changes are untested on macOS; the health-poll loop and lsof port check need a real run 	Medium 	Open
 20 	Old %TEMP%\ai_km_run_*.bat files from before v2.4.7 contain API keys in plaintext on any machine that ran the UI 	High 	Action required — delete and rotate keys
+21 	call_ai_with_fallback sent prompts to cloud providers even when --provider ollama was requested, because the chain was built as [requested] + FALLBACK_PROVIDERS and a timeout counts as transient. Confidential input could reach a third party 	CRITICAL 	RESOLVED (v2.4.8) — LOCAL_ONLY_PROVIDERS never falls back
+22 	23 Python source files began with a UTF-8 BOM. Python tolerates it on import but ast.parse() rejects it, and with an encoding mismatch it renders as garbage — previously misdiagnosed as corrupted comments 	Medium 	RESOLVED (v2.4.8) — stripped; scripts/check_no_bom.py guards
+23 	A clean install on Python 3.14 fails across pywin32, textract, pillow, opencv-python and pymupdf. python.org now serves 3.14 by default 	High 	RESOLVED (v2.4.8) — main.py rejects unsupported versions with a 3.12 link and the Docker alternative
+24 	OCR packages were installed but unusable: the image never provided Tesseract, Poppler or libGL, so ~2GB of PyTorch via easyocr bought nothing 	Medium 	RESOLVED (v2.4.8) — moved to requirements-ocr.txt
+25 	_is_transient_error matches substrings, so an auth error mentioning "connection" is treated as retryable 	Low 	Open
+26 	No regression test asserting that --provider ollama never reaches a cloud API 	Medium 	Open — the fix for #21 is untested
 Contributing
 
     Fork the repository
