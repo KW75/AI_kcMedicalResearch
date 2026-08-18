@@ -92,6 +92,7 @@ def write_results(path: Path, meta_rows: list[dict]) -> None:
         "n_intervention", "n_control",
         "mean_intervention", "sd_intervention",
         "mean_control", "sd_control",
-        "included_in_meta", "skip_reason"
+        "included_in_meta", "skip_reason",
+        "plausibility_flag", "sd_se_warning", "group_timepoint_warning",
     ]
     _write_csv(path, meta_rows, fields)
