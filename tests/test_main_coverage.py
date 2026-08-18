@@ -90,42 +90,50 @@ class TestMainInteractiveLoop:
     @patch('SOURCE_CODE.main.choose_role')
     def test_main_coding_mode(self, mock_choose_role):
         m = self._run_main('coding', 'deepseek', False, mock_choose_role,
-                           'Builder', 'prompts/coding/builder.txt')
+                           'Builder', 'prompts/builder-prompt.md')
         mock_choose_role.assert_called_once_with('coding')
         m.assert_called_once()
 
     @patch('SOURCE_CODE.main.choose_role')
     def test_main_writing_mode(self, mock_choose_role):
         m = self._run_main('writing', 'deepseek', False, mock_choose_role,
-                           'Editor', 'prompts/writing/editor.txt')
+                           'Editor', 'prompts/editor-prompt.md')
         mock_choose_role.assert_called_once_with('writing')
         m.assert_called_once()
 
     @patch('SOURCE_CODE.main.choose_role')
     def test_main_appraisal_mode(self, mock_choose_role):
         m = self._run_main('appraisal', 'deepseek', False, mock_choose_role,
-                           'Appraiser', 'prompts/appraisal/appraiser.txt')
+                           'Appraiser', 'prompts/appraisal-prompt.md')
         mock_choose_role.assert_called_once_with('appraisal')
         m.assert_called_once()
 
     @patch('SOURCE_CODE.main.choose_role')
     def test_main_search_mode(self, mock_choose_role):
         m = self._run_main('search', 'deepseek', False, mock_choose_role,
-                           'Researcher', 'prompts/search/researcher.txt')
+                           'Researcher', 'prompts/researcher-prompt.md')
         mock_choose_role.assert_called_once_with('search')
         m.assert_called_once()
 
     @patch('SOURCE_CODE.main.choose_role')
     def test_main_rct_search_mode(self, mock_choose_role):
         m = self._run_main('rct_search', 'deepseek', False, mock_choose_role,
-                           'Formulator', 'prompts/rct_search/formulator.txt')
+                           'Formulator', 'prompts/formulator-prompt.md')
         mock_choose_role.assert_called_once_with('rct_search')
         m.assert_called_once()
 
     @patch('SOURCE_CODE.main.choose_role')
     def test_main_sr_mode(self, mock_choose_role):
+        # NOTE: ALL_MODES in main.py has no "sr" key - SR mode is dispatched
+        # straight to run_sr_launcher() at the entry point and never reaches
+        # main()/choose_role() for real. This test only passes because
+        # choose_role is fully mocked below; with the mock removed,
+        # choose_role('sr') would raise KeyError on `ALL_MODES[mode]`.
+        # Flagged per README Known Issue #8 - worth deciding whether this
+        # test should exist, or be replaced with one that asserts SR mode
+        # routes to run_sr_launcher instead.
         m = self._run_main('sr', 'qwen', False, mock_choose_role,
-                           'Reviewer', 'prompts/sr/reviewer.txt')
+                           'Reviewer', 'prompts/reviewer-prompt.md')
         mock_choose_role.assert_called_once_with('sr')
         m.assert_called_once()
 
