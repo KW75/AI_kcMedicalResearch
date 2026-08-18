@@ -33,6 +33,46 @@ logger = logging.getLogger("sr.main")
 
 SR_DIR = Path(__file__).resolve().parent
 
+# ---------------------------------------------------------------------------
+# Effect-size plausibility bounds (Known Issue #13)
+# ---------------------------------------------------------------------------
+# These do NOT exclude a study from the meta-analysis automatically - an
+# unusually large effect might be genuine (e.g. a dramatic drug response).
+# They flag the study in the audit trail and console log so a human
+# reviewer catches it during the manual verification already required by
+# Known Issues #9 (SD/SE confusion) and #10 (within- vs between-group
+# mixup) - both of which are the most common causes of an implausible
+# effect size passing through unnoticed.
+PLAUSIBILITY_BOUNDS = {
+    "SMD": 1.5,    # matches the exact threshold cited in this project's own
+                   # Known Issue #13 ("|g| > 1.5 from a psychotherapy trial")
+    "MD":  None,   # scale-dependent (units vary by outcome) - no fixed
+                   # bound is meaningful here without knowing the outcome
+    "OR":  10.0,   # an odds/risk ratio this extreme (or its reciprocal) is
+    "RR":  10.0,   # rare enough in real RCTs to warrant a second look
+}
+
+
+def _check_plausibility(effect_measure: str, est: float, author_label: str) -> str | None:
+    """Return a warning string if `est` exceeds the plausibility bound for
+    this effect measure, else None. Logs a warning as a side effect."""
+    bound = PLAUSIBILITY_BOUNDS.get(effect_measure)
+    if bound is None:
+        return None
+    if effect_measure in ("OR", "RR"):
+        implausible = est > bound or (est > 0 and est < 1.0 / bound)
+    else:
+        implausible = abs(est) > bound
+    if not implausible:
+        return None
+    msg = (
+        f"|{effect_measure}|={est:.3f} exceeds plausibility bound ({bound}) "
+        f"for {author_label} - verify against source PDF before trusting "
+        f"this estimate (see Known Issues #9, #10, #13)."
+    )
+    logger.warning(f"[PLAUSIBILITY] {msg}")
+    return msg
+
 
 def load_config(p=None):
     path = Path(p) if p else SR_DIR / "config" / "prisma_criteria.yaml"
@@ -62,7 +102,7 @@ def main():
 
     cfg = load_config(args.config)
 
-    # ?? Effect measure resolution: CLI > yaml > fallback OR ??????????????????
+    #  Effect measure resolution: CLI > yaml > fallback OR
     VALID = ("OR", "RR", "MD", "SMD")
     yaml_em = cfg.get("effect_measure")
     if yaml_em and yaml_em not in VALID:
@@ -77,17 +117,17 @@ def main():
             "No effect_measure specified  - defaulting to OR. "
             "Add 'effect_measure: MD' (or SMD/RR) to prisma_criteria.yaml.")
 
-    # ?? Resolve PDF input folder ??????????????????????????????????????????????
+    #  Resolve PDF input folder
     if args.pdf_dir:
         pdf_dir = Path(args.pdf_dir)
     else:
         pdf_dir = PROJECT_ROOT / "input" / "sr"
 
-    # ?? Initialise project layout ?????????????????????????????????????????????
+    #  Initialise project layo
     layout = SRProjectLayout(run_id=args.run_id)
     logger.info(f"Project folder: {layout.project}")
 
-    # ?? Stage 1: Upload ???????????????????????????????????????????????????????
+    #  Stage 1: Upload
     logger.info("=== STAGE 1: Upload ===")
     if args.provider == "anthropic":
         fm   = FileManager()
@@ -112,7 +152,7 @@ def main():
     pd.DataFrame(recs).to_csv(
         layout.uploads / "upload_manifest.csv", index=False)
 
-    # ?? Stage 2: Screening ????????????????????????????????????????????????????
+    # Stage 2: Screening
     logger.info("=== STAGE 2: Screening ===")
     sr = RelevanceScreener(
         pico_criteria      = cfg["pico"],
@@ -132,7 +172,7 @@ def main():
         logger.error("No studies included after screening. Stopping.")
         return
 
-    # ?? Stage 3: Extraction ???????????????????????????????????????????????????
+    # Stage 3: Extraction
     logger.info("=== STAGE 3: Extraction ===")
     er = DataExtractor(
         pico_criteria = cfg.get("pico", {}),
@@ -142,7 +182,7 @@ def main():
 
     write_extracts(layout.extracted_csv, er)
 
-    # ?? Stage 3.5: RoB 2.0 ???????????????????????????????????????????????????
+    # Stage 3.5: RoB 2.0
     logger.info("=== STAGE 3.5: RoB 2.0 Assessment ===")
     rob = RoB2Assessor(
         model    = args.model,
@@ -151,7 +191,7 @@ def main():
 
     write_rob2(layout.rob2_csv, rob)
 
-    # ?? Stage 4: Meta-Analysis ????????????????????????????????????????????????
+    # Stage 4: Meta-Analysis
     logger.info("=== STAGE 4: Meta-Analysis ===")
     reported = [r.get("primary_outcome", {}).get("effect_measure") for r in er
                 if r.get("primary_outcome", {}).get("outcome_match", True) is not False]
@@ -191,6 +231,7 @@ def main():
             "sd_control"        : po.get("sd_control"),
             "included_in_meta"  : False,
             "skip_reason"       : None,
+            "plausibility_flag" : None,
         }
         try:
             if po.get("outcome_match") is False:
@@ -243,8 +284,12 @@ def main():
                         f"MD for {m.get('first_author','?')}: "
                         f"MD={est:.3f} [{cl:.3f},{cu:.3f}]")
 
+            author_label = f"{m.get('first_author','?')} ({m.get('year','')})"
+            plausibility_flag = _check_plausibility(
+                args.effect_measure, float(est), author_label)
+
             rows.append({
-                "study"               : f"{m.get('first_author','?')} ({m.get('year','')})",
+                "study"               : author_label,
                 "effect_estimate"     : float(est),
                 "ci_lower"            : float(cl),
                 "ci_upper"            : float(cu),
@@ -258,10 +303,11 @@ def main():
                 "sd_control"          : po.get("sd_control"),
             })
             audit_row.update({
-                "hedges_g"         : float(est),
-                "ci_lower"         : float(cl),
-                "ci_upper"         : float(cu),
-                "included_in_meta" : True,
+                "hedges_g"          : float(est),
+                "ci_lower"          : float(cl),
+                "ci_upper"          : float(cu),
+                "included_in_meta"  : True,
+                "plausibility_flag" : plausibility_flag,
             })
 
         except Exception as e:
@@ -271,6 +317,16 @@ def main():
         meta_audit.append(audit_row)
 
     write_results(layout.results_csv, meta_audit)
+
+    flagged = [r for r in meta_audit if r.get("plausibility_flag")]
+    if flagged:
+        logger.warning(
+            f"[PLAUSIBILITY] {len(flagged)} of {len(meta_audit)} studies "
+            f"exceeded the effect-size plausibility bound and need manual "
+            f"verification before this pooled estimate is trusted:")
+        for r in flagged:
+            logger.warning(f"  - {r.get('first_author','?')} ({r.get('year','')}): "
+                            f"{r.get('plausibility_flag')}")
 
     if len(rows) < 2:
         logger.error("< 2 studies with usable data. Aborting meta-analysis.")
@@ -285,7 +341,7 @@ def main():
         f"[{ma['ci_lower']:.3f},{ma['ci_upper']:.3f}] "
         f"I2={ma['I2']:.1f}%")
 
-    # ?? Stage 5: Forest Plot ??????????????????????????????????????????????????
+    # Stage 5: Forest Plot
     logger.info("=== STAGE 5: Forest Plot ===")
     fp = str(layout.figures / "forest_plot.png")
     ForestPlotGenerator().generate(
@@ -293,7 +349,7 @@ def main():
         effect_measure = args.effect_measure,
         output_path    = fp)
 
-    # ?? Stage 6: Reports ??????????????????????????????????????????????????????
+    # Stage 6: Reports
     logger.info("=== STAGE 6: Reports ===")
     title = cfg.get("review_title", "Systematic Review")
     pico  = cfg.get("pico",  {})
@@ -328,7 +384,7 @@ def main():
         output_path        = str(layout.pdf),
         also_save_html     = True)
 
-    # ?? Mirror to output\sr\ ??????????????????????????????????????????????????
+    # Mirror to output\sr\
     layout.mirror_all()
 
     logger.info("Pipeline complete.")
