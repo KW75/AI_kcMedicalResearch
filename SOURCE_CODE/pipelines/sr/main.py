@@ -214,6 +214,14 @@ def main():
         m  = r.get("study_metadata",  {})
         po = r.get("primary_outcome", {})
         pt = r.get("participants",    {})
+        # sd_se_warning lives at the top level of r, not inside
+        # primary_outcome - the extraction restructuring step only moves a
+        # fixed list of known keys into primary_outcome, and this isn't on
+        # it. Only ever set on the text-fallback path (see data_extractor.py
+        # _flag_possible_se_as_sd); Anthropic-provider extractions never
+        # get this flag, since _extract_anthropic has no text-fallback path.
+        sd_se_warning = r.get("sd_se_warning")
+        group_timepoint_warning = r.get("group_timepoint_warning")
         audit_row = {
             "first_author"      : m.get("first_author"),
             "year"              : m.get("year"),
@@ -232,6 +240,8 @@ def main():
             "included_in_meta"  : False,
             "skip_reason"       : None,
             "plausibility_flag" : None,
+            "sd_se_warning"     : sd_se_warning,
+            "group_timepoint_warning" : group_timepoint_warning,
         }
         try:
             if po.get("outcome_match") is False:
@@ -327,6 +337,30 @@ def main():
         for r in flagged:
             logger.warning(f"  - {r.get('first_author','?')} ({r.get('year','')}): "
                             f"{r.get('plausibility_flag')}")
+
+    se_flagged = [r for r in meta_audit if r.get("sd_se_warning")]
+    if se_flagged:
+        logger.warning(
+            f"[SD/SE CHECK] {len(se_flagged)} of {len(meta_audit)} studies "
+            f"had a value extracted into an SD field from a source line "
+            f"also containing 'SE'/'SEM'/'standard error' - verify these "
+            f"are genuine SDs, not standard errors, before trusting this "
+            f"pooled estimate (see REVIEWER_GUIDE.md 3.1):")
+        for r in se_flagged:
+            logger.warning(f"  - {r.get('first_author','?')} ({r.get('year','')}): "
+                            f"{r.get('sd_se_warning')}")
+
+    group_flagged = [r for r in meta_audit if r.get("group_timepoint_warning")]
+    if group_flagged:
+        logger.warning(
+            f"[GROUP/TIMEPOINT CHECK] {len(group_flagged)} of {len(meta_audit)} "
+            f"studies had a group label that looks like a timepoint, or "
+            f"identical intervention/control labels - possible within- vs "
+            f"between-group confusion. Verify against the source PDF before "
+            f"trusting this pooled estimate (see REVIEWER_GUIDE.md 2.2):")
+        for r in group_flagged:
+            logger.warning(f"  - {r.get('first_author','?')} ({r.get('year','')}): "
+                            f"{r.get('group_timepoint_warning')}")
 
     if len(rows) < 2:
         logger.error("< 2 studies with usable data. Aborting meta-analysis.")
