@@ -1,5 +1,5 @@
 ﻿# =============================================================================
-#  launcher.py  |  AI kcMedicalResearch  |  v2.4.3
+#  launcher.py  |  AI kcMedicalResearch  |  v2.4.9
 # =============================================================================
 
 import subprocess
@@ -196,7 +196,7 @@ def section_header(title: str) -> None:
 
 
 # -----------------------------------------------------------------------------
-#  Banner  v2.4.3
+#  Banner  v2.4.9
 # -----------------------------------------------------------------------------
 def banner() -> None:
     W = _W
@@ -210,9 +210,9 @@ def banner() -> None:
     print(f'  {FRAME}║{RESET}   {LOGO}██║ ██╔╝██╔════╝{RESET}{W(4)}'
           f'{INFO}─────────────────────{RESET}{W(11)}{FRAME}║{RESET}')
     print(f'  {FRAME}║{RESET}   {LOGO}█████╔╝ ██║{RESET}{W(9)}'
-          f'{ACCENT}Version  {RESET}{HILITE}2.4.3{RESET}{W(14)}{FRAME}    ║{RESET}')
+          f'{ACCENT}Version  {RESET}{HILITE}2.4.9{RESET}{W(14)}{FRAME}    ║{RESET}')
     print(f'  {FRAME}║{RESET}   {LOGO}██╔═██╗ ██║{RESET}{W(9)}'
-          f'{ACCENT}Tests    {RESET}{GOOD}400 passed - 3 skipped{RESET}{W(1)}{FRAME}║{RESET}')
+          f'{ACCENT}Tests    {RESET}{GOOD}405 passed - 3 skipped{RESET}{W(1)}{FRAME}║{RESET}')
     print(f'  {FRAME}║{RESET}   {LOGO}██║  ██╗╚██████╗{RESET}{W(4)}'
           f'{ACCENT}Deploy   {RESET}{INFO}render.com / local{RESET}{W(5)}{FRAME}║{RESET}')
     print(f'  {FRAME}║{RESET}   {LOGO}╚═╝  ╚═╝ ╚═════╝{RESET}{W(36)}{FRAME}║{RESET}')

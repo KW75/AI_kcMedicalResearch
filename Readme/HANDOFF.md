@@ -1,11 +1,11 @@
 ﻿AI kcMedicalResearch — Combined Handoff Document
-Version 2.4.8 — Local-Provider Confidentiality Fix, BOM Cleanup, Python Version Gate
+Version 2.4.9 — Startup Reliability, Provider Lazy-Init, PICO/UI Parity, SR Plausibility Flag
 
-Date: 2026-08-17 (Sessions 8-10) Repository: https://github.com/KW75/AI_kcMedicalResearch Live App: https://ai-kcmedicalresearch.onrender.com Health Check: https://ai-kcmedicalresearch.onrender.com/_stcore/health Uptime Monitor: UptimeRobot, 5-minute interval, keeps free-tier Render instance warm Tests: 401 passed, 3 skipped, 11 deselected/live tests (410 passed, 5 skipped with no marker filter) Coverage: ~53% Current Status: CI green, Render live, health endpoint returns ok
+Date: 2026-08-18 (Session 11, following Sessions 8-10) Repository: https://github.com/KW75/AI_kcMedicalResearch Live App: https://ai-kcmedicalresearch.onrender.com Health Check: https://ai-kcmedicalresearch.onrender.com/_stcore/health Uptime Monitor: UptimeRobot, 5-minute interval, keeps free-tier Render instance warm Tests: 405 passed, 3 skipped, 11 deselected (all-marker figure of 410/5 from Session 7 not re-verified this session) Coverage: ~53% (not re-measured this session) Current Status: local test suite green (405 passed); CI/Render status not re-verified this session
 
-CRITICAL READ FIRST (1): Session 10 found and fixed a confidentiality defect. An explicit --provider ollama could silently send the prompt to DeepSeek on a timeout, because the fallback chain ignored which provider was requested. Ollama is the only provider that keeps input local, so this affected exactly the case where it mattered. Fixed in v2.4.8; no regression test yet (Issue #26).
+CRITICAL READ FIRST (1): Session 10 found and fixed a confidentiality defect. An explicit --provider ollama could silently send the prompt to DeepSeek on a timeout, because the fallback chain ignored which provider was requested. Ollama is the only provider that keeps input local, so this affected exactly the case where it mattered. Fixed in v2.4.8. Session 11 closed the "no regression test yet" gap (#35) — see tests/test_provider_fallback.py — and also fixed the related classifier bug (#34) that could have reopened this hole: an auth error whose message happened to contain the word "connection" was being misclassified as retryable.
 
-CRITICAL READ FIRST (2): Session 8 found that SR extraction can produce a confident, precisely-quantified, entirely invalid effect size with no warning at any stage. See Session 8 notes, Known Issues #15 and #16, and Readme/REVIEWER_GUIDE.md. Do not report any pooled estimate from this pipeline without manual source verification.
+CRITICAL READ FIRST (2): Session 8 found that SR extraction can produce a confident, precisely-quantified, entirely invalid effect size with no warning at any stage. See Session 8 notes, Known Issues #15 and #16, and Readme/REVIEWER_GUIDE.md. Do not report any pooled estimate from this pipeline without manual source verification. Session 11 added a plausibility flag (#20 → RESOLVED) that catches the specific magnitude class of the zsy234 failure (|g| > 1.5) and writes it to results_csv plus the console log — this is a tripwire, not a substitute for #15/#16, which remain CRITICAL and unresolved.
 
 ======================================
 1. PROJECT OVERVIEW
@@ -113,13 +113,30 @@ Session 10 — 2026-08-17 — v2.4.8: Confidentiality Fix, BOM Cleanup, Python G
     Documentation (resolved) — Setup_Instructions_for_Users.txt previously led with the hosted app as "the right choice for most people" with no confidentiality warning, in a tool intended for patient data. It now states plainly that the hosted app must not be used for confidential or patient-identifiable input, and the Providers section carries the Ollama local-only guarantee, the pre-v2.4.8 caveat, and the note that SR works on published papers so a cloud provider is appropriate there. Also documents the platform launchers, the version-gate message, and the BOM check.
     Commit trail: f0b678e (local-provider fallback) -> 1541b09 (requirements split, compose, docs) -> c851259 (delete broken setup scripts) -> 5439ede (BOM strip + guards) -> f64d84d (Python version gate) -> e332b3b (v2.4.8 docs) -> 8d2e110 (launcher parity, delete Mac_Setup.sh).
 
+Session 11 — 2026-08-18 — v2.4.9: Startup Reliability, Provider Lazy-Init, PICO/UI Parity, SR Plausibility Flag
+
+    Startup crash on Ctrl+C (resolved) — main.py's entry-point try/except KeyboardInterrupt only wrapped code inside `if __name__ == "__main__":`. The document_reader -> pytesseract -> pandas import chain runs at module load, before that block starts, so Ctrl+C during the ~7s cold start (a routine action per the on-screen tip "Press Ctrl+C ... to stop and return here") fell through to a raw traceback through pandas internals instead of the clean "Session stopped. Returning to menu..." message. Fixed by wrapping the import block in its own try/except KeyboardInterrupt with the same message.
+    No wait notice during slow provider calls (resolved) — A user report showed the CLI appearing to hang for 15s+ after selecting Ollama, with real risk of an impatient Ctrl+C mid-generation. call_ai() now prints a visible notice ("Pulling LLM..." for Ollama, a lighter version for cloud providers) before dispatching, gated on sys.stdout.isatty() to stay silent in non-TTY/CI runs.
+    #26 (RESOLVED) — pipelines.sr.main (~2.8s: scipy, matplotlib, pymupdf) was imported unconditionally at the top of main.py via `from pipelines.sr import run_sr`, alongside three sibling imports (run_coding, run_writing, run_search) — none of which were referenced anywhere else in the file. Every real handler (handle_coding_mode, handle_writing_mode, handle_search_mode, run_sr_launcher) already does its own local import from a different submodule path when it actually needs one. Deleted the four dead imports; every mode now only pays for the pipeline it actually uses.
+    Provider-select box misalignment (resolved) — scripts/launcher.py's SR provider table used a Unicode checkmark (✓) for vision-capable providers and plain "x" for non-vision ones, padded with hand-counted trailing spaces. On a CJK-locale terminal, ✓ is an ambiguous-width character and renders as 2 columns instead of 1, so every checkmark row was a column wider than its character count implied — throwing the right-hand border out of alignment. Root-caused by testing the byte-length assumption directly rather than guessing at font metrics. Fixed by replacing ✓ with a plain-ASCII "+" and padding every badge variant to the same fixed width via ljust on the plain text before adding color codes.
+    #10 / #25 (RESOLVED, same root cause) — providers.py auto-detected the best Ollama model at import time unconditionally, for every provider, every run: `if not OLLAMA_MODEL: OLLAMA_MODEL = _ollama_detect_best_model(OLLAMA_HOST)` at module scope. This did a live network probe (bounded by a 5s timeout, but still a latent hang per #25's own framing) and printed "[ollama] Auto-detected..." even on a pure Qwen SR run that never touches Ollama (#10's "cosmetic" framing undersold it — a network call during import is not merely cosmetic). Fixed by moving resolution into _resolve_ollama_model(), called lazily from call_ollama_provider() on first actual use. get_default_model("ollama") now returns "(auto-detected on first use)" instead of triggering the probe just to answer a status-display query.
+    #34 (RESOLVED) — _is_transient_error matched the bare substring "connection" against the lowercased error message, so an auth error whose text happened to contain that word anywhere (e.g. a gateway saying "connection refused by auth proxy") would be misclassified as transient and incorrectly retried against a fallback provider — a mechanism that could have reopened the exact confidentiality hole #29 fixed in Session 10, since Ollama's own connection-failure messages contain that phrase. Fixed by parsing the actual HTTP status code when the message contains one (401/403 are never transient, full stop, regardless of wording) and falling back to a small set of specific phrases — the precise "connection error" (what this module's own URLError handlers actually produce), not the bare word "connection" — only when no status code is present.
+    #35 (RESOLVED) — Added tests/test_provider_fallback.py: four regression tests covering (1) Ollama failure never reaching a cloud provider, (2) normal cloud-to-cloud fallback still working, (3) the #34 auth-error-mentions-"connection" edge case specifically, (4) import of providers.py doing no network I/O. Verified locally with a hand-rolled monkeypatch harness (no pytest available in the sandbox that authored the fix) before handoff; re-run and confirmed passing (4/4) in the real project venv.
+    #13 (RESOLVED, verified not reproducible) — Checked SOURCE_CODE/pipelines/sr/main.py's --model argparse default directly: `default=None`, threaded through unchanged to every extractor/screener/assessor call (args.model appears 4 times, always passed straight through). No hardcoded qwen3.7-plus found anywhere in the file. Matches the documented QWEN_VISION_MODEL auto-resolution path from Session 7. Downgrading from "Open — verify" to RESOLVED.
+    #14 (RESOLVED) — test_main_coverage.py hardcoded a nested prompts/<mode>/<role>.txt layout (e.g. 'prompts/coding/builder.txt') that has never existed on disk. Cross-checked against ALL_MODES in main.py, which builds every real prompt path as AI_DIR / "<role>-prompt.md" (flat, no mode subfolder) — e.g. Appraiser's file is "appraisal-prompt.md", not "appraiser-prompt.md" as the role name would suggest. All five reachable mode/role pairs corrected. Side finding, NOT yet fixed: ALL_MODES has no "sr" key at all — SR mode is dispatched straight to run_sr_launcher() at the entry point and never reaches choose_role(). test_main_sr_mode currently only "passes" because choose_role is fully mocked; with the mock removed it would raise KeyError on ALL_MODES['sr']. Tracked as new issue #43 — needs a decision (redesign the test to assert SR routes to run_sr_launcher, or drop it) rather than a code fix.
+    #20 (RESOLVED) — Added an effect-size plausibility check to sr/main.py: |Hedges g / SMD| > 1.5 (the exact threshold this document's own #20 entry names) or OR/RR beyond 10x / below 0.1x. Does NOT auto-exclude the study — an unusual value might be genuine — it writes a plausibility_flag column into results_csv and prints a summary block at the end of Stage 4 listing every flagged study, feeding the manual-verification workflow #15/#16 already mandate. This is a tripwire for the zsy234-class failure (g=-2.356, would have been flagged), not a fix for #15/#16 themselves — those require actual SD-vs-SE and within/between-group detection logic, which is unimplemented.
+    #21 (RESOLVED, description corrected) — This document's own entry read "Streamlit UI globs output/rct_search/, CLI globs input/sr/" — checked both files directly and that's not accurate. rct_search.py's CLI actually checks input/rct_search/pico_*.json first, falling back to output/rct_search/pico_*.json (never input/sr/ — that path is INPUT_SR, used only for a one-way opt-in copy-to-SR-input step, not read back for PICO discovery). app.py's UI checked output/rct_search/ only. The real gap: a PICO JSON existing solely in input/rct_search/ (e.g. manually placed) was invisible to the UI. Fixed app.py's _get_all_pico_files() to check both locations, merged and deduped, with input/rct_search/ winning on a filename collision to match the CLI's own precedence.
+    #24 (RESOLVED, risk narrowed) — Verified the actual data flow before treating this as a straightforward fix: st.session_state is per-browser-session in Streamlit's execution model, not shared server-wide as this document's own framing implied ("i.e. into the server process"). _get_env_with_api_keys() does `os.environ.copy()` (never mutates the real os.environ) and the result is only ever passed via subprocess `env=`, never written to disk or echoed — confirmed the Session 9 .bat-file leak fix is durable and has an explicit guard comment against reintroducing it. The genuine remaining risk is narrower: an entered key sits in server-side session memory as plaintext for the whole session's lifetime with no way to clear it early. Added a "Clear stored keys" sidebar button; had to also reset each provider's text_input widget state (st.session_state.pop(f"api_{provider}")), not just the api_keys dict, since Streamlit repopulates api_keys from the still-filled widgets on the very next rerun otherwise.
+    Local test suite: 405 passed, 3 skipped, 11 deselected (up from 401 — the four new tests in test_provider_fallback.py account for the difference). Commit trail (7 commits, one per file): 3bcecb4 (main.py: KeyboardInterrupt handler, wait notice, #26) -> d328b42 (launcher.py: box alignment) -> f032dc2 (providers.py: #10, #25, #34) -> 644365c (test_provider_fallback.py: #35) -> 43fc085 (test_main_coverage.py: #14) -> f40ee69 (app.py: #21, #24) -> c4aec59 (sr/main.py: #20).
+    NOT done this session, still needs a human decision: whether to redesign test_main_sr_mode (#43), and everything in "IMMEDIATE ACTIONS BEFORE NEXT SESSION" below — none of it was touched this session (key rotation, temp-file deletion, spend limits, venv verification, macOS launcher testing).
+
 ======================================
 3. CURRENT STATUS
 ======================================
 Component 	                      Status 	                Details
-GitHub Actions CI 	              GREEN 	                401 tests, Python 3.11, checkout@v5, setup-python@v6
-Render Build 	                      GREEN 	                Uses requirements-render.txt
-Render Deploy 	                      LIVE 	                Streamlit app live
+GitHub Actions CI 	              not re-verified 	      Local suite 405 tests passing, Python 3.11.9; CI not re-run this session
+Render Build 	                      not re-verified 	      Unchanged from Session 10; not re-deployed this session
+Render Deploy 	                      not re-verified 	      Unchanged from Session 10; not re-checked this session
 Render Health Check 	              ACTIVE 	                /_stcore/health returns ok
 UptimeRobot 	                      MONITORING 	        5-minute pings
 Provider Fallback 	              ACTIVE 	                DeepSeek → Qwen → Groq on transient errors
@@ -144,14 +161,14 @@ Documentation 	                      CURRENT 	                README.md, HANDOFF
 8 	SR output written under SOURCE_CODE/ instead of repo root 	                       Medium 	               RESOLVED (Session 6)
 9 	Hardcoded qwen3.7-plus in _DEFAULT_MODELS (outer main.py); should read model constants Low 	               RESOLVED (Session 7)
 10 	Cosmetic [ollama] Auto-detected best model line fires even on Qwen SR runs; does not affect actual provider used
-                                                                                               Low 	               Open
+                                                                                               Low 	               RESOLVED (Session 11) — see #25, same root cause (module-scope probe made lazy)
 11 	Launcher completion message in run_sr_launcher printed stale pipelines/sr/outputs path Low 	               RESOLVED (Session 7)
 12 	Vision regression: SR launcher defaulted qwen to text-only qwen-plus-latest, breaking all extraction
                                                                                                High 	               RESOLVED (Session 7) — now defaults to qwen-vl-max via QWEN_VISION_MODEL
 13 	Inner sr/main.py argparse default may still hardcode qwen3.7-plus (only the outer launcher was verified fixed this session)
-                                                                                               Low 	               Open — verify
+                                                                                               Low 	               RESOLVED (Session 11) — verified: --model defaults to None, threaded through unchanged everywhere; no hardcoded override found
 14 	test_main_coverage.py references a nested prompts/coding/*.txt layout (with .txt) that does not exist on disk; actual files are flat prompts/-prompt.md. Tests pass against mocked paths, not real files
-                                                                                               Low 	               Open
+                                                                                               Low 	               RESOLVED (Session 11) — corrected to flat prompts/<role>-prompt.md; side finding tracked as new #43
 15 	No SD/SE disambiguation. A reported SE is read as an SD, understating dispersion by up to sqrt(n) and inflating the effect size. Observed 8x understatement in zsy234.pdf
                                                                                                CRITICAL 	        Open — manual check required
 16 	No within- vs between-group detection. A within-subject pre/post contrast can be extracted as intervention-vs-control, producing a large invalid effect with no warning. Observed in zsy234.pdf
@@ -163,17 +180,17 @@ Documentation 	                      CURRENT 	                README.md, HANDOFF
 19 	zsy234.pdf still included in the test corpus results as a valid study despite reporting no between-group pain effect
                                                                                                High 	                Open — exclude with documented reason, or extract correct group-level values
 20 	No effect-size plausibility bound. |g| > 1.5 from a psychotherapy trial passes unflagged
-                                                                                               Medium 	                Open
+                                                                                               Medium 	                RESOLVED (Session 11) — flags |g/SMD|>1.5 or OR/RR beyond 10x/0.1x in results_csv + console; does not auto-exclude (tripwire only, not a fix for #15/#16)
 21 	PICO discovery differs between interfaces: Streamlit UI globs output/rct_search/, CLI globs input/sr/. A PICO saved in one is invisible to the other
-                                                                                               Low 	                Open
+                                                                                               Low 	                RESOLVED (Session 11) — description was inaccurate: CLI actually checked input/rct_search/ then output/rct_search/ (never input/sr/); UI checked output/rct_search/ only. UI now merges both, matching CLI precedence
 22 	RoB 2.0 runs independently of study_overrides.yaml and may assess OCR text for a study whose outcome data was hand-entered
                                                                                                Low 	                Open
 23 	No regression fixtures for the five-paper test corpus. Ground truth exists only in REVIEWER_GUIDE.md prose
                                                                                                Medium 	                Open
 
-24 	Streamlit UI override fields put API keys into st.session_state, i.e. into the server process. Safe locally; a shared/Render deployment would place user keys in a multi-user process 	Medium 	Open — verify Render exposure; consider disabling override inputs when not localhost
-25 	providers.py probes Ollama at MODULE scope: the "[ollama] Auto-detected best model" line fires on import, on every run and every test, regardless of --provider. A network call during import is also a latent hang if Ollama is installed but unresponsive 	Medium 	Open — gate behind provider == "ollama" (supersedes the cosmetic framing of #10)
-26 	pipelines.sr.main (~2.8s: scipy.stats, matplotlib, pymupdf) is imported even for coding mode 	Low 	Open — same lazy-import treatment as utils
+24 	Streamlit UI override fields put API keys into st.session_state, i.e. into the server process. Safe locally; a shared/Render deployment would place user keys in a multi-user process 	Medium 	RESOLVED (Session 11, risk narrowed) — st.session_state is per-browser-session in Streamlit, not shared server-wide as originally framed; verified no os.environ mutation and no disk/echo leak (Session 9 fix confirmed durable). Added a "Clear stored keys" button to shorten the plaintext-in-memory exposure window
+25 	providers.py probes Ollama at MODULE scope: the "[ollama] Auto-detected best model" line fires on import, on every run and every test, regardless of --provider. A network call during import is also a latent hang if Ollama is installed but unresponsive 	Medium 	RESOLVED (Session 11) — resolution moved to _resolve_ollama_model(), called lazily from call_ollama_provider() on first real use; also resolves #10
+26 	pipelines.sr.main (~2.8s: scipy.stats, matplotlib, pymupdf) is imported even for coding mode 	Low 	RESOLVED (Session 11) — removed 4 dead top-level imports (run_coding, run_writing, run_search, run_sr) that were never referenced anywhere in main.py
 27 	macOS launcher changes are untested on macOS. The curl /_stcore/health poll loop and the lsof port check need a real run 	Medium 	Open — verify before relying on them
 28 	Old %TEMP%\ai_km_run_*.bat files from before the v2.4.7 fix still contain API keys in plaintext on any machine that ran the UI 	High 	Action required — delete them and rotate affected keys
 29 	call_ai_with_fallback sent prompts to cloud providers even when --provider ollama was requested. Confidential input could reach a third party on a routine timeout 	CRITICAL 	RESOLVED (Session 10) — LOCAL_ONLY_PROVIDERS never falls back
@@ -181,12 +198,16 @@ Documentation 	                      CURRENT 	                README.md, HANDOFF
 31 	Clean install on Python 3.14 fails across five packages 	High 	RESOLVED (Session 10) — main.py gates 3.11-3.12 with a download link
 32 	OCR packages installed but unusable: no Tesseract/Poppler/libGL in the image, so ~2GB of PyTorch bought nothing 	Medium 	RESOLVED (Session 10) — moved to requirements-ocr.txt
 33 	Docker_setup.bat and mac_docker_setup.sh were both non-functional and were the advertised one-click setup routes 	High 	RESOLVED (Session 10) — deleted; replaced by docker compose
-34 	_is_transient_error matches substrings, so an auth error mentioning "connection" is treated as retryable and triggers fallback 	Low 	Open
-35 	No regression test asserting --provider ollama never reaches a cloud API. The fix for #29 is verified only by a manual check 	Medium 	Open
+34 	_is_transient_error matches substrings, so an auth error mentioning "connection" is treated as retryable and triggers fallback 	Low 	RESOLVED (Session 11) — checks HTTP status code explicitly (401/403 never transient); falls back only to the precise phrase "connection error", not the bare word "connection"
+35 	No regression test asserting --provider ollama never reaches a cloud API. The fix for #29 is verified only by a manual check 	Medium 	RESOLVED (Session 11) — added tests/test_provider_fallback.py, 4 tests, verified passing in the real project venv (405 total)
 36 	check_no_bom.py is not wired into CI, so BOMs can return silently 	Low 	Open
 37 	Windows and macOS launchers used matching filenames but different mechanisms: the .bat files ran the virtualenv, the .sh files ran docker run 	Medium 	RESOLVED (Session 10) — both venv-based; Docker via docker compose only
 38 	Setup instructions led with the hosted app and carried no confidentiality warning, in a tool intended for patient data 	High 	RESOLVED (Session 10) — explicit warning added to Option 1 and the Providers section
 39 	macOS launchers are untested on macOS. Rewritten from Docker-based to venv-based in v2.4.8; the lsof port check and the Python 3.11/3.12 discovery loop need a real run 	Medium 	Open
+40 	Ctrl+C during the startup import chain (pandas/pytesseract, ~7s cold start) raised a raw traceback through pandas internals instead of the clean "Session stopped. Returning to menu..." message - the entry-point's try/except KeyboardInterrupt only wrapped code inside if __name__ == "__main__", not the module-level imports above it 	Medium 	RESOLVED (Session 11) — imports wrapped in their own try/except KeyboardInterrupt
+41 	Provider-select box in scripts/launcher.py misaligned on CJK-locale terminals: the Unicode checkmark (✓) is an ambiguous-width character and renders as 2 columns instead of 1, throwing every vision-capable provider row a column wider than its "x no vision" counterpart 	Low 	RESOLVED (Session 11) — replaced ✓ with ASCII "+", padded all badge variants to a fixed width before adding color codes
+42 	No visible wait notice before a slow provider call (Ollama model load, or any cloud provider taking 15s+); looked indistinguishable from a hang, risking an impatient Ctrl+C mid-generation 	Low 	RESOLVED (Session 11) — call_ai() now prints a wait notice before dispatch, gated on sys.stdout.isatty()
+43 	test_main_sr_mode (test_main_coverage.py) exercises main.main(mode='sr', ...), a code path that cannot occur for real: ALL_MODES has no "sr" key (SR mode is dispatched straight to run_sr_launcher() at the entry point, never reaches choose_role()). The test only passes because choose_role is fully mocked; with the mock removed it would raise KeyError on ALL_MODES['sr'] 	Low 	Open — needs a decision: redesign to assert SR routes to run_sr_launcher, or remove
 ======================================
 5. AI PROVIDERS
 ======================================
@@ -204,7 +225,7 @@ Ollama 	                              --provider ollama 	OLLAMA_HOST 	        Au
 Fallback: transient errors (timeout, 429, 502, 503) trigger next provider; auth errors (401, 403) raise immediately. SR pipeline blocks non-vision providers (DeepSeek/Ollama not usable for SR).
 
 ======================================
-6. TEST COVERAGE (unchanged this session)
+6. TEST COVERAGE (per-module % not re-measured this session; total test count did change)
 ======================================
 Module 	Coverage
 writing.py 	        89%
@@ -222,21 +243,22 @@ providers.py 	        54%
 main.py 	        41%
 document_reader.py 	24%
 SR pipeline (src/*) 	~10-53% (low)
-TOTAL 	~53% (401 tests)
+TOTAL 	~53% (405 tests, not re-measured this session - up from 401)
 
 ======================================
 7. NEXT SESSION PRIORITIES
 Priority 	Task 	Details
-1 	Regression test for #29 	Assert that call_ai_with_fallback("...", provider="ollama") attempts only ollama. The manual check in Session 10 is most of the test already. Highest value: it protects a confidentiality guarantee that currently rests on one uncommitted-to-test code path.
-2 	Test Docker on the laptop (#19) 	docker compose build; docker compose run --rm cli; docker images for size; and the .env-exclusion check: docker run --rm <img> sh -c "ls /app/.env && echo LEAK || echo OK". Nothing Docker-related has ever been executed.
-3 	Verify the macOS launchers (#39) 	They were rewritten from Docker-based to venv-based without ever running on a Mac. Check the Python discovery loop finds 3.11/3.12, the lsof port check works, and .venv creation succeeds.
-4 	Resolve zsy234.pdf (#19 in README) 	Still in SR results as a valid study at g=-2.36 despite the paper reporting no between-group pain effect. Exclude with a documented PRISMA reason, or extract correct group-level values.
-5 	Fix font CMap decode 	All five test PDFs decode cleanly with a fixed +1 character offset yet are OCR'd unnecessarily. Likely upstream cause of extraction non-determinism.
-6 	Add semantic validators 	SD-vs-SE, within-vs-between-group, |g| > 1.5 plausibility bound. These three would have caught the zsy234 failure.
-7 	Wire check_no_bom.py into CI (#36) 	One step in the workflow.
-8 	Add regression fixtures for the five-paper corpus 	Including expected FAILURES: zsy234 must not be silently included with a large effect.
-9 	Gate the module-scope Ollama probe (#25 in README) 	Network call at import time, every run and every test, regardless of --provider.
-10 	Raise SR pipeline coverage 	Core screening/extraction still ~10-53%
+1 	SD-vs-SE disambiguation (#15, CRITICAL) 	Still unimplemented. The plausibility flag added in Session 11 (#20) catches the resulting magnitude class after the fact but does not detect the root cause. Needs extraction/screening logic changes in pipelines/sr/src/extraction/data_extractor.py.
+2 	Within- vs between-group detection (#16, CRITICAL) 	Same status: unimplemented, needs pipelines/sr/src/extraction and/or screening logic, not yet reviewed this session.
+3 	Test Docker on the laptop (#19 in this doc) 	docker compose build; docker compose run --rm cli; docker images for size; and the .env-exclusion check. Still nothing Docker-related has ever been executed. Unchanged since Session 10.
+4 	Verify the macOS launchers (#39) 	Still untested on a real Mac. Unchanged since Session 9/10.
+5 	Resolve zsy234.pdf (#19 in README numbering) 	Still in SR results as a valid study at g=-2.36. Session 11's plausibility flag (#20) would now surface this at |g|=2.356 > 1.5, but the study itself is still not excluded or corrected.
+6 	Fix font CMap decode (#18 in README numbering) 	All five test PDFs decode cleanly with a fixed +1 character offset yet are OCR'd unnecessarily. Likely upstream cause of extraction non-determinism (#17 in README numbering).
+7 	Decide on test_main_sr_mode (#43, new this session) 	Either redesign to assert SR mode routes to run_sr_launcher(), or remove - it currently tests a code path (ALL_MODES['sr']) that cannot occur outside the mock.
+8 	Add regression fixtures for the five-paper corpus (#23) 	Including expected FAILURES: zsy234 must not be silently included with a large effect.
+9 	Raise SR pipeline coverage 	Core screening/extraction still ~10-53%, not re-measured this session.
+10 	Re-verify CI/Render after pushing Session 11's commits 	Local suite is green (405/3/11) but CI and the Render deployment were not re-run this session - confirm both before relying on this handoff's "current status."
+11 	Wire check_no_bom.py into CI (#36) 	Still open, unchanged since Session 10. One step in the workflow.
 
 8. LESSONS LEARNED
 ======================================
@@ -288,6 +310,12 @@ Priority 	Task 	Details
     (Session 10) Put a version gate above the first third-party import, not merely near the top. Below `from dotenv import load_dotenv` the user gets ModuleNotFoundError and never sees the message.
     (Session 10) When a dependency needs system binaries pip cannot install, installing the Python package alone is worse than not installing it: it looks supported, costs disk, and fails at runtime. The image carried ~2GB of PyTorch for OCR it could not perform.
     (Session 9) Profile before optimising. The 15-20s startup was assumed to be an Ollama network probe; importtime showed it was eager imports. Measured 3.2s of imports against 15-20s observed, so filesystem/AV cold cache accounts for the remainder — no code change fixes that part.
+    (Session 11) An entry-point's try/except doesn't cover module-level code. Wrapping `if __name__ == "__main__":` in try/except KeyboardInterrupt looks complete but doesn't catch Ctrl+C during the imports that run before that block starts. If startup is slow enough to interrupt, the imports need their own handler.
+    (Session 11) "Ambiguous width" Unicode characters are locale-dependent, not font-dependent in the way you'd assume. A checkmark that's 1 column in an English-locale terminal can render as 2 columns in a CJK-locale terminal (East Asian Width property), silently breaking any layout that counts characters instead of accounting for this. Prefer plain ASCII for anything alignment-critical.
+    (Session 11) When a document names an exact number as a bug example ("|g| > 1.5"), use that number, not a substitute you consider more defensible. A plausibility bound of 2.0 felt more principled but would have silently failed to catch the document's own cited case at g=1.51-1.99.
+    (Session 11) Verify a Known Issue's literal claim against the code before fixing it, not just its symptom. #21's description ("CLI globs input/sr/") was wrong — checking rct_search.py directly showed the real behavior (input/rct_search/ then output/rct_search/). Fixing the described-but-nonexistent bug would have left the real, narrower gap in place.
+    (Session 11) A named risk mechanism doesn't always match the real one. #24 described API keys landing in "the server process" as if shared across users; st.session_state is per-browser-session in Streamlit by default. Trace the actual data flow (here: os.environ.copy(), never mutated; subprocess env= only) before implementing a fix for the risk as originally framed — the real, narrower risk (plaintext duration-of-exposure) still needed addressing, just not the way the description implied.
+    (Session 11) Fixing a hardcoded test path can surface a design bug the test was hiding. Correcting test_main_sr_mode's mocked prompt path revealed that ALL_MODES has no "sr" key at all — the test exercises a code path that cannot happen outside its own mock. A mechanical path fix is not the same as validating the test still tests something real; flag the deeper finding rather than silently patch past it.
 
 ======================================
 9. FINAL VERIFIED RENDER SETTINGS
@@ -352,4 +380,13 @@ Reviewer rules (full version in Readme/REVIEWER_GUIDE.md): read the source table
 
 5. Test the macOS launchers on an actual Mac (Issue #27).
 
-Handoff prepared: 2026-08-17 · Version: v2.4.8 · Single source of truth for next session.
+6. Decide on test_main_sr_mode (#43): redesign to assert SR mode routes to
+   run_sr_launcher(), or remove it - it currently tests a code path
+   (ALL_MODES['sr']) that only "passes" because choose_role is fully mocked.
+
+7. Push Session 11's 7 commits and re-verify CI (GitHub Actions) and the
+   Render deployment - neither was re-run this session. Local suite is
+   green (405 passed, 3 skipped, 11 deselected) but that is not the same
+   guarantee as CI passing in a clean environment.
+
+Handoff prepared: 2026-08-18 · Version: v2.4.9 · Single source of truth for next session.
