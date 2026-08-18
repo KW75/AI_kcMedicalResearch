@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import time
 import urllib.error
 import urllib.request
@@ -188,12 +189,27 @@ def _get_model_size(host: str, model_name: str) -> float:
     return 0.0
 
 
-# Auto-detect Ollama model at import time if not explicitly set
-if not OLLAMA_MODEL:
-    try:
-        OLLAMA_MODEL = _ollama_detect_best_model(OLLAMA_HOST)
-    except Exception:
-        OLLAMA_MODEL = "llama3.2"
+# Ollama model resolution is lazy (see _resolve_ollama_model below), not
+# eager at import time. Previously this block ran unconditionally for every
+# process regardless of which provider was actually selected: a network
+# probe to the local Ollama server (bounded by a 5s timeout, but still a
+# latent hang on every single run - Known Issue #17) and a cosmetic
+# "[ollama] Auto-detected..." print that fired even on a Qwen SR run that
+# never touches Ollama (Known Issue #6).
+_OLLAMA_MODEL_RESOLVED: str | None = None
+
+
+def _resolve_ollama_model() -> str:
+    """Return the Ollama model to use, auto-detecting on first real use only."""
+    global _OLLAMA_MODEL_RESOLVED
+    if OLLAMA_MODEL:
+        return OLLAMA_MODEL
+    if _OLLAMA_MODEL_RESOLVED is None:
+        try:
+            _OLLAMA_MODEL_RESOLVED = _ollama_detect_best_model(OLLAMA_HOST)
+        except Exception:
+            _OLLAMA_MODEL_RESOLVED = "llama3.2"
+    return _OLLAMA_MODEL_RESOLVED
 
 
 # ---------------------------------------------------------------------------
@@ -278,7 +294,7 @@ def call_ollama_provider(
     max_tokens: int = 8192,
 ) -> str:
     """Send a prompt to the local Ollama generate endpoint."""
-    model = model or OLLAMA_MODEL
+    model = model or _resolve_ollama_model()
     url = f"{OLLAMA_HOST}/api/generate"
     payload = json.dumps({
         "model": model,
@@ -454,13 +470,41 @@ def call_ai(
 # ---------------------------------------------------------------------------
 # Fallback-aware call
 # ---------------------------------------------------------------------------
-_TRANSIENT_INDICATORS = ("timeout", "timed out", "503", "502", "429", "rate limit", "connection")
+_AUTH_STATUS_CODES = {"401", "403"}
+_TRANSIENT_STATUS_CODES = {"429", "500", "502", "503", "504"}
+_TRANSIENT_PHRASES = ("timeout", "timed out", "rate limit", "connection error")
+
+_HTTP_ERROR_RE = re.compile(r"http error (\d{3})")
 
 
 def _is_transient_error(error: Exception) -> bool:
-    """Determine if an error is transient (worth retrying with another provider)."""
+    """Determine if an error is transient (worth retrying with another provider).
+
+    Auth errors (401/403) must never be treated as transient, even if their
+    message happens to contain a word like "connection" somewhere (e.g. a
+    gateway saying "connection refused by auth proxy"). Previously this
+    matched the bare substring "connection", which could misclassify an
+    auth failure as retryable - defeating the "auth errors raise immediately
+    and never fall back" guarantee (Known Issue #25).
+
+    The HTTP status code, when present in the message, is checked first and
+    is authoritative. Only a small set of specific phrases are used as a
+    fallback for errors with no status code (e.g. genuine urllib.error.URLError
+    connection failures) - "connection" alone is no longer one of them, only
+    the more precise "connection error" phrase that this module's own
+    URLError handlers actually produce.
+    """
     msg = str(error).lower()
-    return any(indicator in msg for indicator in _TRANSIENT_INDICATORS)
+
+    code_match = _HTTP_ERROR_RE.search(msg)
+    if code_match:
+        code = code_match.group(1)
+        if code in _AUTH_STATUS_CODES:
+            return False
+        if code in _TRANSIENT_STATUS_CODES:
+            return True
+
+    return any(phrase in msg for phrase in _TRANSIENT_PHRASES)
 
 
 def call_ai_with_fallback(
@@ -550,14 +594,21 @@ def validate_provider(provider: str) -> tuple[bool, str]:
 
 
 def get_default_model(provider: str) -> str:
-    """Return the default model for a given provider."""
+    """Return the default model for a given provider.
+
+    For Ollama, this reflects only an explicitly configured OLLAMA_MODEL and
+    deliberately does NOT trigger the network auto-detect probe - callers
+    that just want to list/display provider status shouldn't pay for or
+    wait on a live Ollama query. The real model is resolved lazily on first
+    actual generation call; see _resolve_ollama_model.
+    """
     defaults = {
         "deepseek": DEEPSEEK_MODEL,
         "openai": OPENAI_MODEL,
         "anthropic": ANTHROPIC_MODEL,
         "groq": GROQ_MODEL,
         "qwen": QWEN_MODEL,
-        "ollama": OLLAMA_MODEL,
+        "ollama": OLLAMA_MODEL or "(auto-detected on first use)",
     }
     return defaults.get(provider, "")
 
