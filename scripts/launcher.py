@@ -326,23 +326,29 @@ def pick_provider(mode_flag: str = '') -> str:
         section_header('SELECT  PROVIDER')
         print()
 
+        BADGE_W = 12  # fixed visible width for the badge column, ASCII-only so it
+                      # renders identically regardless of terminal locale/font
+                      # (Unicode marks like the old checkmark are ambiguous-width
+                      # and render as 2 columns in CJK-locale terminals, which
+                      # was throwing the right-hand border out of alignment)
+
         for key, name, desc, flag in PROVIDERS:
             prov_id = flag.split()[-1] if flag else 'ollama'
 
             if is_sr and prov_id in BLOCKED_FOR_SR:
-                badge = f'{ERR}x no vision{RESET}'
+                badge = f'{ERR}{"x no vision":<{BADGE_W}}{RESET}'
                 prow  = (f'  {FRAME}│{RESET}  {INFO}{key}{RESET}  '
                          f'{INFO}{name:<12}{RESET}  {INFO}{desc:<26}{RESET}'
-                         f'{badge}  {FRAME}│{RESET}')
+                         f'{badge}{FRAME}│{RESET}')
             elif is_sr and prov_id in VISION_PROVIDERS:
-                badge = f'{GOOD}✓ vision  {RESET}'
+                badge = f'{GOOD}{"+ vision":<{BADGE_W}}{RESET}'
                 prow  = (f'  {FRAME}│{RESET}  {ACCENT}{key}{RESET}  '
                          f'{TEXT}{name:<12}{RESET}  {INFO}{desc:<26}{RESET}'
-                         f'{badge}  {FRAME}│{RESET}')
+                         f'{badge}{FRAME}│{RESET}')
             else:
                 prow  = (f'  {FRAME}│{RESET}  {ACCENT}{key}{RESET}  '
                          f'{TEXT}{name:<12}{RESET}  {INFO}{desc:<26}{RESET}'
-                         f'{" " * 12}{FRAME}│{RESET}')
+                         f'{" " * BADGE_W}{FRAME}│{RESET}')
             print(prow)
 
         print()
