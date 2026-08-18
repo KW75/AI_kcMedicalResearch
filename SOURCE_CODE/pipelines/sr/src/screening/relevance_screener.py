@@ -73,9 +73,21 @@ class RelevanceScreener:
                     import pytesseract
                     import io
                     from PIL import Image
-                    pytesseract.pytesseract.tesseract_cmd = (
-                        r"C:\Program Files\Tesseract-OCR\tesseract.exe"
-                    )
+                    import sys
+                    if sys.platform == "win32":
+                        # Common default install location on Windows. Only
+                        # override if it's actually there - if the user
+                        # installed elsewhere or added tesseract to PATH,
+                        # leave pytesseract's own discovery alone.
+                        _default_win_path = (
+                            r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+                        )
+                        if os.path.exists(_default_win_path):
+                            pytesseract.pytesseract.tesseract_cmd = _default_win_path
+                    # On macOS/Linux/Docker, tesseract is expected on PATH
+                    # (e.g. via apt-get/brew install tesseract-ocr) - setting
+                    # a Windows-only absolute path here would silently break
+                    # OCR everywhere else.
                     doc = fitz.open(pdf_path)
                     ocr_chunks = []
                     for i in range(min(8, len(doc))):

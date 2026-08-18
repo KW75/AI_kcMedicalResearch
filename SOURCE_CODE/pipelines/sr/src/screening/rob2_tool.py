@@ -41,7 +41,16 @@ def _openai_compat_creds(provider: str, api_key: Optional[str] = None):
 
 
 class RoB2Assessor:
-    def __init__(self, model="qwen3.7-plus", provider="qwen", api_key: Optional[str] = None):
+    def __init__(self, model="qwen-plus-latest", provider="qwen", api_key: Optional[str] = None):
+        # NOTE: default matches providers.py's QWEN_MODEL default (text
+        # model). The previous default ("qwen3.7-plus") didn't match
+        # anything in providers.py's model registry. assess_by_pdf_path()
+        # only ever calls _call_with_text() - _call_with_images() exists in
+        # this class but is never actually invoked from any code path - so
+        # the text model, not the vision model, is the correct default here.
+        # In normal pipeline usage this default is overridden by sr/main.py
+        # passing model=args.model explicitly, but it's a landmine for
+        # direct construction (tests, scripts) that omit model.
         self.provider = provider.lower()
         self.model    = model
         if self.provider == "anthropic":
@@ -137,9 +146,21 @@ class RoB2Assessor:
                     import pytesseract
                     import io
                     from PIL import Image
-                    pytesseract.pytesseract.tesseract_cmd = (
-                        r"C:\Program Files\Tesseract-OCR\tesseract.exe"
-                    )
+                    import sys
+                    if sys.platform == "win32":
+                        # Common default install location on Windows. Only
+                        # override if it's actually there - if the user
+                        # installed elsewhere or added tesseract to PATH,
+                        # leave pytesseract's own discovery alone.
+                        _default_win_path = (
+                            r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+                        )
+                        if os.path.exists(_default_win_path):
+                            pytesseract.pytesseract.tesseract_cmd = _default_win_path
+                    # On macOS/Linux/Docker, tesseract is expected on PATH
+                    # (e.g. via apt-get/brew install tesseract-ocr) - setting
+                    # a Windows-only absolute path here would silently break
+                    # OCR everywhere else.
                     doc = fitz.open(pdf_path)
                     total_pages = len(doc)
                     if total_pages <= 6:
