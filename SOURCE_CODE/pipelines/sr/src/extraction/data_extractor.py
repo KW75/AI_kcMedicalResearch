@@ -1388,6 +1388,141 @@ class DataExtractor:
             f"{extracted_text}\n"
         )
 
+    GROUP_LABEL_FOLLOWUP_TEMPLATE = '''You previously extracted these outcome values from this paper:
+  Intervention/treatment arm: mean={mean_intervention}, SD={sd_intervention}, N={n_intervention}
+  Control/comparator arm: mean={mean_control}, SD={sd_control}, N={n_control}
+
+I need the actual NAMES of these two arms/groups, as the paper itself calls
+them (e.g. "CBT", "Usual Medical Care", "Metformin 500mg", "Placebo").
+
+Do NOT answer with a role description like "intervention" or "control" -
+I already know which is which, I need what the paper actually calls them.
+
+Do NOT answer with a timepoint (baseline, pre-treatment, post-treatment,
+follow-up, Week 12, T1/T2/T3, etc.) - a timepoint is not a group name. If
+the only difference you can find between these two rows of numbers is a
+timepoint rather than a treatment arm, that is important - say so by
+setting both fields to null rather than guessing.
+
+Return ONLY valid JSON, no markdown:
+{{"intervention_group": "<name as the paper calls it, or null if you cannot find a real arm name>",
+  "control_group": "<name as the paper calls it, or null if you cannot find a real arm name>"}}
+'''
+
+    def _needs_group_labels(self, result: dict) -> bool:
+        """True if the result has usable outcome data but no group labels -
+        i.e. the #10 within/between-group tripwire (_flag_group_timepoint_confusion)
+        has nothing to check. Found via real-world testing: even on the
+        text-fallback path, where the extraction schema explicitly requests
+        intervention_group/control_group, the model doesn't reliably answer
+        that part of a large combined prompt - and the primary vision prompt
+        never asks for these fields at all."""
+        if not isinstance(result, dict):
+            return False
+        candidate = result.get("best_meta_analysis_candidate")
+        candidate = candidate if isinstance(candidate, dict) else {}
+        primary = result.get("primary_outcome")
+        primary = primary if isinstance(primary, dict) else {}
+        sources = [result, candidate, primary]
+        intervention_group = self._first_from_sources(
+            sources, ["intervention_group", "treatment_group", "experimental_group"])
+        control_group = self._first_from_sources(
+            sources, ["control_group", "comparator_group"])
+        return not (intervention_group and control_group)
+
+    def _build_group_label_followup_prompt(self, result: dict) -> str:
+        candidate = result.get("best_meta_analysis_candidate")
+        candidate = candidate if isinstance(candidate, dict) else {}
+        primary = result.get("primary_outcome")
+        primary = primary if isinstance(primary, dict) else {}
+        sources = [result, candidate, primary]
+
+        def get(keys):
+            v = self._first_from_sources(sources, keys)
+            return v if v is not None else "(not recorded)"
+
+        return self.GROUP_LABEL_FOLLOWUP_TEMPLATE.format(
+            mean_intervention=get(["mean_intervention", "intervention_mean", "treatment_mean"]),
+            sd_intervention=get(["sd_intervention", "intervention_sd", "treatment_sd"]),
+            n_intervention=get(["n_intervention", "intervention_n"]),
+            mean_control=get(["mean_control", "control_mean", "comparator_mean"]),
+            sd_control=get(["sd_control", "control_sd", "comparator_sd"]),
+            n_control=get(["n_control", "control_n"]),
+        )
+
+    def _call_chat_api_with_prompt(self, prompt: str, max_tokens: int = 256) -> str:
+        """Send an arbitrary text-only prompt via the same OpenAI-compatible
+        chat-completions client used elsewhere in this class. For narrow,
+        single-purpose follow-up questions (like the group-label re-prompt)
+        where a full extraction prompt/schema would be overkill. Not
+        available for the Anthropic provider, which uses a different client
+        (self.client.beta.messages.create, not chat.completions.create) -
+        callers must guard on self.provider != "anthropic"."""
+        resp = self.client.chat.completions.create(
+            model=self.model,
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=max_tokens,
+            temperature=0,
+        )
+        return (resp.choices[0].message.content or "").strip()
+
+    def _fetch_group_labels_if_missing(self, result: dict, filename: str,
+                                        base64_images: list = None,
+                                        extracted_text: str = None) -> dict:
+        """If the result has usable outcome data but is missing group
+        labels, issue a focused follow-up call asking specifically for
+        intervention_group/control_group, instead of leaving the #10
+        within/between-group tripwire with nothing to check (the gap found
+        during real-corpus verification - see HANDOFF.md Session 12/13).
+
+        Not available for the Anthropic provider (different client API) -
+        silently no-ops there. Still not guaranteed to succeed: the model
+        can answer null, or invent a plausible-but-wrong name - this
+        increases the odds of having group labels to check, it does not
+        guarantee correctness. Re-runs _flag_group_timepoint_confusion
+        itself after fetching labels, since _coerce_extraction_result
+        already ran once before this method is called (before labels
+        existed to check).
+        """
+        if self.provider == "anthropic":
+            return result
+        if not self._needs_group_labels(result):
+            return result
+        if not base64_images and not extracted_text:
+            return result
+
+        prompt = self._build_group_label_followup_prompt(result)
+
+        try:
+            if base64_images:
+                raw = self._call_vision_api(base64_images, prompt)
+            else:
+                raw = self._call_chat_api_with_prompt(prompt)
+
+            from ..utils.json_utils import extract_json
+            labels = extract_json(raw)
+            if not isinstance(labels, dict):
+                return result
+
+            for key in ("intervention_group", "control_group"):
+                value = labels.get(key)
+                if self._value_present(value):
+                    result[key] = value
+
+            logger.info(
+                "[GROUP LABELS] Follow-up for %s: intervention_group=%r, control_group=%r",
+                filename, result.get("intervention_group"), result.get("control_group"),
+            )
+
+        except Exception as exc:
+            logger.warning(f"[GROUP LABELS] Follow-up request failed for {filename}: {exc}")
+
+        # Re-run the confusion check now that labels may have changed -
+        # _coerce_extraction_result already ran once before this method was
+        # called, so this check needs to run again explicitly.
+        self._flag_group_timepoint_confusion(result)
+        return result
+
     def _call_text_api(self, extracted_text: str, filename: str = "") -> str:
         """Send extracted PDF text to the same chat-completions client as a fallback."""
         resp = self.client.chat.completions.create(
@@ -1465,6 +1600,8 @@ class DataExtractor:
                 if r and isinstance(r, dict):
                     if self._has_usable_extraction_result(r):
                         logger.info(f"[VISION] {strategy_name} strategy found data for {filename}")
+                        r = self._fetch_group_labels_if_missing(
+                            r, filename, base64_images=base64_images)
                         result = r
                         break
                     else:
@@ -1492,6 +1629,8 @@ class DataExtractor:
                         if r and isinstance(r, dict) and self._has_usable_extraction_result(r):
                             logger.info(f"[TEXT] Text fallback found usable data for {filename}")
                             r.setdefault("extraction_method", "text_fallback")
+                            r = self._fetch_group_labels_if_missing(
+                                r, filename, extracted_text=text_payload)
                             result = r
                         else:
                             logger.info(f"[TEXT] Text fallback found no usable data for {filename}")
