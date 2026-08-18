@@ -2,7 +2,7 @@ AI kcMedical Research
 
 A multi-mode AI assistant for medical research, critical appraisal, systematic review, coding, and writing. Uses cloud providers by default (DeepSeek, Qwen, OpenAI, Anthropic, Groq) with optional local Ollama support.
 
-    Version: 2.4.10
+    Version: 2.4.11
     Tests: 423 passed, 3 skipped
     Coverage: ~53%
     CI: GitHub Actions - Green
@@ -171,6 +171,14 @@ specific documented failure patterns, not every possible extraction error.
 Manual verification against the source PDF is still required regardless of
 whether any flag fired.
 
+NOTE: from v2.4.10 through the first real-corpus test, these three columns
+were silently absent from the actual results_csv output despite existing in
+the code, because write_results() wrote a hardcoded fieldnames list that
+didn't include them (#36) - fixed in v2.4.11. Real-corpus testing in v2.4.11
+also found that #9 and #10's tripwires have not yet been exercised against
+the specific paper (zsy234.pdf) they were built to catch - see #9, #10, #38
+for what happened when they were actually tested against it.
+
 Place your PDFs in the SR input folder:
 
 Windows:        copy *.pdf input\sr\
@@ -251,9 +259,9 @@ Known Issues
 8 	test_main_coverage.py references a nonexistent nested prompts/coding/*.txt layout (actual files are flat prompts/-prompt.md)
                                         Low 	                                        RESOLVED (v2.4.9) — corrected to flat prompts/<role>-prompt.md; side finding tracked as #29
 9 	No SD/SE disambiguation. Extraction reads a reported SE as an SD, understating dispersion by up to ~sqrt(n) and inflating the effect size
-                                        CRITICAL 	                                MITIGATED (v2.4.10) — deterministic tripwire added: flags sd_intervention/sd_control values pulled from a source line also containing "SE"/"SEM"/"standard error" (text-fallback path only; vision path relies on a prompt-level warning with no post-hoc check). Manual check via REVIEWER_GUIDE.md 3.1 is still required - this catches the documented failure pattern, not every possible SE/SD confusion
+                                        CRITICAL 	                                MITIGATED (v2.4.10), tested against real corpus (v2.4.11) — deterministic tripwire flags sd_intervention/sd_control values pulled from a source line also containing "SE"/"SEM"/"standard error" (text-fallback path only). Real-world test: zsy234.pdf (the documented SE-as-SD failure case) succeeded via vision on 2/2 real runs, never reaching the text-fallback path this tripwire is scoped to - so it has not yet been exercised against the paper it was built for. Manual check via REVIEWER_GUIDE.md 3.1 is still required
 10 	No within- vs between-group detection. A within-subject pre/post contrast can be extracted as if it were intervention-vs-control, producing a large invalid effect with no warning
-                                        CRITICAL 	                                MITIGATED (v2.4.10) — deterministic tripwire added: flags when intervention_group/control_group contains timepoint vocabulary (baseline/post-treatment/follow-up/etc.) or when both group labels are identical (runs on both extraction paths). Manual check via REVIEWER_GUIDE.md 2.2 is still required - this catches mislabeling visible in the group NAME itself, not a model that invents a plausible-but-wrong arm name
+                                        CRITICAL 	                                MITIGATED (v2.4.10), tested against real corpus (v2.4.11) — deterministic tripwire flags timepoint vocabulary or identical labels in intervention_group/control_group. Real-world test: the vision prompt never requested these fields at all (fixed in v2.4.11 with a follow-up re-prompt, see #34), but even once real arm names were obtained for zsy234.pdf ("CBT-I"/"WLC" - genuinely correct trial-design facts), the check went silent while the underlying mean/SD values remained unchanged and still required #13's plausibility bound to be flagged. The follow-up validates "what are this trial's arms called," not "do the already-extracted numbers actually belong to a between-group comparison of those arms" - see #34. Manual check via REVIEWER_GUIDE.md 2.2 is still required
 11 	Extraction is non-deterministic. The same PDF can yield different means/SDs/Ns on consecutive runs; observed in 2 of 5 test papers
                                         High 	                                        Open — run 3x and diff before trusting output
 12 	Broken font CMaps misdetected as garbled text. Affected PDFs have a clean text layer recoverable with a fixed character-code offset, but the pipeline falls back to OCR, losing fidelity 	High 	Open — likely upstream cause of #11
@@ -280,6 +288,10 @@ Known Issues
 33 	relevance_screener.py and rob2_tool.py hardcoded a Windows-only absolute Tesseract path (C:\Program Files\Tesseract-OCR\tesseract.exe), breaking the OCR fallback entirely on macOS/Linux/Docker regardless of whether Tesseract was actually installed there 	Medium 	RESOLVED (v2.4.10) — now only overrides tesseract_cmd on Windows, and only if that default path exists; otherwise defers to pytesseract's normal PATH-based discovery
 34 	RoB2Assessor defaulted to model="qwen3.7-plus", which matches nothing in providers.py's model registry. Currently unreachable via the documented pipeline (sr/main.py always passes model=args.model explicitly), but a landmine for direct construction (tests, scripts) that omit model 	Low 	RESOLVED (v2.4.10) — default corrected to qwen-plus-latest, matching providers.py's QWEN_MODEL; also found assess_by_pdf_path only ever calls _call_with_text (_call_with_images is defined but never invoked), confirming the text model, not the vision model, is the correct default
 35 	_infer_group_timepoint_from_text hardcoded three literal arm names (CBT-IP, CBT-P, UMC) from one specific trial with no generic fallback - silently returned (None, None) for every other paper's table, giving the appearance of general group-inference machinery while only ever working for one study 	Medium 	RESOLVED (v2.4.10) — generalized to derive candidate arm names from each paper's own extraction output (intervention_group/control_group fields, or groups_n_by_timepoint-style rows) instead of hardcoded literals; verified the original trial still matches correctly and a completely different trial's names now match too
+36 	audit_logger.py's write_results() used a hardcoded fieldnames list with csv.DictWriter(extrasaction="ignore"), silently dropping the plausibility_flag/sd_se_warning/group_timepoint_warning columns from meta_analysis_results.csv even though they existed in each row's audit_row dict 	Medium 	RESOLVED (v2.4.11) — added the three field names to the fixed list; verified against real pipeline output (header and values now present)
+37 	Real .env DASHSCOPE_BASE_URL pointed at a decommissioned private workspace endpoint (the same URL removed from .env.example's DASHSCOPE_ANTHROPIC_URL earlier), causing every SR extraction call to fail with "Connection error" and every RoB2 call to get HTTP 404 - not caused by any code change, a pre-existing dormant misconfiguration only surfaced when the pipeline was actually run 	High 	RESOLVED (v2.4.11) — user corrected their local .env; not a code fix, noted here since it was mistaken for a regression before the log was read carefully
+38 	The v2.4.11 group-label follow-up (added to address #10's missing intervention_group/control_group data) validates "what are this trial's treatment arms called," not "do the specific numbers already extracted actually belong to a between-group comparison of those arms." Real-world test on zsy234.pdf: follow-up correctly returned genuine arm names (CBT-I, WLC) while the underlying mean/SD values remained unchanged from prior runs and the group/timepoint tripwire stayed silent - producing a cleaner-looking result for exactly the paper it was built to catch, with only #13's plausibility bound still flagging it 	CRITICAL 	Open — needs the model to quote/cite the specific source text it pulled the numbers from, and a check that the quoted text doesn't contain timepoint language, binding verification to the NUMBERS rather than only to the labels
+39 	No regression test for the v2.4.11 group-label follow-up mechanism (_fetch_group_labels_if_missing, _needs_group_labels, _build_group_label_followup_prompt, _call_chat_api_with_prompt) - only verified via standalone logic simulation and two real pipeline runs, not a committed pytest test 	Medium 	Open
 Contributing
 
     Fork the repository
