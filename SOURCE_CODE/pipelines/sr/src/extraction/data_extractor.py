@@ -54,6 +54,15 @@ Return the data in this exact nested JSON structure:
 
 If you find pain-related outcome data, fill in the numeric values. If not, set outcome_match to false.
 
+CRITICAL - SD vs SE: sd_intervention and sd_control must be STANDARD DEVIATIONS.
+Do not use standard errors (SE, SEM), confidence intervals, t statistics,
+F statistics, p values, or effect sizes for these fields. A standard error
+is much smaller than a standard deviation for the same data (SE = SD /
+sqrt(N)) and using it here will make the study's effect size look several
+times larger than it really is. If the source reports "SE" or "SEM" next
+to a value, do not put that value in sd_intervention or sd_control - either
+find the actual SD elsewhere in the paper, or leave the field null.
+
 DO NOT fabricate values. Return null if not found.
 '''
 
@@ -432,7 +441,97 @@ class DataExtractor:
                         result[dest] = value
 
         self._derive_missing_sample_sizes(result)
+        self._flag_group_timepoint_confusion(result)
         return result
+
+    # Vocabulary that identifies a study TIMEPOINT, not a treatment arm.
+    # Deliberately narrow: real arm names essentially never contain these
+    # words, so this has a low false-positive rate. Not exhaustive - it
+    # catches the documented failure pattern (a within-subject pre/post
+    # label extracted into intervention_group/control_group), not every
+    # possible within/between confusion.
+    _TIMEPOINT_VOCAB_PATTERN = re.compile(
+        r"\b("
+        r"baseline|pre[-\s]?treatment|pre[-\s]?test|pre[-\s]?intervention|"
+        r"post[-\s]?treatment|post[-\s]?test|post[-\s]?intervention|"
+        r"follow[-\s]?up|endpoint|end[-\s]?of[-\s]?treatment|"
+        r"week\s*\d+|month\s*\d+|day\s*\d+|"
+        r"t\d\b|wk\d+"
+        r")\b",
+        re.IGNORECASE,
+    )
+
+    def _flag_group_timepoint_confusion(self, result: dict) -> None:
+        """Deterministic tripwire for Known Issue #10 (within- vs
+        between-group confusion).
+
+        Does not correct or exclude anything - flags it in the result for
+        the mandatory manual review REVIEWER_GUIDE.md 2.2 already requires.
+        Runs on BOTH extraction paths (vision and text-fallback), unlike
+        the SD/SE tripwire, since it only needs the group labels the model
+        already extracted, not literal source text.
+
+        Two checks, both narrow and low-false-positive by design:
+          1. A group label contains timepoint vocabulary (baseline,
+             post-treatment, follow-up, week N, ...) - a real treatment
+             arm essentially never looks like this.
+          2. intervention_group and control_group are the same value -
+             structurally impossible for a genuine between-group contrast.
+
+        This is intentionally NOT a general within/between-group detector:
+        it only catches cases where the mislabeling shows up in the group
+        NAME itself. A model that fabricates a plausible-sounding but
+        still-wrong arm name (rather than reusing an obvious timepoint
+        word) would not be caught by this check.
+        """
+        if not isinstance(result, dict):
+            return
+
+        candidate = result.get("best_meta_analysis_candidate")
+        candidate = candidate if isinstance(candidate, dict) else {}
+        primary = result.get("primary_outcome")
+        primary = primary if isinstance(primary, dict) else {}
+        sources = [result, candidate, primary]
+
+        intervention_group = self._first_from_sources(
+            sources, ["intervention_group", "treatment_group", "experimental_group"])
+        control_group = self._first_from_sources(
+            sources, ["control_group", "comparator_group"])
+
+        warning = None
+
+        for label, value in (("intervention_group", intervention_group),
+                              ("control_group", control_group)):
+            if not value:
+                continue
+            if self._TIMEPOINT_VOCAB_PATTERN.search(str(value)):
+                warning = (
+                    f"{label}={value!r} looks like a timepoint label "
+                    f"(baseline/post-treatment/follow-up/etc.), not a "
+                    f"treatment arm name. If the source paper is reporting "
+                    f"a within-subject pre/post comparison rather than a "
+                    f"between-group comparison, this is NOT a valid effect "
+                    f"size for this meta-analysis."
+                )
+                break
+
+        if warning is None and intervention_group and control_group:
+            if self._normalize_label(intervention_group) == self._normalize_label(control_group):
+                warning = (
+                    f"intervention_group and control_group are both "
+                    f"{intervention_group!r} - the same group cannot be "
+                    f"its own comparator. This looks like a within-subject "
+                    f"(pre/post) contrast mislabeled as a between-group "
+                    f"comparison."
+                )
+
+        if warning:
+            result["group_timepoint_warning"] = warning
+            logger.warning(
+                "[GROUP/TIMEPOINT CHECK] Possible within/between-group "
+                "confusion for %s: %s",
+                result.get("filename", "?"), warning,
+            )
 
     def _has_usable_extraction_result(self, result: dict) -> bool:
         """Mirror the existing acceptance gate, but handle zero values safely."""
@@ -698,6 +797,16 @@ class DataExtractor:
         Last-resort deterministic sample-size parser for table headers like:
         CBT-P (n = 34) ... (n = 28) ... (n = 24)
         UMC   (n = 41) ... (n = 36) ... (n = 26)
+
+        NOTE: the CBT-IP/CBT-P/UMC branches below are narrow, known-trial
+        formatting workarounds (e.g. this trial's table sometimes abbreviates
+        CBT-IP as just "IP"), not general logic. They are safe to leave as-is
+        because each only activates when `group_norm` exactly equals one of
+        those three literal strings - for any other paper's arm names, this
+        falls straight through to the generic `else` branch below. Unlike
+        _infer_group_timepoint_from_text (see that docstring), this function
+        already has a working generic fallback, so it does not silently no-op
+        for other papers the way that one did.
         """
         import re
 
@@ -753,24 +862,86 @@ class DataExtractor:
         return None
 
 
-    def _infer_group_timepoint_from_text(self, extracted_text: str, mean_value, sd_value):
+    def _collect_candidate_group_names(self, result: dict) -> list:
+        """Gather candidate arm names actually present in this paper's own
+        extraction output, for use as search candidates in
+        _infer_group_timepoint_from_text.
+
+        Pulls from two places: (1) intervention_group/control_group-style
+        fields, wherever the model put them (top level, best_meta_analysis_candidate,
+        primary_outcome); (2) group/arm/name/label values inside any
+        groups_n_by_timepoint / sample_sizes / group_sample_sizes rows -
+        the same structures _get_sample_size_for_group already reads.
+        These are genuinely specific to whichever paper is being processed,
+        unlike a hardcoded literal list.
+        """
+        if not isinstance(result, dict):
+            return []
+
+        candidate = result.get("best_meta_analysis_candidate")
+        candidate = candidate if isinstance(candidate, dict) else {}
+        primary = result.get("primary_outcome")
+        primary = primary if isinstance(primary, dict) else {}
+        sources = [result, candidate, primary]
+
+        names = []
+
+        for key in ("intervention_group", "treatment_group", "experimental_group",
+                    "control_group", "comparator_group"):
+            value = self._first_from_sources(sources, [key])
+            if self._value_present(value):
+                names.append(str(value).strip())
+
+        rows = (
+            result.get("groups_n_by_timepoint")
+            or result.get("sample_sizes")
+            or result.get("group_sample_sizes")
+            or []
+        )
+        if isinstance(rows, list):
+            for row in rows:
+                if not isinstance(row, dict):
+                    continue
+                value = row.get("group") or row.get("arm") or row.get("name") or row.get("label")
+                if self._value_present(value):
+                    names.append(str(value).strip())
+
+        # De-duplicate while preserving order, drop empties.
+        seen = set()
+        deduped = []
+        for name in names:
+            if name and name not in seen:
+                seen.add(name)
+                deduped.append(name)
+        return deduped
+
+    def _infer_group_timepoint_from_text(self, extracted_text: str, mean_value, sd_value,
+                                          candidate_groups: list = None) -> tuple:
         """
         Infer group/timepoint by matching an extracted mean/SD pair against
         compacted table text rows, e.g.:
-        CBT-P 7.58 (1.75) 7.35 (2.08) 7.21 (1.79)
+        <group label> 7.58 (1.75) 7.35 (2.08) 7.21 (1.79)
+
+        candidate_groups: arm names to search for in the text. Normally
+        supplied by the caller via _collect_candidate_group_names(), derived
+        from whatever THIS paper's own extraction already named as its arms.
+
+        This used to hardcode three literal arm names from one specific
+        trial (CBT-IP/CBT-P/UMC) with no fallback - meaning it only ever
+        matched anything for that one paper and returned (None, None) for
+        every other paper's table, silently. Deriving candidates from each
+        paper's own extraction output generalizes this instead of hardcoding
+        one trial's names into shared code. If a paper's own extraction
+        doesn't surface clean arm names for this to find, the correct fix is
+        a study_overrides.yaml entry for that specific paper (see
+        StudyOverrides) - not another hardcoded literal here.
         """
         import re
 
-        if not extracted_text:
+        if not extracted_text or not candidate_groups:
             return None, None
 
         timepoints = ["pre-treatment", "post-treatment", "follow-up"]
-
-        group_patterns = [
-            ("CBT-IP", [r"\bCBT[-\s]?IP\b"]),
-            ("CBT-P", [r"\bCBT[-\s]?P\b"]),
-            ("UMC", [r"\bUMC\b"]),
-        ]
 
         for raw_line in extracted_text.splitlines():
             line = re.sub(r"^\s*\d{4}:\s*", "", raw_line).strip()
@@ -785,9 +956,16 @@ class DataExtractor:
                 continue
 
             group_name = None
-            for candidate_group, patterns in group_patterns:
-                if any(re.search(pattern, line, flags=re.I) for pattern in patterns):
-                    group_name = candidate_group
+            for candidate in candidate_groups:
+                candidate = str(candidate).strip()
+                if not candidate:
+                    continue
+                # Allow a hyphen/space in the candidate name to match either
+                # a hyphen, a space, or nothing in the source text (covers
+                # "CBT-IP" vs "CBT IP" vs "CBTIP"-style formatting drift).
+                pattern = re.escape(candidate).replace(r"\-", r"[-\s]?")
+                if re.search(rf"\b{pattern}\b", line, flags=re.I):
+                    group_name = candidate
                     break
 
             if not group_name:
@@ -802,6 +980,60 @@ class DataExtractor:
                     return group_name, timepoint
 
         return None, None
+
+    def _flag_possible_se_as_sd(self, result: dict, extracted_text: str) -> dict:
+        """Deterministic tripwire for Known Issue #9 (SD/SE confusion).
+
+        Does not correct or exclude anything - flags it in the result for
+        the mandatory manual review REVIEWER_GUIDE.md 3.1 already requires.
+        Only runs on the text-fallback path, where literal source text is
+        available to check against (the vision path has no text to search).
+
+        Looks for the literal words "SE" / "SEM" / "standard error"
+        appearing on the same source line as a value that was extracted
+        into sd_intervention or sd_control - the exact failure mode
+        documented for zsy234.pdf, where the source read
+        "(M = 47.14, SE = 2.36)" and the value was extracted as an SD.
+
+        This is a conservative co-occurrence check, not a semantic parser:
+        it will miss cases where the SE label and the value are on
+        different lines, and it can false-positive if an unrelated SE
+        value happens to share a line with the real SD. It is a tripwire
+        for a human reviewer, not a corrector.
+        """
+        if not isinstance(result, dict) or not extracted_text:
+            return result
+
+        primary = result.get("primary_outcome")
+        if not isinstance(primary, dict):
+            primary = result  # some callers still use the flat shape here
+
+        se_pattern = re.compile(r"\b(SE|SEM|standard error)\b", re.IGNORECASE)
+        warnings_found = []
+
+        for field, label in (("sd_intervention", "intervention"), ("sd_control", "control")):
+            value = primary.get(field)
+            if value is None:
+                continue
+            value_str = str(value)
+            for line in extracted_text.splitlines():
+                if se_pattern.search(line) and value_str in line:
+                    warnings_found.append(
+                        f"{label} SD ({value}) appears on a source line "
+                        f"containing 'SE'/'SEM'/'standard error' - verify "
+                        f"this is really an SD, not a standard error, "
+                        f"against the source PDF."
+                    )
+                    break
+
+        if warnings_found:
+            result["sd_se_warning"] = " | ".join(warnings_found)
+            logger.warning(
+                "[SD/SE CHECK] Possible SE-as-SD confusion for %s: %s",
+                result.get("filename", "?"), result["sd_se_warning"],
+            )
+
+        return result
 
     def _derive_missing_sample_sizes_from_text(self, result: dict, extracted_text: str) -> dict:
         """Fill missing Ns from extracted table text when the model omits them."""
@@ -844,10 +1076,12 @@ class DataExtractor:
                 mean_value = self._first_from_sources(sources, mean_keys)
                 sd_value = self._first_from_sources(sources, sd_keys)
 
+                candidate_groups = self._collect_candidate_group_names(result)
                 inferred_group, inferred_timepoint = self._infer_group_timepoint_from_text(
                     extracted_text,
                     mean_value,
                     sd_value,
+                    candidate_groups=candidate_groups,
                 )
                 group = group or inferred_group
                 side_timepoint = side_timepoint or inferred_timepoint
@@ -1253,6 +1487,7 @@ class DataExtractor:
                         from ..utils.json_utils import extract_json
                         r = self._coerce_extraction_result(extract_json(raw))
                         r = self._derive_missing_sample_sizes_from_text(r, text_payload)
+                        r = self._flag_possible_se_as_sd(r, text_payload)
 
                         if r and isinstance(r, dict) and self._has_usable_extraction_result(r):
                             logger.info(f"[TEXT] Text fallback found usable data for {filename}")
