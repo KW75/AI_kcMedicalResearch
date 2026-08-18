@@ -1,5 +1,5 @@
 ﻿# =============================================================================
-#  launcher.py  |  AI kcMedicalResearch  |  v2.4.9
+#  launcher.py  |  AI kcMedicalResearch  |  v2.4.3
 # =============================================================================
 
 import subprocess
@@ -137,7 +137,7 @@ MODES = [
 ]
 
 PROVIDERS = [
-    ('1', 'Ollama',    'local - free - default',  ''),
+    ('1', 'Ollama',    'local - free - default',  '--provider ollama'),
     ('2', 'Qwen',      'Alibaba - recommended',   '--provider qwen'),
     ('3', 'Groq',      'fast inference',          '--provider groq'),
     ('4', 'DeepSeek',  'cost-efficient',          '--provider deepseek'),
@@ -196,7 +196,7 @@ def section_header(title: str) -> None:
 
 
 # -----------------------------------------------------------------------------
-#  Banner  v2.4.9
+#  Banner  v2.4.3
 # -----------------------------------------------------------------------------
 def banner() -> None:
     W = _W
@@ -210,9 +210,9 @@ def banner() -> None:
     print(f'  {FRAME}║{RESET}   {LOGO}██║ ██╔╝██╔════╝{RESET}{W(4)}'
           f'{INFO}─────────────────────{RESET}{W(11)}{FRAME}║{RESET}')
     print(f'  {FRAME}║{RESET}   {LOGO}█████╔╝ ██║{RESET}{W(9)}'
-          f'{ACCENT}Version  {RESET}{HILITE}2.4.9{RESET}{W(14)}{FRAME}    ║{RESET}')
+          f'{ACCENT}Version  {RESET}{HILITE}2.4.3{RESET}{W(14)}{FRAME}    ║{RESET}')
     print(f'  {FRAME}║{RESET}   {LOGO}██╔═██╗ ██║{RESET}{W(9)}'
-          f'{ACCENT}Tests    {RESET}{GOOD}405 passed - 3 skipped{RESET}{W(1)}{FRAME}║{RESET}')
+          f'{ACCENT}Tests    {RESET}{GOOD}400 passed - 3 skipped{RESET}{W(1)}{FRAME}║{RESET}')
     print(f'  {FRAME}║{RESET}   {LOGO}██║  ██╗╚██████╗{RESET}{W(4)}'
           f'{ACCENT}Deploy   {RESET}{INFO}render.com / local{RESET}{W(5)}{FRAME}║{RESET}')
     print(f'  {FRAME}║{RESET}   {LOGO}╚═╝  ╚═╝ ╚═════╝{RESET}{W(36)}{FRAME}║{RESET}')
@@ -365,7 +365,7 @@ def pick_provider(mode_flag: str = '') -> str:
         ).strip()
 
         if choice == '':
-            prov_flag = ''
+            prov_flag = '--provider ollama'
             prov_id   = 'ollama'
         else:
             matched = False
@@ -468,6 +468,8 @@ def _run_cmd(cmd: list, label: str = '') -> None:
     print(f'  {FRAME}╔══ Running ═════════════════════════════════════════════════════╗{RESET}')
     print(f'  {FRAME}║{RESET}  {ACCENT}python SOURCE_CODE/main.py {display:<33}{RESET}  {FRAME}║{RESET}')
     print(f'  {FRAME}╚══ Ctrl+C stops and returns to menu ════════════════════════════╝{RESET}')
+    print()
+    print(f'  {WARN}⏳ Starting up... this can take several seconds while dependencies load. Please wait...{RESET}')
     print()
     try:
         subprocess.run(cmd, cwd=str(BASE), stdin=sys.stdin, stdout=sys.stdout, stderr=sys.stderr)
