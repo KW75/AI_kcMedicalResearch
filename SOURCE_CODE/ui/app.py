@@ -295,6 +295,28 @@ def _get_cached_pico_files(directory: Path) -> List[Path]:
         return []
     return sorted(directory.glob("pico_*.json"), reverse=True)
 
+def _get_all_pico_files() -> List[Path]:
+    """PICO files from both input/rct_search/ and output/rct_search/, merged.
+
+    Known Issue #14: the CLI (rct_search.py) checks input/rct_search/ first,
+    falling back to output/rct_search/ - but this UI previously checked only
+    output/rct_search/. A PICO JSON that existed only in input/rct_search/
+    (e.g. manually placed there, or copied from another machine) was
+    invisible here even though the CLI could see and offer it. Both
+    locations are now checked and merged so the two interfaces agree on
+    what's available, with input/rct_search/ taking priority on a filename
+    collision, matching the CLI's own precedence.
+    """
+    input_files = _get_cached_pico_files(INPUT_DIR / "rct_search")
+    output_files = _get_cached_pico_files(OUTPUT_DIR / "rct_search")
+    seen = set()
+    merged = []
+    for f in input_files + output_files:
+        if f.name not in seen:
+            seen.add(f.name)
+            merged.append(f)
+    return sorted(merged, key=lambda p: p.name, reverse=True)
+
 def _upload_files_with_progress(files: List, dest: Path, progress_text: str = "Uploading...") -> int:
     """Upload files with progress bar."""
     if not files:
@@ -418,6 +440,20 @@ def _api_key_sidebar() -> None:
             st.caption("Current session keys:")
             for key in st.session_state.api_keys:
                 st.caption(f"✅ {key.title()}: ********")
+
+            # Known Issue #16: an entered key sits in server-side session
+            # memory as plaintext for the whole session's lifetime, with no
+            # way to remove it early. st.session_state is per-browser-session
+            # in Streamlit's execution model (not shared across users), so
+            # this isn't a cross-user leak, but a session left open longer
+            # than needed keeps the key resident in memory longer than
+            # necessary. This button lets the user shorten that window
+            # deliberately instead of relying on session timeout.
+            if st.button("🗑️ Clear stored keys", key="clear_api_keys"):
+                st.session_state.api_keys = {}
+                for provider in ('openai', 'anthropic', 'groq', 'deepseek', 'qwen'):
+                    st.session_state.pop(f"api_{provider}", None)
+                st.rerun()
 
 # ============================================================================
 # TERMINAL LAUNCHER
@@ -905,14 +941,13 @@ def _mode_page(mode: str) -> None:
                 st.rerun()
         
         # PICO import
-        pico_dir = OUTPUT_DIR / "rct_search"
-        pico_files = _get_cached_pico_files(pico_dir)
+        pico_files = _get_all_pico_files()
         with st.expander("📥 Import PICO from RCT Search", expanded=bool(pico_files)):
             if not pico_files:
-                st.info("No PICO files found in `output/rct_search/`. Run RCT Search mode first.")
+                st.info("No PICO files found in `input/rct_search/` or `output/rct_search/`. Run RCT Search mode first.")
             else:
                 chosen = st.selectbox("Select a saved PICO file", [p.name for p in pico_files], key="pico_select_sr")
-                chosen_path = pico_dir / chosen
+                chosen_path = next(p for p in pico_files if p.name == chosen)
                 import json as _json
                 try:
                     pico_data = _json.loads(chosen_path.read_text(encoding="utf-8"))
