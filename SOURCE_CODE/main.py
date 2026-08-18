@@ -65,59 +65,75 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 SOURCE_CODE_DIR = PROJECT_ROOT / "SOURCE_CODE"
 sys.path.insert(0, str(SOURCE_CODE_DIR))
 
-# Now imports work from SOURCE_CODE/
-from utils.path_utils import PATH_MANAGER, get_input_dir, get_output_dir
-from utils.document_reader import DocumentReader
-# from utils.rag import RAGUtils (functions imported directly)
-
-# Import pipeline modules
-from pipelines.coding import run_coding
-from pipelines.writing import run_writing
-from pipelines.appraisal import run_appraisal
-from pipelines.search import run_search
-from pipelines.rct_search import run_rct_search_pipeline
-from pipelines.sr import run_sr
-
-# Ensure project root is on sys.path BEFORE any imports
-_ROOT = Path(__file__).resolve().parent.parent
-if str(_ROOT) not in sys.path:
-    sys.path.insert(0, str(_ROOT))
-
-# Import coding mode functions
+# --- Heavy imports -----------------------------------------------------
+# document_reader (-> pytesseract -> pandas) and the pipeline modules below
+# are the slow part of startup (~7s cold). If Ctrl+C lands while one of
+# these is still loading, Python raises KeyboardInterrupt from wherever the
+# import chain happens to be (e.g. deep inside pandas/_libs), producing an
+# alarming traceback even though nothing actually failed. The real
+# entry-point handler at the bottom of this file only covers code that runs
+# after imports finish, so it can't catch this. Catch it here too and print
+# the same clean message instead.
 try:
-    from pipelines.coding.coding import (
-        run_builder,
-        run_reviewer,
-        run_tester,
-        parse_direct_instructions,
-    )
-except ModuleNotFoundError:
-    from pipelines.coding.coding import (
-        run_builder,
-        run_reviewer,
-        run_tester,
-        parse_direct_instructions,
-    )
+    # Now imports work from SOURCE_CODE/
+    from utils.path_utils import PATH_MANAGER, get_input_dir, get_output_dir
+    from utils.document_reader import DocumentReader
+    # from utils.rag import RAGUtils (functions imported directly)
 
-# Import RCT Search with fallback
-try:
-    from pipelines.rct_search.rct_search import run_rct_search_pipeline
-except ModuleNotFoundError:
+    # NOTE: run_coding, run_writing, run_search, and run_sr used to be imported
+    # here unconditionally, but nothing in this file ever calls them - every
+    # handler (handle_coding_mode, handle_writing_mode, handle_search_mode,
+    # run_sr_launcher) does its own local import from a different submodule
+    # path when it actually needs one. Importing pipelines.sr alone dragged in
+    # scipy/matplotlib/pymupdf (~2.8s) on every run, including coding mode,
+    # for a name that was never used (Known Issue #18). Only the two pipeline
+    # imports actually referenced later in this file are kept below.
+    from pipelines.appraisal import run_appraisal
+    from pipelines.rct_search import run_rct_search_pipeline
+
+    # Ensure project root is on sys.path BEFORE any imports
+    _ROOT = Path(__file__).resolve().parent.parent
+    if str(_ROOT) not in sys.path:
+        sys.path.insert(0, str(_ROOT))
+
+    # Import coding mode functions
     try:
-        from modes.rct_search import run_rct_search_pipeline
+        from pipelines.coding.coding import (
+            run_builder,
+            run_reviewer,
+            run_tester,
+            parse_direct_instructions,
+        )
     except ModuleNotFoundError:
-        # Define fallback if module doesn't exist
-        def run_rct_search_pipeline(provider="deepseek", model=None, dry_run=False, reports_dir=None):
-            print("[RCT Search] Module not available. Please ensure src/modes/rct_search.py exists.")
-            return None
+        from pipelines.coding.coding import (
+            run_builder,
+            run_reviewer,
+            run_tester,
+            parse_direct_instructions,
+        )
 
-load_dotenv()
+    # Import RCT Search with fallback
+    try:
+        from pipelines.rct_search.rct_search import run_rct_search_pipeline
+    except ModuleNotFoundError:
+        try:
+            from modes.rct_search import run_rct_search_pipeline
+        except ModuleNotFoundError:
+            # Define fallback if module doesn't exist
+            def run_rct_search_pipeline(provider="deepseek", model=None, dry_run=False, reports_dir=None):
+                print("[RCT Search] Module not available. Please ensure src/modes/rct_search.py exists.")
+                return None
 
-# ---------------------------------------------------------------------------
-# Session 4 modules
-# ---------------------------------------------------------------------------
-from streaming import stream_to_console, tee_stream
-from checkpoint import PipelineCheckpoint, find_resumable_checkpoint, prompt_resume
+    load_dotenv()
+
+    # -----------------------------------------------------------------------
+    # Session 4 modules
+    # -----------------------------------------------------------------------
+    from streaming import stream_to_console, tee_stream
+    from checkpoint import PipelineCheckpoint, find_resumable_checkpoint, prompt_resume
+except KeyboardInterrupt:
+    print("\n\nSession stopped. Returning to menu...\n")
+    raise SystemExit(0)
 
 
 
@@ -127,7 +143,7 @@ from checkpoint import PipelineCheckpoint, find_resumable_checkpoint, prompt_res
 # ---------------------------------------------------------------------------
 # Version
 # ---------------------------------------------------------------------------
-VERSION = "2.3.1"
+VERSION = "2.4.8"
 
 # ---------------------------------------------------------------------------
 # Paths
@@ -364,6 +380,13 @@ def call_ai(
     """
     fallback_raw = os.getenv("FALLBACK_PROVIDERS", "deepseek,qwen,groq")
     fallback_chain = [p.strip() for p in fallback_raw.split(",") if p.strip()]
+
+    if sys.stdout.isatty():
+        _WAIT_COLOR = "\033[93m"  # yellow, matches the warning style used elsewhere
+        if provider == "ollama":
+            print(f"\n{_WAIT_COLOR}⏳ Pulling LLM. This can take a while on first load. Please wait...{RESET}\n")
+        else:
+            print(f"\n{_WAIT_COLOR}⏳ Calling {provider}. This can take a moment. Please wait...{RESET}\n")
 
     if stream and sys.stdout.isatty():
         try:
@@ -1791,7 +1814,7 @@ def handle_writing_mode(
         )
         return call_ai(prompt=combined, provider=provider, model=model)
 
-    # ?????Track selection ?????????????????????????????????????????????????????????????????????????????????????
+    # Track selection
     print("\n" + "=" * 60)
     print("  WRITING MODE")
     print("=" * 60)
@@ -1815,7 +1838,7 @@ def handle_writing_mode(
         print("Invalid choice  - returning to menu.")
         return
 
-    # ?????Sub-mode selection ???????????????????????????????????????????????????????????????????????????????
+    # Sub-mode selection
     print(f"\n  Track: {track.upper()}")
     print("  " + "-" * 40)
     print("  1. Writer   - full pipeline: Writer -> Editor -> QA")
@@ -1836,7 +1859,7 @@ def handle_writing_mode(
         return
     sub_mode = sub_mode_map[sub_choice]
 
-    # ?????Word limit ???????????????????????????????????????????????????????????????????????????????????????????????
+    # Word limit
     if sub_mode in ("Writer", "Editor"):
         default_wl = DEFAULT_WORDS[track]
         print(f"\n  Default word limit for {track} track: {default_wl}")
@@ -1852,7 +1875,7 @@ def handle_writing_mode(
     else:
         word_limit = DEFAULT_WORDS[track]
 
-    # ?????Instructions ???????????????????????????????????????????????????????????????????????????????????????????
+    # Instructions
     print(f"  [{sub_mode.upper()} | {track.upper()}] Enter instructions below.")
     print("  Lines starting with > are DIRECT TASK INSTRUCTIONS (highest priority).")
     print("  Press ENTER on a blank line when done.\n")
