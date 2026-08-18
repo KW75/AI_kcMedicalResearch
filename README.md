@@ -2,8 +2,8 @@ AI kcMedical Research
 
 A multi-mode AI assistant for medical research, critical appraisal, systematic review, coding, and writing. Uses cloud providers by default (DeepSeek, Qwen, OpenAI, Anthropic, Groq) with optional local Ollama support.
 
-    Version: 2.4.9
-    Tests: 405 passed, 3 skipped
+    Version: 2.4.10
+    Tests: 423 passed, 3 skipped
     Coverage: ~53%
     CI: GitHub Actions - Green
     GitHub: https://github.com/KW75/AI_kcMedicalResearch
@@ -144,7 +144,7 @@ python -m pytest -q                                   # all markers (410 passed,
 python -m pytest --cov=SOURCE_CODE --cov-report=html  # with coverage
 python -m pytest -m live -v                           # live provider smoke tests
 
-Current status: 405 passed, 3 skipped, 11 deselected.
+Current status: 423 passed, 3 skipped, 11 deselected.
 
 python scripts/check_no_bom.py                        # fail on UTF-8 BOMs in source
 python scripts/strip_bom.py                           # remove them
@@ -158,6 +158,18 @@ confident, precise effect size whether or not it understood the source paper.
 Every extracted mean, SD, and N must be checked against the source PDF before
 any pooled estimate is reported. See Known Issues #9 and #10 for documented
 failure modes.
+
+As of v2.4.10, results_csv carries three tripwire columns that flag (never
+silently correct or exclude) studies worth a closer look:
+plausibility_flag (#13, implausible effect-size magnitude), sd_se_warning
+(#9, a value extracted into an SD field from a source line also mentioning
+"SE"/"SEM"/standard error), and group_timepoint_warning (#10, a group label
+that looks like a timepoint, or identical intervention/control labels). The
+console prints a summary block for each at the end of Stage 4. These are
+deterministic pattern checks, not semantic verification - they catch the
+specific documented failure patterns, not every possible extraction error.
+Manual verification against the source PDF is still required regardless of
+whether any flag fired.
 
 Place your PDFs in the SR input folder:
 
@@ -239,9 +251,9 @@ Known Issues
 8 	test_main_coverage.py references a nonexistent nested prompts/coding/*.txt layout (actual files are flat prompts/-prompt.md)
                                         Low 	                                        RESOLVED (v2.4.9) — corrected to flat prompts/<role>-prompt.md; side finding tracked as #29
 9 	No SD/SE disambiguation. Extraction reads a reported SE as an SD, understating dispersion by up to ~sqrt(n) and inflating the effect size
-                                        CRITICAL 	                                Open — manual check required (REVIEWER_GUIDE.md 3.1)
+                                        CRITICAL 	                                MITIGATED (v2.4.10) — deterministic tripwire added: flags sd_intervention/sd_control values pulled from a source line also containing "SE"/"SEM"/"standard error" (text-fallback path only; vision path relies on a prompt-level warning with no post-hoc check). Manual check via REVIEWER_GUIDE.md 3.1 is still required - this catches the documented failure pattern, not every possible SE/SD confusion
 10 	No within- vs between-group detection. A within-subject pre/post contrast can be extracted as if it were intervention-vs-control, producing a large invalid effect with no warning
-                                        CRITICAL 	                                Open — manual check required (REVIEWER_GUIDE.md 2.2)
+                                        CRITICAL 	                                MITIGATED (v2.4.10) — deterministic tripwire added: flags when intervention_group/control_group contains timepoint vocabulary (baseline/post-treatment/follow-up/etc.) or when both group labels are identical (runs on both extraction paths). Manual check via REVIEWER_GUIDE.md 2.2 is still required - this catches mislabeling visible in the group NAME itself, not a model that invents a plausible-but-wrong arm name
 11 	Extraction is non-deterministic. The same PDF can yield different means/SDs/Ns on consecutive runs; observed in 2 of 5 test papers
                                         High 	                                        Open — run 3x and diff before trusting output
 12 	Broken font CMaps misdetected as garbled text. Affected PDFs have a clean text layer recoverable with a fixed character-code offset, but the pipeline falls back to OCR, losing fidelity 	High 	Open — likely upstream cause of #11
@@ -265,6 +277,9 @@ Known Issues
 30 	Ctrl+C during the startup import chain (pandas/pytesseract, ~7s cold start) raised a raw traceback instead of the clean "Session stopped. Returning to menu..." message - the entry-point's try/except only wrapped code inside if __name__ == "__main__", not the imports above it 	Medium 	RESOLVED (v2.4.9) — imports wrapped in their own try/except KeyboardInterrupt
 31 	Provider-select box in scripts/launcher.py misaligned on CJK-locale terminals: the Unicode checkmark is an ambiguous-width character and renders 2 columns instead of 1 there, throwing the right-hand border out of alignment 	Low 	RESOLVED (v2.4.9) — replaced with ASCII marker, fixed-width padding
 32 	No visible wait notice before a slow provider call (Ollama model load, or any cloud provider taking 15s+); looked indistinguishable from a hang 	Low 	RESOLVED (v2.4.9) — call_ai() now prints a wait notice before dispatch
+33 	relevance_screener.py and rob2_tool.py hardcoded a Windows-only absolute Tesseract path (C:\Program Files\Tesseract-OCR\tesseract.exe), breaking the OCR fallback entirely on macOS/Linux/Docker regardless of whether Tesseract was actually installed there 	Medium 	RESOLVED (v2.4.10) — now only overrides tesseract_cmd on Windows, and only if that default path exists; otherwise defers to pytesseract's normal PATH-based discovery
+34 	RoB2Assessor defaulted to model="qwen3.7-plus", which matches nothing in providers.py's model registry. Currently unreachable via the documented pipeline (sr/main.py always passes model=args.model explicitly), but a landmine for direct construction (tests, scripts) that omit model 	Low 	RESOLVED (v2.4.10) — default corrected to qwen-plus-latest, matching providers.py's QWEN_MODEL; also found assess_by_pdf_path only ever calls _call_with_text (_call_with_images is defined but never invoked), confirming the text model, not the vision model, is the correct default
+35 	_infer_group_timepoint_from_text hardcoded three literal arm names (CBT-IP, CBT-P, UMC) from one specific trial with no generic fallback - silently returned (None, None) for every other paper's table, giving the appearance of general group-inference machinery while only ever working for one study 	Medium 	RESOLVED (v2.4.10) — generalized to derive candidate arm names from each paper's own extraction output (intervention_group/control_group fields, or groups_n_by_timepoint-style rows) instead of hardcoded literals; verified the original trial still matches correctly and a completely different trial's names now match too
 Contributing
 
     Fork the repository
