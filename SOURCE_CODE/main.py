@@ -381,13 +381,6 @@ def call_ai(
     fallback_raw = os.getenv("FALLBACK_PROVIDERS", "deepseek,qwen,groq")
     fallback_chain = [p.strip() for p in fallback_raw.split(",") if p.strip()]
 
-    if sys.stdout.isatty():
-        _WAIT_COLOR = "\033[93m"  # yellow, matches the warning style used elsewhere
-        if provider == "ollama":
-            print(f"\n{_WAIT_COLOR}⏳ Pulling LLM. This can take a while on first load. Please wait...{RESET}\n")
-        else:
-            print(f"\n{_WAIT_COLOR}⏳ Calling {provider}. This can take a moment. Please wait...{RESET}\n")
-
     if stream and sys.stdout.isatty():
         try:
             return stream_to_console(
