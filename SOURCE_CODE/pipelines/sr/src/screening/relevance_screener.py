@@ -7,6 +7,11 @@ import anthropic
 logger      = logging.getLogger(__name__)
 BETA_HEADER = "files-api-2025-04-14"
 
+# Screening reads the FRONT of the paper (title/abstract/methods carry the
+# PICO signal). Both the text path and the OCR fallback share one budget:
+MAX_SCREEN_PAGES = 8     # pages considered, both extraction paths
+MAX_SCREEN_CHARS = 6000  # total chars passed to the screening prompt
+
 PROMPT = """You are a systematic review methodologist performing full-text screening.
 PICO CRITERIA:\n{pico}\nINCLUSION:\n{inclusion}\nEXCLUSION:\n{exclusion}
 The attached PDF is a candidate RCT. Return ONLY valid JSON:
@@ -60,14 +65,27 @@ class RelevanceScreener:
             try:
                 import pdfplumber
                 with pdfplumber.open(pdf_path) as pdf:
-                    pages    = pdf.pages[:8]
+                    pages    = pdf.pages[:MAX_SCREEN_PAGES]
                     pdf_text = "\n\n".join(p.extract_text() or "" for p in pages).strip()
             except Exception as txt_err:
                 logger.warning(f"pdfplumber failed for {filename}: {txt_err}")
 
-            # --- Detect garbled CID-font text and fall back to OCR ---
-            if not pdf_text or "(cid:" in pdf_text or pdf_text.count(" ") < 20:
-                logger.info(f"Garbled text detected for {filename}  - switching to OCR")
+            # --- Detect an unusable text layer and fall back to OCR ---
+            # Three distinct conditions were previously logged under one
+            # blanket "Garbled text detected" message; name the reason so
+            # the log distinguishes a scan from a broken-CMap layer (#18).
+            _fallback_reason = None
+            if not pdf_text:
+                _fallback_reason = "no extractable text layer"
+            elif "(cid:" in pdf_text:
+                _fallback_reason = "CID markers in text layer"
+            elif pdf_text.count(" ") < 20:
+                _fallback_reason = "text layer nearly space-free (possible broken CMap, see #18)"
+            if _fallback_reason:
+                logger.info(
+                    f"Unusable text layer for {filename} "
+                    f"({_fallback_reason}) - switching to OCR"
+                )
                 try:
                     import fitz
                     import pytesseract
@@ -88,26 +106,48 @@ class RelevanceScreener:
                     # (e.g. via apt-get/brew install tesseract-ocr) - setting
                     # a Windows-only absolute path here would silently break
                     # OCR everywhere else.
-                    doc = fitz.open(pdf_path)
+                    # One shared budget, filled front-to-back, matching the
+                    # pdfplumber path. The old per-page t[:800] cap starved
+                    # screening of the abstract and saturated at exactly
+                    # 8*800 + 7*2 = 6414 chars on every >=8-page paper -
+                    # the identical "OCR extracted 6414 chars" lines seen
+                    # across four different PDFs in real runs.
                     ocr_chunks = []
-                    for i in range(min(8, len(doc))):
-                        pix = doc[i].get_pixmap(matrix=fitz.Matrix(2, 2))
-                        img = Image.open(io.BytesIO(pix.tobytes("png")))
-                        t = pytesseract.image_to_string(img).strip()
-                        if t:
-                            ocr_chunks.append(t[:800])
+                    _total = 0
+                    _pages_ocred = 0
+                    with fitz.open(pdf_path) as doc:
+                        for i in range(min(MAX_SCREEN_PAGES, len(doc))):
+                            pix = doc[i].get_pixmap(matrix=fitz.Matrix(2, 2))
+                            img = Image.open(io.BytesIO(pix.tobytes("png")))
+                            t = pytesseract.image_to_string(img).strip()
+                            _pages_ocred += 1
+                            if t:
+                                ocr_chunks.append(t)
+                                _total += len(t)
+                            if _total >= MAX_SCREEN_CHARS:
+                                # Budget met - anything OCR'd beyond this
+                                # would be cut by the prompt truncation
+                                # below, so stop paying OCR time for it.
+                                break
                     pdf_text = "\n\n".join(ocr_chunks).strip()
-                    logger.info(f"OCR extracted {len(pdf_text)} chars from {filename}")
+                    _note = (
+                        f" (prompt uses first {MAX_SCREEN_CHARS})"
+                        if len(pdf_text) > MAX_SCREEN_CHARS else ""
+                    )
+                    logger.info(
+                        f"OCR extracted {len(pdf_text)} chars from "
+                        f"{_pages_ocred} page(s) of {filename}{_note}"
+                    )
                 except Exception as ocr_err:
                     logger.warning(f"OCR failed for {filename}: {ocr_err}")
 
             if not pdf_text:
                 pdf_text = f"[Could not extract text from {filename}]"
-            if len(pdf_text) > 6000:
-                pdf_text = pdf_text[:6000] + "\n...[truncated]"
+            if len(pdf_text) > MAX_SCREEN_CHARS:
+                pdf_text = pdf_text[:MAX_SCREEN_CHARS] + "\n...[truncated]"
             full_prompt = (
                 f"Article filename: {filename}\n\n"
-                f"--- ARTICLE TEXT (first 8 pages) ---\n{pdf_text}\n"
+                f"--- ARTICLE TEXT (first {MAX_SCREEN_PAGES} pages) ---\n{pdf_text}\n"
                 f"--- END OF ARTICLE TEXT ---\n\n"
                 + self._prompt()
             )
@@ -115,9 +155,16 @@ class RelevanceScreener:
             import urllib.error as _ue
             import json as _json
 
+            # Honor DASHSCOPE_BASE_URL like the extraction/RoB2 modules do
+            # (Session 13, #37): a hardcoded URL here silently diverges
+            # from the endpoint every other stage is configured to use.
+            _dashscope_base = os.environ.get(
+                "DASHSCOPE_BASE_URL",
+                "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
+            ).rstrip("/")
             provider_urls = {
                 "deepseek": "https://api.deepseek.com/chat/completions",
-                "qwen":     "https://dashscope-intl.aliyuncs.com/compatible-mode/v1/chat/completions",
+                "qwen":     f"{_dashscope_base}/chat/completions",
                 "openai":   "https://api.openai.com/v1/chat/completions",
                 "groq":     "https://api.groq.com/openai/v1/chat/completions",
                 "ollama":   f"{os.environ.get('OLLAMA_HOST','http://localhost:11434')}/v1/chat/completions",
@@ -142,13 +189,38 @@ class RelevanceScreener:
                 headers={"Content-Type":  "application/json",
                          "Authorization": f"Bearer {api_key}"},
                 method="POST")
-            try:
-                with _ur.urlopen(req, timeout=120) as resp:
-                    data = _json.loads(resp.read())
-            except _ue.HTTPError as http_err:
-                body = http_err.read().decode("utf-8", errors="replace")
-                logger.error(f"HTTP {http_err.code} from {self.provider}: {body[:500]}")
-                raise
+            # Retry transient network failures. Observed in a real run: a
+            # single "Remote end closed connection without response" during
+            # screening silently removed a paper from the ENTIRE review
+            # (screening error -> UNCERTAIN -> not INCLUDE -> dropped from
+            # extraction, RoB2 and the pooled estimate) with one ERROR line
+            # in ~100 lines of log. Auth errors (401/403) are never retried
+            # - same principle as providers.py's #34 fix.
+            import http.client as _hc
+            _last_err = None
+            for _attempt in range(1, 4):
+                try:
+                    with _ur.urlopen(req, timeout=120) as resp:
+                        data = _json.loads(resp.read())
+                    break
+                except _ue.HTTPError as http_err:
+                    body = http_err.read().decode("utf-8", errors="replace")
+                    logger.error(
+                        f"HTTP {http_err.code} from {self.provider}: {body[:500]}")
+                    if http_err.code in (401, 403):
+                        raise  # auth is never transient
+                    _last_err = http_err
+                except (_ue.URLError, _hc.HTTPException,
+                        ConnectionError, TimeoutError, OSError) as net_err:
+                    _last_err = net_err
+                if _attempt < 3:
+                    logger.warning(
+                        f"Screening call attempt {_attempt}/3 failed for "
+                        f"{filename} ({type(_last_err).__name__}: {_last_err})"
+                        f" - retrying in {2 * _attempt}s")
+                    time.sleep(2 * _attempt)
+            else:
+                raise _last_err
             raw = data["choices"][0]["message"]["content"].strip()
             from ..utils.json_utils import extract_json
             r = extract_json(raw)

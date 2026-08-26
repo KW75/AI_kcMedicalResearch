@@ -6,6 +6,13 @@ import anthropic
 logger      = logging.getLogger(__name__)
 BETA_HEADER = "files-api-2025-04-14"
 
+# RoB 2.0 needs methods/randomisation/flow detail, which is front-loaded.
+# Both the text path and the OCR fallback share one budget; anything past
+# it would be cut by the prompt truncation (and _call_with_text's own
+# 6000-char first rung) anyway.
+MAX_ROB2_PAGES = 12    # pages considered, both extraction paths
+MAX_ROB2_CHARS = 6000  # total chars passed to the RoB2 prompt
+
 ROB2_PROMPT = """You are a Cochrane methodologist applying RoB 2.0.
 Assess the attached RCT across five domains. Return ONLY valid JSON:
 {"study":"<FirstAuthor Year>",
@@ -130,17 +137,31 @@ class RoB2Assessor:
                 import pdfplumber
                 with pdfplumber.open(pdf_path) as pdf:
                     chunks = []
-                    for p in pdf.pages[:20]:
-                        t = p.extract_text() or ""
-                        if t.strip():
-                            chunks.append(t[:800])
+                    _total = 0
+                    for p in pdf.pages[:MAX_ROB2_PAGES]:
+                        t = (p.extract_text() or "").strip()
+                        if t:
+                            chunks.append(t)
+                            _total += len(t)
+                        if _total >= MAX_ROB2_CHARS:
+                            break
                     pdf_text = "\n\n".join(chunks).strip()
             except Exception as txt_err:
                 logger.warning(f"pdfplumber failed for {filename}: {txt_err}")
 
-            # --- Detect garbled CID-font text and fall back to OCR ---
-            if not pdf_text or "(cid:" in pdf_text or pdf_text.count(" ") < 20:
-                logger.info(f"Garbled text detected for {filename}  - switching to OCR")
+            # --- Detect an unusable text layer and fall back to OCR ---
+            _fallback_reason = None
+            if not pdf_text:
+                _fallback_reason = "no extractable text layer"
+            elif "(cid:" in pdf_text:
+                _fallback_reason = "CID markers in text layer"
+            elif pdf_text.count(" ") < 20:
+                _fallback_reason = "text layer nearly space-free (possible broken CMap, see #18)"
+            if _fallback_reason:
+                logger.info(
+                    f"Unusable text layer for {filename} "
+                    f"({_fallback_reason}) - switching to OCR"
+                )
                 try:
                     import fitz
                     import pytesseract
@@ -161,28 +182,44 @@ class RoB2Assessor:
                     # (e.g. via apt-get/brew install tesseract-ocr) - setting
                     # a Windows-only absolute path here would silently break
                     # OCR everywhere else.
-                    doc = fitz.open(pdf_path)
-                    total_pages = len(doc)
-                    if total_pages <= 6:
-                        selected = list(range(total_pages))
-                    else:
-                        selected = list(range(3)) + list(range(3, total_pages))[:9]
+                    # One shared budget, filled front-to-back, with early
+                    # stop once met. The old per-page t[:1500] cap over up
+                    # to 12 pages saturated at 12*1500 + 11*2 = 18022
+                    # chars (the exact counts seen in real runs), of which
+                    # the prompt truncation then kept only the first 6000
+                    # - most of the OCR time bought nothing. (The old page
+                    # selection list(range(3)) + list(range(3, n))[:9] was
+                    # also just the first 12 pages, written confusingly.)
                     ocr_chunks = []
-                    for i in selected:
-                        pix = doc[i].get_pixmap(matrix=fitz.Matrix(2, 2))
-                        img = Image.open(io.BytesIO(pix.tobytes("png")))
-                        t = pytesseract.image_to_string(img).strip()
-                        if t:
-                            ocr_chunks.append(t[:1500])
+                    _total = 0
+                    _pages_ocred = 0
+                    with fitz.open(pdf_path) as doc:
+                        for i in range(min(MAX_ROB2_PAGES, len(doc))):
+                            pix = doc[i].get_pixmap(matrix=fitz.Matrix(2, 2))
+                            img = Image.open(io.BytesIO(pix.tobytes("png")))
+                            t = pytesseract.image_to_string(img).strip()
+                            _pages_ocred += 1
+                            if t:
+                                ocr_chunks.append(t)
+                                _total += len(t)
+                            if _total >= MAX_ROB2_CHARS:
+                                break
                     pdf_text = "\n\n".join(ocr_chunks).strip()
-                    logger.info(f"OCR extracted {len(pdf_text)} chars from {filename}")
+                    _note = (
+                        f" (prompt uses first {MAX_ROB2_CHARS})"
+                        if len(pdf_text) > MAX_ROB2_CHARS else ""
+                    )
+                    logger.info(
+                        f"OCR extracted {len(pdf_text)} chars from "
+                        f"{_pages_ocred} page(s) of {filename}{_note}"
+                    )
                 except Exception as ocr_err:
                     logger.warning(f"OCR failed for {filename}: {ocr_err}")
 
             if not pdf_text:
                 pdf_text = f"[Could not extract text from {filename}]"
-            if len(pdf_text) > 6000:
-                pdf_text = pdf_text[:6000] + "\n...[truncated]"
+            if len(pdf_text) > MAX_ROB2_CHARS:
+                pdf_text = pdf_text[:MAX_ROB2_CHARS] + "\n...[truncated]"
 
             raw = self._call_with_text(pdf_text, ROB2_PROMPT)
             from ..utils.json_utils import extract_json
