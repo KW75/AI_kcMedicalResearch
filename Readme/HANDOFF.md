@@ -1,3 +1,293 @@
+Version 2.4.12 (Session 15) — Priority 1 Tests Committed, REVIEWER_GUIDE
+Updated for v2.4.12, activate_venv.bat Version Drift Fixed, Session 14
+Commits Pushed, CI/Render Verified Green
+======================================
+Date: 2026-08-26 (Session 15, following Session 14)
+======================================
+Repository: https://github.com/KW75/AI_kcMedicalResearch
+Tests: 469 passed, 3 skipped, 11 deselected with `-m "not live"` (up from
+430 at Session 14 end); 478 passed, 5 skipped without markers - both
+verified in the real venv this session. The +39 delta is the Session 14
+harness scenarios ported into a committed test suite (Priority 1 from
+Session 14's next-session list).
+Committed: five commits this session (26ebd7d, 1fcf87f, 80cb05f, 44c25fe,
+b0d8b41), all pushed to origin/main. GitHub Actions green on every push.
+Render auto-deploy green.
+Current Status: all v2.4.12 priorities scoped for committed work are
+closed except items 2 (Ang/Jensen bimodality analysis - needs CSV pull),
+3 (zsy234 disposition - reviewer judgement), 5 (check_no_bom.py scan
+root + CI wiring), and 7 (API key rotation - outstanding since Session 9,
+now four sessions overdue). No pipeline runs this session - all work was
+tests, docs, and script hygiene against the code already committed in
+Session 14.
+
+CRITICAL READ FIRST (1): Session 10's confidentiality fix and Session 11's
+regression tests - unchanged. Session 14's #48/#38 source-quote
+verification remains MITIGATED+VERIFIED (real run 20260826_113816
+evidence unchanged); Session 15 added committed pytest coverage but did
+not re-run the pipeline.
+
+CRITICAL READ FIRST (2): Session 14's "commits made locally, not pushed"
+state is now historical. All five Session 14 commits (c5d222b..2527a0f)
+plus all five Session 15 commits (26ebd7d..b0d8b41) are on origin/main.
+CI green on the push, Render deploy green. The five-session gap since
+Session 10's last CI verification is closed.
+
+CRITICAL READ FIRST (3): The `source_quote_warning` mechanism is now
+covered by committed regression tests bound to the exact zsy234 quote
+signature (4 flags: SE-as-SD on both arms + multi-timepoint on both
+arms). A future refactor that breaks the check on that specific quote
+will fail CI. This does NOT extend the check's semantic scope - it is
+still a tripwire on four specific patterns, not a semantic verifier
+(see REVIEWER_GUIDE.md §2.2 and §6, updated this session).
+
+======================================
+SESSION 15 - 2026-08-26 - v2.4.12: DETAIL
+======================================
+
+    Priority 1 from Session 14 (RESOLVED) - Session 14's harness scenarios
+    ported into a committed test suite. Two new files:
+
+    tests/test_data_extractor_source_quotes.py (31 tests). Source-quote
+    verification (#48/#38): the exact zsy234 verbatim quote fires SE+multi-
+    timepoint flags (4 total, matching real run 20260826_113816);
+    clean between-group quote stays silent; number-not-in-quote (7.45
+    absent, 7.4 present matches 7.40); trailing-zero tolerance; missing-
+    quote handling; source_quote_warning key always set (None when clean,
+    per Session 14's always-set-key contract). Null-sentinel group labels
+    (#57): every documented sentinel ("null", "None", "n/a", "NA",
+    "not reported", "unknown", "-", "") normalizes to None at every read
+    site; real arm names preserved; identical-label tripwire does not
+    fire on sentinel-vs-sentinel; and specifically -
+    test_null_sentinel_at_main_extraction_does_not_suppress_followup and
+    test_real_arm_names_do_suppress_followup exercise
+    _needs_group_labels directly (closes #39, the follow-up-mechanism
+    regression-test gap Session 13 flagged).
+
+    tests/test_screener_and_accounting.py (8 tests). Screener retry
+    (#56): transient RemoteDisconnected retries once and succeeds;
+    persistent failure gives exactly 3 attempts then honest error;
+    HTTP 401/403 never retried (same principle as #34). Screening
+    accounting partition: INCLUDE/EXCLUDE/UNCERTAIN separated from
+    ERROR rows using the `error` column (blank vs populated), missing
+    error keys handled gracefully. OCR budget early-stop (#50/#51):
+    both RelevanceScreener and RoB2Assessor stop OCR when
+    MAX_SCREEN_CHARS/MAX_ROB2_CHARS budget is met, verified by
+    monkey-patching fitz/pytesseract/PIL and counting page calls
+    (asserts doc.pixmap_calls <= 3 when 2 pages of 3000 chars saturate
+    MAX_ROB2_CHARS=6000, well below MAX_ROB2_PAGES=12).
+
+    Suite total 469/3/11 (was 430/3/11); +39 tests, +0 regressions.
+    Full run 17.69s in isolation, 41.32s for the whole `-m "not live"`
+    suite. Committed as 26ebd7d.
+
+    Priority 10 from Session 14 (RESOLVED) - activate_venv.bat hardcoded
+    "v2.4.6" in the banner and "v2.4.7" in the header comment, three
+    versions behind the current v2.4.12. Same drift pattern as #43/#53
+    (launcher banner), fixed in Session 14 commit a1a9e33 by parsing
+    VERSION live from SOURCE_CODE/main.py. Applied the identical
+    approach here: a PowerShell one-liner inside the -Command block
+    does Select-String on main.py, extracts the VERSION value with a
+    regex, falls back to "unknown" if the file is missing. Header
+    comment now notes the version is parsed live rather than claiming
+    a specific value. Verified: banner displays v2.4.12 on Windows
+    PowerShell 5.1, Python 3.11.9. No macOS equivalent exists (the
+    scripts/macos/ folder contains only Mac_kcMedicalResearch_CLI.sh
+    and Mac_kcMedicalResearch_UI.sh, both venv-managing launchers
+    without a separate activate step). Committed as 44c25fe.
+
+    Priority 4 from Session 14 (RESOLVED) - REVIEWER_GUIDE.md updated
+    for v2.4.12. Four changes: (a) §2.2 (zsy234 case) gains a
+    "What v2.4.12 changes (partial mitigation)" block documenting the
+    four source_quote_warning patterns, the 4-flag firing on zsy234
+    specifically, and an explicit "tripwire not a verifier" caveat -
+    `source_quote_warning = None` means "four patterns did not trip",
+    not "correct"; item 3.1 remains mandatory. (b) New §3.4 covers
+    run_id correlation across screening_audit.csv, extracted_data.csv,
+    rob2_audit.csv, and meta_analysis_results.csv - filter each file
+    on the same run_id, join on filename, and DO NOT compare rows
+    across run_id values because #17's non-determinism makes such a
+    join unsound. (c) New §4.4 documents the [SCREENING] accounting
+    block partition (INCLUDE/EXCLUDE/UNCERTAIN/ERROR); ERROR rows are
+    pipeline failures, not exclusion decisions; explains how to
+    recover the true partition from the audit CSV's `error` column if
+    the console line was missed. (d) §6 known limitations table: SD/SE
+    and within/between rows updated to note v2.4.12 partial mitigation
+    (was "manual check only"); two new rows added -
+    "extractor quote check is a tripwire, not a verifier" and
+    "retry/OCR-budget/quote-check verified on qwen provider path only"
+    (the Anthropic-path gap, #61). Committed as b0d8b41.
+
+    Priority 6 from Session 14 (RESOLVED) - Session 14's five commits
+    (c5d222b..2527a0f) plus Session 15's five commits were pushed to
+    origin/main across the session. GitHub Actions ran on every push
+    and stayed green. Render auto-deploy triggered on every push and
+    stayed green. Neither had been exercised since Session 10 (five
+    sessions of local-only work); no divergence found. The Session 15
+    tests exercise fitz/pytesseract via sys.modules injection, which
+    was the highest CI-risk area - both Linux and Windows workers
+    passed on first push.
+
+    Session 14 handoff cleanup - Readme/HANDOFF_Session14.md was added
+    as a merge source in commit 2527a0f (Session 14) and its contents
+    merged into HANDOFF.md in commit 7d3fa5a (also Session 14). The
+    standalone file was redundant from that point on; deleted as
+    commit 1fcf87f. HANDOFF.md is the single source of truth from
+    Session 15 onward.
+
+    README.md test-count line - updated the top banner and the
+    "Running Tests" section to reflect the actual test count
+    (469/3/11 with `-m "not live"`, 478/5 without markers), the
+    v2.4.12 baseline, and the commit reference (26ebd7d) that
+    introduced the Priority 1 harness ports. Also flipped Known
+    Issue #39 (group-label follow-up regression-test gap) from Open
+    to RESOLVED (v2.4.12), citing the two specific tests that close
+    it: test_null_sentinel_at_main_extraction_does_not_suppress_followup
+    and test_real_arm_names_do_suppress_followup. Preserved the note
+    that _fetch_group_labels_if_missing /
+    _build_group_label_followup_prompt / _call_chat_api_with_prompt
+    remain verified only via real pipeline runs - a full integration
+    test would require API mocking, out of scope. Committed as 80cb05f.
+
+======================================
+KNOWN ISSUES - STATUS CHANGES (Session 15)
+======================================
+#39   follow-up regression test    Open -> RESOLVED (Session 15) - two
+                                   tests in test_data_extractor_source_
+                                   quotes.py exercise _needs_group_labels
+                                   directly; the outer follow-up functions
+                                   remain verified only via real pipeline
+                                   runs (an integration test would need
+                                   API mocking, deferred).
+
+Carried unchanged (all Session 14 statuses preserved): #17 (Open,
+characterized), #18 (Open, confirmed on all 5 papers), #19 (Open,
+5 flags on zsy234, disposition decision still pending), #60 (Open,
+check_no_bom scan root), #61 (Open, Anthropic-path tripwire gap),
+#2, #22, #23, #27, #28, #36. #28 (API key rotation) is now four
+sessions overdue and remains the highest-priority outstanding item
+carried from previous sessions.
+
+======================================
+FILES DELIVERED THIS SESSION
+======================================
+tests/test_data_extractor_source_quotes.py  (new, 31 tests)
+tests/test_screener_and_accounting.py       (new, 8 tests)
+scripts/windows/activate_venv.bat           (banner parses VERSION live)
+Readme/REVIEWER_GUIDE.md                    (4 edits per Priority 4 above)
+README.md                                   (test count 469; #39 RESOLVED)
+Readme/HANDOFF_Session14.md                 (DELETED - merged into
+                                             HANDOFF.md in Session 14)
+Readme/HANDOFF.md                           (this file - Session 15 head)
+
+Commit trail: 26ebd7d (Priority 1 tests) -> 1fcf87f (HANDOFF_Session14.md
+removal, amended from 43e7805) -> 80cb05f (README test count + #39) ->
+44c25fe (activate_venv.bat VERSION parse) -> b0d8b41 (REVIEWER_GUIDE.md
+v2.4.12 documentation).
+
+======================================
+LESSONS LEARNED (Session 15)
+======================================
+    Verify the artifact, not the intent. Commit 43e7805 was made with a
+    message describing a README test-count update, but the actual diff
+    was the deletion of Readme/HANDOFF_Session14.md - two operations
+    mentally conflated before staging. Caught by `git show --stat HEAD`
+    on review, then amended to 1fcf87f with a message matching the
+    real diff, and the intended README update made as a separate commit
+    (80cb05f). Same class of failure as Session 8's "verify a patch
+    actually applied" and Session 14's "identical byte counts are a
+    saturated cap, not a coincidence": in every case, the fix is to
+    inspect the concrete artifact rather than trust the summary.
+    Preventive check now standard: after any commit, run
+    `git show --stat HEAD` before pushing, and confirm the file list
+    matches the message.
+
+    A first-time push after five sessions of local-only work is a risk
+    concentration, not a routine event. The Session 15 push was green
+    on the first try, but that outcome was not guaranteed: CI hadn't
+    been exercised since Session 10, Render hadn't been deployed since
+    Session 10, and the Priority 1 tests used sys.modules injection
+    (fitz/pytesseract) that could plausibly break on Linux. Green on
+    the first push is the good outcome; the lesson is not to defer
+    pushes long enough to make it a coin flip. Push per-commit or
+    per-session, not per-milestone.
+
+    A hardcoded version string is a load-bearing lie unless it is
+    parsed at runtime. activate_venv.bat's "v2.4.6" banner (three
+    versions stale) was the third instance this project has fixed of
+    the same pattern (#43 launcher argparse, #53 launcher banner,
+    Session 15 activate_venv.bat) - and the merged HANDOFF.md itself
+    picked up a UTF-8 BOM during the Session 14 paste-merge, which is
+    the fourth. Any string that displays a fact should either be
+    computed from the fact's source at display time, or not displayed.
+
+    "The tests I wrote already work in a harness" and "the tests are
+    committed to the suite" are different states with different
+    guarantees. Session 14 verified all its tripwires via harness runs
+    but explicitly noted the tests were not yet ported. Session 15
+    ported them; the +39 tests now gate CI on the real-run signatures
+    (zsy234 4-flag firing, 6414/18022 saturation numbers,
+    401/403 no-retry). A future refactor that silently breaks those
+    signatures now fails CI on push - a guarantee no harness can give.
+
+======================================
+NEXT SESSION PRIORITIES (Session 16)
+======================================
+1   #28 API key rotation (STILL OUTSTANDING since Session 9, four
+    sessions overdue). Rotate Anthropic, DeepSeek, and DashScope keys
+    at each provider console; delete stale %TEMP%\ai_km_run_*.bat
+    files; set per-provider spend limits. Not a code task - a security
+    hygiene task that only the user can perform. Every additional
+    session it remains open widens the exposure window from the
+    pre-v2.4.7 UI launcher leak.
+
+2   Pull run 20260826_113816's extracted_data.csv (deferred from
+    Session 14 Priority 2). Read primary_outcome.source_quote_* for
+    Ang - which table/timepoint does each value set (+0.075 vs -0.248
+    families) come from? - and Jensen (extraction returned rounded
+    49.0/59.0 which its own quotes do not contain; almost certainly
+    #17 caught in the act). Ang's answer resolves the bimodality
+    story; Jensen's confirms whether the pipeline's rounding is
+    model-side or a downstream cast. Both feed #23's corpus fixtures
+    ground truth.
+
+3   Decide zsy234's disposition (#19), unchanged from Session 14.
+    Five flags across three mechanisms (source-quote SE x2,
+    source-quote multi-timepoint x2, plausibility). Reviewer choice:
+    exclude with a documented PRISMA reason, or enter reviewer-verified
+    between-group values via study_overrides.yaml. Not a code task.
+
+4   #60 check_no_bom.py scan root, then #36 CI wiring. Change the scan
+    root from SOURCE_CODE/ to the repo root (with an explicit ignore
+    list for .git, .venv, output/, reports/, and node_modules if
+    ever added). Re-run against the current tree; expect zero BOMs
+    (the three known BOMs in tests/ and scripts/ were stripped in
+    Session 14). Then add a GitHub Actions step that runs
+    check_no_bom.py before pytest. Small self-contained work, ~30 min.
+
+5   #61 Anthropic-path tripwire gap. Either implement source-quote /
+    SD-SE / group-timepoint checks on the _extract_anthropic /
+    assess_by_file_id paths, or add a startup warning when
+    --provider anthropic is selected for SR mode (and document the
+    gap in REVIEWER_GUIDE.md - already noted in §6 this session).
+    Implementation is preferred; documentation-only is acceptable as
+    an interim step.
+
+6   #17 root cause via #18 (broken font CMaps confirmed on all 5
+    papers). A fixed +1 character-offset decode before the OCR
+    fallback would give every stage a clean text layer and likely
+    stabilize extraction - the highest-leverage unfixed defect in
+    the repo per Session 14's assessment. Session 15 did nothing on
+    this; it remains the correct large-scope item for Session 16.
+
+7   Session 14 Priority 8 (Docker end-to-end, unverified since
+    Session 10) and Priority 9 (macOS launchers untested, #27/#39) -
+    both blocked on hardware access, both carried unchanged.
+
+Handoff prepared: 2026-08-26 - Session 15 - prepended to HANDOFF.md; this
+document remains the single source of truth for Session 16. Session 14's
+handoff follows below unchanged as the historical record.
+
 Version 2.4.12 - run_cli Refactor, OCR Truncation Root-Cause, Audit
 Provenance, Screening Drop Guard, Source-Quote Verification (#48 REAL-RUN VERIFIED)
 ======================================
