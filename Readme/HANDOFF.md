@@ -14,10 +14,10 @@ Committed: five commits this session (26ebd7d, 1fcf87f, 80cb05f, 44c25fe,
 b0d8b41), all pushed to origin/main. GitHub Actions green on every push.
 Render auto-deploy green.
 Current Status: all v2.4.12 priorities scoped for committed work are
-closed except items 2 (Ang/Jensen bimodality analysis - needs CSV pull),
-3 (zsy234 disposition - reviewer judgement), 5 (check_no_bom.py scan
-root + CI wiring), and 7 (API key rotation - outstanding since Session 9,
-now four sessions overdue). No pipeline runs this session - all work was
+closed except items 1 (Ang/Jensen quote analysis - needs CSV pull), 
+2 (zsy234 disposition - reviewer judgement), and 
+3 (check_no_bom.py scan root + CI wiring). API key rotation resolved out-of-band; see below.
+No pipeline runs this session - all work was
 tests, docs, and script hygiene against the code already committed in
 Session 14.
 
@@ -164,9 +164,13 @@ Carried unchanged (all Session 14 statuses preserved): #17 (Open,
 characterized), #18 (Open, confirmed on all 5 papers), #19 (Open,
 5 flags on zsy234, disposition decision still pending), #60 (Open,
 check_no_bom scan root), #61 (Open, Anthropic-path tripwire gap),
-#2, #22, #23, #27, #28, #36. #28 (API key rotation) is now four
-sessions overdue and remains the highest-priority outstanding item
-carried from previous sessions.
+#2, #22, #23, #27, #36. 
+
+#28   API key rotation
+Open -> RESOLVED (Session 15) - user confirmed all three provider keys
+(Anthropic, DeepSeek, DashScope) rotated out-of-band after the
+pre-v2.4.7 launcher leak. %TEMP% file cleanup remains as housekeeping
+(leaked strings are no longer valid).
 
 ======================================
 FILES DELIVERED THIS SESSION
@@ -233,15 +237,8 @@ LESSONS LEARNED (Session 15)
 ======================================
 NEXT SESSION PRIORITIES (Session 16)
 ======================================
-1   #28 API key rotation (STILL OUTSTANDING since Session 9, four
-    sessions overdue). Rotate Anthropic, DeepSeek, and DashScope keys
-    at each provider console; delete stale %TEMP%\ai_km_run_*.bat
-    files; set per-provider spend limits. Not a code task - a security
-    hygiene task that only the user can perform. Every additional
-    session it remains open widens the exposure window from the
-    pre-v2.4.7 UI launcher leak.
 
-2   Pull run 20260826_113816's extracted_data.csv (deferred from
+1   Pull run 20260826_113816's extracted_data.csv (deferred from
     Session 14 Priority 2). Read primary_outcome.source_quote_* for
     Ang - which table/timepoint does each value set (+0.075 vs -0.248
     families) come from? - and Jensen (extraction returned rounded
@@ -251,13 +248,13 @@ NEXT SESSION PRIORITIES (Session 16)
     model-side or a downstream cast. Both feed #23's corpus fixtures
     ground truth.
 
-3   Decide zsy234's disposition (#19), unchanged from Session 14.
+2   Decide zsy234's disposition (#19), unchanged from Session 14.
     Five flags across three mechanisms (source-quote SE x2,
     source-quote multi-timepoint x2, plausibility). Reviewer choice:
     exclude with a documented PRISMA reason, or enter reviewer-verified
     between-group values via study_overrides.yaml. Not a code task.
 
-4   #60 check_no_bom.py scan root, then #36 CI wiring. Change the scan
+3   #60 check_no_bom.py scan root, then #36 CI wiring. Change the scan
     root from SOURCE_CODE/ to the repo root (with an explicit ignore
     list for .git, .venv, output/, reports/, and node_modules if
     ever added). Re-run against the current tree; expect zero BOMs
@@ -265,7 +262,7 @@ NEXT SESSION PRIORITIES (Session 16)
     Session 14). Then add a GitHub Actions step that runs
     check_no_bom.py before pytest. Small self-contained work, ~30 min.
 
-5   #61 Anthropic-path tripwire gap. Either implement source-quote /
+4   #61 Anthropic-path tripwire gap. Either implement source-quote /
     SD-SE / group-timepoint checks on the _extract_anthropic /
     assess_by_file_id paths, or add a startup warning when
     --provider anthropic is selected for SR mode (and document the
@@ -273,16 +270,22 @@ NEXT SESSION PRIORITIES (Session 16)
     Implementation is preferred; documentation-only is acceptable as
     an interim step.
 
-6   #17 root cause via #18 (broken font CMaps confirmed on all 5
+5   #17 root cause via #18 (broken font CMaps confirmed on all 5
     papers). A fixed +1 character-offset decode before the OCR
     fallback would give every stage a clean text layer and likely
     stabilize extraction - the highest-leverage unfixed defect in
     the repo per Session 14's assessment. Session 15 did nothing on
     this; it remains the correct large-scope item for Session 16.
 
-7   Session 14 Priority 8 (Docker end-to-end, unverified since
+6   Session 14 Priority 8 (Docker end-to-end, unverified since
     Session 10) and Priority 9 (macOS launchers untested, #27/#39) -
     both blocked on hardware access, both carried unchanged.
+
+Housekeeping (not urgent, not a Session 16 priority): run
+`Remove-Item "$env:TEMP\ai_km_run_*.bat" -ErrorAction SilentlyContinue`
+on any Windows machine that ran the pre-v2.4.7 UI launcher. The keys
+inside are invalidated by the out-of-band rotation, but the files are
+noise on disk.
 
 Handoff prepared: 2026-08-26 - Session 15 - prepended to HANDOFF.md; this
 document remains the single source of truth for Session 16. Session 14's
@@ -591,8 +594,7 @@ NEW 61  Anthropic path runs no     Open - _extract_anthropic /
 
 Carried unchanged: #2 WeasyPrint, #19(README)/HANDOFF Docker unverified,
 #22 RoB2 vs overrides, #23 corpus fixtures, #27/#39 macOS launchers,
-#28 temp-file/key rotation (STILL OUTSTANDING since Session 9), #36 CI BOM
-wiring, CI/Render not re-verified since Session 10.
+#36 CI BOM wiring, CI/Render not re-verified since Session 10.
 
 ======================================
 FILES DELIVERED THIS SESSION (place at these paths)
@@ -1117,3 +1119,4 @@ Reviewer rules (full version in Readme/REVIEWER_GUIDE.md): read the source table
     no committed pytest test.
 
 Handoff prepared: 2026-08-18 · Version: v2.4.11 · Single source of truth for next session.
+
