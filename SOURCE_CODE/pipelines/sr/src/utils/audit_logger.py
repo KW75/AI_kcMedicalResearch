@@ -22,13 +22,33 @@ def _write_csv(path: Path, rows: list[dict], fieldnames: list[str]) -> None:
 
 
 def write_screens(path: Path, screening_results: list[dict]) -> None:
-    """Write Stage 2 screening decisions."""
+    """Write Stage 2 screening decisions.
+
+    The screener returns pico_match as a NESTED dict; the previous fixed
+    fieldnames expected flat pico_* keys that nothing ever wrote, so the
+    pico columns were empty in every screening_log.csv ever produced,
+    and confidence / is_rct / exclusion_reasons were silently dropped by
+    extrasaction="ignore" (Session 14; same disease as #47). Flatten
+    here so the CSV carries what the screener actually returned.
+    """
     fields = [
-        "filename", "decision", "rationale",
-        "pico_population", "pico_intervention",
-        "pico_comparator", "pico_outcome", "error"
+        "run_id", "filename", "decision", "confidence", "is_rct",
+        "pico_population", "pico_intervention", "pico_comparator",
+        "pico_outcome", "pico_study_design",
+        "exclusion_reasons", "rationale", "error",
     ]
-    _write_csv(path, screening_results, fields)
+    rows = []
+    for r in screening_results:
+        flat = dict(r)
+        pico = flat.pop("pico_match", None)
+        if isinstance(pico, dict):
+            for k, v in pico.items():
+                flat[f"pico_{k}"] = v
+        reasons = flat.get("exclusion_reasons")
+        if isinstance(reasons, list):
+            flat["exclusion_reasons"] = "; ".join(str(x) for x in reasons)
+        rows.append(flat)
+    _write_csv(path, rows, fields)
 
 
 def write_extracts(path: Path, extraction_results: list[dict]) -> None:
@@ -86,6 +106,8 @@ def write_rob2(path: Path, rob2_results: list[dict]) -> None:
 def write_results(path: Path, meta_rows: list[dict]) -> None:
     """Write Stage 4 meta-analysis per-study results."""
     fields = [
+        "run_id",  # stamped by sr/main.py; must be listed here or
+                   # extrasaction="ignore" silently drops it (#47)
         "first_author", "year", "filename",
         "outcome_match", "effect_measure",
         "hedges_g", "ci_lower", "ci_upper",
@@ -94,5 +116,6 @@ def write_results(path: Path, meta_rows: list[dict]) -> None:
         "mean_control", "sd_control",
         "included_in_meta", "skip_reason",
         "plausibility_flag", "sd_se_warning", "group_timepoint_warning",
+        "source_quote_warning",
     ]
     _write_csv(path, meta_rows, fields)

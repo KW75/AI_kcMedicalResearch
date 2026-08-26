@@ -48,7 +48,9 @@ Return the data in this exact nested JSON structure:
     "mean_intervention": null,
     "sd_intervention": null,
     "mean_control": null,
-    "sd_control": null
+    "sd_control": null,
+    "source_quote_intervention": null,
+    "source_quote_control": null
   }}
 }}
 
@@ -62,6 +64,15 @@ sqrt(N)) and using it here will make the study's effect size look several
 times larger than it really is. If the source reports "SE" or "SEM" next
 to a value, do not put that value in sd_intervention or sd_control - either
 find the actual SD elsewhere in the paper, or leave the field null.
+
+CRITICAL - SOURCE QUOTES: for each arm, source_quote_intervention /
+source_quote_control must be a VERBATIM copy of the sentence or table
+row the mean and SD were read from - including any SD/SE label and any
+timepoint words (baseline, post-treatment, week N) that appear around
+the numbers. Copy exactly; do not paraphrase, translate, or clean up.
+Both fields may hold the same quote if one row reports both arms. Set
+null if you cannot point to the exact source text. These quotes are
+how a human reviewer audits every number you extract.
 
 DO NOT fabricate values. Return null if not found.
 '''
@@ -390,6 +401,11 @@ class DataExtractor:
             "sd_control": ["control_sd", "comparator_sd"],
             "n_control": ["control_n", "comparator_n"],
             "outcome_match": ["matched_outcome"],
+            # no alternate names; listed so the nested-primary copy loop
+            # carries the #48 source quotes to the top level, from where
+            # the restructure step rebuilds primary_outcome
+            "source_quote_intervention": [],
+            "source_quote_control": [],
         }
 
         # Handle outputs shaped like:
@@ -493,10 +509,10 @@ class DataExtractor:
         primary = primary if isinstance(primary, dict) else {}
         sources = [result, candidate, primary]
 
-        intervention_group = self._first_from_sources(
-            sources, ["intervention_group", "treatment_group", "experimental_group"])
-        control_group = self._first_from_sources(
-            sources, ["control_group", "comparator_group"])
+        intervention_group = self._clean_group_label(self._first_from_sources(
+            sources, ["intervention_group", "treatment_group", "experimental_group"]))
+        control_group = self._clean_group_label(self._first_from_sources(
+            sources, ["control_group", "comparator_group"]))
 
         warning = None
 
@@ -525,8 +541,12 @@ class DataExtractor:
                     f"comparison."
                 )
 
+        # ALWAYS set the key, None when clean: extracted_data.csv builds
+        # its columns dynamically from whatever keys exist, so a key set
+        # only on failure makes a clean run indistinguishable from a run
+        # where this check never executed (Session 14).
+        result["group_timepoint_warning"] = warning
         if warning:
-            result["group_timepoint_warning"] = warning
             logger.warning(
                 "[GROUP/TIMEPOINT CHECK] Possible within/between-group "
                 "confusion for %s: %s",
@@ -558,6 +578,29 @@ class DataExtractor:
 
         return self._value_present(mean_intervention) or self._value_present(outcome_match)
 
+
+    # Strings a model uses to DECLINE naming an arm, not name one.
+    # Observed in a real run: the group-label follow-up returned the
+    # quoted string 'null' for both fields; _value_present('null') is
+    # True, so it was stored as a genuine label, tripping the
+    # identical-labels check with a misleading within/between message -
+    # and a truthy sentinel would also have suppressed the follow-up in
+    # _needs_group_labels. Every label read goes through
+    # _clean_group_label so sentinels behave exactly like JSON null.
+    _LABEL_SENTINELS = {
+        "null", "none", "n/a", "na", "nan", "not reported",
+        "not stated", "not specified", "unknown", "unclear", "-", "",
+    }
+
+    @classmethod
+    def _clean_group_label(cls, value):
+        """Return the label, or None if it is a decline-sentinel."""
+        if value is None:
+            return None
+        text = str(value).strip()
+        if text.lower() in cls._LABEL_SENTINELS:
+            return None
+        return value
 
     @staticmethod
     def _normalize_label(value) -> str:
@@ -1026,13 +1069,143 @@ class DataExtractor:
                     )
                     break
 
+        # ALWAYS set the key, None when clean - same rationale as
+        # _flag_group_timepoint_confusion (Session 14). Note this runs
+        # on the text-fallback path only; vision-path rows carry no
+        # sd_se_warning key at all, and extraction_method (now set on
+        # both paths) is how downstream code tells the two apart.
+        result["sd_se_warning"] = " | ".join(warnings_found) if warnings_found else None
         if warnings_found:
-            result["sd_se_warning"] = " | ".join(warnings_found)
             logger.warning(
                 "[SD/SE CHECK] Possible SE-as-SD confusion for %s: %s",
                 result.get("filename", "?"), result["sd_se_warning"],
             )
 
+        return result
+
+
+    # Phrases that mark a WITHIN-SUBJECT contrast in a source quote - the
+    # zsy234 failure pattern: "less morning pain at posttreatment (M = 47.14,
+    # SE = 2.36) relative to baseline (M = 52.67, SE = 2.27)". A single
+    # timepoint word in a quote is normal (between-group values AT a
+    # timepoint); a comparison BETWEEN timepoints is not a between-group
+    # effect.
+    _WITHIN_SUBJECT_PHRASES = re.compile(
+        r"(relative to|compared (?:to|with)|versus|vs\.?|change[sd]? from|"
+        r"improve[dment]* from|reduc\w+ from|from)\s+(?:the\s+)?"
+        r"(baseline|pre[-\s]?treatment|pre[-\s]?test|pre[-\s]?intervention)",
+        re.IGNORECASE,
+    )
+    _SE_MARKER = re.compile(r"\b(SE|SEM|standard error)\b", re.IGNORECASE)
+
+    @staticmethod
+    def _number_in_text(value, text: str) -> bool:
+        """True if `value` appears in `text` as a standalone number.
+
+        Tolerates trailing zeros (7.4 matches "7.40") and decimal commas,
+        rejects substring hits (76 must not match 176 or 76.3, 7.4 must not
+        match 7.45). Non-numeric values fall back to substring match.
+        """
+        s = str(value).strip()
+        try:
+            float(s)
+        except (TypeError, ValueError):
+            return s in (text or "")
+        core = re.escape(s).replace("\\.", "[.,]")
+        if "." in s:
+            pattern = rf"(?<![\d.,]){core}0*(?!\d)"
+        else:
+            # integer: allow "15.0"-style forms, reject "15.3"/"150"
+            pattern = rf"(?<![\d.,]){core}(?:[.,]0+)?(?!\d)(?!\.\d)"
+        return re.search(pattern, text or "") is not None
+
+    def _flag_suspect_source_quotes(self, result: dict,
+                                    source_text: str = None) -> dict:
+        """Deterministic tripwire for Known Issue #48 (#38 in HANDOFF
+        numbering): bind verification to the NUMBERS, not just the labels.
+
+        The Session 13 group-label follow-up validated "what are this
+        trial's arms called" - a question the model answers correctly even
+        when the extracted numbers come from a within-subject table (the
+        zsy234 failure). This check inspects the VERBATIM source quote the
+        extraction schema now requires per arm:
+
+          1. missing quote for extracted values -> flagged (unauditable);
+          2. extracted mean/SD not present in its own quote -> flagged
+             (the quote does not support the number);
+          3. SE/SEM label in the quote of an SD value -> flagged (extends
+             Known Issue #9's SD/SE check to the VISION path, which has no
+             source text of its own);
+          4. two or more distinct timepoint references, or an explicit
+             within-subject phrase ("relative to baseline"), in a quote ->
+             flagged (the zsy234 within-vs-between failure class);
+          5. text-fallback only: quote not found verbatim in the source
+             text (whitespace-normalized) -> flagged (possible fabrication).
+
+        Flags only - never corrects or excludes. ALWAYS sets
+        result["source_quote_warning"] (None when clean) so the audit CSV
+        column exists on every row and silence is unambiguous.
+        """
+        if not isinstance(result, dict):
+            return result
+        primary = result.get("primary_outcome")
+        primary = primary if isinstance(primary, dict) else result
+
+        warnings_found = []
+        for arm in ("intervention", "control"):
+            mean = primary.get(f"mean_{arm}")
+            sd = primary.get(f"sd_{arm}")
+            if mean is None and sd is None:
+                continue
+            quote = self._clean_group_label(primary.get(f"source_quote_{arm}"))
+            if not quote:
+                warnings_found.append(
+                    f"no source quote provided for the {arm} values - the "
+                    f"numbers cannot be audited against the source text")
+                continue
+            quote = str(quote)
+
+            for label, value in (("mean", mean), ("SD", sd)):
+                if value is not None and not self._number_in_text(value, quote):
+                    warnings_found.append(
+                        f"{arm} {label} ({value}) does not appear in its own "
+                        f"source quote - the quote does not support this number")
+
+            if sd is not None and self._SE_MARKER.search(quote):
+                warnings_found.append(
+                    f"{arm} SD ({sd}) was quoted from text containing "
+                    f"'SE'/'SEM'/'standard error' - verify this is really an "
+                    f"SD, not a standard error (Known Issue #9)")
+
+            timepoints = {m.group(0).lower()
+                          for m in self._TIMEPOINT_VOCAB_PATTERN.finditer(quote)}
+            if len(timepoints) >= 2:
+                warnings_found.append(
+                    f"{arm} source quote references multiple timepoints "
+                    f"({', '.join(sorted(timepoints))}) - these values may be "
+                    f"a within-subject pre/post contrast, not a between-group "
+                    f"comparison")
+            elif self._WITHIN_SUBJECT_PHRASES.search(quote):
+                warnings_found.append(
+                    f"{arm} source quote uses within-subject comparison "
+                    f"phrasing ({self._WITHIN_SUBJECT_PHRASES.search(quote).group(0)!r}) "
+                    f"- these values may not be a between-group comparison")
+
+            if source_text:
+                norm = lambda t: re.sub(r"\s+", " ", t).strip().lower()
+                if norm(quote) not in norm(source_text):
+                    warnings_found.append(
+                        f"{arm} source quote was not found verbatim in the "
+                        f"extracted source text - it may be paraphrased or "
+                        f"fabricated")
+
+        result["source_quote_warning"] = (
+            " | ".join(warnings_found) if warnings_found else None)
+        if warnings_found:
+            logger.warning(
+                "[SOURCE QUOTE CHECK] %s: %s",
+                result.get("filename", "?"), result["source_quote_warning"],
+            )
         return result
 
     def _derive_missing_sample_sizes_from_text(self, result: dict, extracted_text: str) -> dict:
@@ -1360,6 +1533,8 @@ class DataExtractor:
             '  "mean_control": null,\n'
             '  "sd_control": null,\n'
             '  "raw_fragment": null,\n'
+            '  "source_quote_intervention": null,\n'
+            '  "source_quote_control": null,\n'
             '  "warnings": []\n'
             "}\n\n"
             "When visible, also include sample-size evidence in this optional shape:\n"
@@ -1380,7 +1555,11 @@ class DataExtractor:
             "confidence intervals, or standard errors as SDs.\n"
             "- If multiple timepoints are available, prefer the timepoint requested by the "
             "original prompt; otherwise prefer the latest follow-up with usable data.\n"
-            "- Include a raw_fragment so the extracted values can be audited.\n\n"
+            "- Include a raw_fragment so the extracted values can be audited.\n"
+            "- source_quote_intervention / source_quote_control: VERBATIM copy of the "
+            "sentence or table row each arm's mean/SD was read from, including any "
+            "SD/SE label and timepoint words around the numbers. Never paraphrase; "
+            "null if unsure.\n\n"
             f"FILENAME: {filename}\n\n"
             "ORIGINAL EXTRACTION PROMPT:\n"
             f"{original_prompt}\n\n"
@@ -1405,8 +1584,10 @@ timepoint rather than a treatment arm, that is important - say so by
 setting both fields to null rather than guessing.
 
 Return ONLY valid JSON, no markdown:
-{{"intervention_group": "<name as the paper calls it, or null if you cannot find a real arm name>",
-  "control_group": "<name as the paper calls it, or null if you cannot find a real arm name>"}}
+{{"intervention_group": "<arm name exactly as the paper prints it>",
+  "control_group": "<arm name exactly as the paper prints it>"}}
+If you cannot find a real arm name for a field, use unquoted JSON null
+for that field - NOT the quoted string "null".
 '''
 
     def _needs_group_labels(self, result: dict) -> bool:
@@ -1424,10 +1605,10 @@ Return ONLY valid JSON, no markdown:
         primary = result.get("primary_outcome")
         primary = primary if isinstance(primary, dict) else {}
         sources = [result, candidate, primary]
-        intervention_group = self._first_from_sources(
-            sources, ["intervention_group", "treatment_group", "experimental_group"])
-        control_group = self._first_from_sources(
-            sources, ["control_group", "comparator_group"])
+        intervention_group = self._clean_group_label(self._first_from_sources(
+            sources, ["intervention_group", "treatment_group", "experimental_group"]))
+        control_group = self._clean_group_label(self._first_from_sources(
+            sources, ["control_group", "comparator_group"]))
         return not (intervention_group and control_group)
 
     def _build_group_label_followup_prompt(self, result: dict) -> str:
@@ -1491,6 +1672,11 @@ Return ONLY valid JSON, no markdown:
         if not base64_images and not extracted_text:
             return result
 
+        # Make the filename available to _flag_group_timepoint_confusion's
+        # log line during the re-run below - it is otherwise only added
+        # later in extract_by_pdf_path, so warnings here logged '?'.
+        result.setdefault("filename", filename)
+
         prompt = self._build_group_label_followup_prompt(result)
 
         try:
@@ -1505,7 +1691,7 @@ Return ONLY valid JSON, no markdown:
                 return result
 
             for key in ("intervention_group", "control_group"):
-                value = labels.get(key)
+                value = self._clean_group_label(labels.get(key))
                 if self._value_present(value):
                     result[key] = value
 
@@ -1580,6 +1766,8 @@ Return ONLY valid JSON, no markdown:
             
             result = None
             raw_response = None
+            text_payload = None  # set on the text-fallback path; the #48
+                                 # quote check uses it when available
             
             for strategy_name, strategy_func in strategies:
                 logger.info(f"[VISION] Trying {strategy_name} strategy for {filename}")
@@ -1602,6 +1790,11 @@ Return ONLY valid JSON, no markdown:
                         logger.info(f"[VISION] {strategy_name} strategy found data for {filename}")
                         r = self._fetch_group_labels_if_missing(
                             r, filename, base64_images=base64_images)
+                        # Record HOW this row was extracted (the text
+                        # path already sets text_fallback). Downstream
+                        # uses this to report which rows the SD/SE
+                        # check could apply to (Known Issue #9).
+                        r.setdefault("extraction_method", f"vision_{strategy_name}")
                         result = r
                         break
                     else:
@@ -1657,7 +1850,8 @@ Return ONLY valid JSON, no markdown:
                 participants = {}
                 
                 for key in ['mean_intervention', 'sd_intervention', 'mean_control', 'sd_control', 
-                           'outcome_match', 'match_rationale', 'name', 'time_point']:
+                           'outcome_match', 'match_rationale', 'name', 'time_point',
+                           'source_quote_intervention', 'source_quote_control']:
                     if key in result and result[key] is not None:
                         primary_outcome[key] = result[key]
                 
@@ -1672,9 +1866,17 @@ Return ONLY valid JSON, no markdown:
                 
                 flat_keys = ['mean_intervention', 'sd_intervention', 'mean_control', 'sd_control', 
                            'outcome_match', 'match_rationale', 'n_intervention', 'n_control',
-                           'name', 'time_point']
+                           'name', 'time_point',
+                           'source_quote_intervention', 'source_quote_control']
                 for key in flat_keys:
                     result.pop(key, None)
+            
+            # #48: bind verification to the NUMBERS. Runs BEFORE
+            # _apply_known_pdf_corrections so flags describe what was
+            # EXTRACTED - reviewer overrides replace values afterwards
+            # and must not be flagged for differing from the quote.
+            result = self._flag_suspect_source_quotes(
+                result, source_text=text_payload)
             
             result.update({
                 "file_id": None,

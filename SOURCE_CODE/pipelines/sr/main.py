@@ -126,6 +126,11 @@ def main():
     #  Initialise project layo
     layout = SRProjectLayout(run_id=args.run_id)
     logger.info(f"Project folder: {layout.project}")
+    # Every audit CSV row carries this run's id: #17 (extraction
+    # non-determinism) means the same paper can carry different values
+    # in different runs' CSVs, and a CSV without a run id is silently
+    # conflatable across runs (observed in Session 14).
+    _run_id = str(getattr(layout, "run_id", "") or Path(str(layout.project)).name)
 
     #  Stage 1: Upload
     logger.info("=== STAGE 1: Upload ===")
@@ -162,12 +167,50 @@ def main():
         provider           = args.provider,
     ).screen_batch(recs)
 
+    for _r in sr:
+        if isinstance(_r, dict):
+            _r.setdefault("run_id", _run_id)
     write_screens(layout.screens_csv, sr)
 
     included = [r for r in recs
                 if any(s["filename"] == r["filename"]
                        and s["decision"] == "INCLUDE"
                        for s in sr)]
+
+    # --- Screening accounting: a paper must never vanish silently ---------
+    # Observed in a real run: one transient network error during screening
+    # (error -> UNCERTAIN -> not INCLUDE) removed a paper from the entire
+    # review, shifted the pooled SMD by ~0.26, and the only trace was a
+    # single ERROR line mid-log. Every non-INCLUDE outcome is now stated,
+    # and error-based drops are labelled as what they are: not scientific
+    # judgments and not valid PRISMA exclusions.
+    _screen_errors    = [s for s in sr if s.get("error")]
+    _screen_excluded  = [s for s in sr
+                         if s.get("decision") == "EXCLUDE" and not s.get("error")]
+    _screen_uncertain = [s for s in sr
+                         if s.get("decision") not in ("INCLUDE", "EXCLUDE")
+                         and not s.get("error")]
+    logger.info(
+        f"[SCREENING] {len(included)} INCLUDE / {len(_screen_excluded)} "
+        f"EXCLUDE / {len(_screen_uncertain)} UNCERTAIN / "
+        f"{len(_screen_errors)} ERROR of {len(sr)} papers")
+    for s in _screen_excluded:
+        logger.info(f"[SCREENING]   EXCLUDE {s.get('filename')}: "
+                    f"{str(s.get('rationale', ''))[:160]}")
+    for s in _screen_uncertain:
+        logger.warning(
+            f"[SCREENING] UNCERTAIN - {s.get('filename')} will NOT proceed "
+            f"in this run. The model could not decide; adjudicate manually "
+            f"(REVIEWER_GUIDE.md) and re-run, or record a PRISMA exclusion "
+            f"reason.")
+    for s in _screen_errors:
+        logger.warning(
+            f"[SCREENING] ERROR - {s.get('filename')} will NOT proceed in "
+            f"this run because the screening CALL FAILED "
+            f"({str(s.get('error'))[:160]}). This is NOT a scientific "
+            f"judgment and NOT a valid PRISMA exclusion - re-run the "
+            f"pipeline or screen this paper manually.")
+
     if not included:
         logger.error("No studies included after screening. Stopping.")
         return
@@ -180,6 +223,10 @@ def main():
         provider      = args.provider,
     ).extract_batch(included)
 
+    for _r in er:
+        if isinstance(_r, dict):
+            _r.setdefault("run_id", _run_id)
+
     write_extracts(layout.extracted_csv, er)
 
     # Stage 3.5: RoB 2.0
@@ -189,6 +236,9 @@ def main():
         provider = args.provider,
     ).assess_batch(included)
 
+    for _r in rob:
+        if isinstance(_r, dict):
+            _r.setdefault("run_id", _run_id)
     write_rob2(layout.rob2_csv, rob)
 
     # Stage 4: Meta-Analysis
@@ -222,7 +272,17 @@ def main():
         # get this flag, since _extract_anthropic has no text-fallback path.
         sd_se_warning = r.get("sd_se_warning")
         group_timepoint_warning = r.get("group_timepoint_warning")
+        # #48: deterministic verification bound to the NUMBERS - checks
+        # each extracted value against the verbatim source quote the
+        # extraction schema now requires per arm (data_extractor.py
+        # _flag_suspect_source_quotes). Set on both extraction paths.
+        source_quote_warning = r.get("source_quote_warning")
         audit_row = {
+            # NOTE: audit_logger.write_results uses a fixed fieldnames
+            # list with extrasaction="ignore" (#47) - "run_id" must be
+            # added there too, or this key is silently dropped from
+            # meta_analysis_results.csv.
+            "run_id"            : _run_id,
             "first_author"      : m.get("first_author"),
             "year"              : m.get("year"),
             "filename"          : r.get("filename"),
@@ -242,6 +302,7 @@ def main():
             "plausibility_flag" : None,
             "sd_se_warning"     : sd_se_warning,
             "group_timepoint_warning" : group_timepoint_warning,
+            "source_quote_warning"    : source_quote_warning,
         }
         try:
             if po.get("outcome_match") is False:
@@ -293,6 +354,17 @@ def main():
                     logger.info(
                         f"MD for {m.get('first_author','?')}: "
                         f"MD={est:.3f} [{cl:.3f},{cu:.3f}]")
+            else:
+                # Extraction supplied effect_estimate/ci_lower_95/
+                # ci_upper_95 directly - previously used with no log
+                # line at all. Model-reported effect sizes are the
+                # least-verifiable input this stage accepts, so say so.
+                logger.info(
+                    f"Using MODEL-REPORTED effect estimate for "
+                    f"{m.get('first_author','?')}: {args.effect_measure}="
+                    f"{float(est):.3f} [{float(cl):.3f},{float(cu):.3f}] "
+                    f"(supplied by extraction, not recomputed from "
+                    f"means/SDs - verify against the source PDF)")
 
             author_label = f"{m.get('first_author','?')} ({m.get('year','')})"
             plausibility_flag = _check_plausibility(
@@ -328,6 +400,7 @@ def main():
 
     write_results(layout.results_csv, meta_audit)
 
+    _bound = PLAUSIBILITY_BOUNDS.get(args.effect_measure)
     flagged = [r for r in meta_audit if r.get("plausibility_flag")]
     if flagged:
         logger.warning(
@@ -337,6 +410,14 @@ def main():
         for r in flagged:
             logger.warning(f"  - {r.get('first_author','?')} ({r.get('year','')}): "
                             f"{r.get('plausibility_flag')}")
+    elif _bound is None:
+        logger.info(
+            f"[PLAUSIBILITY] no bound defined for "
+            f"{args.effect_measure} (scale-dependent) - check skipped.")
+    else:
+        logger.info(
+            f"[PLAUSIBILITY] 0 of {len(meta_audit)} studies exceeded "
+            f"the effect-size plausibility bound ({_bound}).")
 
     se_flagged = [r for r in meta_audit if r.get("sd_se_warning")]
     if se_flagged:
@@ -349,6 +430,17 @@ def main():
         for r in se_flagged:
             logger.warning(f"  - {r.get('first_author','?')} ({r.get('year','')}): "
                             f"{r.get('sd_se_warning')}")
+    else:
+        _n_checkable = sum(
+            1 for r in er
+            if isinstance(r, dict)
+            and str(r.get("extraction_method") or "").startswith("text"))
+        logger.info(
+            f"[SD/SE CHECK] 0 of {_n_checkable} checkable studies "
+            f"flagged ({len(meta_audit) - _n_checkable} vision-path "
+            f"studies NOT checkable - the check needs literal source "
+            f"text; Known Issue #9). Manual verification still "
+            f"required.")
 
     group_flagged = [r for r in meta_audit if r.get("group_timepoint_warning")]
     if group_flagged:
@@ -361,6 +453,35 @@ def main():
         for r in group_flagged:
             logger.warning(f"  - {r.get('first_author','?')} ({r.get('year','')}): "
                             f"{r.get('group_timepoint_warning')}")
+    else:
+        logger.info(
+            f"[GROUP/TIMEPOINT CHECK] 0 of {len(meta_audit)} studies "
+            f"flagged. NOTE: this check validates group LABELS only, "
+            f"not whether the extracted numbers come from a "
+            f"between-group comparison - that is the SOURCE QUOTE "
+            f"check's job (Known Issue #48/#38). Manual verification "
+            f"still required.")
+
+    quote_flagged = [r for r in meta_audit if r.get("source_quote_warning")]
+    if quote_flagged:
+        logger.warning(
+            f"[SOURCE QUOTE CHECK] {len(quote_flagged)} of {len(meta_audit)} "
+            f"studies had extracted values that could not be bound to a "
+            f"clean verbatim source quote (missing quote, number absent "
+            f"from its quote, SE-labelled quote for an SD, or "
+            f"within-subject timepoint language in the quote) - verify "
+            f"each against the source PDF before trusting this pooled "
+            f"estimate (Known Issue #48):")
+        for r in quote_flagged:
+            logger.warning(
+                f"  - {r.get('first_author','?')} ({r.get('year','')}): "
+                f"{r.get('source_quote_warning')}")
+    else:
+        logger.info(
+            f"[SOURCE QUOTE CHECK] 0 of {len(meta_audit)} studies flagged "
+            f"- every extracted value was bound to a verbatim source quote "
+            f"with no SE labels or within-subject timepoint language. "
+            f"Manual verification still required.")
 
     if len(rows) < 2:
         logger.error("< 2 studies with usable data. Aborting meta-analysis.")
@@ -374,6 +495,14 @@ def main():
         f"Pooled {args.effect_measure}={ma['pooled_effect']:.3f} "
         f"[{ma['ci_lower']:.3f},{ma['ci_upper']:.3f}] "
         f"I2={ma['I2']:.1f}%")
+    if _screen_errors or _screen_uncertain:
+        logger.warning(
+            f"[SCREENING] REMINDER: this pooled estimate is missing "
+            f"{len(_screen_errors) + len(_screen_uncertain)} paper(s) "
+            f"dropped at screening for NON-SCIENTIFIC reasons (call "
+            f"errors / unadjudicated UNCERTAIN) - see the [SCREENING] "
+            f"block above and screening_log.csv. The estimate may be "
+            f"biased by their absence.")
 
     # Stage 5: Forest Plot
     logger.info("=== STAGE 5: Forest Plot ===")

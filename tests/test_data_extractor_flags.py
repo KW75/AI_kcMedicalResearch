@@ -58,7 +58,7 @@ def test_se_flag_silent_on_genuine_sd(extractor):
     clean_text = "Group A: mean 7.35, SD 2.08 at 12 weeks."
     result = {"primary_outcome": {"sd_intervention": 2.08}}
     out = extractor._flag_possible_se_as_sd(result, clean_text)
-    assert "sd_se_warning" not in out
+    assert "sd_se_warning" in out and out["sd_se_warning"] is None
 
 
 def test_se_flag_noop_without_text(extractor):
@@ -91,7 +91,8 @@ def test_group_timepoint_confusion(extractor, intervention_group, control_group,
             f"control={control_group!r}, got none"
         )
     else:
-        assert "group_timepoint_warning" not in result, (
+        assert ("group_timepoint_warning" in result
+            and result["group_timepoint_warning"] is None), (    
             f"unexpected flag for intervention={intervention_group!r} "
             f"control={control_group!r}: {result.get('group_timepoint_warning')}"
         )
