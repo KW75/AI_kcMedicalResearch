@@ -1,7 +1,9 @@
-﻿# =============================================================================
-#  launcher.py  |  AI kcMedicalResearch  |  v2.4.3
+# =============================================================================
+#  launcher.py  |  AI kcMedicalResearch
+#  (version shown in the banner is parsed live from SOURCE_CODE/main.py)
 # =============================================================================
 
+import re
 import subprocess
 import sys
 import os
@@ -21,6 +23,33 @@ except ImportError:
 
 BASE   = Path(__file__).resolve().parent.parent
 PYTHON = sys.executable
+
+
+def _project_meta() -> tuple[str, str]:
+    """Parse (VERSION, supported-Python range) from SOURCE_CODE/main.py.
+
+    Parsed live rather than hardcoded: the previous banner claimed
+    v2.4.3 / '400 passed - 3 skipped' nine versions after either was
+    true - a displayed claim nobody re-verifies. Parsed with a regex,
+    not an import, so the banner doesn't pay main.py's import chain.
+    A test count is deliberately NOT displayed: it decays every
+    session and nothing here can verify it.
+    """
+    version, py_range = '?', '3.x'
+    try:
+        src = (BASE / 'SOURCE_CODE' / 'main.py').read_text(
+            encoding='utf-8', errors='replace')
+        m = re.search(r'^VERSION\s*=\s*["\']([^"\']+)["\']', src, re.M)
+        if m:
+            version = m.group(1)
+        lo = re.search(r'^MIN_PYTHON\s*=\s*\((\d+),\s*(\d+)\)', src, re.M)
+        hi = re.search(r'^MAX_PYTHON_EXCLUSIVE\s*=\s*\((\d+),\s*(\d+)\)', src, re.M)
+        if lo and hi:
+            py_range = (f'{lo.group(1)}.{lo.group(2)} - '
+                        f'{hi.group(1)}.{int(hi.group(2)) - 1}')
+    except OSError:
+        pass
+    return version, py_range
 
 # -----------------------------------------------------------------------------
 #  Background detection  (4-layer strategy)
@@ -196,7 +225,7 @@ def section_header(title: str) -> None:
 
 
 # -----------------------------------------------------------------------------
-#  Banner  v2.4.3
+#  Banner
 # -----------------------------------------------------------------------------
 def banner() -> None:
     W = _W
@@ -209,10 +238,13 @@ def banner() -> None:
           f'{LOGO_TXT}AI kcMedical Research{RESET}{W(9)}{FRAME}  ║{RESET}')
     print(f'  {FRAME}║{RESET}   {LOGO}██║ ██╔╝██╔════╝{RESET}{W(4)}'
           f'{INFO}─────────────────────{RESET}{W(11)}{FRAME}║{RESET}')
+    _ver, _py = _project_meta()
+    _ver = _ver[:23]
     print(f'  {FRAME}║{RESET}   {LOGO}█████╔╝ ██║{RESET}{W(9)}'
-          f'{ACCENT}Version  {RESET}{HILITE}2.4.3{RESET}{W(14)}{FRAME}    ║{RESET}')
+          f'{ACCENT}Version  {RESET}{HILITE}{_ver}{RESET}{W(23 - len(_ver))}{FRAME}║{RESET}')
+    _py = _py[:23]
     print(f'  {FRAME}║{RESET}   {LOGO}██╔═██╗ ██║{RESET}{W(9)}'
-          f'{ACCENT}Tests    {RESET}{GOOD}400 passed - 3 skipped{RESET}{W(1)}{FRAME}║{RESET}')
+          f'{ACCENT}Python   {RESET}{GOOD}{_py}{RESET}{W(23 - len(_py))}{FRAME}║{RESET}')
     print(f'  {FRAME}║{RESET}   {LOGO}██║  ██╗╚██████╗{RESET}{W(4)}'
           f'{ACCENT}Deploy   {RESET}{INFO}render.com / local{RESET}{W(5)}{FRAME}║{RESET}')
     print(f'  {FRAME}║{RESET}   {LOGO}╚═╝  ╚═╝ ╚═════╝{RESET}{W(36)}{FRAME}║{RESET}')
@@ -246,7 +278,7 @@ def banner() -> None:
 
 
 # -----------------------------------------------------------------------------
-#  Mode selection menu  v2.4.3
+#  Mode selection menu
 # -----------------------------------------------------------------------------
 def pick_mode():
     while True:
