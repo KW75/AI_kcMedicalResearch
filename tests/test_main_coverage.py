@@ -1,4 +1,4 @@
-﻿"""
+"""
 Corrected tests for main.py: argument parsing, interactive loop,
 helpers, validation, and session management.
 """
@@ -123,26 +123,86 @@ class TestMainInteractiveLoop:
         m.assert_called_once()
 
     @patch('SOURCE_CODE.main.choose_role')
-    def test_main_sr_mode(self, mock_choose_role):
-        # NOTE: ALL_MODES in main.py has no "sr" key - SR mode is dispatched
-        # straight to run_sr_launcher() at the entry point and never reaches
-        # main()/choose_role() for real. This test only passes because
-        # choose_role is fully mocked below; with the mock removed,
-        # choose_role('sr') would raise KeyError on `ALL_MODES[mode]`.
-        # Flagged per README Known Issue #8 - worth deciding whether this
-        # test should exist, or be replaced with one that asserts SR mode
-        # routes to run_sr_launcher instead.
-        m = self._run_main('sr', 'qwen', False, mock_choose_role,
-                           'Reviewer', 'prompts/reviewer-prompt.md')
-        mock_choose_role.assert_called_once_with('sr')
-        m.assert_called_once()
-
-    @patch('SOURCE_CODE.main.choose_role')
     def test_main_dry_run_skips_call_ai(self, mock_choose_role):
         m = self._run_main('coding', 'deepseek', True, mock_choose_role,
                            'Builder', 'prompts/coding/builder.txt')
         mock_choose_role.assert_called_once_with('coding')
         m.assert_not_called()
+
+
+class TestCliRouting:
+    """Test run_cli() mode dispatch (#43).
+
+    run_cli() was extracted from main.py's ``if __name__ == "__main__"``
+    block so this dispatch chain is testable at all. The SR tests replace
+    the old test_main_sr_mode, which exercised main.main(mode='sr') - a
+    path that cannot occur for real: ALL_MODES has no "sr" key, so
+    choose_role('sr') would raise KeyError. SR mode is dispatched straight
+    to run_sr_launcher() and must never reach main()/choose_role().
+
+    validate_api_keys is patched throughout so these tests do not depend
+    on provider keys being present in the environment.
+    """
+
+    @patch('SOURCE_CODE.main.validate_api_keys')
+    @patch('SOURCE_CODE.main.run_sr_launcher')
+    def test_sr_mode_routes_to_launcher(self, mock_launcher, _mock_keys):
+        main.run_cli(main.parse_args(['--mode', 'sr', '--provider', 'qwen']))
+        mock_launcher.assert_called_once_with(provider='qwen', model=None)
+
+    @patch('SOURCE_CODE.main.validate_api_keys')
+    @patch('SOURCE_CODE.main.choose_role')
+    @patch('SOURCE_CODE.main.run_sr_launcher')
+    def test_sr_mode_never_reaches_choose_role(self, _mock_launcher,
+                                               mock_choose_role, _mock_keys):
+        main.run_cli(main.parse_args(['--mode', 'sr']))
+        mock_choose_role.assert_not_called()
+
+    @patch('SOURCE_CODE.main.validate_api_keys')
+    @patch('SOURCE_CODE.main.handle_coding_mode')
+    def test_coding_mode_routes_to_handler(self, mock_handler, _mock_keys):
+        main.run_cli(main.parse_args(['--mode', 'coding']))
+        mock_handler.assert_called_once_with(
+            provider='deepseek', model=None, dry_run=False)
+
+    @patch('SOURCE_CODE.main.validate_api_keys')
+    @patch('SOURCE_CODE.main.handle_writing_mode')
+    def test_writing_mode_routes_to_handler(self, mock_handler, _mock_keys):
+        main.run_cli(main.parse_args(['--mode', 'writing']))
+        mock_handler.assert_called_once_with(
+            provider='deepseek', model=None, dry_run=False)
+
+    @patch('SOURCE_CODE.main.validate_api_keys')
+    @patch('SOURCE_CODE.main.handle_appraisal_mode')
+    def test_appraisal_mode_routes_to_handler(self, mock_handler, _mock_keys):
+        main.run_cli(main.parse_args(['--mode', 'appraisal']))
+        mock_handler.assert_called_once_with(
+            provider='deepseek', model=None, dry_run=False)
+
+    @patch('SOURCE_CODE.main.validate_api_keys')
+    @patch('SOURCE_CODE.main.run_rct_search_pipeline')
+    def test_rct_search_mode_routes_to_pipeline(self, mock_pipeline, _mock_keys):
+        main.run_cli(main.parse_args(['--mode', 'rct_search']))
+        mock_pipeline.assert_called_once_with(
+            provider='deepseek', model=None, dry_run=False)
+
+    @patch('SOURCE_CODE.main.validate_api_keys')
+    @patch('SOURCE_CODE.main.handle_search_mode')
+    def test_search_mode_routes_to_handler(self, mock_handler, _mock_keys):
+        main.run_cli(main.parse_args(['--mode', 'search']))
+        mock_handler.assert_called_once_with(
+            provider='deepseek', model=None, sub_mode=None)
+
+    @patch('SOURCE_CODE.main.validate_api_keys')
+    def test_undispatched_mode_raises(self, _mock_keys):
+        # parse_args restricts --mode to six dispatched choices, so this can
+        # only happen programmatically - but a silent fallthrough to main()
+        # is exactly how the SR KeyError path (#43) arose. run_cli must fail
+        # loudly on a mode with no dispatch branch.
+        args = main.parse_args(['--mode', 'coding'])
+        args.mode = 'bogus'
+        with pytest.raises(ValueError, match='no dispatch branch'):
+            main.run_cli(args)
 
 
 class TestMainHelpers:

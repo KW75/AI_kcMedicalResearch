@@ -1,5 +1,5 @@
 """
-main.py  - AI Automation Tool  v2.2.0
+main.py  - AI Automation Tool (version: see VERSION below)
 Supports six workflow modes: coding, writing, rct_search, appraisal, search, sr.
 Supports six AI providers: deepseek (default), openai, anthropic, ollama, groq, qwen.
 RAG layer: per-session, mode-specific input/ folder indexing via rag.py.
@@ -143,7 +143,7 @@ except KeyboardInterrupt:
 # ---------------------------------------------------------------------------
 # Version
 # ---------------------------------------------------------------------------
-VERSION = "2.4.8"
+VERSION = "2.4.12"
 
 # ---------------------------------------------------------------------------
 # Paths
@@ -249,7 +249,7 @@ def auto_load_input_files(mode: str) -> list[Path]:
 
 
 # ---------------------------------------------------------------------------
-# Environment / provider config ??sourced from providers.py + local overrides
+# Environment / provider config -- sourced from providers.py + local overrides
 # ---------------------------------------------------------------------------
 from providers import (
     OLLAMA_HOST, OLLAMA_MODEL, OPENAI_API_KEY, OPENAI_MODEL,
@@ -349,7 +349,7 @@ DOC_FILES_BY_ROLE: dict[str, list[Path]] = {
 # Provider registry
 # ---------------------------------------------------------------------------
 # ---------------------------------------------------------------------------
-# Provider functions ??delegated to providers.py (backward-compatible names)
+# Provider functions -- delegated to providers.py (backward-compatible names)
 # ---------------------------------------------------------------------------
 from providers import (
     call_openai_provider,
@@ -362,7 +362,7 @@ from providers import (
 )
 
 
-# PROVIDERS dict ??re-exported from providers.py
+# PROVIDERS dict -- re-exported from providers.py
 from providers import PROVIDERS
 
 
@@ -1332,7 +1332,7 @@ def run_sr_launcher(provider: str = "", model: str = "") -> None:
                     print(f"   - Modified PICO saved to: {new_path.name}")
                     
             except Exception as e:
-                print(f"  ?????? Could not load PICO: {e}")
+                print(f"  [!] Could not load PICO: {e}")
                 pico_data = None
         
         elif choice == "0":
@@ -1363,7 +1363,7 @@ def run_sr_launcher(provider: str = "", model: str = "") -> None:
             )
             print(f"   - New PICO saved to: {pico_path.name}")
         else:
-            print("  ?????? No PICO configured. Using existing config.")
+            print("  [i] No PICO configured. Using existing config.")
     
     # -- Step 3: Update prisma_criteria.yaml with PICO data -----------------
     cfg_yaml: dict = {}
@@ -1391,7 +1391,7 @@ def run_sr_launcher(provider: str = "", model: str = "") -> None:
         print(f"\n   - prisma_criteria.yaml updated with PICO")
         print(f"     PubMed query: {cfg_yaml.get('pubmed_query_cleaned', 'n/a')}")
     else:
-        print("\n  ?????? Using existing prisma_criteria.yaml")
+        print("\n  [i] Using existing prisma_criteria.yaml")
 
     # -- Step 4: resolve provider and model ------------------------------------
 
@@ -1409,7 +1409,7 @@ def run_sr_launcher(provider: str = "", model: str = "") -> None:
     # --- Provider check for vision support ---
     if _provider == "deepseek":
         print("\n" + "=" * 58)
-        print("  ??????  WARNING: DeepSeek does NOT support vision API")
+        print("  [!]  WARNING: DeepSeek does NOT support vision API")
         print("=" * 58)
         print("  The SR pipeline uses vision-based extraction (images of PDF pages).")
         print("  DeepSeek's API only accepts text, not images.")
@@ -1446,6 +1446,7 @@ def run_sr_launcher(provider: str = "", model: str = "") -> None:
                             if pico_data else "SMD",
     ]
     print(f"\n[SR] Running: {' '.join(cmd)}\n")
+    _run_started = time.time() - 2  # small slack for filesystem timestamp granularity
     result = _sp.run(cmd, cwd=str(BASE_DIR))
 
 
@@ -1454,10 +1455,26 @@ def run_sr_launcher(provider: str = "", model: str = "") -> None:
         mirror_figures = BASE_DIR / "output" / "sr" / "figures"
         runs_root      = BASE_DIR / "reports" / "sr"
         print("\n[SR] Pipeline complete.")
-        print(f"[SR] DOCX   -> {mirror_reports / 'systematic_review.docx'}")
-        print(f"[SR] PDF    -> {mirror_reports / 'systematic_review.pdf'}")
-        print(f"[SR] HTML   -> {mirror_reports / 'systematic_review.html'}")
-        print(f"[SR] Plot   -> {mirror_figures / 'forest_plot.png'}")
+        # Only advertise artifacts this run actually produced. The PDF is
+        # legitimately absent when WeasyPrint is unavailable (README #2),
+        # and the mirror dir persists across runs, so also require the
+        # file to be newer than this run's start - a bare exists() would
+        # present a stale copy from an earlier run as this run's output.
+        _artifacts = [
+            ("DOCX", mirror_reports / "systematic_review.docx"),
+            ("PDF",  mirror_reports / "systematic_review.pdf"),
+            ("HTML", mirror_reports / "systematic_review.html"),
+            ("Plot", mirror_figures / "forest_plot.png"),
+        ]
+        for _label, _path in _artifacts:
+            if _path.exists() and _path.stat().st_mtime >= _run_started:
+                print(f"[SR] {_label:<7}-> {_path}")
+            elif _path.exists():
+                print(f"[SR] {_label:<7}-> not generated by this run "
+                      f"(stale copy from an earlier run: {_path})")
+            else:
+                print(f"[SR] {_label:<7}-> not generated "
+                      f"(see pipeline log above)")
         print(f"[SR] Full run (with audit CSVs) -> {runs_root}\\<run_id>\\")
     else:
         print(f"\n[SR] Pipeline exited with code {result.returncode}.")
@@ -1720,7 +1737,7 @@ def handle_search_mode(provider: str, model: str, sub_mode: str = None) -> None:
         print(f"   - Using sub-mode: {sub}")
     elif is_cloud:
         # Cloud environment - use default
-        print("  ??????  Cloud environment detected. Defaulting to Topic Search (1).")
+        print("  [i]  Cloud environment detected. Defaulting to Topic Search (1).")
         sub = "1"
     else:
         # Local - interactive
@@ -1729,7 +1746,7 @@ def handle_search_mode(provider: str, model: str, sub_mode: str = None) -> None:
             if not sub:
                 sub = "1"
         except (EOFError, KeyboardInterrupt):
-            print("\n  ?????? No input received. Defaulting to Topic Search (1).")
+            print("\n  [i] No input received. Defaulting to Topic Search (1).")
             sub = "1"
 
     if sub not in ("1", "2"):
@@ -2181,123 +2198,141 @@ def parse_args(args: list[str] | None = None) -> argparse.Namespace:
 # ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
+def run_cli(args: argparse.Namespace) -> None:
+    """Dispatch parsed CLI arguments to the correct handler.
+
+    Extracted from the ``if __name__ == "__main__"`` block so mode
+    routing is testable (issue #43): SR mode must route to
+    run_sr_launcher() and never reach main()/choose_role(), because
+    ALL_MODES has no "sr" key and choose_role("sr") would raise
+    KeyError.
+
+    KeyboardInterrupt is intentionally NOT caught here; the
+    entry-point guard below owns the clean-exit message.
+    """
+
+    if args.ui:
+        import subprocess as _sp
+        proc = _sp.Popen(
+            [sys.executable, "-m", "streamlit", "run",
+             str(SOURCE_CODE_DIR / "ui" / "app.py"),
+             "--server.runOnSave", "false"],
+            cwd=str(Path(__file__).resolve().parent.parent),
+        )
+        print("UI launched -- open http://localhost:8501 in your browser.")
+        print("Press Ctrl+C to stop the UI server.")
+        try:
+            proc.wait()
+        except KeyboardInterrupt:
+            proc.terminate()
+        raise SystemExit(0)
+
+    non_ai_flags = (
+        args.list_sessions
+        or args.read_session
+        or args.delete_session
+        or args.export_session
+        or args.rename_session
+        or args.stats
+        or args.list_roles
+        or args.help_guide
+        or args.dry_run
+    )
+    if not non_ai_flags:
+        try:
+            validate_api_keys(args.provider)
+        except (EnvironmentError, ValueError) as e:
+            print(e)
+            sys.exit(1)
+
+    if args.list_sessions:
+        list_sessions(reports_dir=str(REPORTS_DIR))
+    elif args.read_session:
+        read_session(filename=args.read_session, reports_dir=str(REPORTS_DIR))
+    elif args.delete_session:
+        delete_session(filename=args.delete_session, reports_dir=str(REPORTS_DIR))
+    elif args.export_session:
+        export_session(filename=args.export_session, reports_dir=str(REPORTS_DIR))
+    elif args.rename_session:
+        rename_session(filename=args.rename_session, reports_dir=str(REPORTS_DIR))
+    elif args.stats:
+        show_stats(reports_dir=str(REPORTS_DIR))
+    elif args.list_roles:
+        list_roles(mode=args.mode)
+    elif args.help_guide:
+        open_help_guide()
+    elif args.revise:
+        if args.mode != "coding":
+            print("--revise is only available in coding mode.")
+            print("Use: python SOURCE_CODE/main.py --mode coding --revise")
+            sys.exit(1)
+        generate_code_revision(
+            start_role=args.role,
+            provider=args.provider,
+            model=args.model,
+            dry_run=args.dry_run,
+        )
+    elif args.report:
+        if args.mode != "writing":
+            print("--report is only available in writing mode.")
+            print("Use: python SOURCE_CODE/main.py --mode writing --report")
+            sys.exit(1)
+        generate_writing_report(provider=args.provider, model=args.model)
+    elif args.mode == "search":
+        sub_mode = getattr(args, 'sub', None)
+        handle_search_mode(
+            provider=args.provider,
+            model=args.model,
+            sub_mode=sub_mode,
+        )
+
+
+    elif args.mode == "sr":
+        run_sr_launcher(
+            provider=args.provider,
+            model=args.model,
+        )
+    elif args.mode == "rct_search":
+        run_rct_search_pipeline(
+            provider=args.provider,
+            model=args.model,
+            dry_run=args.dry_run,
+        )
+    elif args.mode == "coding":
+        handle_coding_mode(
+            provider=args.provider,
+            model=args.model,
+            dry_run=args.dry_run,
+        )
+    elif args.mode == "writing":
+        handle_writing_mode(
+            provider=args.provider,
+            model=args.model,
+            dry_run=args.dry_run,
+        )
+    elif args.mode == "appraisal":
+        handle_appraisal_mode(
+            provider=args.provider,
+            model=args.model,
+            dry_run=args.dry_run,
+        )
+    else:
+        # Unreachable via the CLI: parse_args restricts --mode to the six
+        # choices dispatched above. A silent fallthrough to main() is how
+        # the SR-mode KeyError path (#43) arose, so fail loudly instead
+        # if a programmatic caller passes an undispatched mode.
+        raise ValueError(
+            f"run_cli: no dispatch branch for mode {args.mode!r}"
+        )
+
+
+
+# ---------------------------------------------------------------------------
+# Entry point
+# ---------------------------------------------------------------------------
 if __name__ == "__main__":
     try:
-        args = parse_args()
-
-        if args.ui:
-            import subprocess as _sp
-            proc = _sp.Popen(
-                [sys.executable, "-m", "streamlit", "run",
-                 str(SOURCE_CODE_DIR / "ui" / "app.py"),
-                 "--server.runOnSave", "false"],
-                cwd=str(Path(__file__).resolve().parent.parent),
-            )
-            print("UI launched -- open http://localhost:8501 in your browser.")
-            print("Press Ctrl+C to stop the UI server.")
-            try:
-                proc.wait()
-            except KeyboardInterrupt:
-                proc.terminate()
-            raise SystemExit(0)
-
-        non_ai_flags = (
-            args.list_sessions
-            or args.read_session
-            or args.delete_session
-            or args.export_session
-            or args.rename_session
-            or args.stats
-            or args.list_roles
-            or args.help_guide
-            or args.dry_run
-        )
-        if not non_ai_flags:
-            try:
-                validate_api_keys(args.provider)
-            except (EnvironmentError, ValueError) as e:
-                print(e)
-                sys.exit(1)
-
-        if args.list_sessions:
-            list_sessions(reports_dir=str(REPORTS_DIR))
-        elif args.read_session:
-            read_session(filename=args.read_session, reports_dir=str(REPORTS_DIR))
-        elif args.delete_session:
-            delete_session(filename=args.delete_session, reports_dir=str(REPORTS_DIR))
-        elif args.export_session:
-            export_session(filename=args.export_session, reports_dir=str(REPORTS_DIR))
-        elif args.rename_session:
-            rename_session(filename=args.rename_session, reports_dir=str(REPORTS_DIR))
-        elif args.stats:
-            show_stats(reports_dir=str(REPORTS_DIR))
-        elif args.list_roles:
-            list_roles(mode=args.mode)
-        elif args.help_guide:
-            open_help_guide()
-        elif args.revise:
-            if args.mode != "coding":
-                print("--revise is only available in coding mode.")
-                print("Use: python SOURCE_CODE/main.py --mode coding --revise")
-                sys.exit(1)
-            generate_code_revision(
-                start_role=args.role,
-                provider=args.provider,
-                model=args.model,
-                dry_run=args.dry_run,
-            )
-        elif args.report:
-            if args.mode != "writing":
-                print("--report is only available in writing mode.")
-                print("Use: python SOURCE_CODE/main.py --mode writing --report")
-                sys.exit(1)
-            generate_writing_report(provider=args.provider, model=args.model)
-        elif args.mode == "search":
-            sub_mode = getattr(args, 'sub', None)
-            handle_search_mode(
-                provider=args.provider,
-                model=args.model,
-                sub_mode=sub_mode,
-            )
-
-
-        elif args.mode == "sr":
-            run_sr_launcher(
-                provider=args.provider,
-                model=args.model,
-            )
-        elif args.mode == "rct_search":
-            run_rct_search_pipeline(
-                provider=args.provider,
-                model=args.model,
-                dry_run=args.dry_run,
-            )
-        elif args.mode == "coding":
-            handle_coding_mode(
-                provider=args.provider,
-                model=args.model,
-                dry_run=args.dry_run,
-            )
-        elif args.mode == "writing":
-            handle_writing_mode(
-                provider=args.provider,
-                model=args.model,
-                dry_run=args.dry_run,
-            )
-        elif args.mode == "appraisal":
-            handle_appraisal_mode(
-                provider=args.provider,
-                model=args.model,
-                dry_run=args.dry_run,
-            )
-        else:
-            main(
-                model_override=args.model,
-                dry_run=args.dry_run,
-                mode=args.mode,
-                provider=args.provider,
-            )
-
+        run_cli(parse_args())
     except KeyboardInterrupt:
         print("\n\nSession stopped. Returning to menu...\n")
         raise SystemExit(0)
