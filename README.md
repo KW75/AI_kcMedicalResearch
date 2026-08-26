@@ -3,10 +3,9 @@ AI kcMedical Research
 A multi-mode AI assistant for medical research, critical appraisal, systematic review, coding, and writing. Uses cloud providers by default (DeepSeek, Qwen, OpenAI, Anthropic, Groq) with optional local Ollama support.
 
     Version: 2.4.12
-    Tests: ~431 expected (423 at v2.4.11 +8 net new; NOT yet re-run in
-           the real venv after the v2.4.12 changes - run the suite and
-           update this line before trusting it)
-    Coverage: ~53%
+    Tests: 469 passed, 3 skipped, 11 deselected as of v2.4.12
+           (reproduce with `python -m pytest -m "not live" --tb=short -q`)
+    Coverage: ~53% (not re-measured this session)
     CI: GitHub Actions - Green
     GitHub: https://github.com/KW75/AI_kcMedicalResearch
     Live App: https://ai-kcmedicalresearch.onrender.com
@@ -148,16 +147,17 @@ runs regardless.
 Running Tests
 
 python -m pytest -m "not live" --tb=short -q          # standard suite
-python -m pytest -q                                   # all markers (410 passed, 5 skipped as of v2.4.5; not re-verified since)
+python -m pytest -q                                   # all markers incl. live (478 passed, 5 skipped as of v2.4.12)
 python -m pytest --cov=SOURCE_CODE --cov-report=html  # with coverage
 python -m pytest -m live -v                           # live provider smoke tests
 
-Current status: 423 passed, 3 skipped, 11 deselected as of v2.4.11.
-v2.4.12 adds 8 net tests (mode-routing incl. SR, undispatched-mode
-guard) and changes screening_log.csv's schema (#44) - re-run the suite
-and update this line. NOTE: check_no_bom.py currently scans only
-SOURCE_CODE/; three BOMs were found in tests/ and scripts/ in v2.4.12
-(see Known Issue #49).
+Current status: 469 passed, 3 skipped, 11 deselected as of v2.4.12
+(423 at v2.4.11 baseline; v2.4.12 added mode-routing/undispatched-mode
+tests and the Priority 1 harness ports in commit 26ebd7d - source-quote
+check, sentinel labels, screener retry, screening accounting, OCR
+budget early-stop in both screener and RoB2). NOTE: check_no_bom.py
+currently scans only SOURCE_CODE/; three BOMs were found in tests/ and
+scripts/ in v2.4.12 (see Known Issue #49).
 
 python scripts/check_no_bom.py                        # fail on UTF-8 BOMs in source
 python scripts/strip_bom.py                           # remove them
@@ -330,7 +330,7 @@ Known Issues
 36 	audit_logger.py's write_results() used a hardcoded fieldnames list with csv.DictWriter(extrasaction="ignore"), silently dropping the plausibility_flag/sd_se_warning/group_timepoint_warning columns from meta_analysis_results.csv even though they existed in each row's audit_row dict 	Medium 	RESOLVED (v2.4.11) — added the three field names to the fixed list; verified against real pipeline output (header and values now present)
 37 	Real .env DASHSCOPE_BASE_URL pointed at a decommissioned private workspace endpoint (the same URL removed from .env.example's DASHSCOPE_ANTHROPIC_URL earlier), causing every SR extraction call to fail with "Connection error" and every RoB2 call to get HTTP 404 - not caused by any code change, a pre-existing dormant misconfiguration only surfaced when the pipeline was actually run 	High 	RESOLVED (v2.4.11) — user corrected their local .env; not a code fix, noted here since it was mistaken for a regression before the log was read carefully
 38 	The v2.4.11 group-label follow-up (added to address #10's missing intervention_group/control_group data) validates "what are this trial's treatment arms called," not "do the specific numbers already extracted actually belong to a between-group comparison of those arms." Real-world test on zsy234.pdf: follow-up correctly returned genuine arm names (CBT-I, WLC) while the underlying mean/SD values remained unchanged from prior runs and the group/timepoint tripwire stayed silent - producing a cleaner-looking result for exactly the paper it was built to catch, with only #13's plausibility bound still flagging it 	CRITICAL 	RESOLVED (v2.4.12) — both extraction prompts now require verbatim per-arm source quotes (source_quote_intervention/_control), preserved through coercion/restructure; _flag_suspect_source_quotes checks missing quotes, numbers absent from their own quote, SE labels (extends #9 to the vision path), multiple-timepoint/within-subject phrasing, and (text path) verbatim presence in the source. REAL-RUN VERIFIED: run 20260826_113816 flagged zsy234.pdf 4x from its own quotes on the vision path (plus #13's plausibility flag) and caught a second study whose extracted values were absent from their quotes. Manual verification still required; the Anthropic path runs none of these checks (#50)
-39 	No regression test for the v2.4.11 group-label follow-up mechanism (_fetch_group_labels_if_missing, _needs_group_labels, _build_group_label_followup_prompt, _call_chat_api_with_prompt) - only verified via standalone logic simulation and two real pipeline runs, not a committed pytest test 	Medium 	Open — broadened in v2.4.12: also port the sandbox-harness scenarios for the source-quote check (zsy234 quote fires; clean quote stays clean; number-not-in-quote; missing quote), sentinel labels (#47 in this table), screening retry (#46), screening accounting partition, and the OCR budget early-stop in both tools
+39 	No regression test for the v2.4.11 group-label follow-up mechanism (_fetch_group_labels_if_missing, _needs_group_labels, _build_group_label_followup_prompt, _call_chat_api_with_prompt) - only verified via standalone logic simulation and two real pipeline runs, not a committed pytest test 	Medium 	RESOLVED (v2.4.12) - tests/test_data_extractor_source_quotes.py covers _needs_group_labels via test_null_sentinel_at_main_extraction_does_not_suppress_followup and test_real_arm_names_do_suppress_followup. The outer follow-up functions (_fetch_group_labels_if_missing /_build_group_label_followup_prompt / _call_chat_api_with_prompt) remain verified only via real pipeline runs - a full integration test would require mocking the API round-trip, out of scope for a regression test. Priority 1 harness scenarios ported in the same commit (26ebd7d): source-quote check, sentinel labels, screener retry, screening accounting, OCR budget early-stop in both tools.
 40 	Screening OCR capped each page at t[:800] over 8 pages, saturating at exactly 6414 chars on every >=8-page paper (the identical counts across four PDFs in real logs), then the 6000-char prompt cap discarded more - screening decisions were made on 800-char snippets, less than most abstracts 	High 	RESOLVED (v2.4.12) — one shared 6000-char budget filled front-to-back with early stop (matches the text path); reason-specific fallback logging; honest char/page accounting; fitz doc closed; screening OCR ~15-19s -> ~3s per paper; all 5 corpus papers still screen INCLUDE
 41 	RoB2 OCR capped chunks at t[:1500] over up to 12 pages - every real-log count is the saturated formula (18022/13516/9010) - of which the prompt kept 6000; ~70% of ~2m50s of OCR bought nothing. The pdfplumber text path had its own 800/page cap 	Medium 	RESOLVED (v2.4.12) — same budget/early-stop package; Stage 3.5 ~2m50s -> ~60-80s. NOTE: garble detection now inspects only the budget window (first ~2-4 pages); CID damage that starts later takes the text path there (observed benignly on Lami - clean front pages are better input than OCR, but the detection window narrowed)
 42 	run_sr_launcher printed all four artifact paths unconditionally - including a PDF the pipeline itself reported as None (WeasyPrint absent, #2) - and a bare exists() check would have advertised stale mirror copies from earlier runs 	Low 	RESOLVED (v2.4.12) — each line prints only if the file exists AND was modified at/after this run's start; otherwise "not generated" or "stale copy from an earlier run"
