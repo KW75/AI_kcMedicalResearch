@@ -81,8 +81,35 @@ Three independent errors:
 The paper reports **no** significant effect of treatment on pain. The pipeline
 reported g = −2.36, one of the largest effects in the psychotherapy literature.
 
-**Nothing in the pipeline flagged this.** It was found only by decoding the PDF
-text layer and reading the results section.
+**Nothing in the pipeline flagged this** in the run that produced the extract
+above. It was found only by decoding the PDF text layer and reading the results
+section.
+
+**What v2.4.12 changes (partial mitigation).** The extractor now emits
+`source_quote_intervention` and `source_quote_control` fields alongside each
+numeric extraction, plus a `source_quote_warning` column that fires on four
+patterns:
+
+1. The label `SE` or `SEM` appears in a quote used for an SD field.
+2. The quote mentions two or more distinct timepoints, or contains
+   within-subject phrases (`regardless of condition`, `main effect of time`,
+   `pre-post`, `baseline to`, etc.).
+3. The extracted number does not appear verbatim in its own quote. The match
+   is trailing-zero tolerant (`7.4` matches `7.40`) but rejects a different
+   decimal (`7.4` does not match `7.45`).
+4. The quote is missing entirely.
+
+On `zsy234.pdf` the flag now fires four times per re-extraction — SE-as-SD on
+both arms plus multi-timepoint on both arms — making that specific failure
+loud rather than silent.
+
+**This does not remove the reviewer's responsibility.** The check is a
+tripwire on the extractor's own quote, not a semantic verification against the
+paper. If the extractor produces a clean quote from a hallucinated passage, or
+misattributes a real quote from a different section, the flag will not fire.
+`source_quote_warning = None` is not evidence of correctness; it is evidence
+that the four specific patterns above did not trip. Item 3.1 remains
+mandatory.
 
 ---
 
@@ -131,6 +158,30 @@ At the end of Stage 3 the log prints a **DATA PROVENANCE SUMMARY**. Read it.
 
 Both must be described in the review's data-collection methods.
 
+### 3.4 Correlating audit files via `run_id`
+
+Every pipeline invocation stamps a `run_id` (timestamp of the form
+`YYYYMMDD_HHMMSS`) on every row of every audit file it writes. To trace a
+single study through the pipeline:
+
+```
+screening_audit.csv          run_id, filename, decision, reason, error
+extracted_data.csv           run_id, filename, source_quote_warning, ...
+rob2_audit.csv               run_id, filename, domain_1..5, overall
+meta_analysis_results.csv    run_id, study, hedges_g, ...
+```
+
+Filter each file on the same `run_id` and join on `filename`. This is the only
+reliable way to reconstruct *why* a specific effect estimate looks the way it
+does — screening reason, extraction warning, and RoB judgement live in
+different files but describe the same PDF read in the same session.
+
+**Do not compare rows across `run_id` values.** Extraction is
+non-deterministic (§6); a study's row in `extracted_data.csv` from run A
+cannot be paired with its RoB judgement from run B, because the two reads may
+disagree on which arms, timepoints, or numbers are present. If you need to
+combine information across runs, first re-verify against source.
+
 ---
 
 ## 4. Include / exclude decisions at extraction
@@ -177,6 +228,44 @@ without a stated rationale.
 
 **Imputed SDs.** Permitted (Cochrane Handbook 6.5.2) but must be declared, and
 a sensitivity analysis without imputed studies should be reported.
+
+### 4.4 Reading the `[SCREENING]` accounting block
+
+At the end of Stage 2 the console prints a partition of the screening batch:
+
+```
+[SCREENING] 120 records processed
+  INCLUDE    : 34
+  EXCLUDE    : 71
+  UNCERTAIN  : 12
+  ERROR      :  3
+```
+
+- **INCLUDE / EXCLUDE / UNCERTAIN** are model decisions on PDFs the screener
+  could read.
+- **ERROR** rows are PDFs the screener could not read at all — corrupt file,
+  API 5xx after retries exhausted, OCR budget saturated before any usable text
+  was recovered, or an unhandled exception. **These are not exclusion
+  decisions.** They are pipeline failures.
+
+For PRISMA reporting, ERROR rows must be resolved manually before the flow
+diagram is drawn. Counting them as EXCLUDE inflates your "excluded at
+screening" number with studies that were never actually screened, and hides
+records that a human should decide on.
+
+The audit CSV distinguishes them via the `error` column: populated on ERROR
+rows, blank on real decisions. If the console line was missed or the run was
+resumed across sessions, filter `screening_audit.csv` on that column to
+recover the true partition:
+
+```
+records with error != ""    → pipeline failures, resolve manually
+records with error == ""    → real INCLUDE / EXCLUDE / UNCERTAIN decisions
+```
+
+The four totals in the console line should equal the row count of
+`screening_audit.csv` filtered to the current `run_id`. If they do not, a
+worker crashed silently and the run is incomplete.
 
 ---
 
@@ -234,8 +323,10 @@ RoB 2.0 assessment re-read the PDF independently and are unaffected.
 | Several corpus PDFs have broken font CMaps | Text layer appears garbled; pipeline falls back to OCR unnecessarily, losing fidelity | Decode with a fixed character offset before OCR fallback |
 | Outcome tables may be embedded images | Values cannot be cross-checked against the text layer | Manual verification is the only check |
 | Author/year heuristics fail on unusual name formats | Wrong study labels | Flagged as `pdf_auto (verify)`; override as needed |
-| No SD/SE disambiguation | Silent 8x error in dispersion (see 2.2) | Manual check, item 3.1 |
-| No within- vs between-group detection | Silent invalid effect size (see 2.2) | Manual check, item 3.1 |
+| No semantic SD/SE disambiguation | Silent 8x error in dispersion (see 2.2) | v2.4.12 `source_quote_warning` flags SE/SEM label in an SD quote; manual check (item 3.1) still required |
+| No semantic within- vs between-group detection | Silent invalid effect size (see 2.2) | v2.4.12 `source_quote_warning` flags multi-timepoint and within-subject phrasing in a quote; manual check (item 3.1) still required |
+| Extractor quote check is a tripwire, not a verifier | A clean quote from a hallucinated or misattributed passage will not flag; only four specific patterns are detected | `source_quote_warning = None` means "four patterns did not trip", not "correct". Item 3.1 remains mandatory |
+| Retry, OCR-budget, and quote-check behaviour verified on the `qwen` provider path only | Anthropic provider path may fail or silently succeed differently under the same conditions | Reviewer verification required on any run whose provider is Anthropic; do not assume qwen-path test coverage transfers |
 | RoB 2.0 runs independently of overrides | RoB assessment may use OCR text of a study whose data was hand-entered | Review RoB judgements separately |
 
 ---
