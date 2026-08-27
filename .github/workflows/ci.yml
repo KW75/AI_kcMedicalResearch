@@ -17,10 +17,14 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v5
 
-      - name: Set up Python ${{ matrix.python-version }}
+      -
+        name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
+
+      - name: Check for UTF-8 BOMs
+        run: python scripts/check_no_bom.py
 
       - name: Install system dependencies
         run: |
