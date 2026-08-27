@@ -483,6 +483,47 @@ def main():
             f"with no SE labels or within-subject timepoint language. "
             f"Manual verification still required.")
 
+    # ---------------------------------------------------------------------
+    # [OUTCOME/TIMEPOINT] provenance surfacing (#22 / #51).
+    # Extraction is non-deterministic (#11): the same paper can draw its
+    # numbers from different outcomes or different timepoints across runs
+    # (Ang's bimodal g=+0.075 vs -0.248 was the motivating case). The
+    # schema records outcome_selected and timepoint_selected per study;
+    # the fields land in primary_outcome after the restructure step on
+    # both extraction paths. Surface them here so a reviewer sees WHICH
+    # row of each paper's results the pooled estimate is keyed to,
+    # without opening extracted_data.csv.
+    # ---------------------------------------------------------------------
+    _op_rows = []
+    for r in er:
+        if not isinstance(r, dict):
+            continue
+        m_ = r.get("study_metadata", {}) or {}
+        po_ = r.get("primary_outcome", {}) or {}
+        outcome_sel = po_.get("outcome_selected")
+        timepoint_sel = po_.get("timepoint_selected")
+        _op_rows.append({
+            "author": m_.get("first_author") or "?",
+            "year": m_.get("year") or "",
+            "filename": r.get("filename", "?"),
+            "outcome_selected": outcome_sel,
+            "timepoint_selected": timepoint_sel,
+        })
+    _op_recorded = sum(
+        1 for x in _op_rows
+        if x["outcome_selected"] is not None or x["timepoint_selected"] is not None)
+    logger.info(
+        f"[OUTCOME/TIMEPOINT] {_op_recorded} of {len(_op_rows)} studies "
+        f"recorded outcome_selected and/or timepoint_selected. These "
+        f"fields document WHICH outcome and WHICH timepoint each run "
+        f"drew from - a run whose numbers change between executions "
+        f"(#11) will show the change here without opening the CSV.")
+    for x in _op_rows:
+        logger.info(
+            f"[OUTCOME/TIMEPOINT]   {x['author']} ({x['year']}): "
+            f"outcome={x['outcome_selected'] if x['outcome_selected'] is not None else '(not recorded)'} "
+            f"| timepoint={x['timepoint_selected'] if x['timepoint_selected'] is not None else '(not recorded)'}")
+
     if len(rows) < 2:
         logger.error("< 2 studies with usable data. Aborting meta-analysis.")
         layout.mirror_all()
