@@ -21,6 +21,64 @@ The attached PDF is a candidate RCT. Return ONLY valid JSON:
 "exclusion_reasons":["..."],"rationale":"<=150 words","is_rct":true|false|null}}
 Bias toward INCLUDE when uncertain."""
 
+# --- Broken-CMap offset-decode helper (Known Issue #18) ---
+# Some PDFs have a ToUnicode CMap that is systematically shifted by a
+# constant (usually +1 or -1), producing text like "Uif!qbujfout" instead
+# of "The patients". Detect this by trying a handful of small integer
+# offsets on the extracted text and scoring each result by how many
+# common English stopwords appear. If one offset produces readable text,
+# return it - the screening/extraction stages then avoid a slow OCR pass.
+# Does NOT fix "(cid:XX)" markers (those mean the ToUnicode map is
+# missing entirely, not shifted).
+_CMAP_STOPWORDS = frozenset({
+    "the", "and", "of", "to", "in", "a", "is", "that", "for", "with",
+    "on", "as", "was", "were", "by", "at", "this", "from", "or", "an",
+    "be", "are", "we", "not", "study", "patients", "group", "results",
+    "control", "trial", "treatment", "pain", "mean", "significant",
+})
+
+def _cmap_score(text: str) -> int:
+    """Count occurrences of common English words in text (case-insensitive)."""
+    if not text:
+        return 0
+    import re as _re
+    tokens = _re.findall(r"[A-Za-z]+", text.lower())
+    return sum(1 for tok in tokens if tok in _CMAP_STOPWORDS)
+
+
+def _shift_text(text: str, offset: int) -> str:
+    """Shift every ASCII letter by offset (wrapping within A-Z / a-z)."""
+    out = []
+    for ch in text:
+        code = ord(ch)
+        if 65 <= code <= 90:  # A-Z
+            out.append(chr((code - 65 + offset) % 26 + 65))
+        elif 97 <= code <= 122:  # a-z
+            out.append(chr((code - 97 + offset) % 26 + 97))
+        else:
+            out.append(ch)
+    return "".join(out)
+
+
+def _try_cmap_offset_decode(text: str, min_score: int = 15) -> tuple:
+    """Try common CMap offsets on garbled text. Return (decoded_text, offset)
+    if a candidate scores above min_score, else (None, None). Only considers
+    offsets that clearly beat the original text - a small win is not enough
+    to justify overriding the raw extraction.
+    """
+    if not text:
+        return None, None
+    baseline = _cmap_score(text)
+    best_text, best_offset, best_score = None, None, baseline + min_score
+    for offset in (1, -1, 2, -2):
+        candidate = _shift_text(text, offset)
+        score = _cmap_score(candidate)
+        if score > best_score:
+            best_text, best_offset, best_score = candidate, offset, score
+    return best_text, best_offset
+
+
+
 class RelevanceScreener:
     def __init__(self, pico_criteria, inclusion_criteria, exclusion_criteria,
                  model="claude-opus-4-7", api_key=None, provider="anthropic"):
@@ -81,6 +139,22 @@ class RelevanceScreener:
                 _fallback_reason = "CID markers in text layer"
             elif pdf_text.count(" ") < 20:
                 _fallback_reason = "text layer nearly space-free (possible broken CMap, see #18)"
+
+            # #18: before falling back to OCR, try a CMap offset decode.
+            # Only helps the "shifted-by-N" failure mode, not (cid:XX)
+            # markers (missing ToUnicode entries can't be recovered by
+            # shifting). Skip when there is no text at all.
+            if _fallback_reason and _fallback_reason != "no extractable text layer" \
+                    and "(cid:" not in pdf_text:
+                decoded, offset = _try_cmap_offset_decode(pdf_text)
+                if decoded:
+                    logger.info(
+                        f"CMap offset decode succeeded for {filename} "
+                        f"(offset={offset:+d}) - skipping OCR fallback (#18)"
+                    )
+                    pdf_text = decoded
+                    _fallback_reason = None
+
             if _fallback_reason:
                 logger.info(
                     f"Unusable text layer for {filename} "
