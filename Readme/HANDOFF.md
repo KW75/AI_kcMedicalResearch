@@ -1,3 +1,32 @@
+## Version 2.4.13 (Session 16) — 2026-08-27
+
+**Status:** 5 commits pushed, CI green, Render green. Tests: 470 passed, 3 skipped.
+
+**Commits this session:**
+| SHA | Description |
+|-----|-------------|
+| 32e0098 | Widen check_no_bom / strip_bom to repo root; strip 24 BOMs (#60) |
+| 0ede7bd | Add BOM check step to CI workflow (#36) |
+| d65fd1e | Fix numeric-matcher false-positive for integer-vs-float (#62) + regression test |
+| 6a6bdf1 | Add startup warning for --provider anthropic --mode sr (#61 interim) |
+| be98fb2 | Add zsy234 PRISMA exclusion entry to REVIEWER_GUIDE.md |
+
+**Resolved:** #60, #36, #62, #19 (zsy234 excluded). **Interim:** #61 (warning only; full Anthropic-path tripwires deferred).
+
+**Still open:** #17, #18, #2, #22, #23, #27, #39.
+
+**Next session priorities:**
+1. Verify #62 fix on a fresh pipeline run (Jensen no longer flagged).
+2. Full Anthropic-path implementation for #61 (source-quote, SD/SE, group-timepoint checks in `_extract_anthropic`).
+3. CMap decode offset-detection for #18 (helps McCrae within-subject flavor of #17).
+4. Add `outcome_selected` and `timepoint_selected` schema fields (Ang outcome-selection, Lami timepoint-picking).
+5. Tabular multi-timepoint detection in `_flag_suspect_source_quotes`.
+6. Hardware-blocked: Docker end-to-end (#27), macOS launchers (#39).
+
+Session 15's handoff follows below unchanged as the historical record.
+
+---
+
 Version 2.4.12 (Session 15) — Priority 1 Tests Committed, REVIEWER_GUIDE
 Updated for v2.4.12, activate_venv.bat Version Drift Fixed, Session 14
 Commits Pushed, CI/Render Verified Green
