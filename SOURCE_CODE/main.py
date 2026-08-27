@@ -2211,6 +2211,20 @@ def run_cli(args: argparse.Namespace) -> None:
     entry-point guard below owns the clean-exit message.
     """
 
+    # Anthropic-path tripwire gap (#61): _extract_anthropic and
+    # assess_by_file_id bypass the source-quote, SD/SE, and
+    # group/timepoint checks that the qwen path runs. Warn at point
+    # of use until the checks are ported to the Anthropic path.
+    if args.mode == "sr" and args.provider == "anthropic":
+        print(
+            "\n[!] Warning: --provider anthropic runs SR extraction without "
+            "the source-quote, SD/SE, or group-timepoint tripwires.\n"
+            "    See Known Issue #61. For full tripwire coverage use "
+            "--provider qwen (default vision model).\n"
+            "    Manual verification against source PDFs remains required "
+            "either way.\n"
+        )
+
     if args.ui:
         import subprocess as _sp
         proc = _sp.Popen(
