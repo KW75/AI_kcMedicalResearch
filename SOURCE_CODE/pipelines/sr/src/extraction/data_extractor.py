@@ -1,3 +1,4 @@
+
 # SOURCE_CODE/pipelines/sr/src/extraction/data_extractor.py
 import json, logging, os, time
 import base64
@@ -45,6 +46,8 @@ Return the data in this exact nested JSON structure:
   "primary_outcome": {{
     "outcome_match": true,
     "match_rationale": "brief explanation",
+    "outcome_selected": null,
+    "timepoint_selected": null,
     "mean_intervention": null,
     "sd_intervention": null,
     "mean_control": null,
@@ -73,6 +76,17 @@ the numbers. Copy exactly; do not paraphrase, translate, or clean up.
 Both fields may hold the same quote if one row reports both arms. Set
 null if you cannot point to the exact source text. These quotes are
 how a human reviewer audits every number you extract.
+
+CRITICAL - OUTCOME AND TIMEPOINT SELECTION: if the paper reports more than
+one outcome that could satisfy the review's primary outcome, set
+outcome_selected to the exact name of the one you extracted (e.g. "FIQ
+pain score", "VAS pain intensity", "NFR threshold"). If the paper reports
+the outcome at more than one timepoint (baseline, post-treatment,
+follow-up, week 12, ...), set timepoint_selected to the one your numbers
+come from. These two fields document WHICH row of the paper's results was
+chosen - without them, two runs that pick different outcomes or timepoints
+produce different effect sizes with no way to tell why. Leave null only
+if the paper reports exactly one outcome at exactly one timepoint.
 
 DO NOT fabricate values. Return null if not found.
 '''
@@ -128,98 +142,98 @@ class DataExtractor:
         """Score a page based on medical research indicators and position"""
         score = 0
         text_lower = text.lower()
-        
+
         # Comprehensive medical outcome indicators
         indicators = {
             # Pain outcomes
             'pain': 4, 'vas': 5, 'nrs': 5, 'fiq': 5, 'mpq': 5, 'bpi': 5,
             'psqi': 5, 'pain intensity': 5, 'pain severity': 5,
             'visual analog': 4, 'numerical rating': 4, 'mcgill': 5,
-            
+
             # Quality of Life
             'qol': 5, 'quality of life': 5, 'eq-5d': 5, 'sf-36': 5,
             'sf-12': 5, 'whoqol': 5, 'hrqol': 5,
-            
+
             # Clinical outcomes
             'mortality': 5, 'death': 5, 'survival': 4, 'complication': 4,
             'adverse event': 4, 'readmission': 5, 'rehospitalization': 5,
             'admission rate': 5, 'complication rate': 5,
             'infection': 4, 'bleeding': 4, 'stroke': 4,
-            
+
             # Functional outcomes
             'adl': 4, 'iadl': 4, 'functional': 3, 'disability': 3,
             'physical function': 4, 'mobility': 3,
-            
+
             # Laboratory/Physiological
             'hba1c': 5, 'glucose': 4, 'blood pressure': 4,
             'cholesterol': 4, 'bmi': 4, 'weight': 4,
-            
+
             # Mental Health
             'depression': 4, 'anxiety': 4, 'hads': 5, 'bdi': 5,
             'gad': 5, 'phq': 5, 'phq-9': 5,
-            
+
             # Sleep
             'sleep quality': 5, 'insomnia': 5, 'isi': 5,
             'sleep disturbance': 4,
-            
+
             # Statistical/Table indicators
             'mean': 3, 'sd': 3, 'standard deviation': 3,
             'median': 2, 'iqr': 2, 'p value': 3,
             'confidence interval': 3, 'ci': 3,
             'effect size': 3, 'odds ratio': 3,
-            
+
             # Group indicators
             'intervention': 4, 'control': 4, 'treatment': 3,
             'placebo': 4, 'usual care': 4,
-            
+
             # Table indicators
             'table': 5, 'figure': 3, 'tab.': 4, 'table ': 5,
             'fig.': 3, 'figure ': 3
         }
-        
+
         for term, weight in indicators.items():
             if term in text_lower:
                 score += weight
-        
+
         # Bonus for multiple numbers in a row (table-like)
         number_rows = len(re.findall(r'\d+\.?\d*\s+\d+\.?\d*\s+\d+\.?\d*', text))
         if number_rows > 0:
             score += min(number_rows, 10)
-        
+
         # Bonus for column-like structure (multiple groups)
         group_patterns = ['intervention', 'control', 'cbt', 'umc', 'placebo', 'waitlist']
         found_groups = sum(1 for p in group_patterns if p in text_lower)
         if found_groups >= 2:
             score += 5
-        
+
         # Bonus for pages with table + mean/sd or pain + mean/sd
         if 'table' in text_lower and ('mean' in text_lower or 'sd' in text_lower):
             score += 15
-        
+
         if 'pain' in text_lower and ('mean' in text_lower or 'sd' in text_lower):
             score += 15
-               
+
         # Position bias: favor pages in the middle-to-end of the paper
         position_ratio = page_num / max(total_pages, 1)
-        
+
         if 0.3 <= position_ratio <= 0.8:
             score += 8
         elif 0.8 < position_ratio <= 0.95:
             score += 5
         elif position_ratio > 0.95:
             score -= 5
-        
+
         # Penalize first 2 pages (abstract/introduction)
         if page_num < 2:
             score -= 10
-        
+
         return score
 
     def _get_page_images(self, pdf_path: str, filename: str) -> list:
         """Convert PDF pages to base64 images with smart page selection"""
         doc = fitz.open(pdf_path)
         total_pages = len(doc)
-        
+
         # Score each page
         page_scores = []
         for page_num in range(total_pages):
@@ -227,27 +241,27 @@ class DataExtractor:
             text = page.get_text()
             score = self._score_page(page_num, total_pages, text)
             page_scores.append((page_num, score))
-        
+
         # Sort by score (highest first)
         page_scores.sort(key=lambda x: x[1], reverse=True)
-        
+
         # Select pages
         selected = []
-        
+
         # Get top scoring pages
         if page_scores and page_scores[0][1] > 5:
             # Get top 5 scoring pages
             top_pages = [p[0] for p in page_scores[:5]]
-            
+
             # Add context pages around them
             context_pages = set()
             for p in top_pages:
                 for offset in [-2, -1, 0, 1, 2]:
                     if 0 <= p + offset < total_pages:
                         context_pages.add(p + offset)
-            
+
             selected = sorted(context_pages)[:10]
-            
+
             # Ensure we have at least 4 pages
             if len(selected) < 4:
                 for p in page_scores[:8]:
@@ -256,7 +270,7 @@ class DataExtractor:
                         if len(selected) >= 8:
                             break
                 selected = sorted(selected)
-        
+
         # Fallback if no good pages found
         if not selected:
             if total_pages <= 8:
@@ -269,10 +283,10 @@ class DataExtractor:
                     mid = total_pages // 2
                     pages.update([mid - 1, mid, mid + 1])
                 selected = sorted(pages)[:10]
-        
+
         logger.info(f"[VISION] Selected {len(selected)} pages (out of {total_pages}) for {filename}")
         logger.info(f"[VISION] Page scores: {[(p+1, s) for p, s in page_scores[:5] if s > 0]}")
-        
+
         # Convert selected pages to images
         base64_images = []
         for page_num in selected:
@@ -283,7 +297,7 @@ class DataExtractor:
                 img.save(buffered, format="PNG")
                 img_base64 = base64.b64encode(buffered.getvalue()).decode()
                 base64_images.append(img_base64)
-        
+
         return base64_images
 
     def _get_page_images_smart(self, pdf_path: str, filename: str) -> list:
@@ -294,65 +308,65 @@ class DataExtractor:
         """Expanded page selection - more pages, wider context"""
         doc = fitz.open(pdf_path)
         total_pages = len(doc)
-        
+
         if total_pages <= 10:
             return self._pages_to_images(doc, list(range(total_pages)))
-        
+
         pages = set()
         pages.update(range(min(4, total_pages)))
         pages.update(range(max(0, total_pages - 6), total_pages))
-        
+
         if total_pages > 12:
             step = max(1, (total_pages - 10) // 8)
             for i in range(4, total_pages - 6, step):
                 pages.add(i)
-        
+
         selected = sorted(pages)[:12]
-        
+
         logger.info(f"[VISION] Expanded selection: {len(selected)} pages")
         return self._pages_to_images(doc, selected)
-    
+
     def _get_page_images_results(self, pdf_path: str, filename: str) -> list:
         """Focus on results section - middle to end of paper"""
         doc = fitz.open(pdf_path)
         total_pages = len(doc)
-        
+
         if total_pages <= 8:
             return self._pages_to_images(doc, list(range(total_pages)))
-        
+
         start = int(total_pages * 0.3)
         end = int(total_pages * 0.8)
-        
+
         if end - start < 4:
             start = max(0, start - 2)
             end = min(total_pages, end + 2)
-        
+
         pages = list(range(start, end))
         pages.extend(range(max(0, total_pages - 3), total_pages))
-        
+
         selected = sorted(set(pages))[:10]
-        
+
         logger.info(f"[VISION] Results section: pages {[p+1 for p in selected]}")
         return self._pages_to_images(doc, selected)
-    
+
     def _get_page_images_full(self, pdf_path: str, filename: str) -> list:
         """Sample pages across the entire document"""
         doc = fitz.open(pdf_path)
         total_pages = len(doc)
-        
+
         if total_pages <= 12:
             return self._pages_to_images(doc, list(range(total_pages)))
-        
+
         step = max(1, total_pages // 10)
         pages = list(range(0, total_pages, step))[:10]
         pages.extend([0, 1, 2])
         pages.extend([total_pages - 3, total_pages - 2, total_pages - 1])
-        
+
         selected = sorted(set(pages))[:12]
-        
+
         logger.info(f"[VISION] Full document sample: {[p+1 for p in selected]}")
         return self._pages_to_images(doc, selected)
-    
+
     def _pages_to_images(self, doc, pages: list) -> list:
         """Convert page numbers to base64 images"""
         base64_images = []
@@ -364,7 +378,7 @@ class DataExtractor:
                 img.save(buffered, format="PNG")
                 img_base64 = base64.b64encode(buffered.getvalue()).decode()
                 base64_images.append(img_base64)
-        
+
         return base64_images
 
 
@@ -406,6 +420,10 @@ class DataExtractor:
             # the restructure step rebuilds primary_outcome
             "source_quote_intervention": [],
             "source_quote_control": [],
+            # #63: outcome-selection and timepoint-picking provenance.
+            "outcome_selected": ["outcome_name", "selected_outcome"],
+            "timepoint_selected": ["timepoint", "selected_timepoint",
+                                    "assessment_timepoint"],
         }
 
         # Handle outputs shaped like:
@@ -461,11 +479,6 @@ class DataExtractor:
         return result
 
     # Vocabulary that identifies a study TIMEPOINT, not a treatment arm.
-    # Deliberately narrow: real arm names essentially never contain these
-    # words, so this has a low false-positive rate. Not exhaustive - it
-    # catches the documented failure pattern (a within-subject pre/post
-    # label extracted into intervention_group/control_group), not every
-    # possible within/between confusion.
     _TIMEPOINT_VOCAB_PATTERN = re.compile(
         r"\b("
         r"baseline|pre[-\s]?treatment|pre[-\s]?test|pre[-\s]?intervention|"
@@ -478,28 +491,7 @@ class DataExtractor:
     )
 
     def _flag_group_timepoint_confusion(self, result: dict) -> None:
-        """Deterministic tripwire for Known Issue #10 (within- vs
-        between-group confusion).
-
-        Does not correct or exclude anything - flags it in the result for
-        the mandatory manual review REVIEWER_GUIDE.md 2.2 already requires.
-        Runs on BOTH extraction paths (vision and text-fallback), unlike
-        the SD/SE tripwire, since it only needs the group labels the model
-        already extracted, not literal source text.
-
-        Two checks, both narrow and low-false-positive by design:
-          1. A group label contains timepoint vocabulary (baseline,
-             post-treatment, follow-up, week N, ...) - a real treatment
-             arm essentially never looks like this.
-          2. intervention_group and control_group are the same value -
-             structurally impossible for a genuine between-group contrast.
-
-        This is intentionally NOT a general within/between-group detector:
-        it only catches cases where the mislabeling shows up in the group
-        NAME itself. A model that fabricates a plausible-sounding but
-        still-wrong arm name (rather than reusing an obvious timepoint
-        word) would not be caught by this check.
-        """
+        """Deterministic tripwire for Known Issue #10."""
         if not isinstance(result, dict):
             return
 
@@ -541,10 +533,6 @@ class DataExtractor:
                     f"comparison."
                 )
 
-        # ALWAYS set the key, None when clean: extracted_data.csv builds
-        # its columns dynamically from whatever keys exist, so a key set
-        # only on failure makes a clean run indistinguishable from a run
-        # where this check never executed (Session 14).
         result["group_timepoint_warning"] = warning
         if warning:
             logger.warning(
@@ -579,14 +567,6 @@ class DataExtractor:
         return self._value_present(mean_intervention) or self._value_present(outcome_match)
 
 
-    # Strings a model uses to DECLINE naming an arm, not name one.
-    # Observed in a real run: the group-label follow-up returned the
-    # quoted string 'null' for both fields; _value_present('null') is
-    # True, so it was stored as a genuine label, tripping the
-    # identical-labels check with a misleading within/between message -
-    # and a truthy sentinel would also have suppressed the follow-up in
-    # _needs_group_labels. Every label read goes through
-    # _clean_group_label so sentinels behave exactly like JSON null.
     _LABEL_SENTINELS = {
         "null", "none", "n/a", "na", "nan", "not reported",
         "not stated", "not specified", "unknown", "unclear", "-", "",
@@ -661,8 +641,6 @@ class DataExtractor:
                 "t1_n", "n_t1",
             ]
 
-        # If timepoint is absent, prefer the review's usual post-intervention
-        # target, then follow-up, then baseline.
         return [
             "post_n", "n_post", "post_intervention_n", "n_post_intervention",
             "follow_up_n", "followup_n", "n_followup", "n_follow_up",
@@ -720,10 +698,7 @@ class DataExtractor:
         return None
 
     def _infer_group_timepoint_from_outcomes(self, result: dict, mean_value, sd_value):
-        """
-        Infer group/timepoint by matching extracted mean/SD values against
-        model-provided outcome tables.
-        """
+        """Infer group/timepoint by matching extracted mean/SD against outcome tables."""
         outcomes = result.get("outcomes") if isinstance(result, dict) else None
         if not isinstance(outcomes, list):
             return None, None
@@ -760,10 +735,7 @@ class DataExtractor:
         return None, None
 
     def _derive_missing_sample_sizes(self, result: dict) -> dict:
-        """
-        Fill missing n_intervention/n_control from common model output shapes,
-        especially groups_n_by_timepoint + selected group/timepoint.
-        """
+        """Fill missing n_intervention/n_control from common model output shapes."""
         if not isinstance(result, dict):
             return result
 
@@ -836,21 +808,7 @@ class DataExtractor:
         return result
 
     def _sample_size_from_text_for_group(self, extracted_text: str, group, timepoint):
-        """
-        Last-resort deterministic sample-size parser for table headers like:
-        CBT-P (n = 34) ... (n = 28) ... (n = 24)
-        UMC   (n = 41) ... (n = 36) ... (n = 26)
-
-        NOTE: the CBT-IP/CBT-P/UMC branches below are narrow, known-trial
-        formatting workarounds (e.g. this trial's table sometimes abbreviates
-        CBT-IP as just "IP"), not general logic. They are safe to leave as-is
-        because each only activates when `group_norm` exactly equals one of
-        those three literal strings - for any other paper's arm names, this
-        falls straight through to the generic `else` branch below. Unlike
-        _infer_group_timepoint_from_text (see that docstring), this function
-        already has a working generic fallback, so it does not silently no-op
-        for other papers the way that one did.
-        """
+        """Last-resort deterministic sample-size parser for table headers."""
         import re
 
         if not extracted_text or not group:
@@ -864,7 +822,6 @@ class DataExtractor:
         elif "pre" in time_norm or "baseline" in time_norm:
             n_index = 0
         else:
-            # Default to post-intervention/post-treatment for this review.
             n_index = 1
 
         for raw_line in extracted_text.splitlines():
@@ -906,18 +863,7 @@ class DataExtractor:
 
 
     def _collect_candidate_group_names(self, result: dict) -> list:
-        """Gather candidate arm names actually present in this paper's own
-        extraction output, for use as search candidates in
-        _infer_group_timepoint_from_text.
-
-        Pulls from two places: (1) intervention_group/control_group-style
-        fields, wherever the model put them (top level, best_meta_analysis_candidate,
-        primary_outcome); (2) group/arm/name/label values inside any
-        groups_n_by_timepoint / sample_sizes / group_sample_sizes rows -
-        the same structures _get_sample_size_for_group already reads.
-        These are genuinely specific to whichever paper is being processed,
-        unlike a hardcoded literal list.
-        """
+        """Gather candidate arm names from extraction output."""
         if not isinstance(result, dict):
             return []
 
@@ -949,7 +895,6 @@ class DataExtractor:
                 if self._value_present(value):
                     names.append(str(value).strip())
 
-        # De-duplicate while preserving order, drop empties.
         seen = set()
         deduped = []
         for name in names:
@@ -960,25 +905,7 @@ class DataExtractor:
 
     def _infer_group_timepoint_from_text(self, extracted_text: str, mean_value, sd_value,
                                           candidate_groups: list = None) -> tuple:
-        """
-        Infer group/timepoint by matching an extracted mean/SD pair against
-        compacted table text rows, e.g.:
-        <group label> 7.58 (1.75) 7.35 (2.08) 7.21 (1.79)
-
-        candidate_groups: arm names to search for in the text. Normally
-        supplied by the caller via _collect_candidate_group_names(), derived
-        from whatever THIS paper's own extraction already named as its arms.
-
-        This used to hardcode three literal arm names from one specific
-        trial (CBT-IP/CBT-P/UMC) with no fallback - meaning it only ever
-        matched anything for that one paper and returned (None, None) for
-        every other paper's table, silently. Deriving candidates from each
-        paper's own extraction output generalizes this instead of hardcoding
-        one trial's names into shared code. If a paper's own extraction
-        doesn't surface clean arm names for this to find, the correct fix is
-        a study_overrides.yaml entry for that specific paper (see
-        StudyOverrides) - not another hardcoded literal here.
-        """
+        """Infer group/timepoint from compacted table text rows."""
         import re
 
         if not extracted_text or not candidate_groups:
@@ -1003,9 +930,6 @@ class DataExtractor:
                 candidate = str(candidate).strip()
                 if not candidate:
                     continue
-                # Allow a hyphen/space in the candidate name to match either
-                # a hyphen, a space, or nothing in the source text (covers
-                # "CBT-IP" vs "CBT IP" vs "CBTIP"-style formatting drift).
                 pattern = re.escape(candidate).replace(r"\-", r"[-\s]?")
                 if re.search(rf"\b{pattern}\b", line, flags=re.I):
                     group_name = candidate
@@ -1025,31 +949,13 @@ class DataExtractor:
         return None, None
 
     def _flag_possible_se_as_sd(self, result: dict, extracted_text: str) -> dict:
-        """Deterministic tripwire for Known Issue #9 (SD/SE confusion).
-
-        Does not correct or exclude anything - flags it in the result for
-        the mandatory manual review REVIEWER_GUIDE.md 3.1 already requires.
-        Only runs on the text-fallback path, where literal source text is
-        available to check against (the vision path has no text to search).
-
-        Looks for the literal words "SE" / "SEM" / "standard error"
-        appearing on the same source line as a value that was extracted
-        into sd_intervention or sd_control - the exact failure mode
-        documented for zsy234.pdf, where the source read
-        "(M = 47.14, SE = 2.36)" and the value was extracted as an SD.
-
-        This is a conservative co-occurrence check, not a semantic parser:
-        it will miss cases where the SE label and the value are on
-        different lines, and it can false-positive if an unrelated SE
-        value happens to share a line with the real SD. It is a tripwire
-        for a human reviewer, not a corrector.
-        """
+        """Deterministic tripwire for Known Issue #9 (SD/SE confusion)."""
         if not isinstance(result, dict) or not extracted_text:
             return result
 
         primary = result.get("primary_outcome")
         if not isinstance(primary, dict):
-            primary = result  # some callers still use the flat shape here
+            primary = result
 
         se_pattern = re.compile(r"\b(SE|SEM|standard error)\b", re.IGNORECASE)
         warnings_found = []
@@ -1069,11 +975,6 @@ class DataExtractor:
                     )
                     break
 
-        # ALWAYS set the key, None when clean - same rationale as
-        # _flag_group_timepoint_confusion (Session 14). Note this runs
-        # on the text-fallback path only; vision-path rows carry no
-        # sd_se_warning key at all, and extraction_method (now set on
-        # both paths) is how downstream code tells the two apart.
         result["sd_se_warning"] = " | ".join(warnings_found) if warnings_found else None
         if warnings_found:
             logger.warning(
@@ -1084,12 +985,6 @@ class DataExtractor:
         return result
 
 
-    # Phrases that mark a WITHIN-SUBJECT contrast in a source quote - the
-    # zsy234 failure pattern: "less morning pain at posttreatment (M = 47.14,
-    # SE = 2.36) relative to baseline (M = 52.67, SE = 2.27)". A single
-    # timepoint word in a quote is normal (between-group values AT a
-    # timepoint); a comparison BETWEEN timepoints is not a between-group
-    # effect.
     _WITHIN_SUBJECT_PHRASES = re.compile(
         r"(relative to|compared (?:to|with)|versus|vs\.?|change[sd]? from|"
         r"improve[dment]* from|reduc\w+ from|from)\s+(?:the\s+)?"
@@ -1100,25 +995,13 @@ class DataExtractor:
 
     @staticmethod
     def _number_in_text(value, text: str) -> bool:
-        """True if `value` appears in `text` as a standalone number.
-
-        Tolerates trailing zeros in BOTH directions:
-          - extracted "7.4" matches quote "7.40" (original behavior)
-          - extracted "49.0" matches quote "49"  (mirror; #62)
-        Also tolerates decimal commas. Rejects substring hits (76 must
-        not match 176 or 76.3, 7.4 must not match 7.45). Non-numeric
-        values fall back to substring match.
-        """
+        """True if `value` appears in `text` as a standalone number."""
         s = str(value).strip()
         try:
             f = float(s)
         except (TypeError, ValueError):
             return s in (text or "")
 
-        # Build candidate strings to search for. If the value is an
-        # integer-valued float (49.0, 7.00), also accept the bare integer
-        # form in the quote (#62: paper prints "49", extraction stores
-        # 49.0, tolerant matcher should not flag this as absent).
         candidates = [s]
         if f == int(f):
             candidates.append(str(int(f)))
@@ -1128,7 +1011,6 @@ class DataExtractor:
             if "." in candidate:
                 pattern = rf"(?<![\d.,]){core}0*(?!\d)"
             else:
-                # integer: allow "15.0"-style forms, reject "15.3"/"150"
                 pattern = rf"(?<![\d.,]){core}(?:[.,]0+)?(?!\d)(?!\.\d)"
             if re.search(pattern, text or ""):
                 return True
@@ -1137,31 +1019,7 @@ class DataExtractor:
 
     def _flag_suspect_source_quotes(self, result: dict,
                                     source_text: str = None) -> dict:
-        """Deterministic tripwire for Known Issue #48 (#38 in HANDOFF
-        numbering): bind verification to the NUMBERS, not just the labels.
-
-        The Session 13 group-label follow-up validated "what are this
-        trial's arms called" - a question the model answers correctly even
-        when the extracted numbers come from a within-subject table (the
-        zsy234 failure). This check inspects the VERBATIM source quote the
-        extraction schema now requires per arm:
-
-          1. missing quote for extracted values -> flagged (unauditable);
-          2. extracted mean/SD not present in its own quote -> flagged
-             (the quote does not support the number);
-          3. SE/SEM label in the quote of an SD value -> flagged (extends
-             Known Issue #9's SD/SE check to the VISION path, which has no
-             source text of its own);
-          4. two or more distinct timepoint references, or an explicit
-             within-subject phrase ("relative to baseline"), in a quote ->
-             flagged (the zsy234 within-vs-between failure class);
-          5. text-fallback only: quote not found verbatim in the source
-             text (whitespace-normalized) -> flagged (possible fabrication).
-
-        Flags only - never corrects or excludes. ALWAYS sets
-        result["source_quote_warning"] (None when clean) so the audit CSV
-        column exists on every row and silence is unambiguous.
-        """
+        """Deterministic tripwire for Known Issue #48."""
         if not isinstance(result, dict):
             return result
         primary = result.get("primary_outcome")
@@ -1323,11 +1181,7 @@ class DataExtractor:
         return x is not None and abs(x - target) <= tol
 
     def _mirror_study_metadata(self, result: dict) -> None:
-        """Copy resolved first_author/year into the nested study_metadata block.
-
-        Reporting and meta-analysis read study_metadata, while corrections write
-        top-level keys. Call this after any metadata is resolved.
-        """
+        """Copy resolved first_author/year into the nested study_metadata block."""
         if not isinstance(result, dict):
             return
 
@@ -1358,19 +1212,12 @@ class DataExtractor:
 
     def _apply_known_pdf_corrections(self, result: dict, filename: str = "",
                                      pdf_path: str = "") -> dict:
-        """Resolve study metadata and apply reviewer overrides.
-
-        Order matters:
-          1. metadata already present in the model output
-          2. metadata derived from the PDF itself (best effort, flagged)
-          3. reviewer overrides from study_overrides.yaml (always wins)
-        """
+        """Resolve study metadata and apply reviewer overrides."""
         if not isinstance(result, dict):
             return result
 
         paper = result.get("paper") if isinstance(result.get("paper"), dict) else {}
 
-        # 1. Metadata propagation from nested model output.
         if self._missing_like_value(result.get("first_author")):
             for key in ("first_author", "firstAuthor", "author"):
                 if not self._missing_like_value(paper.get(key)):
@@ -1383,7 +1230,6 @@ class DataExtractor:
                     result["year"] = paper.get(key)
                     break
 
-        # 2. Derive from the PDF when the model gave us nothing.
         needs_meta = (
             self._missing_like_value(result.get("first_author"))
             or self._missing_like_value(result.get("year"))
@@ -1404,7 +1250,6 @@ class DataExtractor:
             except Exception as exc:
                 logger.warning("PDF metadata resolution failed for %s: %s", filename, exc)
 
-        # 3. Reviewer overrides always win.
         try:
             self._study_overrides.apply(result, filename or result.get("filename") or "")
         except Exception as exc:
@@ -1451,13 +1296,11 @@ class DataExtractor:
             if term in lower:
                 score += weight
 
-        # Mean (SD)-style numeric cells, e.g. 7.44 (1.33)
         score += min(
             36,
             6 * len(re.findall(r"\b\d+(?:\.\d+)?\s*\(\s*\d+(?:\.\d+)?\s*\)", text)),
         )
 
-        # Group sample sizes, e.g. n = 34
         score += min(15, 3 * len(re.findall(r"\bn\s*=\s*\d+", lower)))
 
         return score
@@ -1468,12 +1311,7 @@ class DataExtractor:
         max_pages: int = 6,
         max_chars: int = 24000,
     ) -> str:
-        """
-        Extract high-signal text pages for a text fallback.
-
-        This is intentionally conservative: it only prepares candidate text.
-        The existing acceptance gate still decides whether the model response is usable.
-        """
+        """Extract high-signal text pages for a text fallback."""
         import fitz
 
         scored_pages = []
@@ -1500,7 +1338,6 @@ class DataExtractor:
         if not scored_pages:
             return ""
 
-        # Top-scoring pages, returned in original PDF order for readability.
         selected = sorted(scored_pages, key=lambda item: (-item[0], item[1]))[:max_pages]
         selected = sorted(selected, key=lambda item: item[1])
 
@@ -1539,7 +1376,9 @@ class DataExtractor:
             "{\n"
             '  "outcome_match": null,\n'
             '  "outcome_name": null,\n'
+            '  "outcome_selected": null,\n'
             '  "timepoint": null,\n'
+            '  "timepoint_selected": null,\n'
             '  "intervention_group": null,\n'
             '  "control_group": null,\n'
             '  "n_intervention": null,\n'
@@ -1575,7 +1414,10 @@ class DataExtractor:
             "- source_quote_intervention / source_quote_control: VERBATIM copy of the "
             "sentence or table row each arm's mean/SD was read from, including any "
             "SD/SE label and timepoint words around the numbers. Never paraphrase; "
-            "null if unsure.\n\n"
+            "null if unsure.\n"
+            "- outcome_selected / timepoint_selected: exact name of the outcome measure "
+            "and timepoint your numbers come from - documents which row of the paper's "
+            "results was chosen (#63).\n\n"
             f"FILENAME: {filename}\n\n"
             "ORIGINAL EXTRACTION PROMPT:\n"
             f"{original_prompt}\n\n"
@@ -1607,13 +1449,7 @@ for that field - NOT the quoted string "null".
 '''
 
     def _needs_group_labels(self, result: dict) -> bool:
-        """True if the result has usable outcome data but no group labels -
-        i.e. the #10 within/between-group tripwire (_flag_group_timepoint_confusion)
-        has nothing to check. Found via real-world testing: even on the
-        text-fallback path, where the extraction schema explicitly requests
-        intervention_group/control_group, the model doesn't reliably answer
-        that part of a large combined prompt - and the primary vision prompt
-        never asks for these fields at all."""
+        """True if the result has usable outcome data but no group labels."""
         if not isinstance(result, dict):
             return False
         candidate = result.get("best_meta_analysis_candidate")
@@ -1648,13 +1484,7 @@ for that field - NOT the quoted string "null".
         )
 
     def _call_chat_api_with_prompt(self, prompt: str, max_tokens: int = 256) -> str:
-        """Send an arbitrary text-only prompt via the same OpenAI-compatible
-        chat-completions client used elsewhere in this class. For narrow,
-        single-purpose follow-up questions (like the group-label re-prompt)
-        where a full extraction prompt/schema would be overkill. Not
-        available for the Anthropic provider, which uses a different client
-        (self.client.beta.messages.create, not chat.completions.create) -
-        callers must guard on self.provider != "anthropic"."""
+        """Send an arbitrary text-only prompt via the OpenAI-compatible client."""
         resp = self.client.chat.completions.create(
             model=self.model,
             messages=[{"role": "user", "content": prompt}],
@@ -1666,21 +1496,7 @@ for that field - NOT the quoted string "null".
     def _fetch_group_labels_if_missing(self, result: dict, filename: str,
                                         base64_images: list = None,
                                         extracted_text: str = None) -> dict:
-        """If the result has usable outcome data but is missing group
-        labels, issue a focused follow-up call asking specifically for
-        intervention_group/control_group, instead of leaving the #10
-        within/between-group tripwire with nothing to check (the gap found
-        during real-corpus verification - see HANDOFF.md Session 12/13).
-
-        Not available for the Anthropic provider (different client API) -
-        silently no-ops there. Still not guaranteed to succeed: the model
-        can answer null, or invent a plausible-but-wrong name - this
-        increases the odds of having group labels to check, it does not
-        guarantee correctness. Re-runs _flag_group_timepoint_confusion
-        itself after fetching labels, since _coerce_extraction_result
-        already ran once before this method is called (before labels
-        existed to check).
-        """
+        """Follow-up call for missing group labels."""
         if self.provider == "anthropic":
             return result
         if not self._needs_group_labels(result):
@@ -1688,9 +1504,6 @@ for that field - NOT the quoted string "null".
         if not base64_images and not extracted_text:
             return result
 
-        # Make the filename available to _flag_group_timepoint_confusion's
-        # log line during the re-run below - it is otherwise only added
-        # later in extract_by_pdf_path, so warnings here logged '?'.
         result.setdefault("filename", filename)
 
         prompt = self._build_group_label_followup_prompt(result)
@@ -1719,14 +1532,11 @@ for that field - NOT the quoted string "null".
         except Exception as exc:
             logger.warning(f"[GROUP LABELS] Follow-up request failed for {filename}: {exc}")
 
-        # Re-run the confusion check now that labels may have changed -
-        # _coerce_extraction_result already ran once before this method was
-        # called, so this check needs to run again explicitly.
         self._flag_group_timepoint_confusion(result)
         return result
 
     def _call_text_api(self, extracted_text: str, filename: str = "") -> str:
-        """Send extracted PDF text to the same chat-completions client as a fallback."""
+        """Send extracted PDF text to the chat-completions client as a fallback."""
         resp = self.client.chat.completions.create(
             model=self.model,
             messages=[
@@ -1742,17 +1552,15 @@ for that field - NOT the quoted string "null".
         return (resp.choices[0].message.content or "").strip()
 
     def _call_vision_api(self, base64_images: list, prompt: str) -> str:
-        """Send images to vision API (Qwen, OpenAI, etc.)"""
-        
-        # --- Vision support check ---
+        """Send images to vision API."""
         if self.provider not in ["qwen", "openai", "anthropic", "groq"]:
             raise RuntimeError(
                 f" - Provider '{self.provider}' does NOT support vision API.\n"
                 "Please use --provider qwen (recommended), openai, anthropic, or groq."
             )
-        
+
         content = [{"type": "text", "text": prompt}]
-        for img in base64_images[:5]:  # Max 5 pages
+        for img in base64_images[:5]:
             content.append({
                 "type": "image_url",
                 "image_url": {"url": f"data:image/png;base64,{img}"}
@@ -1772,32 +1580,29 @@ for that field - NOT the quoted string "null".
         try:
             logger.info(f"[VISION] Extracting from {filename}")
 
-            # Define page selection strategies
             strategies = [
                 ("smart", self._get_page_images_smart),
                 ("expanded", self._get_page_images_expanded),
                 ("results", self._get_page_images_results),
                 ("full", self._get_page_images_full),
             ]
-            
+
             result = None
             raw_response = None
-            text_payload = None  # set on the text-fallback path; the #48
-                                 # quote check uses it when available
-            
+            text_payload = None
+
             for strategy_name, strategy_func in strategies:
                 logger.info(f"[VISION] Trying {strategy_name} strategy for {filename}")
-                
+
                 base64_images = strategy_func(pdf_path, filename)
-                
+
                 if not base64_images:
                     logger.warning(f"[VISION] No images from {strategy_name} strategy")
                     continue
-                
+
                 raw = self._call_vision_api(base64_images, self._prompt())
                 raw_response = raw
-                
-                # Use relative import
+
                 from ..utils.json_utils import extract_json
                 r = self._coerce_extraction_result(extract_json(raw))
 
@@ -1806,10 +1611,6 @@ for that field - NOT the quoted string "null".
                         logger.info(f"[VISION] {strategy_name} strategy found data for {filename}")
                         r = self._fetch_group_labels_if_missing(
                             r, filename, base64_images=base64_images)
-                        # Record HOW this row was extracted (the text
-                        # path already sets text_fallback). Downstream
-                        # uses this to report which rows the SD/SE
-                        # check could apply to (Known Issue #9).
                         r.setdefault("extraction_method", f"vision_{strategy_name}")
                         result = r
                         break
@@ -1817,7 +1618,7 @@ for that field - NOT the quoted string "null".
                         logger.info(f"[VISION] {strategy_name} strategy found no data, trying next")
                 else:
                     logger.info(f"[VISION] {strategy_name} strategy returned invalid result")
-            
+
             if not result:
                 try:
                     text_payload = self._extract_candidate_table_text(pdf_path)
@@ -1859,41 +1660,39 @@ for that field - NOT the quoted string "null".
                     "filename": filename,
                     "extraction_error": "No data found with any page selection strategy"
                 }
-            
+
             # Re-structure data to nested format expected by meta-analysis
             if 'mean_intervention' in result or 'n_intervention' in result:
                 primary_outcome = {}
                 participants = {}
-                
-                for key in ['mean_intervention', 'sd_intervention', 'mean_control', 'sd_control', 
+
+                for key in ['mean_intervention', 'sd_intervention', 'mean_control', 'sd_control',
                            'outcome_match', 'match_rationale', 'name', 'time_point',
+                           'outcome_selected', 'timepoint_selected',
                            'source_quote_intervention', 'source_quote_control']:
                     if key in result and result[key] is not None:
                         primary_outcome[key] = result[key]
-                
+
                 for key in ['n_intervention', 'n_control']:
                     if key in result and result[key] is not None:
                         participants[key] = result[key]
-                
+
                 if primary_outcome:
                     result['primary_outcome'] = primary_outcome
                 if participants:
                     result['participants'] = participants
-                
-                flat_keys = ['mean_intervention', 'sd_intervention', 'mean_control', 'sd_control', 
+
+                flat_keys = ['mean_intervention', 'sd_intervention', 'mean_control', 'sd_control',
                            'outcome_match', 'match_rationale', 'n_intervention', 'n_control',
                            'name', 'time_point',
+                           'outcome_selected', 'timepoint_selected',
                            'source_quote_intervention', 'source_quote_control']
                 for key in flat_keys:
                     result.pop(key, None)
-            
-            # #48: bind verification to the NUMBERS. Runs BEFORE
-            # _apply_known_pdf_corrections so flags describe what was
-            # EXTRACTED - reviewer overrides replace values afterwards
-            # and must not be flagged for differing from the quote.
+
             result = self._flag_suspect_source_quotes(
                 result, source_text=text_payload)
-            
+
             result.update({
                 "file_id": None,
                 "filename": filename,
@@ -1934,12 +1733,7 @@ for that field - NOT the quoted string "null".
 
     @staticmethod
     def _log_provenance_summary(results) -> None:
-        """Report which studies' data did not come straight from extraction.
-
-        Printed once at the end of Stage 3 so the counts are visible in the
-        run log rather than only in a CSV column. Anything listed here needs
-        to be described in the review's data-collection methods.
-        """
+        """Report which studies' data did not come straight from extraction."""
         overridden = []
         auto_meta = []
 
@@ -1979,17 +1773,7 @@ for that field - NOT the quoted string "null".
         logger.info("-" * 60)
 
     def _extract_anthropic(self, file_id, filename):
-        """Anthropic-specific extraction.
-
-        Routes the response through the same normalization and tripwires
-        used by the vision path so that #48 (source-quote), #9 (SD/SE via
-        quotes), and #10 (group/timepoint) checks all apply here too
-        (Known Issue #61). Anthropic has no text-fallback path in this
-        pipeline, so source_text is None for the quote check - the
-        number-in-quote, SE-in-quote, and multi-timepoint sub-checks
-        still run; only the "quote appears verbatim in source text"
-        sub-check is skipped.
-        """
+        """Anthropic-specific extraction (routes through shared tripwires)."""
         try:
             resp = self.client.beta.messages.create(
                 model=self.model, max_tokens=4096,
@@ -2007,8 +1791,6 @@ for that field - NOT the quoted string "null".
                 return {"file_id": file_id, "filename": filename,
                         "extraction_error": "Anthropic returned non-dict result"}
 
-            # Re-structure flat fields into nested primary_outcome/participants,
-            # mirroring the vision path so downstream code sees a consistent shape.
             if 'mean_intervention' in result or 'n_intervention' in result:
                 primary_outcome = {}
                 participants = {}
@@ -2016,6 +1798,7 @@ for that field - NOT the quoted string "null".
                 for key in ['mean_intervention', 'sd_intervention',
                             'mean_control', 'sd_control',
                             'outcome_match', 'match_rationale', 'name', 'time_point',
+                            'outcome_selected', 'timepoint_selected',
                             'source_quote_intervention', 'source_quote_control']:
                     if key in result and result[key] is not None:
                         primary_outcome[key] = result[key]
@@ -2034,17 +1817,13 @@ for that field - NOT the quoted string "null".
                              'outcome_match', 'match_rationale',
                              'n_intervention', 'n_control',
                              'name', 'time_point',
+                             'outcome_selected', 'timepoint_selected',
                              'source_quote_intervention', 'source_quote_control']
                 for key in flat_keys:
                     result.pop(key, None)
 
             result.setdefault("extraction_method", "anthropic_file")
 
-            # #48/#61: run the source-quote tripwire on the Anthropic path.
-            # source_text=None because Anthropic uses file_id (no raw text
-            # available here); the verbatim-source sub-check is skipped,
-            # but number-in-quote, SE-in-quote, and multi-timepoint checks
-            # still run against the quotes themselves.
             result = self._flag_suspect_source_quotes(result, source_text=None)
 
             result.update({"file_id": file_id, "filename": filename,
