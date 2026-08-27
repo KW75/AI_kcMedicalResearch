@@ -1979,7 +1979,17 @@ for that field - NOT the quoted string "null".
         logger.info("-" * 60)
 
     def _extract_anthropic(self, file_id, filename):
-        """Anthropic-specific extraction"""
+        """Anthropic-specific extraction.
+
+        Routes the response through the same normalization and tripwires
+        used by the vision path so that #48 (source-quote), #9 (SD/SE via
+        quotes), and #10 (group/timepoint) checks all apply here too
+        (Known Issue #61). Anthropic has no text-fallback path in this
+        pipeline, so source_text is None for the quote check - the
+        number-in-quote, SE-in-quote, and multi-timepoint sub-checks
+        still run; only the "quote appears verbatim in source text"
+        sub-check is skipped.
+        """
         try:
             resp = self.client.beta.messages.create(
                 model=self.model, max_tokens=4096,
@@ -1991,8 +2001,54 @@ for that field - NOT the quoted string "null".
                 betas=[BETA_HEADER])
             raw = resp.content[0].text.strip()
             from ..utils.json_utils import extract_json
-            r = extract_json(raw)
-            r.update({"file_id": file_id, "filename": filename, "extraction_error": None})
-            return r
+            result = self._coerce_extraction_result(extract_json(raw))
+
+            if not isinstance(result, dict):
+                return {"file_id": file_id, "filename": filename,
+                        "extraction_error": "Anthropic returned non-dict result"}
+
+            # Re-structure flat fields into nested primary_outcome/participants,
+            # mirroring the vision path so downstream code sees a consistent shape.
+            if 'mean_intervention' in result or 'n_intervention' in result:
+                primary_outcome = {}
+                participants = {}
+
+                for key in ['mean_intervention', 'sd_intervention',
+                            'mean_control', 'sd_control',
+                            'outcome_match', 'match_rationale', 'name', 'time_point',
+                            'source_quote_intervention', 'source_quote_control']:
+                    if key in result and result[key] is not None:
+                        primary_outcome[key] = result[key]
+
+                for key in ['n_intervention', 'n_control']:
+                    if key in result and result[key] is not None:
+                        participants[key] = result[key]
+
+                if primary_outcome:
+                    result['primary_outcome'] = primary_outcome
+                if participants:
+                    result['participants'] = participants
+
+                flat_keys = ['mean_intervention', 'sd_intervention',
+                             'mean_control', 'sd_control',
+                             'outcome_match', 'match_rationale',
+                             'n_intervention', 'n_control',
+                             'name', 'time_point',
+                             'source_quote_intervention', 'source_quote_control']
+                for key in flat_keys:
+                    result.pop(key, None)
+
+            result.setdefault("extraction_method", "anthropic_file")
+
+            # #48/#61: run the source-quote tripwire on the Anthropic path.
+            # source_text=None because Anthropic uses file_id (no raw text
+            # available here); the verbatim-source sub-check is skipped,
+            # but number-in-quote, SE-in-quote, and multi-timepoint checks
+            # still run against the quotes themselves.
+            result = self._flag_suspect_source_quotes(result, source_text=None)
+
+            result.update({"file_id": file_id, "filename": filename,
+                           "extraction_error": None})
+            return result
         except Exception as e:
             return {"file_id": file_id, "filename": filename, "extraction_error": str(e)}
