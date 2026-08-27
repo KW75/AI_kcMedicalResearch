@@ -310,3 +310,30 @@ def test_real_arm_names_do_suppress_followup(extractor):
         "control_group": "Usual Medical Care",
     }
     assert extractor._needs_group_labels(result) is False
+
+def test_integer_in_quote_matches_float_extraction():
+    """Jensen 2012 case (#62): paper prints '49', extraction stores 49.0.
+    The tolerant matcher should treat integer-valued floats as matching
+    their integer form in the quote."""
+    from pipelines.sr.src.extraction.data_extractor import DataExtractor
+
+    result = {
+        "filename": "jensen_test.pdf",
+        "primary_outcome": {
+            "mean_intervention": 49.0,
+            "sd_intervention": 19.0,
+            "mean_control": 59.0,
+            "sd_control": 26.0,
+            "source_quote_intervention": "Posttreat CBT: 49 \u00b1 19",
+            "source_quote_control": "Posttreat controls: 59 \u00b1 26",
+        },
+    }
+    extractor = DataExtractor.__new__(DataExtractor)
+    extractor._flag_suspect_source_quotes(result)
+
+    warning = result.get("source_quote_warning")
+    # The tripwire must not flag "does not appear" - all four integer
+    # values are present in their quotes as integers.
+    assert warning is None or "does not appear" not in warning, (
+        f"False-positive on integer-in-quote / float-in-extraction: {warning}"
+    )

@@ -1102,22 +1102,38 @@ class DataExtractor:
     def _number_in_text(value, text: str) -> bool:
         """True if `value` appears in `text` as a standalone number.
 
-        Tolerates trailing zeros (7.4 matches "7.40") and decimal commas,
-        rejects substring hits (76 must not match 176 or 76.3, 7.4 must not
-        match 7.45). Non-numeric values fall back to substring match.
+        Tolerates trailing zeros in BOTH directions:
+          - extracted "7.4" matches quote "7.40" (original behavior)
+          - extracted "49.0" matches quote "49"  (mirror; #62)
+        Also tolerates decimal commas. Rejects substring hits (76 must
+        not match 176 or 76.3, 7.4 must not match 7.45). Non-numeric
+        values fall back to substring match.
         """
         s = str(value).strip()
         try:
-            float(s)
+            f = float(s)
         except (TypeError, ValueError):
             return s in (text or "")
-        core = re.escape(s).replace("\\.", "[.,]")
-        if "." in s:
-            pattern = rf"(?<![\d.,]){core}0*(?!\d)"
-        else:
-            # integer: allow "15.0"-style forms, reject "15.3"/"150"
-            pattern = rf"(?<![\d.,]){core}(?:[.,]0+)?(?!\d)(?!\.\d)"
-        return re.search(pattern, text or "") is not None
+
+        # Build candidate strings to search for. If the value is an
+        # integer-valued float (49.0, 7.00), also accept the bare integer
+        # form in the quote (#62: paper prints "49", extraction stores
+        # 49.0, tolerant matcher should not flag this as absent).
+        candidates = [s]
+        if f == int(f):
+            candidates.append(str(int(f)))
+
+        for candidate in candidates:
+            core = re.escape(candidate).replace("\\.", "[.,]")
+            if "." in candidate:
+                pattern = rf"(?<![\d.,]){core}0*(?!\d)"
+            else:
+                # integer: allow "15.0"-style forms, reject "15.3"/"150"
+                pattern = rf"(?<![\d.,]){core}(?:[.,]0+)?(?!\d)(?!\.\d)"
+            if re.search(pattern, text or ""):
+                return True
+        return False
+
 
     def _flag_suspect_source_quotes(self, result: dict,
                                     source_text: str = None) -> dict:
