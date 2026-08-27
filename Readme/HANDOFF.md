@@ -1,3 +1,125 @@
+## Session 17 - 2026-08-27 - v2.4.13
+
+**Status:** 7 commits pushed, CI green (pending final confirmation), Render green.
+**Tests:** 471 passed, 3 skipped, 11 deselected (up from 470 at session start).
+**Baseline:** v2.4.13 (commit 2faec37), CI green.
+
+### Commits this session
+
+- `9cf0bbf` - Route Anthropic extraction through source-quote tripwire (#61 full).
+  `_extract_anthropic` now coerces the API response, restructures flat fields into
+  nested `primary_outcome` / `participants` dictionaries, sets
+  `extraction_method = "anthropic_file"`, and calls `_flag_suspect_source_quotes`
+  with `source_text=None`. Closes the #50 gap for source-quote checks on the
+  Anthropic path (SD/SE and group/timepoint flags still text-fallback only).
+
+- `316bc76` - Add CMap offset-decode fallback before OCR (#12).
+  Added module-level helpers to `relevance_screener.py`: `_CMAP_STOPWORDS`,
+  `_cmap_score`, `_shift_text`, `_try_cmap_offset_decode`. When the text layer
+  triggers a non-CID fallback reason, tries offsets (+1, -1, +2, -2) and adopts
+  the best decode if it beats baseline by >=15 stopword hits. Reduces
+  unnecessary OCR on shift-broken CMaps; McCrae/Jensen-style within-subject
+  offsets are the target case. Note: commit message says #18, README's stable
+  numbering has this as #12 (broken font CMaps) - same issue, README wins.
+
+- `3b4c0ca` - Add outcome_selected/timepoint_selected schema fields (#51).
+  Extended `EXTRACTION_PROMPT_TEMPLATE`, both flat-key lists in
+  `extract_by_pdf_path` and `_extract_anthropic`, and `_text_extraction_prompt`
+  to carry `outcome_selected` and `timepoint_selected`. Targets Ang's bimodal
+  outcome flip (pain-change g=-0.248 vs NFR g=+0.075, #11) and Lami's
+  timepoint-picking; the fields record WHICH outcome and WHICH timepoint the
+  model chose, so the flip becomes visible in extracted_data.csv rather than
+  silent. Not yet surfaced in Stage 4 provenance summary. Commit message
+  cites #63 (working number during the session); README canonical is #51.
+
+- `ed7c43a` - Flag tabular multi-timepoint quote rows (#52).
+  Extended `_flag_suspect_source_quotes` with an `else` branch after the
+  timepoint-vocab / within-subject check: three or more
+  `\d+\.?\d*\s*\(\s*\d+\.?\d*\s*\)` cells in one quote now trigger a
+  "multiple mean(SD) cells" warning even without timepoint keywords. Added
+  regression test `test_tabular_multi_timepoint_row_is_flagged` (Lami
+  "CBT-P 7.58 (1.75) 7.35 (2.08) 7.21 (1.79)" pattern). Test count
+  470 -> 471. Commit message cites #64; README canonical is #52.
+
+- `8875df4` - Clean up README: fix cross-references, group Known Issues by
+  status, bump to v2.4.13. 353 insertions, 269 deletions. Reorganized the
+  flat Known Issues table into four groups (Open / Mitigated / Resolved /
+  Interim). Fixed drifted cross-references (Docker note now points to #28
+  not #19; Startup Time clarifies #17=Ollama probe vs #18=sr.main import).
+  Added #51, #52 and Interim #61.
+
+- `8ca7160` - Bump VERSION to 2.4.13. One-line edit to `SOURCE_CODE/main.py`
+  line 146; startup banner and code now agree.
+
+### Resolved this session
+
+- **#61 full** - Anthropic path now runs the source-quote tripwire.
+  Remaining #50 sub-scope: SD/SE and group/timepoint checks on Anthropic path.
+- **#12** - MITIGATED. CMap offset-decode before OCR fallback (implementation
+  landed; needs a real-run confirmation on a known-shifted PDF to fully close).
+- **#51** - `outcome_selected` / `timepoint_selected` schema fields added.
+- **#52** - Tabular multi-timepoint quote rows now flagged (with regression
+  test).
+- **Priority 1 verification** - Run `20260827_143901` confirmed #62 fix from
+  Session 16: Ang/Karlsson/Lami `source_quote_warning` empty; only McCrae's
+  expected multi-timepoint warning fires. Jensen-style false-positive
+  eliminated.
+
+### Still open
+
+- **#11** - Extraction non-determinism (Ang bimodal, Jensen bimodal, Lami
+  chaotic Ns). #51's new fields make the flip visible but do not fix it.
+- **#12** - CMap fix landed but needs real-run confirmation on a
+  known-shifted PDF; measure OCR-avoided count in the fallback log.
+- **#19** - macOS launchers still untested on macOS (hardware-blocked).
+- **#22 (equivalent)** - `outcome_selected` / `timepoint_selected` not yet
+  consumed by any audit summary or reviewer report; currently
+  reviewer-inspectable only.
+- **#23 (equivalent)** - Regression fixtures pinning Ang's two exact bimodal
+  value sets (g=+0.075 / g=-0.248) still not written; the v2.4.12 verbatim
+  quotes identify which table each mode drew from and are ready to key
+  fixtures on.
+- **#28** - Docker end-to-end still unverified (hardware-blocked).
+- **#49** - `check_no_bom.py` still scans only `SOURCE_CODE/`; needs widening
+  to `tests/` and `scripts/`, then CI wiring.
+- **#50 (partial)** - Anthropic path still bypasses SD/SE and
+  group/timepoint tripwires (source-quote check resolved this session).
+
+### Housekeeping notes carried forward
+
+- Header shows "Version 2.4.12" in older run logs; only affects runs before
+  commit `8ca7160`. Fresh runs will show 2.4.13.
+- Lami's N values still appear as `28.0` (float) in CSV - cosmetic only.
+- Log label for McCrae was corrected mid-session (now matches CSV entry
+  McCrae 2019).
+
+### Next session priorities
+
+1. **#49** - widen `check_no_bom.py` scan to `tests/` and `scripts/` and add
+   to CI (carried from Session 16, deferred twice now).
+2. **#12 confirmation** - real-run test of CMap offset-decode on a
+   known-shifted PDF (McCrae or Jensen); check the fallback log for the
+   new "decoded with offset X" line.
+3. **#23 regression fixtures** for Ang's bimodal value sets, keyed on the
+   v2.4.12 verbatim source quotes.
+4. **#50 completion** - port SD/SE and group/timepoint checks into
+   `_extract_anthropic` (the source-quote scope is already done).
+5. **#22 surfacing** - consume `outcome_selected` / `timepoint_selected` in
+   the Stage 4 provenance summary so reviewers see the flip without
+   opening the CSV.
+
+### Instructions to close Session 17
+
+Save this file, then:
+
+    python scripts/check_no_bom.py
+    git add Readme/HANDOFF.md
+    git commit -m "Update HANDOFF.md with Session 17 summary"
+    git push
+
+Paste the push output to close Session 17.
+
+
 ## Version 2.4.13 (Session 16) — 2026-08-27
 
 **Status:** 5 commits pushed, CI green, Render green. Tests: 470 passed, 3 skipped.
