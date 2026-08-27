@@ -111,6 +111,26 @@ misattributes a real quote from a different section, the flag will not fire.
 that the four specific patterns above did not trip. Item 3.1 remains
 mandatory.
 
+**Disposition for this corpus (v2.4.12, run 20260826_113816).** All four
+`source_quote_warning` flags fired on `zsy234.pdf` as documented above, plus
+`plausibility_flag` on |g|=2.36. The extracted values were then manually
+confirmed against the PDF as within-subject baseline vs posttreatment on a
+single arm, not intervention vs control. Because the paper itself reports
+no significant group-by-time interaction on the pain outcomes, there is no
+usable between-group effect estimate to enter — Option B (reviewer override
+with corrected between-group values) is not available for this paper.
+
+`zsy234.pdf` is therefore **excluded at the data-extraction stage** with
+the PRISMA reason:
+
+> Outcome data not reported in a usable format for between-group comparison
+> (McCrae 2019 reports within-subject pre/post values only; authors report
+> no significant group-by-time interaction on pain outcomes).
+
+This follows §4.2's row "Only within-subject change reported → No
+between-group contrast available." The pipeline flags are recorded in the
+audit trail; the exclusion is a reviewer decision documented here.
+
 ---
 
 ## 3. Mandatory checks before reporting any result
