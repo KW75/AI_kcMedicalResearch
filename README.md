@@ -3,7 +3,7 @@
 A multi-mode AI assistant for medical research, critical appraisal, systematic review, coding, and writing. Uses cloud providers by default (DeepSeek, Qwen, OpenAI, Anthropic, Groq) with optional local Ollama support.
 
     Version: 2.4.13
-    Tests: 471 passed, 3 skipped, 11 deselected as of v2.4.13
+    Tests: 477 passed, 3 skipped, 11 deselected as of v2.4.13
            (reproduce with `python -m pytest -m "not live" --tb=short -q`)
     Coverage: ~53% (not re-measured this session)
     CI: GitHub Actions - Green
@@ -175,12 +175,13 @@ regardless.
     python -m pytest --cov=SOURCE_CODE --cov-report=html  # with coverage
     python -m pytest -m live -v                           # live provider smoke tests
 
-Current status: 471 passed, 3 skipped, 11 deselected as of v2.4.13
-(470 at v2.4.13 session start; v2.4.13 added tabular multi-timepoint
-quote-row detection with regression test - see #52).
+Current status: 477 passed, 3 skipped, 11 deselected as of v2.4.13
+(471 at Session 18 start; Session 18 added six regression tests for the
+BOM guard - see #49).
 
-NOTE: `check_no_bom.py` currently scans only `SOURCE_CODE/`; three BOMs were
-found in `tests/` and `scripts/` in v2.4.12 (see #49).
+`scripts/check_no_bom.py` scans the whole repo (excluding `.git`, `.venv`,
+`output/`, `reports/`, caches, and build artifacts) and runs in CI before
+pytest. Regression-tested by `tests/test_check_no_bom.py`.
 
     python scripts/check_no_bom.py                        # fail on UTF-8 BOMs in source
     python scripts/strip_bom.py                           # remove them
@@ -365,7 +366,6 @@ list below is grouped by current status for readability.
 | 15 | RoB 2.0 assessment runs independently of `study_overrides.yaml` and may assess OCR text for a study whose outcome data was hand-entered. | Low |
 | 19 | macOS launchers are untested on macOS. Changed from Docker-based to venv-based in v2.4.8; the `lsof` port check and Python 3.11/3.12 discovery loop need a real run. | Medium |
 | 28 | Docker route has never been executed: not the build, not either compose service, not the `.env`-exclusion check. Docker is not installed on the dev machine. | High |
-| 49 | `check_no_bom.py` scans only `SOURCE_CODE/`. Three UTF-8 BOMs found outside it (`tests/test_main_coverage.py`, `scripts/launcher.py`). Widen scan root and wire into CI. | Medium |
 | 50 | Anthropic provider path (`_extract_anthropic`, `assess_by_file_id`) runs most tripwires only partially. Source-quote check added v2.4.13 (#61); SD/SE and group/timepoint flags still absent. Plausibility inputs are computed at Stage 4 regardless. | Medium |
 
 ### Mitigated (deterministic tripwire; manual verification still required)
@@ -418,6 +418,7 @@ list below is grouped by current status for readability.
 | 46 | A transient network error during screening silently removed a paper from the ENTIRE review    | v2.4.12 - screening retries transient failures (3 attempts, backoff); `[SCREENING]` accounting block; PRISMA-invalid drops flagged under the pooled estimate |
 | 47 | Group-label follow-up returned the QUOTED STRING `'null'`; stored as a real label              | v2.4.12 - `_clean_group_label()` treats null/none/n-a/not reported/unknown/etc. as declines; prompt demands unquoted JSON null explicitly |
 | 48 | `python -m SOURCE_CODE.pipelines.sr.main` printed a runpy RuntimeWarning on every run          | v2.4.12 - lazy PEP 562 `__getattr__` re-export; warning verified absent |
+| 49 | `check_no_bom.py` scanned only `SOURCE_CODE/`, missing BOMs in `tests/` and `scripts/`         | Session 16 (`32e0098`) widened scan root to repo root with IGNORE_DIRS; Session 16 (`0ede7bd`) wired into CI before pytest. Session 18 (`4b03fed`) added `tests/test_check_no_bom.py` (6 regression tests covering BOM detection at repo root and in tests/scripts subdirs, IGNORE_DIRS respect, suffix contract, clean-tree exit 0, offender exit 1). |
 | 51 | `outcome_selected` / `timepoint_selected` not recorded, so Ang's bimodal flip (#11) and Lami's timepoint-picking were invisible in audit output | v2.4.13 - fields added to `EXTRACTION_PROMPT_TEMPLATE`, both flat-key lists (`extract_by_pdf_path` and `_extract_anthropic`), and `_text_extraction_prompt`. Not yet surfaced in Stage 4 provenance summary. |
 | 52 | Tabular multi-timepoint quote rows (e.g. Lami "CBT-P 7.58 (1.75) 7.35 (2.08) 7.21 (1.79)") contain three mean(SD) cells but no timepoint keywords, so #38's check went silent on them | v2.4.13 - `_flag_suspect_source_quotes` now flags three or more mean(SD) cells in one quote via regex regardless of timepoint vocabulary; regression test `test_tabular_multi_timepoint_row_is_flagged` covers Lami's exact pattern. |
 

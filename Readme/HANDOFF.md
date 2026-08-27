@@ -1,3 +1,114 @@
+## Session 18 - 2026-08-27 - v2.4.13
+
+**Status:** 2 commits pushed, CI pending confirmation, Render unchanged.
+**Tests:** 477 passed, 3 skipped, 11 deselected (up from 471).
+**Baseline:** v2.4.13 (commit 7fb0782), CI green.
+
+### Finding on session open
+
+Session 17's handoff listed #49 (`check_no_bom.py` scans only
+`SOURCE_CODE/`) as the top-priority carryover for Session 18. Direct
+inspection of the file on `main` at 7fb0782 showed the fix had already
+shipped in Session 16: `REPO_ROOT` is the repo root, `IGNORE_DIRS`
+covers `.git`, `.venv`, `output`, `reports`, `input`, caches, and
+build artifacts, `CHECK_SUFFIXES` is comprehensive, and
+`.github/workflows/ci.yml` runs the guard before pytest. CI run #249
+on 7fb0782 executed the step and passed. Session 16 commits `32e0098`
+(widen scan root, strip 24 BOMs) and `0ede7bd` (wire into CI) shipped
+both halves; Session 17's HANDOFF carried #49 as still-open by mistake
+and the README's Open table was never updated to match. Same failure
+pattern as Sessions 8, 14, and 15 - verify the artifact, not the
+summary; fourth documented instance in this project.
+
+### Commits this session
+
+- `4b03fed` - Add regression tests for `check_no_bom.py` (#49).
+  New file `tests/test_check_no_bom.py`, 6 tests. Loads
+  `scripts/check_no_bom.py` via `importlib.util.spec_from_file_location`
+  (`scripts/` has no `__init__.py`), monkeypatches `REPO_ROOT` to
+  `tmp_path` so tests never touch the real repo. Coverage:
+  `test_detects_bom_in_repo_root` (baseline);
+  `test_detects_bom_in_tests_and_scripts_subdirs` (the specific
+  regression Session 17's stale claim warned about - a future refactor
+  that narrows the scan root would fail here explicitly);
+  `test_ignores_bom_under_ignored_dirs` (pins `IGNORE_DIRS`, six
+  entries each staged with a BOM'd file, none reported);
+  `test_ignores_non_source_suffixes` (pins `CHECK_SUFFIXES`; `.png`,
+  `.log`, `.pdf` starting with BOM bytes not flagged);
+  `test_clean_tree_returns_empty_and_main_returns_zero` (silence
+  contract, exit 0); `test_main_returns_1_and_names_offenders`
+  (CI-gate contract, exit 1, path printed - prevents the
+  Session 14 #36/#44-shape failure where a check "runs" but silently
+  returns 0 on failure). Test count 471 -> 477.
+
+- `<sha2>` - Docs: mark #49 Resolved and record Session 18.
+  README.md: test count banner and Running Tests section 471 -> 477;
+  replaced stale "scans only SOURCE_CODE/" note with accurate
+  description of the current guard; moved #49 from Open to Resolved
+  citing Session 16 commits `32e0098`/`0ede7bd` and Session 18 test
+  commit `4b03fed`. HANDOFF.md: this Session 18 block prepended.
+
+### Resolved this session
+
+- **#49** - `check_no_bom.py` scan-root and CI-wiring gap. Underlying
+  code fix landed Session 16; Session 18 closed the doc drift and
+  added regression tests so a future refactor of the guard fails CI
+  on push rather than silently regresses the scan scope.
+
+### Still open (carried unchanged from Session 17)
+
+- **#11** - Extraction non-determinism (Ang bimodal, Jensen bimodal,
+  Lami chaotic Ns).
+- **#12 confirmation** - CMap offset-decode landed Session 17;
+  needs real-run test on a known-shifted PDF (McCrae or Jensen);
+  look for the new "decoded with offset X" line in the fallback log.
+- **#19** - macOS launchers untested (hardware-blocked).
+- **#22 (equivalent)** - `outcome_selected` / `timepoint_selected`
+  not yet surfaced in Stage 4 provenance summary.
+- **#23 (equivalent)** - Regression fixtures for Ang's bimodal value
+  sets (+0.075 / -0.248) not yet written.
+- **#28** - Docker end-to-end unverified (hardware-blocked).
+- **#50 (partial)** - Anthropic path still bypasses SD/SE and
+  group/timepoint tripwires (source-quote check landed Session 17).
+
+### Next session priorities (Session 19)
+
+1. **#12 confirmation** - real-run test of CMap offset-decode on a
+   known-shifted PDF; verify the fallback log line.
+2. **#50 completion** - port SD/SE and group/timepoint checks into
+   `_extract_anthropic` (source-quote scope done Session 17).
+3. **#23 regression fixtures** for Ang's bimodal value sets, keyed
+   on the v2.4.12 verbatim source quotes.
+4. **#22 surfacing** - consume `outcome_selected` /
+   `timepoint_selected` in the Stage 4 provenance summary.
+
+### Lesson recorded
+
+"Verify the artifact, not the summary" now has four documented
+instances (Sessions 8, 14, 15, 18) and should be promoted to a
+standing session-open protocol: before treating any Known Issue as
+work-to-do, read the current source of the affected file rather than
+the previous session's description. Session 18's regression test is
+a durable improvement Session 16 didn't ship, but the framing
+"widen the scan root and add to CI" was already false when Session 17
+wrote it.
+
+### Instructions to close Session 18
+
+    python scripts/check_no_bom.py
+    python -m pytest -m "not live" --tb=short -q
+    git add README.md Readme/HANDOFF.md
+    git commit -m "docs: mark #49 resolved; document Session 18"
+    git log --oneline -1
+    # then edit HANDOFF.md to replace <sha2> with that SHA
+    git add Readme/HANDOFF.md
+    git commit --amend --no-edit
+    git push
+
+Paste push output and CI conclusion to close Session 18.
+
+
+
 ## Session 17 - 2026-08-27 - v2.4.13
 
 **Status:** 7 commits pushed, CI green (pending final confirmation), Render green.
