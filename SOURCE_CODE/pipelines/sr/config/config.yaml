@@ -1,4 +1,4 @@
-﻿pipeline:
+pipeline:
   default_model:           claude-opus-4-7
   default_effect_measure:  OR
   screening_delay_sec:     1.0

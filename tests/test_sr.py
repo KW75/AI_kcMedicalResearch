@@ -1,4 +1,4 @@
-﻿"""Tests for the Systematic Review (sr) pipeline module - Standard Way: Tests define the specification."""
+"""Tests for the Systematic Review (sr) pipeline module - Standard Way: Tests define the specification."""
 
 import sys
 import json

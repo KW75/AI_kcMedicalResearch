@@ -1,4 +1,4 @@
-﻿"""
+"""
 test_live_providers.py  -  Live provider smoke test
 
 Run standalone:  python tests/test_live_providers.py

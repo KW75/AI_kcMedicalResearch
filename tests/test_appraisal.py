@@ -1,4 +1,4 @@
-﻿"""Tests for the appraisal pipeline module."""
+"""Tests for the appraisal pipeline module."""
 
 import sys
 from pathlib import Path

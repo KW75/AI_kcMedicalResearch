@@ -1,4 +1,4 @@
-﻿# PICO Framework
+# PICO Framework
 
 This document defines the PICO structure used to formulate clinical research
 questions for systematic review searches. It is injected into all three

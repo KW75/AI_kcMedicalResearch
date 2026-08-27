@@ -1,4 +1,4 @@
-﻿# Product Requirements Document
+# Product Requirements Document
 
 ## Project Name
 AI kcMedicalResearch - Multi-Mode AI Pipeline for Medical Research

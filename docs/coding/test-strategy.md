@@ -1,4 +1,4 @@
-﻿# Test Strategy
+# Test Strategy
 
 > Injected into the Tester AI prompt when --mode coding is active.
 

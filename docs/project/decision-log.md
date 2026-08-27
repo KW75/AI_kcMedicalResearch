@@ -1,4 +1,4 @@
-﻿# Decision Log
+# Decision Log
 
 Record of significant architectural and technical decisions.
 

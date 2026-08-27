@@ -1,4 +1,4 @@
-﻿"""Tests for the writing pipeline module - Standard Way: Tests define the specification."""
+"""Tests for the writing pipeline module - Standard Way: Tests define the specification."""
 
 import sys
 from pathlib import Path

@@ -1,4 +1,4 @@
-﻿# Database Search Guide
+# Database Search Guide
 
 This document is injected into the Searcher AI role only. It defines the
 databases to search, Boolean logic conventions, and syntax rules for each

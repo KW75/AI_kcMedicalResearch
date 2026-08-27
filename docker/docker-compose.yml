@@ -1,4 +1,4 @@
-﻿# docker/docker-compose.yml
+# docker/docker-compose.yml
 #
 # Single definition of how to run AI kcMedicalResearch in Docker.
 # Replaces docker_cli.bat, docker_menu.bat, mac_docker_cli.sh and

@@ -1,4 +1,4 @@
-﻿# Architecture
+# Architecture
 
 ## Overview
 AI kcMedicalResearch is a Python CLI/web application built around specialised

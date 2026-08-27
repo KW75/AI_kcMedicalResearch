@@ -1,27 +1,86 @@
-"""Fail if any Python source file starts with a UTF-8 BOM.
-
-Python tolerates a BOM on import, but ast.parse() rejects it, and combined
-with an encoding mismatch it renders as garbage characters in editors -
-which is how 23 files in this repo came to look like corrupted comments.
-
-PowerShell 5 `Set-Content -Encoding UTF8` writes a BOM. Use
-`-Encoding utf8NoBOM` (PS7) or [System.IO.File]::WriteAllText with
-UTF8Encoding($false).
+#!/usr/bin/env python3
 """
-import glob
+Fail if any tracked source file starts with a UTF-8 BOM.
+
+Scans from the repository root, ignoring directories that legitimately
+contain non-source content (VCS metadata, virtual environments, generated
+artifacts). See Known Issue #60.
+"""
+from __future__ import annotations
+
 import sys
+from pathlib import Path
 
-bad = []
-for path in glob.glob("SOURCE_CODE/**/*.py", recursive=True):
-    with open(path, "rb") as handle:
-        if handle.read(3) == b"\xef\xbb\xbf":
-            bad.append(path)
+REPO_ROOT = Path(__file__).resolve().parent.parent
 
-if bad:
-    print("UTF-8 BOM found in %d file(s):" % len(bad))
-    for path in bad:
-        print("   ", path)
-    print("\nStrip with scripts/strip_bom.py")
-    sys.exit(1)
+IGNORE_DIRS = {
+    ".git",
+    ".venv",
+    "venv",
+    "__pycache__",
+    ".pytest_cache",
+    ".mypy_cache",
+    ".ruff_cache",
+    "node_modules",
+    "output",
+    "reports",
+    "input",
+    ".idea",
+    ".vscode",
+    "htmlcov",
+    "dist",
+    "build",
+    ".egg-info",
+}
 
-print("No BOMs found.")
+CHECK_SUFFIXES = {
+    ".py", ".pyi",
+    ".md", ".txt", ".rst",
+    ".yml", ".yaml",
+    ".toml", ".ini", ".cfg",
+    ".json",
+    ".sh", ".bat", ".ps1", ".cmd",
+    ".html", ".css", ".js",
+}
+
+BOM = b"\xef\xbb\xbf"
+
+
+def is_ignored(path: Path) -> bool:
+    return any(part in IGNORE_DIRS for part in path.parts)
+
+
+def scan(root: Path) -> list[Path]:
+    offenders: list[Path] = []
+    for path in root.rglob("*"):
+        if not path.is_file():
+            continue
+        if is_ignored(path.relative_to(root)):
+            continue
+        if path.suffix.lower() not in CHECK_SUFFIXES:
+            continue
+        try:
+            with path.open("rb") as fh:
+                head = fh.read(3)
+        except OSError:
+            continue
+        if head == BOM:
+            offenders.append(path)
+    return offenders
+
+
+def main() -> int:
+    offenders = scan(REPO_ROOT)
+    if not offenders:
+        print(f"[check_no_bom] OK - no UTF-8 BOMs found under {REPO_ROOT}")
+        return 0
+    print(f"[check_no_bom] FAIL - {len(offenders)} file(s) start with a UTF-8 BOM:")
+    for path in offenders:
+        print(f"  {path.relative_to(REPO_ROOT)}")
+    print()
+    print("Fix with: python scripts/strip_bom.py")
+    return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

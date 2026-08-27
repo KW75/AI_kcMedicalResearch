@@ -1,4 +1,4 @@
-﻿# Validation Criteria
+# Validation Criteria
 
 This document is injected into the Validator AI role only. It defines the
 checklist used to confirm that the search strategy is complete and correctly

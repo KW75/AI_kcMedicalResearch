@@ -1,4 +1,4 @@
-﻿"""Tests for the search pipeline module."""
+"""Tests for the search pipeline module."""
 
 import sys
 from pathlib import Path

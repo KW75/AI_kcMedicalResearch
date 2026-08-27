@@ -1,4 +1,4 @@
-﻿# Coding Standards
+# Coding Standards
 
 > Injected into Builder, Reviewer, and Tester prompts when --mode coding is active.
 

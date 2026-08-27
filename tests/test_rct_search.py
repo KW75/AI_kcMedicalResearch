@@ -1,4 +1,4 @@
-﻿"""Tests for the RCT Search pipeline module - Standard Way: Tests define the specification."""
+"""Tests for the RCT Search pipeline module - Standard Way: Tests define the specification."""
 
 import sys
 import json
