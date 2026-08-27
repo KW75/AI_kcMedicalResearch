@@ -1064,6 +1064,25 @@ class DataExtractor:
                     f"{arm} source quote uses within-subject comparison "
                     f"phrasing ({self._WITHIN_SUBJECT_PHRASES.search(quote).group(0)!r}) "
                     f"- these values may not be a between-group comparison")
+            else:
+                # Tabular multi-timepoint pattern (#64): a quote like
+                # "CBT-P 7.58 (1.75) 7.35 (2.08) 7.21 (1.79)" carries three
+                # mean(SD) cells for the same arm - almost certainly three
+                # timepoints, even though no timepoint word appears. The
+                # extractor picks one cell; the reviewer needs to know a
+                # choice was made.
+                cells = re.findall(
+                    r"(?<![\w.])[-+]?\d+(?:\.\d+)?\s*\(\s*[-+]?\d+(?:\.\d+)?\s*\)",
+                    quote,
+                )
+                if len(cells) >= 3:
+                    warnings_found.append(
+                        f"{arm} source quote contains {len(cells)} mean(SD) "
+                        f"cells on one row - these are almost certainly "
+                        f"successive timepoints (e.g. baseline / post / "
+                        f"follow-up). Verify the extracted values come "
+                        f"from the intended timepoint (#64)")
+
 
             if source_text:
                 norm = lambda t: re.sub(r"\s+", " ", t).strip().lower()

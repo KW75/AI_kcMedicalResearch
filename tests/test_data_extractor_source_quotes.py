@@ -337,3 +337,25 @@ def test_integer_in_quote_matches_float_extraction():
     assert warning is None or "does not appear" not in warning, (
         f"False-positive on integer-in-quote / float-in-extraction: {warning}"
     )
+
+def test_tabular_multi_timepoint_row_is_flagged():
+    """Lami 2018 pattern (#64): a quote with 3+ mean(SD) cells on one row
+    should be flagged even without timepoint words present."""
+    from pipelines.sr.src.extraction.data_extractor import DataExtractor
+    result = {
+        "filename": "lami_test.pdf",
+        "primary_outcome": {
+            "mean_intervention": 7.35,
+            "sd_intervention": 2.08,
+            "mean_control": 7.40,
+            "sd_control": 1.29,
+            "source_quote_intervention": "CBT-P 7.58 (1.75) 7.35 (2.08) 7.21 (1.79)",
+            "source_quote_control": "UMC 7.16 (1.27) 7.40 (1.29) 7.20 (1.58)",
+        },
+    }
+    extractor = DataExtractor.__new__(DataExtractor)
+    extractor._flag_suspect_source_quotes(result)
+    warning = result.get("source_quote_warning") or ""
+    assert "mean(SD) cells" in warning, (
+        f"Expected tabular multi-timepoint flag, got: {warning!r}"
+    )
