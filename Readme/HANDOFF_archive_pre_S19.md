@@ -1,3 +1,75 @@
+# HANDOFF archive (Sessions 1-18)
+
+Historical record. The live handoff is `HANDOFF.md`; open issues are in
+`README.md`; closed issues are indexed in `RESOLVED_ISSUES.md`.
+
+## Issue-number mapping
+
+Sessions 1-16 in this file use an older issue numbering. Sessions 17-18
+(and everything outside this file) use the README numbering. When a
+session entry below cites `#NN`, look it up here first.
+
+| Old (Sessions 1-16) | README | Issue |
+|---------------------|--------|-------|
+| 1-3   | 1-3  | Same (Lami extraction; WeasyPrint; Anthropic geo-restriction) |
+| 4-8   | -    | Early cleanup items (deprecation warning, Streamlit config, dead code, SR import crash, SR output path) - resolved by Session 6, never carried into README |
+| 9     | 4    | Hardcoded `qwen3.7-plus` in `_DEFAULT_MODELS` |
+| 10    | 6    | Spurious `[ollama] Auto-detected` line |
+| 11    | -    | Stale launcher output path - resolved Session 7 |
+| 12    | 5    | SR vision regression (text-only Qwen default) |
+| 13    | 7    | Inner `sr/main.py` `--model` default |
+| 14    | 8    | Test referenced nonexistent prompts layout |
+| 15    | 9    | SD/SE disambiguation |
+| 16    | 10   | Within- vs between-group detection |
+| 17    | 11   | Extraction non-determinism |
+| 18    | 12   | CMap offset misdetected as garbled text |
+| 19    | -    | zsy234 disposition - excluded with PRISMA reason (Session 16); never in README |
+| 20    | 13   | Effect-size plausibility bound |
+| 21    | 14   | PICO discovery UI vs CLI |
+| 22    | 15   | RoB 2.0 ignores overrides |
+| 23    | 11   | Regression fixtures for the corpus - folded into #11 mitigation (Session 20) |
+| 24    | 16   | UI keys in `st.session_state` |
+| 25    | 17   | Module-scope Ollama probe |
+| 26    | 18   | SR heavy imports in every mode |
+| 27    | 28   | Docker end-to-end unverified |
+| 28    | 20   | API keys in `%TEMP%` `.bat` files |
+| 29    | 21   | Ollama fell back to cloud (confidentiality) |
+| 30    | 22   | UTF-8 BOMs in source |
+| 31    | 23   | Python 3.14 install failure |
+| 32    | 24   | OCR packages unusable |
+| 33    | -    | Broken Docker setup scripts - deleted Session 10 |
+| 34    | 25   | Transient-error substring match |
+| 35    | 26   | No Ollama-never-cloud test |
+| 36    | 49   | `check_no_bom.py` not in CI (merged with old #60) |
+| 37    | 27   | Launcher mechanism mismatch |
+| 38    | -    | Setup instructions lacked confidentiality warning - resolved Session 10 |
+| 39    | 19   | macOS launchers untested |
+| 40    | 30   | Ctrl+C traceback |
+| 41    | 31   | CJK terminal misalignment |
+| 42    | 32   | Wait notice |
+| 43    | 29   | Impossible `main(mode='sr')` test path |
+| 44    | 33   | Hardcoded Tesseract path |
+| 45    | 34   | `RoB2Assessor` default model |
+| 46    | 35   | Hardcoded arm names |
+| 47    | 36   | `write_results()` dropped columns |
+| 48    | 38   | Group-label check validated names not numbers |
+| 49    | 39   | No group-label follow-up test |
+| 50    | 40   | Screening OCR budget |
+| 51    | 41   | RoB2 OCR budget |
+| 52    | 42   | Launcher artifact paths |
+| 53    | 43   | Launcher banner hardcoded |
+| 54    | 44   | Empty `pico_*` columns |
+| 55    | 45   | No `run_id` |
+| 56    | 46   | Silent screening drop |
+| 57    | 47   | Literal `'null'` group label |
+| 60    | 49   | `check_no_bom.py` scan root (merged with old #36) |
+| 61    | 61 / 50 | Anthropic path tripwires - source-quote part is #61 (done), remainder is #50 (open) |
+| 62    | 62   | Integer-vs-float quote matching (closed not-reproducible, Session 21) |
+
+Old numbers 58-59 were never assigned.
+
+---
+
 ## Session 18 - 2026-08-27 - v2.4.13
 
 **Status:** 2 commits pushed, CI pending confirmation, Render unchanged.

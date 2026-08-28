@@ -1,0 +1,58 @@
+# Resolved Issues
+
+One line per issue, so numbers cited in commit messages stay resolvable.
+Full detail: `HANDOFF_archive_pre_S19.md` and `git log`. Do not reopen
+without reading the closing notes there.
+
+| #  | Issue | Resolved |
+|----|-------|----------|
+| 1  | Lami extraction failed (Table 4, pp. 12-13) | v2.4.6 - text fallback + `study_overrides.yaml`; instability tracked as #11 |
+| 4  | Hard-coded `qwen3.7-plus` overrode `QWEN_MODEL` | v2.4.5 |
+| 5  | SR launcher defaulted Qwen to text-only model | v2.4.5 - `QWEN_VISION_MODEL` |
+| 6  | Spurious `[ollama] Auto-detected` line on Qwen runs | v2.4.9 (via #17) |
+| 7  | Inner `sr/main.py` `--model` default hardcoded | v2.4.9 - verified None |
+| 8  | Test referenced nonexistent `prompts/coding/*.txt` layout | v2.4.9 |
+| 9  | No SD/SE disambiguation | MITIGATED v2.4.10/v2.4.12 - `sd_se_warning` + source-quote check. Manual check still required (`REVIEWER_GUIDE.md` 3.1). |
+| 10 | No within- vs between-group detection | MITIGATED v2.4.10/v2.4.13 - `group_timepoint_warning` + tabular multi-timepoint flag. Manual check still required (`REVIEWER_GUIDE.md` 2.2). |
+| 13 | No effect-size plausibility bound | v2.4.9 - `plausibility_flag`, flag only |
+| 14 | PICO file discovery differed UI vs CLI | v2.4.9 |
+| 16 | Streamlit UI kept API keys in `st.session_state` | v2.4.9 - per-session only; "Clear stored keys" button |
+| 17 | `providers.py` probed Ollama at import | v2.4.9 - lazy on first use |
+| 18 | SR heavy imports pulled in for every mode | v2.4.9 |
+| 20 | Pre-v2.4.7 launcher wrote API keys to `%TEMP%` `.bat` | Session 15 - keys rotated |
+| 21 | `--provider ollama` could fall back to a cloud provider | v2.4.8 - `LOCAL_ONLY_PROVIDERS` |
+| 22 | UTF-8 BOMs in 23 source files | v2.4.8 - stripped; `check_no_bom.py` guards |
+| 23 | Install failed on Python 3.14 | v2.4.8 - version gate |
+| 24 | OCR packages installed but unusable | v2.4.8 - `requirements-ocr.txt` |
+| 25 | Auth errors mentioning "connection" were retried | v2.4.9 - status-code check |
+| 26 | No test that Ollama never reaches cloud | v2.4.9 - `tests/test_provider_fallback.py` |
+| 27 | Windows/macOS launchers used different mechanisms | v2.4.8 - both venv |
+| 29 | Test exercised an impossible `main(mode='sr')` path | v2.4.12 - `run_cli(args)` |
+| 30 | Ctrl+C during startup raised raw traceback | v2.4.9 |
+| 31 | Provider-select box misaligned on CJK terminals | v2.4.9 |
+| 32 | No wait notice before slow provider call | v2.4.9 |
+| 33 | Hardcoded Windows Tesseract path | v2.4.10 |
+| 34 | `RoB2Assessor` default model not in registry | v2.4.10 |
+| 35 | Hardcoded arm names in group/timepoint inference | v2.4.10 |
+| 36 | `write_results()` silently dropped tripwire columns | v2.4.11 |
+| 37 | Local `.env` pointed at decommissioned DashScope endpoint | v2.4.11 - config, not code |
+| 38 | Group-label check validated names, not numbers | v2.4.12 - verbatim per-arm source quotes, `source_quote_warning` |
+| 39 | No test for group-label follow-up | v2.4.12 |
+| 40 | Screening OCR budget saturated at 6414 chars | v2.4.12 - shared 6000-char budget |
+| 41 | RoB2 OCR chunk cap | v2.4.12 |
+| 42 | Launcher printed artifact paths unconditionally | v2.4.12 |
+| 43 | Launcher banner hardcoded version/test count | v2.4.12 - parsed live |
+| 44 | `pico_*` columns empty in every `screening_log.csv` | v2.4.12 - SCHEMA CHANGE |
+| 45 | Audit CSVs carried no `run_id` | v2.4.12 |
+| 46 | Transient screening error silently dropped a paper | v2.4.12 - retries + `[SCREENING]` block |
+| 47 | Group-label follow-up returned literal `'null'` | v2.4.12 - `_clean_group_label()` |
+| 48 | runpy RuntimeWarning on every SR run | v2.4.12 - lazy PEP 562 re-export |
+| 49 | `check_no_bom.py` scanned only `SOURCE_CODE/` | Session 16/18 - repo-wide, in CI, tested |
+| 51 | `outcome_selected` / `timepoint_selected` not recorded or surfaced | v2.4.13 - recorded (Session 17), surfaced in Stage 4 `[OUTCOME/TIMEPOINT]` block (Session 19) |
+| 52 | Tabular multi-timepoint rows escaped the source-quote check | v2.4.13 |
+| 61 | Anthropic path bypassed source-quote check | v2.4.13 - ported; SD/SE + group/timepoint remain as #50 |
+| 62 | Suspected `49.0` vs `49` quote-matching bug | Session 21 - not reproducible; `_number_in_text` already tries the integer form. Pinned by test. |
+
+Regression fixtures for Ang's non-deterministic value sets
+(`tests/test_extraction_regression_fixtures.py`, Session 20) are part of
+#11 mitigation, not a separate issue.
