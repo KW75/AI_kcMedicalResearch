@@ -26,6 +26,27 @@ from .src.utils.audit_logger import (
     write_screens, write_extracts, write_rob2, write_results
 )
 
+def resolve_model(provider: str, model):
+    """CLI > provider's configured default. Fail loudly if neither exists.
+
+    The --model help text has always promised the provider default, but the
+    CLI passed args.model (None) straight through to every stage, so Qwen
+    rejected the very first call with "you must provide a model parameter"
+    (Session 24, #65). The Streamlit UI resolves via get_default_model; the
+    CLI now does the same so both entry points agree.
+    """
+    if model:
+        return model
+    from providers import get_default_model
+    default = get_default_model(provider)
+    if not default or default.startswith("("):
+        raise SystemExit(
+            f"--model not given and no default model is configured for "
+            f"provider {provider!r}. Set {provider.upper()}_MODEL in .env "
+            f"or pass --model.")
+    return default
+
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s -- %(message)s")
@@ -99,6 +120,8 @@ def main():
                     help="Override run timestamp (e.g. for re-runs)")
 
     args = ap.parse_args()
+    args.model = resolve_model(args.provider, args.model)
+    logger.info(f"Provider {args.provider} / model {args.model}")
 
     cfg = load_config(args.config)
 
