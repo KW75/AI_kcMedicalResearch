@@ -15,7 +15,7 @@ Health:     https://ai-kcmedicalresearch.onrender.com/_stcore/health
 | Component      | Status |
 |----------------|--------|
 | Tests          | 503 passed, 3 skipped, 11 deselected (`python -m pytest -m "not live" --tb=short -q`) |
-| CI             | green (25efcd9) |
+| CI             | green (5d286d2) |
 | Render deploy  | green (no code change since Session 21) |
 | SR pipeline    | working; extraction is non-deterministic (#11), verify every number |
 | Providers      | DeepSeek (default) / Qwen (SR) / OpenAI / Anthropic / Groq / Ollama (local, never falls back) |
