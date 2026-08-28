@@ -1,7 +1,7 @@
 # HANDOFF
 
 Single source of truth for the next session. Read this, then work.
-Session-by-session history (1-21) is in `Readme/HANDOFF_archive_pre_S19.md`
+Session-by-session history (1-22) is in `Readme/HANDOFF_archive_pre_S19.md`
 and git log; consult it only before reopening a closed issue.
 
 Repository: https://github.com/KW75/AI_kcMedicalResearch
@@ -10,18 +10,17 @@ Health:     https://ai-kcmedicalresearch.onrender.com/_stcore/health
 
 ---
 
-## Current State (Session 21, v2.4.13, 2026-08-28)
+## Current State (Session 22, v2.4.13, 2026-08-28)
 
 | Component      | Status |
 |----------------|--------|
-| Tests          | 486 passed, 3 skipped, 11 deselected (`python -m pytest -m "not live" --tb=short -q`) |
-| CI             | green (8193231) |
-| Render deploy  | green |
+| Tests          | 501 passed, 3 skipped, 11 deselected (`python -m pytest -m "not live" --tb=short -q`) |
+| CI             | green on push expected (Session 22 was tests-only, no production code changed) |
+| Render deploy  | green (no code change since Session 21) |
 | SR pipeline    | working; extraction is non-deterministic (#11), verify every number |
 | Providers      | DeepSeek (default) / Qwen (SR) / OpenAI / Anthropic / Groq / Ollama (local, never falls back) |
 
-Issue numbers below match `README.md` > Known Issues. That is the only
-numbering scheme in use; older archive entries used a different one.
+Issue numbers below match `README.md` > Known Issues.
 
 ---
 
@@ -29,33 +28,58 @@ numbering scheme in use; older archive entries used a different one.
 
 | #  | Issue | Priority | What to do |
 |----|-------|----------|------------|
-| 11 | Extraction non-determinism (Ang, Jensen, Lami) | High | Ang pinned by fixtures (Session 20). Jensen and Lami fixtures still to write - see Priorities 1-2. |
+| 11 | Extraction non-determinism (Ang, Jensen, Lami) | High | All three pinned by regression fixtures (Sessions 20-22). Underlying non-determinism unaddressed; mitigation is still run 3x and diff, verify against source quotes. See Session 23 priority 3 for reduction options. |
 | 12 | CMap offset-decode (v2.4.13) needs real-run confirmation | High | Hardware-required. Run McCrae or Jensen, grep fallback log for `decoded with offset`. |
 | 28 | Docker route never executed end to end | High | Hardware-blocked (no Docker on dev machine). |
 | 19 | macOS launchers untested on macOS | Medium | Hardware-blocked. |
-| 50 | Anthropic SR path skips SD/SE and group/timepoint tripwires | Medium | Decide: port a text pass, or document the gap in `REVIEWER_GUIDE.md` and close. Recommend the latter. |
+| 50 | Anthropic SR path skips SD/SE and group/timepoint tripwires | Medium | Decide: port a text pass, or document the gap in `REVIEWER_GUIDE.md` and close. Recommend the latter (see Session 23 priority 2). |
 | 2  | WeasyPrint not installed; PDF report falls back to HTML | Medium | |
 | 15 | RoB 2.0 ignores `study_overrides.yaml` | Low | |
 | 3  | Anthropic geo-restricted from dev machine | Low | VPN or skip. |
 
 ---
 
-## Next Session Priorities (Session 22)
+## Session 22 Summary
 
-1. **Lami fixture (#11).** Add `test_lami_*` to
-   `tests/test_extraction_regression_fixtures.py`. Reviewer-verified:
-   n=28/36, m=7.35/7.4, sd=2.08/1.29; `text_fallback` path with a
-   `study_overrides.yaml` entry. Straightforward.
+Tests-only session. No production code changed.
 
-2. **Jensen fixture (#11).** Reviewer-verified: n=25/18, sd=19.0/26.0,
-   means 49.0-49.1 / 59.0-59.2 across runs. Pin n and sd strictly; pin
-   means loosely or as per-run value sets (as Ang does). Note the
-   `49.0`-vs-`49` quote-matching concern was checked in Session 21 and is
-   NOT a bug: `_number_in_text` already tries an integer candidate.
+- Added Lami fixtures to `tests/test_extraction_regression_fixtures.py`
+  (2 tests): text_fallback path passes cleanly; Ns-drift signature
+  (correct means/SDs, missing source quotes) is caught by the
+  missing-quote branch. The latter is what keeps the override
+  mechanism's `confirmed` log entry a real cross-check.
+- Added Jensen fixtures (13 tests): 6 quote-check parametrizations
+  over {49.0, 49.1} x {59.0, 59.1, 59.2}, 6 arm-order parametrizations
+  (mean_i < mean_c, no outcome-direction assumption), and 1 pin of
+  `_number_in_text`'s integer-fallback branch (the Session 21
+  "49.0 vs '49'" investigation, now executable).
+- 486 -> 501 tests. `scripts/check_no_bom.py` clean.
 
-3. **#12 real-run confirmation** (needs a working provider key).
+---
 
-4. **#50 scope decision** - see table above.
+## Next Session Priorities (Session 23)
+
+1. **#12 real-run confirmation.** Run McCrae or Jensen with a working
+   provider key; grep the fallback log for `decoded with offset`.
+   Hardware/key-dependent.
+
+2. **#50 scope decision.** Recommend documenting the tripwire-coverage
+   gap in `REVIEWER_GUIDE.md` and closing #50. Porting a text pass to
+   the Anthropic path costs more than it protects while #3 (Anthropic
+   geo-restricted from dev machine) is open.
+
+3. **#11 mitigation, if worth the effort.** The fixtures pin known
+   failure signatures; they do not reduce the rate. Options, cheapest
+   first:
+   - Set `temperature=0` and a fixed `seed` on the Qwen vision call.
+     Cheap; vision models often ignore seed, so may or may not help.
+   - Run extraction N=3 internally per PDF; surface the row only if
+     all three agree on n, mean (1dp), and sd (1dp), else write
+     `nondet_flag`. Turns the manual "run 3x and diff" step into
+     machine-enforced coverage. Expensive per PDF.
+   - Skip both if reviewer time on the manual step is not the
+     bottleneck - the tripwires + overrides + manual verification
+     already close the correctness loop.
 
 ---
 
@@ -100,6 +124,13 @@ numbering scheme in use; older archive entries used a different one.
   not a specific number** - unless that number is itself the
   reviewer-verified artifact.
 
+- **A regression fixture pins a known failure signature, not the failure
+  rate.** Do not conflate "the shape is pinned" with "the paper extracts
+  reliably". Lami and Jensen still need the run-3x-and-diff reviewer
+  step; the fixtures only guarantee that a known good shape won't be
+  falsely rejected and a known bad shape will still be caught. #11's
+  underlying non-determinism is unchanged.
+
 ---
 
-Handoff prepared: 2026-08-28, Session 21.
+Handoff prepared: 2026-08-28, Session 22.
