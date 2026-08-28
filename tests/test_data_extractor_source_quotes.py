@@ -359,3 +359,48 @@ def test_tabular_multi_timepoint_row_is_flagged():
     assert "mean(SD) cells" in warning, (
         f"Expected tabular multi-timepoint flag, got: {warning!r}"
     )
+
+def test_source_quote_check_tolerates_extracted_float_vs_integer_quote(extractor):
+    """Mirror of test_source_quote_check_tolerates_trailing_zero_formatting.
+
+    The extractor writes numeric fields as Python floats, so an integer
+    value read from a paper table is serialised as e.g. '49.0'. The
+    verbatim source quote, copied from the paper, will typically read
+    '49'. The tripwire must not flag this as a number-not-in-quote
+    mismatch: the underlying value is identical.
+
+    _number_in_text handles this by deriving an int-fallback candidate
+    ('49') whenever value == int(value), in addition to the raw string
+    form ('49.0'). Removing either candidate silently breaks a whole
+    class of clean extractions - every integer-valued mean or SD read
+    from a table would start emitting a false-positive warning.
+
+    Companion coverage:
+      - test_source_quote_check_tolerates_trailing_zero_formatting
+          pins the opposite direction: extracted '7.4' vs quote '7.40'.
+      - test_source_quote_check_flags_number_not_in_quote
+          pins the genuine mismatch case: extracted 49.0 vs quote '49.1'.
+
+    Real-run grounding: Jensen 2012 in post-#48 run 20260826_113816
+    recorded mean_intervention=49.0 with quote 'Posttreat CBT: 49 ± 19'
+    and must extract cleanly on the number-matching axis.
+    """
+    result = {
+        "primary_outcome": {
+            "mean_intervention": 49.0, "sd_intervention": 19.0,
+            "mean_control": 59.0, "sd_control": 26.0,
+            "source_quote_intervention": "Posttreat CBT: 49 ± 19",
+            "source_quote_control": "Posttreat UC: 59 ± 26",
+        },
+        "extraction_method": "vision_smart",
+        "filename": "jensen_2012.pdf",
+    }
+    extractor._flag_suspect_source_quotes(result)
+    assert result["source_quote_warning"] is None, (
+        f"expected clean run - int-fallback candidate should match "
+        f"integer-formatted quote; actual warning: "
+        f"{result['source_quote_warning']!r}"
+    )
+
+
+
