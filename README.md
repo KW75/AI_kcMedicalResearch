@@ -255,7 +255,6 @@ them; gaps are closed issues. Closed issues: `Readme/RESOLVED_ISSUES.md`.
 | 12 | CMap offset-decode fallback landed v2.4.13; not yet confirmed on a real shifted PDF. | High |
 | 28 | Docker route never executed end to end (no Docker on dev machine). | High |
 | 19 | macOS launchers untested on macOS. | Medium |
-| 50 | Anthropic SR path (`_extract_anthropic`) runs the source-quote check but not SD/SE or group/timepoint flags. That path receives structured JSON with no raw text to scan. | Medium |
 | 2  | WeasyPrint not installed; PDF report falls back to HTML. | Medium |
 | 15 | RoB 2.0 runs independently of `study_overrides.yaml` and may assess OCR text for a hand-entered study. | Low |
 | 3  | Anthropic API geo-restricted from the dev machine. | Low |

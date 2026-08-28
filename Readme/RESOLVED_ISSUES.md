@@ -48,6 +48,7 @@ without reading the closing notes there.
 | 47 | Group-label follow-up returned literal `'null'` | v2.4.12 - `_clean_group_label()` |
 | 48 | runpy RuntimeWarning on every SR run | v2.4.12 - lazy PEP 562 re-export |
 | 49 | `check_no_bom.py` scanned only `SOURCE_CODE/` | Session 16/18 - repo-wide, in CI, tested |
+| 50 | Anthropic SR path skips SD/SE text-line tripwire | Session 23 - documented as permanent limitation in REVIEWER_GUIDE.md §6. The Anthropic path receives structured JSON with no raw text to scan; the text-line SD/SE check requires raw text and cannot run there. The source-quote SE-marker branch (§2.2 item 3) still runs on Anthropic and catches most of what would have fired. Group/timepoint check runs on Anthropic via _coerce_extraction_result (previously misdescribed in the handoff as also skipped — the source has always run it since #38/v2.4.12). Not a bug; documented and closed. |
 | 51 | `outcome_selected` / `timepoint_selected` not recorded or surfaced | v2.4.13 - recorded (Session 17), surfaced in Stage 4 `[OUTCOME/TIMEPOINT]` block (Session 19) |
 | 52 | Tabular multi-timepoint rows escaped the source-quote check | v2.4.13 |
 | 61 | Anthropic path bypassed source-quote check | v2.4.13 - ported; SD/SE + group/timepoint remain as #50 |

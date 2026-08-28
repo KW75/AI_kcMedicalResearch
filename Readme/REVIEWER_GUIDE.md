@@ -82,33 +82,63 @@ literature. **Nothing in the pipeline flagged this** in the run that produced
 the extract above. It was found only by decoding the PDF text layer and
 reading the results section.
 
-**What v2.4.12 changes (partial mitigation).** The extractor now emits
-`source_quote_intervention` and `source_quote_control` fields alongside each
-numeric extraction, plus a `source_quote_warning` column that fires on four
-patterns:
+**What v2.4.12–v2.4.13 change (partial mitigation).** The extractor now
+emits `source_quote_intervention` and `source_quote_control` fields
+alongside each numeric extraction, plus a `source_quote_warning` column
+that fires on the following patterns. Each is checked per arm:
 
-1. The label `SE` or `SEM` appears in a quote used for an SD field.
-2. The quote mentions two or more distinct timepoints, or contains
-   within-subject phrases (`regardless of condition`, `main effect of time`,
-   `pre-post`, `baseline to`, etc.).
-3. The extracted number does not appear in its own quote, under a
-   character-level string match. The match is not fully format-tolerant —
-   an integer extracted as `49.0` will not match a quote reading `49 ± 19`,
-   even though the underlying value is the same (see §6). Treat this
-   specific shape as a review prompt, not evidence of a wrong number.
-4. The quote is missing entirely.
+1. **Missing quote.** The mean or SD was reported but no source quote
+   was provided. A confidently-extracted number with no supporting
+   quote cannot be audited.
+2. **Number not in own quote.** The extracted mean or SD does not
+   appear in its own quote, under a string match with an
+   integer-fallback branch (`49.0` in an extraction matches `49` in a
+   quote). The match is not fully format-tolerant — decimal separator
+   differences, unicode-vs-ASCII minus signs, and thousands separators
+   can still miss. Treat a mismatch as a review prompt, not conclusive
+   evidence of a wrong number.
+3. **SE label in an SD quote.** The label `SE`, `SEM`, or `standard
+   error` appears in a quote used for an SD field. This is the branch
+   that catches most of the McCrae signature on provider paths that
+   don't run the separate text-line SD/SE tripwire (see §6).
+4. **Timepoint confusion in the quote.** One of three mutually
+   exclusive checks fires, in this priority order:
+   - The quote mentions two or more distinct timepoints
+     (baseline / post-treatment / follow-up / week N / T1–T3 / etc.);
+   - Otherwise, the quote contains within-subject phrasing
+     (`regardless of condition`, `main effect of time`, `pre-post`,
+     `baseline to`, `compared to baseline`, etc.);
+   - Otherwise, the quote contains three or more `mean (SD)` cells on
+     one row — the tabular-multi-timepoint pattern (issue #64). A row
+     like `CBT-P 7.58 (1.75) 7.35 (2.08) 7.21 (1.79)` almost always
+     carries three timepoints even when no timepoint word is present.
+     The extractor picks one cell; the reviewer needs to know a
+     choice was made.
 
-On `zsy234.pdf` the flag now fires four times per re-extraction — SE-as-SD
-on both arms plus multi-timepoint on both arms — making that specific
-failure loud rather than silent.
+   Only one of these three sub-checks fires per arm; the code is
+   written so that catching the same problem twice does not inflate
+   the warning count.
+5. **Verbatim mismatch against the source text.** The extracted quote
+   could not be found verbatim (after whitespace and case
+   normalisation) in the raw source text the extractor was working
+   from. This branch only runs on paths that HAVE raw source text —
+   the qwen text-fallback path does, the pure-vision paths do not,
+   and the Anthropic path does not (see §6). A missing branch-5
+   result is not evidence of a match; it is evidence that the check
+   could not run.
+
+On `zsy234.pdf` the flag now fires four times per re-extraction —
+branch 3 (SE label in an SD quote) on both arms, plus the
+multi-timepoint sub-check of branch 4 on both arms — making that
+specific failure loud rather than silent.
 
 **This does not remove the reviewer's responsibility.** The check is a
 tripwire on the extractor's own quote, not a semantic verification against
 the paper. If the extractor produces a clean quote from a hallucinated
 passage, or misattributes a real quote from a different section, the flag
 will not fire. `source_quote_warning = None` is not evidence of correctness;
-it is evidence that the four specific patterns above did not trip. Item 3.1
-remains mandatory.
+it is evidence that the patterns above did not trip. Item 3.1 remains
+mandatory.
 
 **Disposition for this corpus (v2.4.12, run 20260826_113816).** All four
 `source_quote_warning` flags fired on `zsy234.pdf` as documented above, plus
@@ -343,10 +373,10 @@ and RoB 2.0 assessment re-read the PDF independently and are unaffected.
 | Outcome tables may be embedded images | Values cannot be cross-checked against the text layer | Manual verification is the only check |
 | Author/year heuristics fail on unusual name formats | Wrong study labels | Flagged as `pdf_auto (verify)`; override as needed |
 | No semantic SD/SE disambiguation | Silent 8× error in dispersion (see §2.2) | v2.4.12 `source_quote_warning` flags SE/SEM label in an SD quote; manual check (item 3.1) still required |
-| SD/SE label check does not run on the Anthropic provider path | An Anthropic-path extraction that misreads SE as SD will not be flagged by the SE-label tripwire, though the source-quote and group/timepoint checks still run | Reviewer verification (item 3.1) is the only safeguard on Anthropic-path runs; prefer qwen for corpora where SE/SD confusion is likely |
+| Text-line SD/SE tripwire (`sd_se_warning`) does not run on the Anthropic provider path | The Anthropic path receives structured JSON from Claude's Files API and never sees raw PDF text, so the tripwire that scans source lines for an SE label adjacent to an SD value cannot run. The source-quote SE-marker branch (§2.2 branch 3) DOES run on Anthropic and catches every case where Claude quotes the SE label alongside the value; the uncovered case is where Claude reports an SE value as an SD without including the SE label in its quote. `group_timepoint_warning` also runs on Anthropic (via `_coerce_extraction_result`). The verbatim-source-text branch (§2.2 branch 5) does not run on Anthropic either, for the same reason. Tracked as closed issue #50 — this is a documented permanent limitation, not a bug. | Reviewer verification (item 3.1) is the safeguard on Anthropic-path runs regardless. Prefer qwen for corpora where SE/SD confusion is likely, since qwen's text-fallback branch adds a second layer of SE detection. |
 | No semantic within- vs between-group detection | Silent invalid effect size (see §2.2) | v2.4.12 `source_quote_warning` flags multi-timepoint and within-subject phrasing in a quote; manual check (item 3.1) still required |
-| Extractor quote check is a tripwire, not a verifier | A clean quote from a hallucinated or misattributed passage will not flag; only four specific patterns are detected | `source_quote_warning = None` means "four patterns did not trip", not "correct". Item 3.1 remains mandatory |
-| Quote-check number matching is character-level, not numeric | An integer extracted as `49.0` does not match a quote reading `49 ± 19`; the warning fires even though the underlying value is the same | Treat this specific shape (extracted value ends `.0`, quote has the same digits without the decimal) as a review prompt, not evidence of a wrong number. Verify the digits match in the source table and move on |
+| Extractor quote check is a tripwire, not a verifier | A clean quote from a hallucinated or misattributed passage will not flag; only the specific patterns in §2.2 are detected | `source_quote_warning = None` means "the checked patterns did not trip", not "correct". Item 3.1 remains mandatory |
+| Quote-check number matching is character-level, not numeric | Under an integer-fallback branch, `49.0` in an extraction matches `49` in a quote; decimal separator differences, unicode-vs-ASCII minus signs, and thousands separators can still miss | Treat a mismatch as a review prompt, not evidence of a wrong number. Verify the digits match in the source table and move on |
 | Retry, OCR-budget, and quote-check behaviour verified on the `qwen` provider path only | Anthropic provider path may fail or silently succeed differently under the same conditions | Reviewer verification required on any run whose provider is Anthropic; do not assume qwen-path test coverage transfers |
 | RoB 2.0 runs independently of overrides | RoB assessment may use OCR text of a study whose data was hand-entered | Review RoB judgements separately |
 
