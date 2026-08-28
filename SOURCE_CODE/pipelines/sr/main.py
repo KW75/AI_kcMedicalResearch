@@ -94,12 +94,199 @@ def _check_plausibility(effect_measure: str, est: float, author_label: str) -> s
     logger.warning(f"[PLAUSIBILITY] {msg}")
     return msg
 
+# Fields whose presence in a meta_audit row means the extractor produced
+# usable per-arm data for that study. Used to compute n_extracted, the
+# uniform denominator for the four Stage-4 tripwire summary lines and the
+# [OUTCOME/TIMEPOINT] provenance block (#66).
+#
+# Rationale: on an all-empty-extraction run, len(meta_audit) is still >0
+# (every included paper produces a row, even when every field is None),
+# so the pre-#66 lines printed "0 of 1 studies flagged - every extracted
+# value was bound to a verbatim source quote" while nothing had actually
+# been extracted. "0 of 0" is the honest denominator; anything else lets
+# a silent-empty run look like a clean run.
+_EXTRACTED_VALUE_FIELDS = (
+    "mean_intervention", "sd_intervention",
+    "mean_control",      "sd_control",
+    "n_intervention",    "n_control",
+    "hedges_g",
+)
+_EXTRACTION_WARNING_FIELDS = (
+    "sd_se_warning",
+    "group_timepoint_warning",
+    "source_quote_warning",
+)
+
+
+def _row_has_extracted_value(row: dict) -> bool:
+    """True if a meta_audit row shows the extractor produced anything the
+    tripwires could meaningfully check. See #66."""
+    if any(row.get(k) is not None for k in _EXTRACTED_VALUE_FIELDS):
+        return True
+    # A warning implies the extractor saw a value and flagged it; count
+    # it as "extracted" so a flagged-but-otherwise-empty study still
+    # appears in the denominator.
+    if any(row.get(k) for k in _EXTRACTION_WARNING_FIELDS):
+        return True
+    return False
+
+
+def _log_stage4_summary(meta_audit: list[dict],
+                        er: list[dict],
+                        effect_measure: str) -> None:
+    """Emit the four tripwire summary lines and the [OUTCOME/TIMEPOINT]
+    provenance block. Extracted from main() for #66 so a zero-extraction
+    run prints '0 of 0' (not '0 of N') and does not assert positives.
+
+    Every branch always emits a line for its label (per the 'always set
+    the key; print the zero' rule); the denominator now says whether the
+    zero means 'checked and clean' or 'nothing was there to check'.
+    """
+    n_extracted = sum(1 for r in meta_audit if _row_has_extracted_value(r))
+
+    # --- [PLAUSIBILITY] --------------------------------------------------
+    _bound = PLAUSIBILITY_BOUNDS.get(effect_measure)
+    flagged = [r for r in meta_audit if r.get("plausibility_flag")]
+    if flagged:
+        logger.warning(
+            f"[PLAUSIBILITY] {len(flagged)} of {n_extracted} extracted "
+            f"studies exceeded the effect-size plausibility bound and "
+            f"need manual verification before this pooled estimate is "
+            f"trusted:")
+        for r in flagged:
+            logger.warning(
+                f"  - {r.get('first_author','?')} ({r.get('year','')}): "
+                f"{r.get('plausibility_flag')}")
+    elif _bound is None:
+        logger.info(
+            f"[PLAUSIBILITY] no bound defined for {effect_measure} "
+            f"(scale-dependent) - check skipped.")
+    else:
+        logger.info(
+            f"[PLAUSIBILITY] 0 flagged of {n_extracted} extracted "
+            f"studies (bound={_bound}).")
+
+    # --- [SD/SE CHECK] ---------------------------------------------------
+    # Keeps its own partial denominator (_n_checkable), because the check
+    # only runs on the text-fallback path (Known Issue #9); a vision-path
+    # study is not "clean", it is "not checkable". Guard against
+    # _n_checkable=0 so the "0 of 0" case doesn't assert positives.
+    se_flagged = [r for r in meta_audit if r.get("sd_se_warning")]
+    _n_checkable = sum(
+        1 for r in er
+        if isinstance(r, dict)
+        and str(r.get("extraction_method") or "").startswith("text"))
+    if se_flagged:
+        logger.warning(
+            f"[SD/SE CHECK] {len(se_flagged)} of {n_extracted} extracted "
+            f"studies had a value extracted into an SD field from a "
+            f"source line also containing 'SE'/'SEM'/'standard error' - "
+            f"verify these are genuine SDs, not standard errors, before "
+            f"trusting this pooled estimate (see REVIEWER_GUIDE.md 3.1):")
+        for r in se_flagged:
+            logger.warning(
+                f"  - {r.get('first_author','?')} ({r.get('year','')}): "
+                f"{r.get('sd_se_warning')}")
+    else:
+        logger.info(
+            f"[SD/SE CHECK] 0 flagged of {_n_checkable} checkable "
+            f"studies ({n_extracted - _n_checkable} vision-path studies "
+            f"NOT checkable - the check needs literal source text; "
+            f"Known Issue #9). Manual verification still required.")
+
+    # --- [GROUP/TIMEPOINT CHECK] -----------------------------------------
+    group_flagged = [r for r in meta_audit if r.get("group_timepoint_warning")]
+    if group_flagged:
+        logger.warning(
+            f"[GROUP/TIMEPOINT CHECK] {len(group_flagged)} of "
+            f"{n_extracted} extracted studies had a group label that "
+            f"looks like a timepoint, or identical intervention/control "
+            f"labels - possible within- vs between-group confusion. "
+            f"Verify against the source PDF before trusting this pooled "
+            f"estimate (see REVIEWER_GUIDE.md 2.2):")
+        for r in group_flagged:
+            logger.warning(
+                f"  - {r.get('first_author','?')} ({r.get('year','')}): "
+                f"{r.get('group_timepoint_warning')}")
+    else:
+        logger.info(
+            f"[GROUP/TIMEPOINT CHECK] 0 flagged of {n_extracted} "
+            f"extracted studies. NOTE: this check validates group "
+            f"LABELS only, not whether the extracted numbers come from "
+            f"a between-group comparison - that is the SOURCE QUOTE "
+            f"check's job (Known Issue #48/#38). Manual verification "
+            f"still required.")
+
+    # --- [SOURCE QUOTE CHECK] --------------------------------------------
+    quote_flagged = [r for r in meta_audit if r.get("source_quote_warning")]
+    if quote_flagged:
+        logger.warning(
+            f"[SOURCE QUOTE CHECK] {len(quote_flagged)} of {n_extracted} "
+            f"extracted studies had extracted values that could not be "
+            f"bound to a clean verbatim source quote (missing quote, "
+            f"number absent from its quote, SE-labelled quote for an "
+            f"SD, or within-subject timepoint language in the quote) - "
+            f"verify each against the source PDF before trusting this "
+            f"pooled estimate (Known Issue #48):")
+        for r in quote_flagged:
+            logger.warning(
+                f"  - {r.get('first_author','?')} ({r.get('year','')}): "
+                f"{r.get('source_quote_warning')}")
+    elif n_extracted == 0:
+        logger.info(
+            f"[SOURCE QUOTE CHECK] 0 flagged of 0 extracted studies "
+            f"(nothing to check). Manual verification still required.")
+    else:
+        logger.info(
+            f"[SOURCE QUOTE CHECK] 0 flagged of {n_extracted} extracted "
+            f"studies - every extracted value was bound to a verbatim "
+            f"source quote with no SE labels or within-subject "
+            f"timepoint language. Manual verification still required.")
+
+    # --- [OUTCOME/TIMEPOINT] provenance ----------------------------------
+    # Skip rows where the extractor produced nothing AND has no author
+    # label - those emit the ugly "? ():" line called out in #66.
+    _op_rows = []
+    for r in er:
+        if not isinstance(r, dict):
+            continue
+        m_ = r.get("study_metadata", {}) or {}
+        po_ = r.get("primary_outcome", {}) or {}
+        author = m_.get("first_author")
+        year = m_.get("year")
+        outcome_sel = po_.get("outcome_selected")
+        timepoint_sel = po_.get("timepoint_selected")
+        # Drop fully-empty rows: no author, no year, no selection. Emitting
+        # "? (): outcome=(not recorded) | timepoint=(not recorded)" told
+        # the reviewer nothing and looked like a bug.
+        if not any([author, year, outcome_sel, timepoint_sel]):
+            continue
+        _op_rows.append({
+            "author": author or "?",
+            "year": year or "",
+            "filename": r.get("filename", "?"),
+            "outcome_selected": outcome_sel,
+            "timepoint_selected": timepoint_sel,
+        })
+    _op_recorded = sum(
+        1 for x in _op_rows
+        if x["outcome_selected"] is not None or x["timepoint_selected"] is not None)
+    logger.info(
+        f"[OUTCOME/TIMEPOINT] {_op_recorded} of {len(_op_rows)} studies "
+        f"recorded outcome_selected and/or timepoint_selected. These "
+        f"fields document WHICH outcome and WHICH timepoint each run "
+        f"drew from - a run whose numbers change between executions "
+        f"(#11) will show the change here without opening the CSV.")
+    for x in _op_rows:
+        logger.info(
+            f"[OUTCOME/TIMEPOINT]   {x['author']} ({x['year']}): "
+            f"outcome={x['outcome_selected'] if x['outcome_selected'] is not None else '(not recorded)'} "
+            f"| timepoint={x['timepoint_selected'] if x['timepoint_selected'] is not None else '(not recorded)'}")
 
 def load_config(p=None):
     path = Path(p) if p else SR_DIR / "config" / "prisma_criteria.yaml"
     with open(path, encoding="utf-8-sig") as f:
         return yaml.safe_load(f)
-
 
 def main():
     ap = argparse.ArgumentParser(
@@ -423,88 +610,7 @@ def main():
 
     write_results(layout.results_csv, meta_audit)
 
-    _bound = PLAUSIBILITY_BOUNDS.get(args.effect_measure)
-    flagged = [r for r in meta_audit if r.get("plausibility_flag")]
-    if flagged:
-        logger.warning(
-            f"[PLAUSIBILITY] {len(flagged)} of {len(meta_audit)} studies "
-            f"exceeded the effect-size plausibility bound and need manual "
-            f"verification before this pooled estimate is trusted:")
-        for r in flagged:
-            logger.warning(f"  - {r.get('first_author','?')} ({r.get('year','')}): "
-                            f"{r.get('plausibility_flag')}")
-    elif _bound is None:
-        logger.info(
-            f"[PLAUSIBILITY] no bound defined for "
-            f"{args.effect_measure} (scale-dependent) - check skipped.")
-    else:
-        logger.info(
-            f"[PLAUSIBILITY] 0 of {len(meta_audit)} studies exceeded "
-            f"the effect-size plausibility bound ({_bound}).")
-
-    se_flagged = [r for r in meta_audit if r.get("sd_se_warning")]
-    if se_flagged:
-        logger.warning(
-            f"[SD/SE CHECK] {len(se_flagged)} of {len(meta_audit)} studies "
-            f"had a value extracted into an SD field from a source line "
-            f"also containing 'SE'/'SEM'/'standard error' - verify these "
-            f"are genuine SDs, not standard errors, before trusting this "
-            f"pooled estimate (see REVIEWER_GUIDE.md 3.1):")
-        for r in se_flagged:
-            logger.warning(f"  - {r.get('first_author','?')} ({r.get('year','')}): "
-                            f"{r.get('sd_se_warning')}")
-    else:
-        _n_checkable = sum(
-            1 for r in er
-            if isinstance(r, dict)
-            and str(r.get("extraction_method") or "").startswith("text"))
-        logger.info(
-            f"[SD/SE CHECK] 0 of {_n_checkable} checkable studies "
-            f"flagged ({len(meta_audit) - _n_checkable} vision-path "
-            f"studies NOT checkable - the check needs literal source "
-            f"text; Known Issue #9). Manual verification still "
-            f"required.")
-
-    group_flagged = [r for r in meta_audit if r.get("group_timepoint_warning")]
-    if group_flagged:
-        logger.warning(
-            f"[GROUP/TIMEPOINT CHECK] {len(group_flagged)} of {len(meta_audit)} "
-            f"studies had a group label that looks like a timepoint, or "
-            f"identical intervention/control labels - possible within- vs "
-            f"between-group confusion. Verify against the source PDF before "
-            f"trusting this pooled estimate (see REVIEWER_GUIDE.md 2.2):")
-        for r in group_flagged:
-            logger.warning(f"  - {r.get('first_author','?')} ({r.get('year','')}): "
-                            f"{r.get('group_timepoint_warning')}")
-    else:
-        logger.info(
-            f"[GROUP/TIMEPOINT CHECK] 0 of {len(meta_audit)} studies "
-            f"flagged. NOTE: this check validates group LABELS only, "
-            f"not whether the extracted numbers come from a "
-            f"between-group comparison - that is the SOURCE QUOTE "
-            f"check's job (Known Issue #48/#38). Manual verification "
-            f"still required.")
-
-    quote_flagged = [r for r in meta_audit if r.get("source_quote_warning")]
-    if quote_flagged:
-        logger.warning(
-            f"[SOURCE QUOTE CHECK] {len(quote_flagged)} of {len(meta_audit)} "
-            f"studies had extracted values that could not be bound to a "
-            f"clean verbatim source quote (missing quote, number absent "
-            f"from its quote, SE-labelled quote for an SD, or "
-            f"within-subject timepoint language in the quote) - verify "
-            f"each against the source PDF before trusting this pooled "
-            f"estimate (Known Issue #48):")
-        for r in quote_flagged:
-            logger.warning(
-                f"  - {r.get('first_author','?')} ({r.get('year','')}): "
-                f"{r.get('source_quote_warning')}")
-    else:
-        logger.info(
-            f"[SOURCE QUOTE CHECK] 0 of {len(meta_audit)} studies flagged "
-            f"- every extracted value was bound to a verbatim source quote "
-            f"with no SE labels or within-subject timepoint language. "
-            f"Manual verification still required.")
+    _log_stage4_summary(meta_audit, er, args.effect_measure)
 
     # ---------------------------------------------------------------------
     # [OUTCOME/TIMEPOINT] provenance surfacing (#22 / #51).
