@@ -10,14 +10,14 @@ Health:     https://ai-kcmedicalresearch.onrender.com/_stcore/health
 
 ---
 
-## Current State (Session 23, v2.4.13, 2026-08-28)
+## Current State (Session 24, v2.4.13, 2026-08-29)
 
 | Component      | Status |
 |----------------|--------|
-| Tests          | 503 passed, 3 skipped, 11 deselected (`python -m pytest -m "not live" --tb=short -q`) |
-| CI             | green (5d286d2) |
-| Render deploy  | green (no code change since Session 21) |
-| SR pipeline    | working; extraction is non-deterministic (#11), verify every number |
+| Tests          | 523 passed, 3 skipped, 11 deselected (`python -m pytest -m "not live" --tb=short -q`) |
+| CI             | green (c6ac1fd); 1458834 pending at handoff time — confirm |
+| Render deploy  | redeploys on 1458834 (CLI-only change, no UI impact) — confirm health URL |
+| SR pipeline    | working via CLI with Qwen for the first time (#65 fixed); extraction non-deterministic (#11), verify every number |
 | Providers      | DeepSeek (default) / Qwen (SR) / OpenAI / Anthropic / Groq / Ollama (local, never falls back) |
 
 Issue numbers below match `README.md` > Known Issues.
@@ -29,81 +29,83 @@ Issue numbers below match `README.md` > Known Issues.
 | #  | Issue | Priority | What to do |
 |----|-------|----------|------------|
 | 11 | Extraction non-determinism (Ang, Jensen, Lami) | High | All three pinned by regression fixtures (Sessions 20-22). Underlying non-determinism unaddressed; mitigation is still run 3x and diff, verify against source quotes. See Session 24 priority 2 for reduction options. |
-| 12 | CMap offset-decode (v2.4.13) needs real-run confirmation | High | Hardware-required. Run McCrae or Jensen, grep fallback log for `decoded with offset`. |
 | 28 | Docker route never executed end to end | High | Hardware-blocked (no Docker on dev machine). |
 | 19 | macOS launchers untested on macOS | Medium | Hardware-blocked. |
 | 2  | WeasyPrint not installed; PDF report falls back to HTML | Medium | |
 | 15 | RoB 2.0 ignores `study_overrides.yaml` | Low | |
 | 3  | Anthropic geo-restricted from dev machine | Low | VPN or skip. |
+| 66 | Stage-4 summary lines assert positives on empty runs | Low | `[SOURCE QUOTE CHECK] 0 of 1 studies flagged - every extracted value was bound to a verbatim source quote` printed when zero values were extracted; `[OUTCOME/TIMEPOINT] ? ()` prints an empty label. Add an "n extracted" denominator so "0 flagged of 0 extracted" is distinguishable from "0 flagged of 1 extracted". Same lesson as the always-print-the-zero tripwire rule. |
 
 ---
 
-## Session 23 Summary
+## Session 24 Summary
 
-Docs-only session. No production code, no tests changed.
+Four commits, two of them code. 501 -> 523 tests. Every item below was
+found by checking a handoff claim against the artifact.
 
-- Closed #50. The Anthropic SR extraction path's SD/SE gap is documented
-  as a permanent architectural limitation in `REVIEWER_GUIDE.md` §6 rather
-  than fixed. The Anthropic path receives structured JSON from Claude's
-  Files API and has no raw source text to scan; the text-line SD/SE
-  tripwire requires raw text and cannot run there.
-- Verified against source that the residual Anthropic coverage is
-  stronger than the handoff had claimed. `source_quote_warning` runs on
-  Anthropic (v2.4.13, #61), including the SE-marker-in-quote branch that
-  catches most of what `sd_se_warning` would have caught.
-  `group_timepoint_warning` also runs on Anthropic via
-  `_coerce_extraction_result` (has since v2.4.10, #10 mitigation) —
-  contra the previous handoff's phantom claim that it was skipped.
-- Corrected `REVIEWER_GUIDE.md` §2.2. The section described the
-  `source_quote_warning` tripwire as firing on four patterns; the
-  extractor actually fires on five numbered branches (missing quote,
-  number not in own quote, SE-label-in-SD-quote, timepoint confusion
-  with three mutually exclusive sub-checks including the #64 tabular
-  branch, and the verbatim-source-text branch that only runs when raw
-  text is available). This was a documented claim that had decayed
-  silently — the "displayed claims that nothing re-verifies decay
-  silently" lesson applies to prose docs too, not just displayed
-  version/test counts.
-- Commit: `25efcd9`. Three files: `README.md` (-1), `RESOLVED_ISSUES.md`
-  (+1), `REVIEWER_GUIDE.md` (+55/-23).
+- **Doc sync (5d286d2, 4c1018a).** HANDOFF.md said the source-quote
+  tripwire fires on six branches; the Session 23 summary in the same
+  file said five. Source says five (`_flag_suspect_source_quotes`; branch
+  4 is an `if/elif/else` of three sub-checks, the #64 tabular check was
+  being miscounted as a sixth). Added `SOURCE_QUOTE_WARNING_BRANCHES` and
+  `tests/test_source_quote_doc_sync.py`, which asserts both docs agree
+  with the tuple length. Dropped the carried "stray `CI |`" cosmetic
+  item (not present).
+- **#12 closed (c6ac1fd).** The v2.4.13 CMap offset decoder had no unit
+  test and no live test case. The handoff's grep string `decoded with
+  offset` does not exist in the code (actual line: `CMap offset decode
+  succeeded for ... (offset=+N)`). More importantly, the decoder only
+  runs on the "nearly space-free" failure mode and skips `(cid:` cases
+  by design; all four broken-CMap corpus PDFs are `(cid:` cases and the
+  fifth has a clean text layer. "Run McCrae or Jensen" could never have
+  confirmed it. Added `tests/test_cmap_offset_decode.py` (16 cases: all
+  four offsets, the space-to-`!` failure shape, false-positive guards).
+  Documented, not fixed: decoded text keeps `!` where spaces were.
+- **#65 found and fixed (1458834).** The first live Qwen CLI run failed
+  on screening with `you must provide a model parameter`. `--model`
+  defaults to None and `main.py` passed it straight to every stage;
+  `providers.get_default_model` existed but only the Streamlit UI called
+  it. No Qwen run had ever completed via the CLI. Added `resolve_model()`
+  at parse time, failing loudly when no default is configured (including
+  the Ollama placeholder string, which would otherwise have been sent as
+  a model name). Verified live: McCrae ran screening/extraction/RoB2 with
+  5x HTTP 200.
+- **McCrae re-extraction returned no data** on every strategy, and the
+  run aborted cleanly. Run 20260826_113816 produced g=-2.36 from the
+  same PDF. This is the better outcome (paper is excluded per
+  REVIEWER_GUIDE §2.2 regardless); #11 cuts both ways.
+- Guide nit noted, not fixed: §2.2 branch 2 says decimal-separator
+  differences can miss; they cannot (`_number_in_text` rewrites `\.`
+  to `[.,]`).
 
----
+## Next Session Priorities (Session 25)
 
-## Next Session Priorities (Session 24)
+1. **Confirm CI green on 1458834 and Render health**, then update the
+   Current State rows. Doc-only commit is fine for the hash.
 
-1. **#12 real-run confirmation.** Run McCrae or Jensen with a working
-   provider key; grep the fallback log for `decoded with offset`.
-   Hardware/key-dependent.
+2. **#66, cheap.** Add an extracted-count denominator to the four
+   Stage-4 summary lines in `main.py`. Pin with a test that a
+   zero-extraction run prints `0 of 0`, not a sentence asserting every
+   value was bound to a quote.
 
-2. **#11 mitigation, if worth the effort.** The fixtures pin known
-   failure signatures; they do not reduce the rate. Options, cheapest
-   first:
-   - Set `temperature=0` and a fixed `seed` on the Qwen vision call.
-     Cheap; vision models often ignore seed, so may or may not help.
-   - Run extraction N=3 internally per PDF; surface the row only if
-     all three agree on n, mean (1dp), and sd (1dp), else write
-     `nondet_flag`. Turns the manual "run 3x and diff" step into
-     machine-enforced coverage. Expensive per PDF.
-   - Skip both if reviewer time on the manual step is not the
-     bottleneck - the tripwires + overrides + manual verification
-     already close the correctness loop.
+3. **#11 mitigation, if worth the effort.** Unchanged from Session 23:
+   `temperature=0`/`seed` on the Qwen vision call (cheap, may not help),
+   or internal N=3 agreement with `nondet_flag` (expensive, machine-
+   enforces the manual step). Skip if reviewer time on the manual step
+   is not the bottleneck.
 
-3. **Guide nit, fold into next doc commit.** `REVIEWER_GUIDE.md` §2.2
-   branch 2 says decimal-separator differences "can still miss". They
-   do not: `_number_in_text` rewrites `\.` to `[.,]`, so `47.14` matches
-   `47,14`. Unicode minus and thousands separators still miss, as stated.
+4. **Decoder `!`-for-space gap, low.** `_shift_text` shifts letters only,
+   so a +1-shifted PDF's spaces (arriving as `!`) stay as `!` after
+   decode. Fine for the LLM screener; may matter if the extractor's
+   text-fallback ever receives decoded text. Check whether it does
+   before deciding it matters — no corpus PDF exercises this path today.
 
-(Session 24 closed the branch-count question from source:
-`_flag_suspect_source_quotes` has five top-level conditions, branch 4 an
-`if/elif/else` chain of three. `SOURCE_QUOTE_WARNING_BRANCHES` in
-`data_extractor.py` and `tests/test_source_quote_doc_sync.py` now pin the
-count against both docs. Also dropped the carried "stray `CI |`" cosmetic
-item — the glitch is not present in the table above.)
-
----
+5. **Guide nit** from Session 24 summary, fold into the next doc commit.
 
 ## Housekeeping (low priority, carry until done)
 
+- Add `run_*.log` to `.gitignore` (two untracked from Session 24) and
+  delete `input\s24_mccrae\` when done with it.
 - Confirm `.venv\Scripts\` Python is the one resolving (a system Python
   was once seen behind a `(.venv)` prompt).
 - Delete stale `%TEMP%\ai_km_run_*.bat` on any machine that ran the
@@ -115,8 +117,11 @@ item — the glitch is not present in the table above.)
 
 ## Durable Lessons
 
-- **Verify the artifact, not the summary.** Eight documented instances now
-  (Session 23 added the phantom "Anthropic skips group/timepoint" claim
+- **Verify the artifact, not the summary.** Eleven documented instances now
+  (Session 24 added three in one file: a CI hash one commit stale, a
+  cosmetic glitch that no longer existed, and a grep string that never
+  existed — plus the branch count itself). Previously eight
+  (Session 23 had added the phantom "Anthropic skips group/timepoint" claim
   that had been restated across at least two handoffs without being
   checked against `_coerce_extraction_result`). Before treating a Known
   Issue as work, read the current source of the affected file. Before
@@ -145,6 +150,17 @@ item — the glitch is not present in the table above.)
   this very entry said "six" while the Session 23 summary above said
   "five" — the same document contradicted itself one screen apart.)
 
+- **A "confirm it works" item must name a test case that can reach the
+  code.** #12 sat as High for three sessions with an instruction (run
+  McCrae) that could not exercise the branch, and a grep string that did
+  not exist. Before carrying a confirmation item, check: which input
+  reaches this code path, and what exact line does it emit?
+
+- **The help text is a claim too.** `--model` promised "provider's
+  configured model" for as long as the flag existed; nothing delivered
+  it. Handoffs said Qwen was the SR provider; the CLI had never completed
+  a Qwen run.
+
 - **A tripwire that only writes its key on failure makes "checked and
   clean" indistinguishable from "never ran".** Always set the key; print
   the zero.
@@ -162,4 +178,4 @@ item — the glitch is not present in the table above.)
 
 ---
 
-Handoff prepared: 2026-08-28, Session 23. Session 24 (2026-08-29): doc-sync test added, branch count verified from source.
+Handoff prepared: 2026-08-29, Session 24.

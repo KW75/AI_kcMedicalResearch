@@ -31,3 +31,4 @@ sr_*.log
 # patch backups
 *.py.bak
 *.py.bak[0-9]
+run_*.log
