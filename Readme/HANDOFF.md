@@ -1,7 +1,7 @@
 # HANDOFF
 
 Single source of truth for the next session. Read this, then work.
-Session-by-session history (1-22) is in `Readme/HANDOFF_archive_pre_S19.md`
+Session-by-session history (1-23) is in `Readme/HANDOFF_archive_pre_S19.md`
 and git log; consult it only before reopening a closed issue.
 
 Repository: https://github.com/KW75/AI_kcMedicalResearch
@@ -10,12 +10,12 @@ Health:     https://ai-kcmedicalresearch.onrender.com/_stcore/health
 
 ---
 
-## Current State (Session 22, v2.4.13, 2026-08-28)
+## Current State (Session 23, v2.4.13, 2026-08-28)
 
 | Component      | Status |
 |----------------|--------|
 | Tests          | 501 passed, 3 skipped, 11 deselected (`python -m pytest -m "not live" --tb=short -q`) |
-| CI             |  CI | green (244e43b) |
+| CI             | green (25efcd9) |
 | Render deploy  | green (no code change since Session 21) |
 | SR pipeline    | working; extraction is non-deterministic (#11), verify every number |
 | Providers      | DeepSeek (default) / Qwen (SR) / OpenAI / Anthropic / Groq / Ollama (local, never falls back) |
@@ -28,47 +28,54 @@ Issue numbers below match `README.md` > Known Issues.
 
 | #  | Issue | Priority | What to do |
 |----|-------|----------|------------|
-| 11 | Extraction non-determinism (Ang, Jensen, Lami) | High | All three pinned by regression fixtures (Sessions 20-22). Underlying non-determinism unaddressed; mitigation is still run 3x and diff, verify against source quotes. See Session 23 priority 3 for reduction options. |
+| 11 | Extraction non-determinism (Ang, Jensen, Lami) | High | All three pinned by regression fixtures (Sessions 20-22). Underlying non-determinism unaddressed; mitigation is still run 3x and diff, verify against source quotes. See Session 24 priority 2 for reduction options. |
 | 12 | CMap offset-decode (v2.4.13) needs real-run confirmation | High | Hardware-required. Run McCrae or Jensen, grep fallback log for `decoded with offset`. |
 | 28 | Docker route never executed end to end | High | Hardware-blocked (no Docker on dev machine). |
 | 19 | macOS launchers untested on macOS | Medium | Hardware-blocked. |
-| 50 | Anthropic SR path skips SD/SE and group/timepoint tripwires | Medium | Decide: port a text pass, or document the gap in `REVIEWER_GUIDE.md` and close. Recommend the latter (see Session 23 priority 2). |
 | 2  | WeasyPrint not installed; PDF report falls back to HTML | Medium | |
 | 15 | RoB 2.0 ignores `study_overrides.yaml` | Low | |
 | 3  | Anthropic geo-restricted from dev machine | Low | VPN or skip. |
 
 ---
 
-## Session 22 Summary
+## Session 23 Summary
 
-Tests-only session. No production code changed.
+Docs-only session. No production code, no tests changed.
 
-- Added Lami fixtures to `tests/test_extraction_regression_fixtures.py`
-  (2 tests): text_fallback path passes cleanly; Ns-drift signature
-  (correct means/SDs, missing source quotes) is caught by the
-  missing-quote branch. The latter is what keeps the override
-  mechanism's `confirmed` log entry a real cross-check.
-- Added Jensen fixtures (13 tests): 6 quote-check parametrizations
-  over {49.0, 49.1} x {59.0, 59.1, 59.2}, 6 arm-order parametrizations
-  (mean_i < mean_c, no outcome-direction assumption), and 1 pin of
-  `_number_in_text`'s integer-fallback branch (the Session 21
-  "49.0 vs '49'" investigation, now executable).
-- 486 -> 501 tests. `scripts/check_no_bom.py` clean.
+- Closed #50. The Anthropic SR extraction path's SD/SE gap is documented
+  as a permanent architectural limitation in `REVIEWER_GUIDE.md` §6 rather
+  than fixed. The Anthropic path receives structured JSON from Claude's
+  Files API and has no raw source text to scan; the text-line SD/SE
+  tripwire requires raw text and cannot run there.
+- Verified against source that the residual Anthropic coverage is
+  stronger than the handoff had claimed. `source_quote_warning` runs on
+  Anthropic (v2.4.13, #61), including the SE-marker-in-quote branch that
+  catches most of what `sd_se_warning` would have caught.
+  `group_timepoint_warning` also runs on Anthropic via
+  `_coerce_extraction_result` (has since v2.4.10, #10 mitigation) —
+  contra the previous handoff's phantom claim that it was skipped.
+- Corrected `REVIEWER_GUIDE.md` §2.2. The section described the
+  `source_quote_warning` tripwire as firing on four patterns; the
+  extractor actually fires on five numbered branches (missing quote,
+  number not in own quote, SE-label-in-SD-quote, timepoint confusion
+  with three mutually exclusive sub-checks including the #64 tabular
+  branch, and the verbatim-source-text branch that only runs when raw
+  text is available). This was a documented claim that had decayed
+  silently — the "displayed claims that nothing re-verifies decay
+  silently" lesson applies to prose docs too, not just displayed
+  version/test counts.
+- Commit: `25efcd9`. Three files: `README.md` (-1), `RESOLVED_ISSUES.md`
+  (+1), `REVIEWER_GUIDE.md` (+55/-23).
 
 ---
 
-## Next Session Priorities (Session 23)
+## Next Session Priorities (Session 24)
 
 1. **#12 real-run confirmation.** Run McCrae or Jensen with a working
    provider key; grep the fallback log for `decoded with offset`.
    Hardware/key-dependent.
 
-2. **#50 scope decision.** Recommend documenting the tripwire-coverage
-   gap in `REVIEWER_GUIDE.md` and closing #50. Porting a text pass to
-   the Anthropic path costs more than it protects while #3 (Anthropic
-   geo-restricted from dev machine) is open.
-
-3. **#11 mitigation, if worth the effort.** The fixtures pin known
+2. **#11 mitigation, if worth the effort.** The fixtures pin known
    failure signatures; they do not reduce the rate. Options, cheapest
    first:
    - Set `temperature=0` and a fixed `seed` on the Qwen vision call.
@@ -80,6 +87,11 @@ Tests-only session. No production code changed.
    - Skip both if reviewer time on the manual step is not the
      bottleneck - the tripwires + overrides + manual verification
      already close the correctness loop.
+
+3. **Cosmetic:** the HANDOFF's Current State table has a small
+   formatting glitch inherited from Session 22 (`| CI |  CI | green (...)`
+   — a stray `CI |` inside the cell). Fold the fix into whatever
+   Session 24's first commit touches; not worth a doc-only commit.
 
 ---
 
@@ -96,11 +108,13 @@ Tests-only session. No production code changed.
 
 ## Durable Lessons
 
-- **Verify the artifact, not the summary.** Seven documented instances.
-  Before treating a Known Issue as work, read the current source of the
-  affected file, not the previous session's description. Before citing a
-  number from a prior handoff, confirm it appears in an audit CSV. This
-  applies to your own outputs mid-session too.
+- **Verify the artifact, not the summary.** Eight documented instances now
+  (Session 23 added the phantom "Anthropic skips group/timepoint" claim
+  that had been restated across at least two handoffs without being
+  checked against `_coerce_extraction_result`). Before treating a Known
+  Issue as work, read the current source of the affected file. Before
+  citing a number from a prior handoff, confirm it appears in an audit
+  CSV. This applies to your own outputs mid-session too.
 
 - **A silent wrong answer is worse than a crash.** Clean-looking CSV rows
   have carried wrong numbers (zsy234 g=-2.36; Ang -8.9). Plausibility is
@@ -115,6 +129,11 @@ Tests-only session. No production code changed.
 
 - **Displayed claims that nothing re-verifies decay silently.** Parse
   version/test counts from source at display time, or do not display them.
+  This applies to prose too: `REVIEWER_GUIDE.md` §2.2 described the
+  source-quote tripwire as four branches when the extractor actually fires
+  on six, because branches were added after the doc was last touched and
+  nothing forced the doc to stay in sync. If a doc claims a specific count
+  or list, either derive it from source or accept that it will rot.
 
 - **A tripwire that only writes its key on failure makes "checked and
   clean" indistinguishable from "never ran".** Always set the key; print
@@ -133,4 +152,4 @@ Tests-only session. No production code changed.
 
 ---
 
-Handoff prepared: 2026-08-28, Session 22.
+Handoff prepared: 2026-08-28, Session 23.
