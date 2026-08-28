@@ -91,6 +91,18 @@ if the paper reports exactly one outcome at exactly one timepoint.
 DO NOT fabricate values. Return null if not found.
 '''
 
+# Top-level trip conditions in DataExtractor._flag_suspect_source_quotes.
+# REVIEWER_GUIDE.md §2.2 numbers these 1-5; tests/test_source_quote_doc_sync.py
+# asserts the count matches so the doc can't drift. Branch 4 carries three
+# mutually exclusive sub-checks (multi-timepoint / within-subject / #64 tabular).
+SOURCE_QUOTE_WARNING_BRANCHES = (
+    "missing_quote",
+    "number_not_in_quote",
+    "se_label_in_sd_quote",
+    "timepoint_confusion",
+    "verbatim_mismatch",
+)
+
 class DataExtractor:
     def __init__(self, pico_criteria: Optional[dict] = None,
                  pico_outcome: Optional[str] = None,

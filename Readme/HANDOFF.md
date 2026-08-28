@@ -14,7 +14,7 @@ Health:     https://ai-kcmedicalresearch.onrender.com/_stcore/health
 
 | Component      | Status |
 |----------------|--------|
-| Tests          | 501 passed, 3 skipped, 11 deselected (`python -m pytest -m "not live" --tb=short -q`) |
+| Tests          | 503 passed, 3 skipped, 11 deselected (`python -m pytest -m "not live" --tb=short -q`) |
 | CI             | green (25efcd9) |
 | Render deploy  | green (no code change since Session 21) |
 | SR pipeline    | working; extraction is non-deterministic (#11), verify every number |
@@ -88,10 +88,17 @@ Docs-only session. No production code, no tests changed.
      bottleneck - the tripwires + overrides + manual verification
      already close the correctness loop.
 
-3. **Cosmetic:** the HANDOFF's Current State table has a small
-   formatting glitch inherited from Session 22 (`| CI |  CI | green (...)`
-   — a stray `CI |` inside the cell). Fold the fix into whatever
-   Session 24's first commit touches; not worth a doc-only commit.
+3. **Guide nit, fold into next doc commit.** `REVIEWER_GUIDE.md` §2.2
+   branch 2 says decimal-separator differences "can still miss". They
+   do not: `_number_in_text` rewrites `\.` to `[.,]`, so `47.14` matches
+   `47,14`. Unicode minus and thousands separators still miss, as stated.
+
+(Session 24 closed the branch-count question from source:
+`_flag_suspect_source_quotes` has five top-level conditions, branch 4 an
+`if/elif/else` chain of three. `SOURCE_QUOTE_WARNING_BRANCHES` in
+`data_extractor.py` and `tests/test_source_quote_doc_sync.py` now pin the
+count against both docs. Also dropped the carried "stray `CI |`" cosmetic
+item — the glitch is not present in the table above.)
 
 ---
 
@@ -131,9 +138,12 @@ Docs-only session. No production code, no tests changed.
   version/test counts from source at display time, or do not display them.
   This applies to prose too: `REVIEWER_GUIDE.md` §2.2 described the
   source-quote tripwire as four branches when the extractor actually fires
-  on six, because branches were added after the doc was last touched and
-  nothing forced the doc to stay in sync. If a doc claims a specific count
-  or list, either derive it from source or accept that it will rot.
+  on five (branch 4 carrying three mutually exclusive sub-checks), because
+  branches were added after the doc was last touched and nothing forced
+  the doc to stay in sync. If a doc claims a specific count or list,
+  either derive it from source or accept that it will rot. (Session 24:
+  this very entry said "six" while the Session 23 summary above said
+  "five" — the same document contradicted itself one screen apart.)
 
 - **A tripwire that only writes its key on failure makes "checked and
   clean" indistinguishable from "never ran".** Always set the key; print
@@ -152,4 +162,4 @@ Docs-only session. No production code, no tests changed.
 
 ---
 
-Handoff prepared: 2026-08-28, Session 23.
+Handoff prepared: 2026-08-28, Session 23. Session 24 (2026-08-29): doc-sync test added, branch count verified from source.
