@@ -93,10 +93,12 @@ that fires on the following patterns. Each is checked per arm:
 2. **Number not in own quote.** The extracted mean or SD does not
    appear in its own quote, under a string match with an
    integer-fallback branch (`49.0` in an extraction matches `49` in a
-   quote). The match is not fully format-tolerant — decimal separator
-   differences, unicode-vs-ASCII minus signs, and thousands separators
-   can still miss. Treat a mismatch as a review prompt, not conclusive
-   evidence of a wrong number.
+   quote) and a decimal-separator branch (`1.5` matches `1,5`; see
+   `_number_in_text` in `data_extractor.py`, which rewrites `\.` to
+   `[.,]` before matching). The match is not fully format-tolerant —
+   unicode-vs-ASCII minus signs and thousands separators can still
+   miss. Treat a mismatch as a review prompt, not conclusive evidence
+   of a wrong number.
 3. **SE label in an SD quote.** The label `SE`, `SEM`, or `standard
    error` appears in a quote used for an SD field. This is the branch
    that catches most of the McCrae signature on provider paths that
@@ -376,7 +378,7 @@ and RoB 2.0 assessment re-read the PDF independently and are unaffected.
 | Text-line SD/SE tripwire (`sd_se_warning`) does not run on the Anthropic provider path | The Anthropic path receives structured JSON from Claude's Files API and never sees raw PDF text, so the tripwire that scans source lines for an SE label adjacent to an SD value cannot run. The source-quote SE-marker branch (§2.2 branch 3) DOES run on Anthropic and catches every case where Claude quotes the SE label alongside the value; the uncovered case is where Claude reports an SE value as an SD without including the SE label in its quote. `group_timepoint_warning` also runs on Anthropic (via `_coerce_extraction_result`). The verbatim-source-text branch (§2.2 branch 5) does not run on Anthropic either, for the same reason. Tracked as closed issue #50 — this is a documented permanent limitation, not a bug. | Reviewer verification (item 3.1) is the safeguard on Anthropic-path runs regardless. Prefer qwen for corpora where SE/SD confusion is likely, since qwen's text-fallback branch adds a second layer of SE detection. |
 | No semantic within- vs between-group detection | Silent invalid effect size (see §2.2) | v2.4.12 `source_quote_warning` flags multi-timepoint and within-subject phrasing in a quote; manual check (item 3.1) still required |
 | Extractor quote check is a tripwire, not a verifier | A clean quote from a hallucinated or misattributed passage will not flag; only the specific patterns in §2.2 are detected | `source_quote_warning = None` means "the checked patterns did not trip", not "correct". Item 3.1 remains mandatory |
-| Quote-check number matching is character-level, not numeric | Under an integer-fallback branch, `49.0` in an extraction matches `49` in a quote; decimal separator differences, unicode-vs-ASCII minus signs, and thousands separators can still miss | Treat a mismatch as a review prompt, not evidence of a wrong number. Verify the digits match in the source table and move on |
+| Quote-check number matching is character-level, not numeric | Under an integer-fallback branch `49.0` in an extraction matches `49` in a quote, and under a decimal-separator branch `1.5` matches `1,5`; unicode-vs-ASCII minus signs and thousands separators can still miss | Treat a mismatch as a review prompt, not evidence of a wrong number. Verify the digits match in the source table and move on |
 | Retry, OCR-budget, and quote-check behaviour verified on the `qwen` provider path only | Anthropic provider path may fail or silently succeed differently under the same conditions | Reviewer verification required on any run whose provider is Anthropic; do not assume qwen-path test coverage transfers |
 | RoB 2.0 runs independently of overrides | RoB assessment may use OCR text of a study whose data was hand-entered | Review RoB judgements separately |
 
