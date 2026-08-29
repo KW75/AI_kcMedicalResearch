@@ -46,8 +46,8 @@ so those catches happen at session open, not mid-work.
 | Component      | Status |
 |----------------|--------|
 | Tests          | 565 passed, 3 skipped, 11 deselected (`python -m pytest -m "not live" --tb=short -q`) |
-| CI             | NOT YET CHECKED on b847c55 / bb48040 / the S26 docs commit — Session 27 priority 1. Last confirmed green: 64a043d (S25). |
-| Render deploy  | not re-checked; S26 commits touch the SR CLI, extractor, and docs only (no UI change). Confirm health returns `ok` in S27. |
+| CI             | green (fb69d50; b847c55 and bb48040 also confirmed green) |
+| Render deploy  | not re-checked after fb69d50; S26 commits touch the SR CLI, extractor, and docs only (no UI change). Confirm health returns `ok` at S27 open. |
 | SR pipeline    | working via CLI with Qwen; vision extraction voted N=3, read `nondet_flag`; Ang's correct reading unverified (#67) |
 | Providers      | DeepSeek (default) / Qwen (SR) / OpenAI / Anthropic / Groq / Ollama (local, never falls back) |
 
@@ -70,7 +70,7 @@ Issue numbers below match `README.md` > Known Issues.
 ## Session 26 Summary
 
 Three commits: `b847c55` (extractor + probe + evidence), `bb48040`
-(CSV / Stage-4 / CLI wiring), and the docs commit this file ships in.
+(CSV / Stage-4 / CLI wiring), `fb69d50` (docs). All three CI green.
 526 -> 565 tests. #11 closed as machine-flagged; #66 migrated to
 RESOLVED_ISSUES (S25 doc lag); #67 opened. Every other priority from
 the S25 handoff explicitly deferred (unchanged from S25).
@@ -131,9 +131,8 @@ the S25 handoff explicitly deferred (unchanged from S25).
 
 ## Next Session Priorities (Session 27)
 
-1. **CI and Render on the three S26 commits.** Check-runs API for
-   `test (3.11)` on `b847c55`, `bb48040`, and the docs commit; health
-   endpoint. None was verified in S26.
+1. **Render health on fb69d50.** CI is confirmed green on all three
+   S26 commits; the health endpoint was not hit. One request.
 
 2. **#67 — Ang Table 2.** Human task, ten minutes, blocks every pooled
    estimate that includes Ang. Record the reading in
