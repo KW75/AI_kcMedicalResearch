@@ -268,11 +268,13 @@ them; gaps are closed issues. Closed issues: `Readme/RESOLVED_ISSUES.md`.
 
 | #  | Issue | Priority |
 |----|-------|----------|
-| 67 | Ang 2010 reading unverified. The N=3 vote draws either of two table readings about 50/50 (32.5/15.0 vs 37.6/10.0, or 37.6/10.0 vs 45.3/24.5 - the same numbers with arms shifted); `table_shift` flags it every run, but which cells are correct must be confirmed by a human against Table 2 and recorded in `study_overrides.yaml`. Blocks trusting any pooled estimate that includes Ang. | High |
 | 28 | Docker route never executed end to end (no Docker on dev machine). | High |
 | 19 | macOS launchers untested on macOS. | Medium |
 | 2  | WeasyPrint not installed; PDF report falls back to HTML. | Medium |
 | 3  | Anthropic API geo-restricted from the dev machine. | Low |
+| 68 | Source-quote tripwire false-positives on Unicode minus/dash. `_number_in_text` compares ASCII `-` (U+002D) against Unicode `−` (U+2212) etc. and fails. Ang's run today fires the tripwire on both arms despite the numbers being present in the quotes. Fix: normalise U+2212, U+2013, U+2014, U+FE63, U+FF0D to `-` on both value and haystack before comparing. | Medium |
+| 69 | Text-fallback path doesn't recover n_intervention / n_control. Lami's Ns come only from study_overrides.yaml; removing the override leaves both cells empty and Lami silently drops from any pooled estimate. Any future paper routed to text-fallback has the same failure mode. Fix: either a second text-fallback pass targeted at Ns, or a MANDATORY tripwire when text_fallback yields empty Ns. | Medium |
+
 
 #9 (SD/SE confusion) and #10 (within- vs between-group) are mitigated by the
 tripwires above but still require the manual checks in `REVIEWER_GUIDE.md`

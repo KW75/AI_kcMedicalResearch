@@ -56,6 +56,7 @@ without reading the closing notes there.
 | 52 | Tabular multi-timepoint rows escaped the source-quote check | v2.4.13 |
 | 61 | Anthropic path bypassed source-quote check | v2.4.13 - ported; SD/SE + group/timepoint remain as #50 |
 | 66 | Stage-4 summary asserted "every extracted value was bound" on an all-empty run | Session 25 (19a583e) - `_log_stage4_summary` with uniform `n_extracted` denominator; zero-extraction prints `0 of 0` and no positive assertion. `tests/test_stage4_summary.py`. |
+| 67 | Ang 2010 reading unverified | Session 27 - verified against PDF Table <N>, page <N>. Ang stable across N=3 (nondet_flag=[]); outcome=NFR pain rating week 6; values -20.2 (23.9) CBT vs -14.9 (16.4) UC. S26 handoff's "table_shift on FIQ" framing was superseded by pipeline changes before verification. No study_overrides.yaml entry needed. |
 | 62 | Suspected `49.0` vs `49` quote-matching bug | Session 21 - not reproducible; `_number_in_text` already tries the integer form. Pinned by test. |
 
 Regression fixtures for Ang's non-deterministic value sets

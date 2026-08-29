@@ -59,11 +59,14 @@ Issue numbers below match `README.md` > Known Issues.
 
 | #  | Issue | Priority | What to do |
 |----|-------|----------|------------|
-| 67 | Ang 2010 reading unverified | High | One reviewer, one PDF, ten minutes: open Ang 2010 Table 2, decide whether intervention/control at week 6 is 32.5 (15.0) / 37.6 (10.0) or 37.6 (10.0) / 45.3 (24.5), write it to `input/sr/study_overrides.yaml` with a `note:` citing page and table. The N=3 vote draws either reading ~50/50 and `table_shift` fires every run; the pipeline cannot decide this. Until done, no pooled estimate including Ang is trustworthy. |
 | 28 | Docker route never executed end to end | High | Hardware-blocked (no Docker on dev machine). |
 | 19 | macOS launchers untested on macOS | Medium | Hardware-blocked. |
 | 2  | WeasyPrint not installed; PDF report falls back to HTML | Medium | |
 | 3  | Anthropic geo-restricted from dev machine | Low | VPN or skip. |
+| 68 | Source-quote tripwire false-positives on Unicode minus/dash. `_number_in_text` compares ASCII `-` (U+002D) against Unicode `−` (U+2212) etc. and fails. Ang's run today fires the tripwire on both arms despite the numbers being present in the quotes. Fix: normalise U+2212, U+2013, U+2014, U+FE63, U+FF0D to `-` on both value and haystack before comparing. | Medium |
+| 69 | Text-fallback path doesn't recover n_intervention / n_control. Lami's Ns come only from study_overrides.yaml; removing the override leaves both cells empty and Lami silently drops from any pooled estimate. Any future paper routed to text-fallback has the same failure mode. Fix: either a second text-fallback pass targeted at Ns, or a MANDATORY tripwire when text_fallback yields empty Ns. | Medium |
+
+
 
 ---
 
@@ -266,6 +269,14 @@ the S25 handoff explicitly deferred (unchanged from S25).
   `unanimous`; the raw values in the override log line disagreed
   across runs. When a study is overridden, its `nondet_flag` describes
   the override, not the extractor. Read the log line.
+
+  **A handoff describing a run's content is a snapshot, not an invariant.**
+  S26 wrote "Ang shows table_shift on FIQ readings" as a standing property.
+  By S27 the pipeline was extracting NFR-threshold, unanimous, no shift.
+  One session's specific numbers and flags will not survive a code change.
+  Describe behaviours the reviewer must verify, not outputs from a run
+  they can't reproduce.
+
 
 ---
 
