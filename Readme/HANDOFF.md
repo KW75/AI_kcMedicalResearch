@@ -69,97 +69,122 @@ Issue numbers below match `README.md` > Known Issues.
 
 ---
 
-## Session 26 Summary
+## Current State (Session 27, v2.4.13, 2026-08-29)
 
-Three commits: `b847c55` (extractor + probe + evidence), `bb48040`
-(CSV / Stage-4 / CLI wiring), `fb69d50` (docs). All three CI green.
-526 -> 565 tests. #11 closed as machine-flagged; #66 migrated to
-RESOLVED_ISSUES (S25 doc lag); #67 opened. Every other priority from
-the S25 handoff explicitly deferred (unchanged from S25).
+| Component      | Status |
+|----------------|--------|
+| Tests          | 569 passed, 3 skipped, 11 deselected (`python -m pytest -m "not live" --tb=short -q`) |
+| CI             | green (28e616e; 3a9081b and 6813b12 also confirmed green) |
+| Render deploy  | health returned `ok` on 28e616e (S27 close) |
+| SR pipeline    | working via CLI with Qwen; Ang 2010 verified against PDF (NFR week 6, unanimous N=3); text-fallback drops now surface in Stage 4 `[SKIP]` block |
+| Providers      | DeepSeek (default) / Qwen (SR) / OpenAI / Anthropic / Groq / Ollama (local, never falls back) |
 
-- **#11 cheap branch measured and rejected.** Before touching sampling,
-  grepped the call site: `_call_vision_api` was at `temperature=0.1`
-  while both text paths were at `0`, and no call sent `seed`. Built
-  `SOURCE_CODE/pipelines/sr/scripts/nondet_probe.py` (N runs per PDF,
-  per-field agreement table, JSON out) and ran 5 corpus PDFs x 3 runs
-  at the old setting and at `t=0, seed=42`. Both: 4/5 PDFs disagreed.
-  Source-quote hashes differed run-to-run under identical config, which
-  is impossible if seed were honoured — qwen-vl-plus ignores it and
-  `t=0` is not deterministic. Ang at `t=0` returned three different
-  tables in three runs; run 1 was a column shift that passed SOURCE
-  QUOTE CHECK. Evidence: `Readme/evidence/s26_issue11/*.json`.
-  Sampling controls kept (`SR_EXTRACT_TEMPERATURE`, `SR_EXTRACT_SEED`,
-  default 0/42) only so the vision and text paths can't drift again;
-  `tests/test_extractor_sampling.py` pins that all three call sites
-  share them.
+Issue numbers below match `README.md` > Known Issues.
 
-- **#11 closed by N=3 agreement (b847c55, bb48040).**
-  `DataExtractor(n_agreement=3)` / `SR_EXTRACT_N_AGREEMENT` /
-  `--n-agreement`. `_extract_vision_with_agreement` calls the vision API
-  N times on the same page images, `_vote_runs` majority-votes
-  mean/sd/n per arm (float/int-coerced) and both group labels
-  (`_normalize_label`-coerced). Source quotes are NOT voted: the quote
-  is carried from a run whose (mean, SD) match the chosen values for
-  that arm, so the quote tripwire still tests a number against its own
-  quote. `nondet_flag` is always written: `[]` unanimous;
-  `field:majority`; `field:no_majority` (run-1 value kept);
-  `table_shift` (all four mean/SD disagree, or one arm's pair equals
-  the other arm's chosen pair; guarded for genuinely identical arms);
-  `usable_runs:k/N`; `["single_run"]` for N=1 and the text fallback.
-  `audit_logger.nondet_flag_to_cell` renders it for
-  `meta_analysis_results.csv` (`unanimous` / `not_checked` / joined);
-  `nondet_flag` and `nondet_runs` added to `write_results` fieldnames.
-  `_log_stage4_summary` prints `[AGREEMENT] k of n voted studies` with
-  a voted-only denominator — an N=1 run prints "not checked", never
-  "0 flagged" — and tags `no_majority`/`table_shift` rows MANDATORY.
-  Cost: ~+20 s and 2 extra vision calls per study.
+---
 
-- **Acceptance run** (`nondet_probe.py --runs 2 --agreement 3`, 5 PDFs):
-  Ang flagged in both runs (all four mean/SD `majority`, `table_shift`
-  after the follow-up); Jensen, 1-s2.0, Lami, zsy234 came out `[]` in
-  both. Tallying every Ang call of the day, the two competing readings
-  were drawn 5 and 6 times of 12 — a coin flip, hence #67.
+## Open Issues
 
-- **Three findings recorded in the guide, not fixed:** the source-quote
-  tripwire fires non-deterministically (zsy234 #64 warning on 1 of 3
-  runs) because the quote varies while the number holds; Lami's
-  `MANUAL OVERRIDE` masks raw drift (13.79 vs 13.68 mean, 4.22 vs 4.61
-  SD); `outcome_selected` wording varies on Ang ("FIQ pain rating" vs
-  "FIQ pain score"), cosmetic, not voted.
+| #  | Issue | Priority | What to do |
+|----|-------|----------|------------|
+| 28 | Docker route never executed end to end | High | Hardware-blocked (no Docker on dev machine). |
+| 19 | macOS launchers untested on macOS | Medium | Hardware-blocked. |
+| 2  | WeasyPrint not installed; PDF report falls back to HTML | Medium | |
+| 3  | Anthropic geo-restricted from dev machine | Low | VPN or skip. |
 
-- **Housekeeping hit in passing.** The probe's error line showed
-  `C:\Users\...\Python311\python.exe` resolving behind a `(.venv)`
-  prompt — the item below is real, not historical. Not fixed.
+---
 
-## Next Session Priorities (Session 27)
+## Session 27 Summary
 
-1. **Render health on fb69d50.** CI is confirmed green on all three
-   S26 commits; the health endpoint was not hit. One request.
+Three commits, all CI green: `6813b12` (docs — close #67, open #68/#69),
+`3a9081b` (#68 fix + test), `28e616e` (#69 fix + tests). 565 → 569 tests.
+Three issues resolved.
 
-2. **#67 — Ang Table 2.** Human task, ten minutes, blocks every pooled
-   estimate that includes Ang. Record the reading in
-   `study_overrides.yaml` with page/table in `note:`, then re-run the
-   corpus once and confirm the Ang row shows the override applied and
-   `table_shift` still fires (the override corrects the value; it does
-   not, and should not, silence the flag).
+- **#67 closed: Ang 2010 verified.** Two post-handoff corpus runs
+  (`20260829_122447` with Lami override, `20260829_124847` without)
+  showed Ang unanimous across N=3 on `-20.2 (23.9)` CBT vs `-14.9
+  (16.4)` UC, `nondet_flag=[]`, `outcome_selected="Pain rating at NFR
+  threshold"`, `timepoint_selected="week 6"`. Reviewer opened PDF and
+  confirmed values against the paper's NFR pain rating change score
+  table at week 6. No `study_overrides.yaml` entry needed — the
+  extractor is now stable on this paper and picks a valid outcome. The
+  S26 handoff's "table_shift on FIQ Table 2, 5-vs-6-of-12" framing
+  described an older pipeline state; something between S26 and S27
+  changed Ang's outcome selection without documentation. Not
+  investigated further because current behaviour is stable and
+  correct; if Ang starts flapping again, `Readme/evidence/s26_issue11/`
+  is the reference for the earlier behaviour.
 
-3. **Decide on voting `outcome_selected` / `timepoint_selected`.**
-   Today they are recorded, not voted. Ang's wording varied
-   cosmetically; a run that picks a different *timepoint* would not be
-   flagged by the vote unless the numbers also moved. Probably worth a
-   normalised-label vote like the group labels. Low effort.
+- **#68 closed: Unicode minus / dash matcher gap.** The `-20.2` extracted
+  value did not match `−20.2` (U+2212) in its source quote, firing the
+  source-quote tripwire falsely on both arms of Ang in both S27 runs.
+  Fix: `_number_in_text` translates U+2212, U+2013, U+2014, U+FE63,
+  U+FF0D to ASCII `-` on both value and haystack before comparing.
+  Pinned by `test_number_in_text_unicode_minus_matches_ascii_minus`
+  with en/em-dash variants and a negative case. Same class of bug as
+  the "decimal separator" gap the S25 lesson thought was fully closed
+  — one flavour was, sign characters weren't. Left the S25 lesson as
+  written; the shape is the point.
 
-4. **Decoder `!`-for-space gap, low.** Unchanged from S25.
+- **#69 closed: text-fallback drops surface in Stage 4.** Lami's run-2
+  (`20260829_124847`, no override) had usable means/SDs from
+  text_fallback but empty per-arm Ns; the effect-size loop raised
+  "insufficient mean/SD/N", `logger.warning("Skip study: ...")` fired
+  once mid-run, Lami dropped from the pooled estimate, and no
+  Stage-4 summary line named it. New `[SKIP]` block in
+  `_log_stage4_summary` separates missing-per-arm-N drops (the
+  Lami-shaped failure typical of text_fallback) from other skip
+  reasons and points the reviewer at `study_overrides.yaml`. Three
+  tests: the Lami case, a clean run prints `0 of N`, and mixed
+  reasons don't conflate. Automated N-recovery is deliberately out
+  of scope: text_fallback returns means/SDs from one timepoint's
+  source quote but the paper often reports Ns at multiple timepoints
+  (Lami: 28/36 post vs 34/41 baseline), and a silent wrong N is
+  worse than a missing one — see the durable lesson.
 
-5. **Housekeeping carryovers**, unchanged — and the `.venv` item is now
-   confirmed live (see S26 summary).
+- **Two findings recorded in passing, not fixed.** McCrae's SDs came
+  back as `None` on one of three vision runs in `20260829_124847`
+  (unanimous in `20260829_122447` earlier the same day); the N=3 vote
+  correctly recovered 2.36 / 2.27 from the other two and flagged
+  `sd_intervention:majority`, `sd_control:majority`. This is the
+  first post-#11-close real-run instance where the model returned
+  `None` and the vote absorbed it — the mitigation works on live
+  inputs, not just fixtures. The S25/#66 Stage-4 "cheapest first
+  temperature=0" carryover is no longer relevant (closed in S26); the
+  `.venv` housekeeping item from S26 was not re-verified this session.
+
+## Next Session Priorities (Session 28)
+
+1. **Vote `outcome_selected` / `timepoint_selected`.** Carryover from
+   S26 priority 3 and now more urgent: today's Ang stability could be
+   the extractor consistently picking the same *non-primary* outcome
+   across runs, and the vote would not surface that. A normalised-label
+   vote on these fields (like the group labels) with `majority` /
+   `no_majority` flags would catch a run that silently switched
+   outcomes. Sketch in S27's chat: normalise wording (strip
+   punctuation, lowercase, whitespace), pick source string from a run
+   whose normalised value matches the winner, add to
+   `nondet_flag_to_cell` vocabulary. Test cases: cosmetic-only jitter
+   ("FIQ pain rating" vs "FIQ pain score") is `majority` not
+   MANDATORY; a real timepoint shift (week 6 vs week 12) is worth
+   surfacing; three-way disagreement is `no_majority`.
+
+2. **Investigate Ang's outcome-selection change between S26 and S27.**
+   S26 evidence at `Readme/evidence/s26_issue11/` should show what Ang
+   returned on those N=3 runs; S27 CSVs show `outcome_selected="Pain
+   rating at NFR threshold"` unanimous. If S26's evidence shows FIQ,
+   something changed (prompt, page selection, model behaviour) with
+   no changelog entry. Worth understanding before priority 1 above,
+   because whatever moved once can move again.
+
+3. **Decoder `!`-for-space gap, low.** Unchanged from S26.
 
 ## Housekeeping (low priority, carry until done)
 
 - Add `run_*.log` to `.gitignore` (two untracked from Session 24) and
   delete `input\s24_mccrae\` when done with it.
 - Confirm `.venv\Scripts\` Python is the one resolving (a system Python
-  was once seen behind a `(.venv)` prompt).
+  was once seen behind a `(.venv)` prompt in S26; not re-verified in S27).
 - Delete stale `%TEMP%\ai_km_run_*.bat` on any machine that ran the
   pre-v2.4.7 UI launcher (keys already rotated).
 - Commit-message files: write them from an editor (UTF-8, no BOM).
@@ -276,7 +301,30 @@ the S25 handoff explicitly deferred (unchanged from S25).
   Describe behaviours the reviewer must verify, not outputs from a run
   they can't reproduce.
 
+- **A handoff describing a run's content is a snapshot, not an invariant.**
+  S26 wrote "Ang shows table_shift on FIQ readings" as if it were a
+  standing property; two S27 corpus runs on the same PDF showed
+  unanimous N=3 on a different outcome entirely (NFR pain rating), no
+  table_shift, and different competing readings than the S26 handoff
+  named. Something changed between sessions with no changelog. A
+  specific number, a specific flag, a specific competing value — none
+  of these survive a code change; describe pipeline *behaviours* the
+  reviewer must verify, not outputs from a run they can't reproduce.
+  Bit us three times in one session (all three S27 issues turned out
+  to be different problems than the S26 handoff described).
+
+- **A patch delivered by prose across a session is fragile.** Mid-S27,
+  #68's `_number_in_text` patch was written as "insert this at the top;
+  the rest stays as it is." The user replaced through the `except`
+  block cleanly and the tail — the entire matching logic — got
+  deleted. Five previously-green tests failed. The problem is that
+  "replace this region" and "keep everything else" are two
+  instructions to a human diff editor and easy to conflate. Rule:
+  when handing a code change across the session boundary, deliver the
+  whole function, top to bottom, not a fragment plus a rule about
+  what to keep.
 
 ---
 
-Handoff prepared: 2026-08-29, Session 26.
+Handoff prepared: 2026-08-29, Session 27.
+
