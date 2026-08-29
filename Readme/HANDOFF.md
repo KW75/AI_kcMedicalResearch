@@ -10,6 +10,33 @@ Health:     https://ai-kcmedicalresearch.onrender.com/_stcore/health
 
 ---
 
+## Session-opening checklist
+
+Before treating any Open Issue as work, and before ending the session:
+
+1. **Test count check.** Grep `README.md` for `Tests: NNN passed`; run
+   `python -m pytest -m "not live" --collect-only -q | tail -1` (or
+   equivalent) and confirm the two match. Update README if not.
+2. **Closed-issue citation grep.** For each issue number in
+   `Readme/RESOLVED_ISSUES.md`, grep `README.md` and this file for
+   `(#N)`. Any hit is a stale citation — replace with a positive
+   description or a REVIEWER_GUIDE section reference.
+3. **Open Issues table drift.** Confirm `Readme/HANDOFF.md`'s Open
+   Issues table matches `README.md`'s Known Issues table (same numbers,
+   same priorities). They live in two files and drift silently.
+4. **Handoff-claim spot check.** Pick one Known Issue you plan to
+   touch. Before starting, grep the affected source file for the
+   claim's specific string (e.g. `SOURCE QUOTE CHECK`, `_number_in_text`).
+   If the string isn't there, the claim is stale — verify before acting.
+
+Session 25 caught four doc-lag items (test count; #12 never migrated
+from S24 handoff to RESOLVED_ISSUES; #15 miscategorised as a bug;
+"decimal separator" claim contradicted by `_number_in_text`). This
+checklist exists so those catches happen at session open, not
+mid-work.
+
+---
+
 ## Current State (Session 25, v2.4.13, 2026-08-29)
 
 | Component      | Status |
