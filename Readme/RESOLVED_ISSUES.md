@@ -14,6 +14,7 @@ without reading the closing notes there.
 | 8  | Test referenced nonexistent `prompts/coding/*.txt` layout | v2.4.9 |
 | 9  | No SD/SE disambiguation | MITIGATED v2.4.10/v2.4.12 - `sd_se_warning` + source-quote check. Manual check still required (`REVIEWER_GUIDE.md` 3.1). |
 | 10 | No within- vs between-group detection | MITIGATED v2.4.10/v2.4.13 - `group_timepoint_warning` + tabular multi-timepoint flag. Manual check still required (`REVIEWER_GUIDE.md` 2.2). |
+| 12 | CMap offset-decode fallback landed v2.4.13; unconfirmed on a real shifted PDF | v2.4.13 code, closed Session 24 (c6ac1fd) - decoder only runs on the "nearly space-free" failure mode and skips `(cid:` cases by design; all corpus PDFs are either `(cid:` cases or have clean text layers, so the branch cannot be exercised by the current corpus. Pinned by `tests/test_cmap_offset_decode.py` (16 cases). Decoded text keeps `!` where spaces were - fine for the LLM screener, may matter for the extractor's text-fallback if it ever receives decoded text (no corpus PDF exercises this today). |
 | 13 | No effect-size plausibility bound | v2.4.9 - `plausibility_flag`, flag only |
 | 14 | PICO file discovery differed UI vs CLI | v2.4.9 |
 | 15 | RoB 2.0 ignores `study_overrides.yaml` | Session 25 - not a bug: RoB is an intentional independent second read (`REVIEWER_GUIDE.md` §5, §6). Verified no override references in `rob2_tool.py` or its tests. |

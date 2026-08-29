@@ -3,7 +3,7 @@
 A multi-mode AI assistant for medical research, critical appraisal, systematic review, coding, and writing. Uses cloud providers by default (DeepSeek, Qwen, OpenAI, Anthropic, Groq) with optional local Ollama support.
 
     Version: 2.4.13
-    Tests: 501 passed, 3 skipped, 11 deselected
+    Tests: 526 passed, 3 skipped, 11 deselected
            (reproduce with `python -m pytest -m "not live" --tb=short -q`)
     CI: GitHub Actions - Green
     GitHub: https://github.com/KW75/AI_kcMedicalResearch
@@ -186,10 +186,11 @@ can be audited without reopening the PDF. `extracted_data.csv` also records
 `[OUTCOME/TIMEPOINT]` provenance block.
 
 Stage 4 prints a summary block for each check unconditionally - a clean run
-prints "0 of N flagged" with coverage notes. Every audit CSV row carries
-`run_id`. Stage 2 prints a `[SCREENING]` accounting block; screening retries
-transient network errors, because an error-based drop is not a valid PRISMA
-exclusion.
+prints "0 flagged of N extracted" with coverage notes. An empty run prints
+"0 flagged of 0 extracted" so a silent-empty run cannot look like a clean
+run (#66). Every audit CSV row carries `run_id`. Stage 2 prints a
+`[SCREENING]` accounting block; screening retries transient network errors,
+because an error-based drop is not a valid PRISMA exclusion.
 
 These are deterministic pattern checks, not semantic verification. Manual
 verification against the PDF is required regardless of whether any flag
@@ -200,8 +201,9 @@ group/timepoint (#50).
 
 Several corpus PDFs have text layers whose ToUnicode CMap is shifted by a
 constant offset (every "H" reads as "I"). Screening tries offsets +/-1, +/-2
-scored by English stopword counts before falling back to OCR. Real-run
-confirmation pending (#12).
+scored by English stopword counts before falling back to OCR. Decoder
+behaviour pinned by `tests/test_cmap_offset_decode.py` (16 cases: all four
+offsets, space-to-`!` failure shape, false-positive guards).
 
 ## Study Metadata and Manual Overrides
 
@@ -232,7 +234,9 @@ Extraction still runs when an override exists, so the log shows
 disable extraction for overridden studies.
 
 Overrides affect extraction and meta-analysis only. Screening and RoB 2.0
-re-read the PDF independently (#15).
+re-read the PDF independently — this is intentional; RoB is a bias
+assessment about the same reviewer's data and should not be influenced by
+reviewer-entered values. See `Readme/REVIEWER_GUIDE.md` §5-6.
 
 The end of Stage 3 prints a DATA PROVENANCE SUMMARY listing every study with
 overridden values or auto-derived metadata. Both must be described in the
@@ -252,7 +256,6 @@ them; gaps are closed issues. Closed issues: `Readme/RESOLVED_ISSUES.md`.
 | #  | Issue | Priority |
 |----|-------|----------|
 | 11 | Extraction is non-deterministic. Ang is bimodal between two value sets; Jensen's means vary in the first decimal; Lami's Ns are chaotic (override catches every variant); McCrae/Karlsson stable. Ang pinned by regression fixtures; Jensen and Lami fixtures pending. **Mitigation:** run 3x and diff, use source quotes. | High |
-| 12 | CMap offset-decode fallback landed v2.4.13; not yet confirmed on a real shifted PDF. | High |
 | 28 | Docker route never executed end to end (no Docker on dev machine). | High |
 | 19 | macOS launchers untested on macOS. | Medium |
 | 2  | WeasyPrint not installed; PDF report falls back to HTML. | Medium |
