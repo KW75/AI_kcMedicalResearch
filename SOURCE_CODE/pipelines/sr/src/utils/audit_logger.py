@@ -12,6 +12,36 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 
 
+# #11: nondet_flag as written by the extractor is a list. The CSV cell must
+# distinguish "checked and unanimous" from "never checked" from "flagged"
+# without relying on an empty string, because an empty cell also appears on
+# error rows and on the Anthropic path where no vote runs.
+NONDET_CELL_UNANIMOUS = "unanimous"
+NONDET_CELL_NOT_CHECKED = "not_checked"
+NONDET_MANDATORY_MARKERS = ("no_majority", "table_shift")
+
+
+def nondet_flag_to_cell(flag) -> str:
+    """Render the extractor's nondet_flag for a CSV cell.
+
+    []            -> "unanimous"
+    None / absent -> "not_checked"   (extraction error, Anthropic path)
+    [..strings..] -> "a|b|c"          (includes "single_run" as-is)
+    """
+    if flag is None:
+        return NONDET_CELL_NOT_CHECKED
+    if isinstance(flag, str):
+        return flag or NONDET_CELL_UNANIMOUS
+    if not flag:
+        return NONDET_CELL_UNANIMOUS
+    return "|".join(str(x) for x in flag)
+
+
+def nondet_cell_is_mandatory(cell: str) -> bool:
+    """True if a rendered nondet_flag cell requires a source check."""
+    return any(m in (cell or "") for m in NONDET_MANDATORY_MARKERS)
+
+
 def _write_csv(path: Path, rows: list[dict], fieldnames: list[str]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w", newline="", encoding="utf-8") as f:
@@ -117,5 +147,6 @@ def write_results(path: Path, meta_rows: list[dict]) -> None:
         "included_in_meta", "skip_reason",
         "plausibility_flag", "sd_se_warning", "group_timepoint_warning",
         "source_quote_warning",
+        "nondet_flag", "nondet_runs",   # #11; rendered via nondet_flag_to_cell
     ]
     _write_csv(path, meta_rows, fields)

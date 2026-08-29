@@ -23,7 +23,8 @@ from .src.reporting.report_generator import ReportGenerator
 from .src.reporting.pdf_report import PDFReportGenerator
 from .src.utils.project_layout import SRProjectLayout
 from .src.utils.audit_logger import (
-    write_screens, write_extracts, write_rob2, write_results
+    write_screens, write_extracts, write_rob2, write_results,
+    nondet_flag_to_cell, nondet_cell_is_mandatory, NONDET_CELL_UNANIMOUS,
 )
 
 def resolve_model(provider: str, model):
@@ -243,6 +244,55 @@ def _log_stage4_summary(meta_audit: list[dict],
             f"source quote with no SE labels or within-subject "
             f"timepoint language. Manual verification still required.")
 
+    # --- [AGREEMENT] (#11) -------------------------------------------------
+    # nondet_flag cell: "unanimous" | "not_checked" | "single_run" |
+    # "field:majority|field:no_majority|table_shift...". Denominator is the
+    # studies that were actually voted (nondet_runs >= 2), not n_extracted:
+    # a corpus run with N=1 must print "not checked", never "0 flagged".
+    voted = [r for r in meta_audit
+             if _row_has_extracted_value(r)
+             and (r.get("nondet_runs") or 0) >= 2]
+    flagged = [r for r in voted
+               if r.get("nondet_flag") not in (None, "", NONDET_CELL_UNANIMOUS)]
+    mandatory = [r for r in flagged if nondet_cell_is_mandatory(r.get("nondet_flag"))]
+    if n_extracted == 0:
+        logger.info(
+            f"[AGREEMENT] 0 flagged of 0 extracted studies (nothing to check).")
+    elif not voted:
+        logger.warning(
+            f"[AGREEMENT] not checked - {n_extracted} extracted studies ran "
+            f"with a single vision call (N=1). Non-determinism (#11) is "
+            f"unmeasured for this run; use --n-agreement 3 or the manual "
+            f"run-3x-and-diff step.")
+    elif flagged:
+        logger.warning(
+            f"[AGREEMENT] {len(flagged)} of {len(voted)} voted studies "
+            f"disagreed across N runs ({len(mandatory)} mandatory: "
+            f"no_majority/table_shift = the runs read different table "
+            f"cells; a majority there is not evidence). Verify each "
+            f"against the source PDF before trusting this pooled estimate "
+            f"(#11):")
+        for r in flagged:
+            tag = "MANDATORY" if nondet_cell_is_mandatory(r.get("nondet_flag")) else "check"
+            logger.warning(
+                f"  - {r.get('first_author','?')} ({r.get('year','')}) "
+                f"[{tag}]: {r.get('nondet_flag')}")
+        if len(voted) < n_extracted:
+            logger.info(
+                f"[AGREEMENT]   ({n_extracted - len(voted)} extracted "
+                f"studies were not voted: text fallback or Anthropic path.)")
+    else:
+        logger.info(
+            f"[AGREEMENT] 0 flagged of {len(voted)} voted studies - all N "
+            f"runs agreed on every voted field (mean/SD/n per arm, group "
+            f"labels). Agreement is stability, not correctness: three runs "
+            f"can agree on the same wrong cell. Manual verification still "
+            f"required.")
+        if len(voted) < n_extracted:
+            logger.info(
+                f"[AGREEMENT]   ({n_extracted - len(voted)} extracted "
+                f"studies were not voted: text fallback or Anthropic path.)")
+
     # --- [OUTCOME/TIMEPOINT] provenance ----------------------------------
     # Skip rows where the extractor produced nothing AND has no author
     # label - those emit the ugly "? ():" line called out in #66.
@@ -305,6 +355,12 @@ def main():
                     help="AI provider for screening and extraction")
     ap.add_argument("--run-id",         default=None,
                     help="Override run timestamp (e.g. for re-runs)")
+    ap.add_argument("--n-agreement",    default=None, type=int,
+                    help="Vision-extraction calls per study, majority-voted "
+                         "and written to nondet_flag (#11). Default 3, or "
+                         "SR_EXTRACT_N_AGREEMENT; 1 disables the vote and "
+                         "writes nondet_flag=single_run. Costs N x Stage-3 "
+                         "vision calls.")
 
     args = ap.parse_args()
     args.model = resolve_model(args.provider, args.model)
@@ -431,6 +487,7 @@ def main():
         pico_criteria = cfg.get("pico", {}),
         model         = args.model,
         provider      = args.provider,
+        n_agreement   = args.n_agreement,
     ).extract_batch(included)
 
     for _r in er:
@@ -513,6 +570,11 @@ def main():
             "sd_se_warning"     : sd_se_warning,
             "group_timepoint_warning" : group_timepoint_warning,
             "source_quote_warning"    : source_quote_warning,
+            # #11: top-level keys on r, set by the extractor's vision path.
+            # Rendered to a string here so write_results' fixed fieldnames
+            # carry a readable cell; the raw list stays in extracted.csv.
+            "nondet_flag"             : nondet_flag_to_cell(r.get("nondet_flag")),
+            "nondet_runs"             : r.get("nondet_runs"),
         }
         try:
             if po.get("outcome_match") is False:
