@@ -1,0 +1,835 @@
+{
+  "tag": "baseline",
+  "timestamp": "2026-08-29T11:11:49",
+  "provider": "qwen",
+  "model": "qwen-vl-plus",
+  "temperature": 0.1,
+  "seed": null,
+  "runs": 3,
+  "pdfs": {
+    "Arthritis Care Research - 2010 - Ang - Cognitive behavioral therapy attenuates nociceptive responding in patients with-1.pdf": {
+      "disagree": [],
+      "flat": [
+        {
+          "extraction_method": "vision_smart",
+          "intervention_group": "CBT",
+          "control_group": "UC",
+          "outcome.name": null,
+          "outcome.time_point": null,
+          "mean_i": 32.5,
+          "sd_i": 15.0,
+          "mean_c": 37.6,
+          "sd_c": 10.0,
+          "n_i": 17,
+          "n_c": 15,
+          "quote_i#": "2c2b0f9b",
+          "quote_c#": "4d084d4a",
+          "extraction_error": null
+        },
+        {
+          "extraction_method": "vision_smart",
+          "intervention_group": "CBT",
+          "control_group": "UC",
+          "outcome.name": null,
+          "outcome.time_point": null,
+          "mean_i": 32.5,
+          "sd_i": 15.0,
+          "mean_c": 37.6,
+          "sd_c": 10.0,
+          "n_i": 17,
+          "n_c": 15,
+          "quote_i#": "2c2b0f9b",
+          "quote_c#": "4d084d4a",
+          "extraction_error": null
+        },
+        {
+          "extraction_method": "vision_smart",
+          "intervention_group": "CBT",
+          "control_group": "UC",
+          "outcome.name": null,
+          "outcome.time_point": null,
+          "mean_i": 32.5,
+          "sd_i": 15.0,
+          "mean_c": 37.6,
+          "sd_c": 10.0,
+          "n_i": 17,
+          "n_c": 15,
+          "quote_i#": "2c2b0f9b",
+          "quote_c#": "4d084d4a",
+          "extraction_error": null
+        }
+      ],
+      "raw": [
+        {
+          "study_metadata": {
+            "first_author": "Ang",
+            "year": 2010,
+            "journal": "Arthritis Care & Research",
+            "doi": "10.1002/acr.20119"
+          },
+          "participants": {
+            "n_intervention": 17,
+            "n_control": 15
+          },
+          "primary_outcome": {
+            "mean_intervention": 32.5,
+            "sd_intervention": 15.0,
+            "mean_control": 37.6,
+            "sd_control": 10.0,
+            "outcome_match": true,
+            "outcome_selected": "FIQ pain rating",
+            "timepoint_selected": "Week 6",
+            "source_quote_intervention": "Baseline values: CBT group (n = 17) 32.5 \u00b1 15",
+            "source_quote_control": "Baseline values: UC group (n = 15) 37.6 \u00b1 10"
+          },
+          "group_timepoint_warning": null,
+          "filename": "Arthritis Care Research - 2010 - Ang - Cognitive behavioral therapy attenuates nociceptive responding in patients with-1.pdf",
+          "intervention_group": "CBT",
+          "control_group": "UC",
+          "extraction_method": "vision_smart",
+          "source_quote_warning": null,
+          "file_id": null,
+          "extraction_error": null,
+          "year": 2010,
+          "metadata_source": "pdf_auto (verify)",
+          "doi": "10.1002/acr.20119"
+        },
+        {
+          "study_metadata": {
+            "first_author": "Ang",
+            "year": 2010,
+            "journal": "Arthritis Care & Research",
+            "doi": "10.1002/acr.20119"
+          },
+          "participants": {
+            "n_intervention": 17,
+            "n_control": 15
+          },
+          "primary_outcome": {
+            "mean_intervention": 32.5,
+            "sd_intervention": 15.0,
+            "mean_control": 37.6,
+            "sd_control": 10.0,
+            "outcome_match": true,
+            "outcome_selected": "FIQ pain rating",
+            "timepoint_selected": "Week 6",
+            "source_quote_intervention": "Baseline values: CBT group (n = 17) 32.5 \u00b1 15",
+            "source_quote_control": "Baseline values: UC group (n = 15) 37.6 \u00b1 10"
+          },
+          "group_timepoint_warning": null,
+          "filename": "Arthritis Care Research - 2010 - Ang - Cognitive behavioral therapy attenuates nociceptive responding in patients with-1.pdf",
+          "intervention_group": "CBT",
+          "control_group": "UC",
+          "extraction_method": "vision_smart",
+          "source_quote_warning": null,
+          "file_id": null,
+          "extraction_error": null,
+          "year": 2010,
+          "metadata_source": "pdf_auto (verify)",
+          "doi": "10.1002/acr.20119"
+        },
+        {
+          "study_metadata": {
+            "first_author": "Ang",
+            "year": 2010,
+            "journal": "Arthritis Care & Research",
+            "doi": "10.1002/acr.2019"
+          },
+          "participants": {
+            "n_intervention": 17,
+            "n_control": 15
+          },
+          "primary_outcome": {
+            "mean_intervention": 32.5,
+            "sd_intervention": 15.0,
+            "mean_control": 37.6,
+            "sd_control": 10.0,
+            "outcome_match": true,
+            "outcome_selected": "FIQ pain",
+            "timepoint_selected": "Week 6",
+            "source_quote_intervention": "Baseline values: CBT group (n = 17) 32.5 \u00b1 15",
+            "source_quote_control": "Baseline values: UC group (n = 15) 37.6 \u00b1 10"
+          },
+          "group_timepoint_warning": null,
+          "filename": "Arthritis Care Research - 2010 - Ang - Cognitive behavioral therapy attenuates nociceptive responding in patients with-1.pdf",
+          "intervention_group": "CBT",
+          "control_group": "UC",
+          "extraction_method": "vision_smart",
+          "source_quote_warning": null,
+          "file_id": null,
+          "extraction_error": null,
+          "year": 2010,
+          "metadata_source": "pdf_auto (verify)",
+          "doi": "10.1002/acr.20119"
+        }
+      ]
+    },
+    "Cognitive Behavioral Therapy increases pain-evoked activation of the prefrontal cortex in patients with fibromyalgeia (1).pdf": {
+      "disagree": [
+        "quote_i#",
+        "quote_c#"
+      ],
+      "flat": [
+        {
+          "extraction_method": "vision_smart",
+          "intervention_group": "CBT",
+          "control_group": "waitinglist",
+          "outcome.name": null,
+          "outcome.time_point": null,
+          "mean_i": 60.5,
+          "sd_i": 4.0,
+          "mean_c": 65.0,
+          "sd_c": 2.7,
+          "n_i": 25,
+          "n_c": 18,
+          "quote_i#": "fa0792de",
+          "quote_c#": "da82178c",
+          "extraction_error": null
+        },
+        {
+          "extraction_method": "vision_smart",
+          "intervention_group": "CBT",
+          "control_group": "waitinglist",
+          "outcome.name": null,
+          "outcome.time_point": null,
+          "mean_i": 60.5,
+          "sd_i": 4.0,
+          "mean_c": 65.0,
+          "sd_c": 2.7,
+          "n_i": 25,
+          "n_c": 18,
+          "quote_i#": "ba18ebd0",
+          "quote_c#": "b5b33eaa",
+          "extraction_error": null
+        },
+        {
+          "extraction_method": "vision_smart",
+          "intervention_group": "CBT",
+          "control_group": "waitinglist",
+          "outcome.name": null,
+          "outcome.time_point": null,
+          "mean_i": 60.5,
+          "sd_i": 4.0,
+          "mean_c": 65.0,
+          "sd_c": 2.7,
+          "n_i": 25,
+          "n_c": 18,
+          "quote_i#": "fa0792de",
+          "quote_c#": "da82178c",
+          "extraction_error": null
+        }
+      ],
+      "raw": [
+        {
+          "study_metadata": {
+            "first_author": "Jensen",
+            "year": 2012,
+            "journal": "PAIN",
+            "doi": "http://dx.doi.org/10.1016/j.pain.2012.04.010"
+          },
+          "participants": {
+            "n_intervention": 25,
+            "n_control": 18
+          },
+          "primary_outcome": {
+            "mean_intervention": 60.5,
+            "sd_intervention": 4.0,
+            "mean_control": 65.0,
+            "sd_control": 2.7,
+            "outcome_match": true,
+            "outcome_selected": "Average weekly FM pain (VAS)",
+            "timepoint_selected": "Post-treatment",
+            "source_quote_intervention": "Average weekly FM pain (0\u2013100 VAS) 60.5 \u00b1 4.0",
+            "source_quote_control": "Average weekly FM pain (0\u2013100 VAS) 65.0 \u00b1 2.7"
+          },
+          "group_timepoint_warning": null,
+          "filename": "Cognitive Behavioral Therapy increases pain-evoked activation of the prefrontal cortex in patients with fibromyalgeia (1).pdf",
+          "intervention_group": "CBT",
+          "control_group": "waitinglist",
+          "extraction_method": "vision_smart",
+          "source_quote_warning": null,
+          "file_id": null,
+          "extraction_error": null,
+          "first_author": "Jensen",
+          "metadata_source": "pdf_auto (verify)",
+          "year": 2012,
+          "doi": "10.1016/j.pain.2012.04.010"
+        },
+        {
+          "study_metadata": {
+            "first_author": "Jensen",
+            "year": 2012,
+            "journal": "PAIN",
+            "doi": "http://dx.doi.org/10.1016/j.pain.2012.04.010"
+          },
+          "participants": {
+            "n_intervention": 25,
+            "n_control": 18
+          },
+          "primary_outcome": {
+            "mean_intervention": 60.5,
+            "sd_intervention": 4.0,
+            "mean_control": 65.0,
+            "sd_control": 2.7,
+            "outcome_match": true,
+            "outcome_selected": "Average weekly FM pain (VAS)",
+            "timepoint_selected": "Post-treatment",
+            "source_quote_intervention": "Average weekly FM pain (0\u2013100 VAS): 60.5 \u00b1 4.0",
+            "source_quote_control": "Average weekly FM pain (0\u2013100 VAS): 65.0 \u00b1 2.7"
+          },
+          "group_timepoint_warning": null,
+          "filename": "Cognitive Behavioral Therapy increases pain-evoked activation of the prefrontal cortex in patients with fibromyalgeia (1).pdf",
+          "intervention_group": "CBT",
+          "control_group": "waitinglist",
+          "extraction_method": "vision_smart",
+          "source_quote_warning": null,
+          "file_id": null,
+          "extraction_error": null,
+          "first_author": "Jensen",
+          "metadata_source": "pdf_auto (verify)",
+          "year": 2012,
+          "doi": "10.1016/j.pain.2012.04.010"
+        },
+        {
+          "study_metadata": {
+            "first_author": "Jensen",
+            "year": 2012,
+            "journal": "PAIN",
+            "doi": "http://dx.doi.org/10.1016/j.pain.2012.04.010"
+          },
+          "participants": {
+            "n_intervention": 25,
+            "n_control": 18
+          },
+          "primary_outcome": {
+            "mean_intervention": 60.5,
+            "sd_intervention": 4.0,
+            "mean_control": 65.0,
+            "sd_control": 2.7,
+            "outcome_match": true,
+            "outcome_selected": "Average weekly FM pain (VAS)",
+            "timepoint_selected": "post-treatment",
+            "source_quote_intervention": "Average weekly FM pain (0\u2013100 VAS) 60.5 \u00b1 4.0",
+            "source_quote_control": "Average weekly FM pain (0\u2013100 VAS) 65.0 \u00b1 2.7"
+          },
+          "group_timepoint_warning": null,
+          "filename": "Cognitive Behavioral Therapy increases pain-evoked activation of the prefrontal cortex in patients with fibromyalgeia (1).pdf",
+          "intervention_group": "CBT",
+          "control_group": "waitinglist",
+          "extraction_method": "vision_smart",
+          "source_quote_warning": null,
+          "file_id": null,
+          "extraction_error": null,
+          "first_author": "Jensen",
+          "metadata_source": "pdf_auto (verify)",
+          "year": 2012,
+          "doi": "10.1016/j.pain.2012.04.010"
+        }
+      ]
+    },
+    "Cognitive behaviour therapy in women with fibromyalgia_ A randomized clinical trial - 1-s2.0-S1877886015000567-main.pdf": {
+      "disagree": [
+        "control_group",
+        "sd_i",
+        "mean_c",
+        "sd_c",
+        "quote_i#",
+        "quote_c#"
+      ],
+      "flat": [
+        {
+          "extraction_method": "vision_smart",
+          "intervention_group": "CBT intervention group",
+          "control_group": "Wait-list group, CBT after 6 months",
+          "outcome.name": null,
+          "outcome.time_point": null,
+          "mean_i": 3.88,
+          "sd_i": 0.85,
+          "mean_c": 3.38,
+          "sd_c": 0.92,
+          "n_i": 24,
+          "n_c": 24,
+          "quote_i#": "f3c2cb6b",
+          "quote_c#": "a92a4001",
+          "extraction_error": null
+        },
+        {
+          "extraction_method": "vision_smart",
+          "intervention_group": "CBT intervention group",
+          "control_group": "Wait-list group, CBT after 6 months",
+          "outcome.name": null,
+          "outcome.time_point": null,
+          "mean_i": 3.88,
+          "sd_i": 0.85,
+          "mean_c": 3.38,
+          "sd_c": 0.92,
+          "n_i": 24,
+          "n_c": 24,
+          "quote_i#": "f3c2cb6b",
+          "quote_c#": "a92a4001",
+          "extraction_error": null
+        },
+        {
+          "extraction_method": "vision_smart",
+          "intervention_group": "CBT intervention group",
+          "control_group": "Wait-list group",
+          "outcome.name": null,
+          "outcome.time_point": null,
+          "mean_i": 3.88,
+          "sd_i": 0.95,
+          "mean_c": 3.37,
+          "sd_c": 0.82,
+          "n_i": 24,
+          "n_c": 24,
+          "quote_i#": "ac5cda2e",
+          "quote_c#": "8a031309",
+          "extraction_error": null
+        }
+      ],
+      "raw": [
+        {
+          "study_metadata": {
+            "first_author": "Karlsson",
+            "year": 2015,
+            "journal": "Scandinavian Journal of Pain",
+            "doi": "10.1016/j.scijp.2014.11.003"
+          },
+          "participants": {
+            "n_intervention": 24,
+            "n_control": 24
+          },
+          "primary_outcome": {
+            "mean_intervention": 3.88,
+            "sd_intervention": 0.85,
+            "mean_control": 3.38,
+            "sd_control": 0.92,
+            "outcome_match": true,
+            "outcome_selected": "Pain severity",
+            "timepoint_selected": "After treatment",
+            "source_quote_intervention": "Pain severity score increased from 3.85 (0.80) to 3.88 (0.85) in group 1",
+            "source_quote_control": "Pain severity score increased from 3.61 (0.81) to 3.67 (0.75) in group 2"
+          },
+          "group_timepoint_warning": null,
+          "filename": "Cognitive behaviour therapy in women with fibromyalgia_ A randomized clinical trial - 1-s2.0-S1877886015000567-main.pdf",
+          "intervention_group": "CBT intervention group",
+          "control_group": "Wait-list group, CBT after 6 months",
+          "extraction_method": "vision_smart",
+          "source_quote_warning": "control mean (3.38) does not appear in its own source quote - the quote does not support this number | control SD (0.92) does not appear in its own source quote - the quote does not support this number",
+          "file_id": null,
+          "extraction_error": null
+        },
+        {
+          "study_metadata": {
+            "first_author": "Karlsson",
+            "year": 2015,
+            "journal": "Scandinavian Journal of Pain",
+            "doi": "10.1016/j.scijp.2014.11.003"
+          },
+          "participants": {
+            "n_intervention": 24,
+            "n_control": 24
+          },
+          "primary_outcome": {
+            "mean_intervention": 3.88,
+            "sd_intervention": 0.85,
+            "mean_control": 3.38,
+            "sd_control": 0.92,
+            "outcome_match": true,
+            "outcome_selected": "Pain severity",
+            "timepoint_selected": "After treatment",
+            "source_quote_intervention": "Pain severity score increased from 3.85 (0.80) to 3.88 (0.85) in group 1",
+            "source_quote_control": "Pain severity score increased from 3.61 (0.81) to 3.67 (0.75) in group 2"
+          },
+          "group_timepoint_warning": null,
+          "filename": "Cognitive behaviour therapy in women with fibromyalgia_ A randomized clinical trial - 1-s2.0-S1877886015000567-main.pdf",
+          "intervention_group": "CBT intervention group",
+          "control_group": "Wait-list group, CBT after 6 months",
+          "extraction_method": "vision_smart",
+          "source_quote_warning": "control mean (3.38) does not appear in its own source quote - the quote does not support this number | control SD (0.92) does not appear in its own source quote - the quote does not support this number",
+          "file_id": null,
+          "extraction_error": null
+        },
+        {
+          "study_metadata": {
+            "first_author": "Karlsson",
+            "year": 2015,
+            "journal": "Scandinavian Journal of Pain",
+            "doi": "10.1016/j.scijp.2014.11.003"
+          },
+          "participants": {
+            "n_intervention": 24,
+            "n_control": 24
+          },
+          "primary_outcome": {
+            "mean_intervention": 3.88,
+            "sd_intervention": 0.95,
+            "mean_control": 3.37,
+            "sd_control": 0.82,
+            "outcome_match": true,
+            "outcome_selected": "Pain severity",
+            "timepoint_selected": "After treatment",
+            "source_quote_intervention": "Pain severity score increased from 3.61 to 4.20 (p = 0.02) in group 1",
+            "source_quote_control": "Pain severity score increased from 3.61 to 3.37 (p = 0.02) in group 2"
+          },
+          "group_timepoint_warning": null,
+          "filename": "Cognitive behaviour therapy in women with fibromyalgia_ A randomized clinical trial - 1-s2.0-S1877886015000567-main.pdf",
+          "intervention_group": "CBT intervention group",
+          "control_group": "Wait-list group",
+          "extraction_method": "vision_smart",
+          "source_quote_warning": "intervention mean (3.88) does not appear in its own source quote - the quote does not support this number | intervention SD (0.95) does not appear in its own source quote - the quote does not support this number | control SD (0.82) does not appear in its own source quote - the quote does not support this number",
+          "file_id": null,
+          "extraction_error": null
+        }
+      ]
+    },
+    "s10608-017-9875-4.pdf": {
+      "disagree": [
+        "quote_i#"
+      ],
+      "flat": [
+        {
+          "extraction_method": "vision_smart",
+          "intervention_group": "CBT-IP",
+          "control_group": "UMC",
+          "outcome.name": null,
+          "outcome.time_point": null,
+          "mean_i": 7.35,
+          "sd_i": 2.08,
+          "mean_c": 7.4,
+          "sd_c": 1.29,
+          "n_i": 28,
+          "n_c": 36,
+          "quote_i#": "429b070a",
+          "quote_c#": "e95773f4",
+          "extraction_error": null
+        },
+        {
+          "extraction_method": "vision_smart",
+          "intervention_group": "CBT-IP",
+          "control_group": "UMC",
+          "outcome.name": null,
+          "outcome.time_point": null,
+          "mean_i": 7.35,
+          "sd_i": 2.08,
+          "mean_c": 7.4,
+          "sd_c": 1.29,
+          "n_i": 28,
+          "n_c": 36,
+          "quote_i#": "429b070a",
+          "quote_c#": "e95773f4",
+          "extraction_error": null
+        },
+        {
+          "extraction_method": "vision_smart",
+          "intervention_group": "CBT-IP",
+          "control_group": "UMC",
+          "outcome.name": null,
+          "outcome.time_point": null,
+          "mean_i": 7.35,
+          "sd_i": 2.08,
+          "mean_c": 7.4,
+          "sd_c": 1.29,
+          "n_i": 28,
+          "n_c": 36,
+          "quote_i#": "b52fd612",
+          "quote_c#": "e95773f4",
+          "extraction_error": null
+        }
+      ],
+      "raw": [
+        {
+          "study_metadata": {
+            "first_author": "Kim",
+            "year": 2011,
+            "journal": "Cogn Ther Res",
+            "doi": "https://doi.org/10.1007/s10608-018-9934-5"
+          },
+          "participants": {
+            "n_intervention": 28,
+            "n_control": 36
+          },
+          "primary_outcome": {
+            "mean_intervention": 7.35,
+            "sd_intervention": 2.08,
+            "mean_control": 7.4,
+            "sd_control": 1.29,
+            "outcome_match": true,
+            "outcome_selected": "Pain intensity",
+            "timepoint_selected": "Follow-up",
+            "source_quote_intervention": "CBT-IP: 13.79 (4.22)",
+            "source_quote_control": "UMC: 13.47 (4.45)",
+            "n_intervention": 28,
+            "intervention_n": 28,
+            "n_control": 36,
+            "control_n": 36
+          },
+          "group_timepoint_warning": null,
+          "filename": "s10608-017-9875-4.pdf",
+          "intervention_group": "CBT-IP",
+          "control_group": "UMC",
+          "extraction_method": "vision_smart",
+          "source_quote_warning": null,
+          "file_id": null,
+          "extraction_error": null,
+          "first_author": "Lami",
+          "metadata_source": "pdf_auto (verify)",
+          "year": 2017,
+          "doi": "10.1007/s10608-017-9875-4",
+          "n_intervention": 28,
+          "n_control": 36,
+          "mean_intervention": 7.35,
+          "sd_intervention": 2.08,
+          "mean_control": 7.4,
+          "sd_control": 1.29,
+          "override_fields": "n_intervention(34->28); n_control(41->36); mean_intervention(13.79->7.35); sd_intervention(4.22->2.08); mean_control(13.47->7.4); sd_control(4.45->1.29)",
+          "override_note": "Table 4, post-intervention CBT-P vs UMC. Ns are post-intervention (28/36), not baseline (34/41). Verified from PDF pages 12-13."
+        },
+        {
+          "study_metadata": {
+            "first_author": "Kim",
+            "year": 2011,
+            "journal": "Cogn Ther Res",
+            "doi": "https://doi.org/10.1007/s10608-018-9934-5"
+          },
+          "participants": {
+            "n_intervention": 28,
+            "n_control": 36
+          },
+          "primary_outcome": {
+            "mean_intervention": 7.35,
+            "sd_intervention": 2.08,
+            "mean_control": 7.4,
+            "sd_control": 1.29,
+            "outcome_match": true,
+            "outcome_selected": "Pain intensity",
+            "timepoint_selected": "Follow-up",
+            "source_quote_intervention": "CBT-IP: 13.79 (4.22)",
+            "source_quote_control": "UMC: 13.47 (4.45)",
+            "n_intervention": 28,
+            "intervention_n": 28,
+            "n_control": 36,
+            "control_n": 36
+          },
+          "group_timepoint_warning": null,
+          "filename": "s10608-017-9875-4.pdf",
+          "intervention_group": "CBT-IP",
+          "control_group": "UMC",
+          "extraction_method": "vision_smart",
+          "source_quote_warning": null,
+          "file_id": null,
+          "extraction_error": null,
+          "first_author": "Lami",
+          "metadata_source": "pdf_auto (verify)",
+          "year": 2017,
+          "doi": "10.1007/s10608-017-9875-4",
+          "n_intervention": 28,
+          "n_control": 36,
+          "mean_intervention": 7.35,
+          "sd_intervention": 2.08,
+          "mean_control": 7.4,
+          "sd_control": 1.29,
+          "override_fields": "n_intervention(34->28); n_control(41->36); mean_intervention(13.79->7.35); sd_intervention(4.22->2.08); mean_control(13.47->7.4); sd_control(4.45->1.29)",
+          "override_note": "Table 4, post-intervention CBT-P vs UMC. Ns are post-intervention (28/36), not baseline (34/41). Verified from PDF pages 12-13."
+        },
+        {
+          "study_metadata": {
+            "first_author": "Kim",
+            "year": 2011,
+            "journal": "Cogn Ther Res",
+            "doi": "https://doi.org/10.1007/s10548-018-0637-9"
+          },
+          "participants": {
+            "n_intervention": 28,
+            "n_control": 36
+          },
+          "primary_outcome": {
+            "mean_intervention": 7.35,
+            "sd_intervention": 2.08,
+            "mean_control": 7.4,
+            "sd_control": 1.29,
+            "outcome_match": true,
+            "outcome_selected": "Pain intensity",
+            "timepoint_selected": "Follow-up",
+            "source_quote_intervention": "CBT-IP: 13.68 (4.61)",
+            "source_quote_control": "UMC: 13.47 (4.45)",
+            "n_intervention": 28,
+            "intervention_n": 28,
+            "n_control": 36,
+            "control_n": 36
+          },
+          "group_timepoint_warning": null,
+          "filename": "s10608-017-9875-4.pdf",
+          "intervention_group": "CBT-IP",
+          "control_group": "UMC",
+          "extraction_method": "vision_smart",
+          "source_quote_warning": null,
+          "file_id": null,
+          "extraction_error": null,
+          "first_author": "Lami",
+          "metadata_source": "pdf_auto (verify)",
+          "year": 2017,
+          "doi": "10.1007/s10608-017-9875-4",
+          "n_intervention": 28,
+          "n_control": 36,
+          "mean_intervention": 7.35,
+          "sd_intervention": 2.08,
+          "mean_control": 7.4,
+          "sd_control": 1.29,
+          "override_fields": "n_intervention(34->28); n_control(41->36); mean_intervention(13.68->7.35); sd_intervention(4.61->2.08); mean_control(13.47->7.4); sd_control(4.45->1.29)",
+          "override_note": "Table 4, post-intervention CBT-P vs UMC. Ns are post-intervention (28/36), not baseline (34/41). Verified from PDF pages 12-13."
+        }
+      ]
+    },
+    "zsy234.pdf": {
+      "disagree": [
+        "quote_i#",
+        "quote_c#"
+      ],
+      "flat": [
+        {
+          "extraction_method": "vision_smart",
+          "intervention_group": "CBT-I",
+          "control_group": "WLC",
+          "outcome.name": null,
+          "outcome.time_point": null,
+          "mean_i": 114.52,
+          "sd_i": 91.1,
+          "mean_c": 94.64,
+          "sd_c": 12.82,
+          "n_i": 39,
+          "n_c": 37,
+          "quote_i#": "10704250",
+          "quote_c#": "a2584a9a",
+          "extraction_error": null
+        },
+        {
+          "extraction_method": "vision_smart",
+          "intervention_group": "CBT-I",
+          "control_group": "WLC",
+          "outcome.name": null,
+          "outcome.time_point": null,
+          "mean_i": 114.52,
+          "sd_i": 91.1,
+          "mean_c": 94.64,
+          "sd_c": 12.82,
+          "n_i": 39,
+          "n_c": 37,
+          "quote_i#": "f30ea74a",
+          "quote_c#": "90d437c8",
+          "extraction_error": null
+        },
+        {
+          "extraction_method": "vision_smart",
+          "intervention_group": "CBT-I",
+          "control_group": "WLC",
+          "outcome.name": null,
+          "outcome.time_point": null,
+          "mean_i": 114.52,
+          "sd_i": 91.1,
+          "mean_c": 94.64,
+          "sd_c": 12.82,
+          "n_i": 39,
+          "n_c": 37,
+          "quote_i#": "10704250",
+          "quote_c#": "a2584a9a",
+          "extraction_error": null
+        }
+      ],
+      "raw": [
+        {
+          "study_metadata": {
+            "first_author": "McCrae et al",
+            "year": 2019,
+            "journal": "SLEEP",
+            "doi": "https://doi.org/10.5665/sleep.8345"
+          },
+          "participants": {
+            "n_intervention": 39,
+            "n_control": 37
+          },
+          "primary_outcome": {
+            "mean_intervention": 114.52,
+            "sd_intervention": 91.1,
+            "mean_control": 94.64,
+            "sd_control": 12.82,
+            "outcome_match": true,
+            "outcome_selected": "VAS pain intensity",
+            "timepoint_selected": "post-treatment",
+            "source_quote_intervention": "Duration of FM; months, M (SD): 114.52, 91.10",
+            "source_quote_control": "Duration of FM; months, M (SD): 94.64, 12.82"
+          },
+          "group_timepoint_warning": null,
+          "filename": "zsy234.pdf",
+          "intervention_group": "CBT-I",
+          "control_group": "WLC",
+          "extraction_method": "vision_smart",
+          "source_quote_warning": null,
+          "file_id": null,
+          "extraction_error": null
+        },
+        {
+          "study_metadata": {
+            "first_author": "McCrae et al",
+            "year": 2019,
+            "journal": "SLEEP",
+            "doi": "https://doi.org/10.5665/sleep.8347"
+          },
+          "participants": {
+            "n_intervention": 39,
+            "n_control": 37
+          },
+          "primary_outcome": {
+            "mean_intervention": 114.52,
+            "sd_intervention": 91.1,
+            "mean_control": 94.64,
+            "sd_control": 12.82,
+            "outcome_match": true,
+            "outcome_selected": "VAS pain intensity",
+            "timepoint_selected": "post-treatment",
+            "source_quote_intervention": "CBT-I: 114.52, SD = 91.10",
+            "source_quote_control": "WLC: 94.64, SD = 12.82"
+          },
+          "group_timepoint_warning": null,
+          "filename": "zsy234.pdf",
+          "intervention_group": "CBT-I",
+          "control_group": "WLC",
+          "extraction_method": "vision_smart",
+          "source_quote_warning": null,
+          "file_id": null,
+          "extraction_error": null
+        },
+        {
+          "study_metadata": {
+            "first_author": "McCrae et al",
+            "year": 2019,
+            "journal": "SLEEP",
+            "doi": "https://doi.org/10.5665/sleep.8347"
+          },
+          "participants": {
+            "n_intervention": 39,
+            "n_control": 37
+          },
+          "primary_outcome": {
+            "mean_intervention": 114.52,
+            "sd_intervention": 91.1,
+            "mean_control": 94.64,
+            "sd_control": 12.82,
+            "outcome_match": true,
+            "outcome_selected": "VAS pain intensity",
+            "timepoint_selected": "post-treatment",
+            "source_quote_intervention": "Duration of FM; months, M (SD): 114.52, 91.10",
+            "source_quote_control": "Duration of FM; months, M (SD): 94.64, 12.82"
+          },
+          "group_timepoint_warning": null,
+          "filename": "zsy234.pdf",
+          "intervention_group": "CBT-I",
+          "control_group": "WLC",
+          "extraction_method": "vision_smart",
+          "source_quote_warning": null,
+          "file_id": null,
+          "extraction_error": null
+        }
+      ]
+    }
+  }
+}

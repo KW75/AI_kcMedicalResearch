@@ -12,6 +12,96 @@ import fitz
 logger = logging.getLogger(__name__)
 BETA_HEADER = "files-api-2025-04-14"
 
+# --- Sampling controls (#11 mitigation, Session 26) ---
+# Every OpenAI-compatible call (vision, text fallback, group-label follow-up)
+# reads these. Before S26 the vision call used temperature=0.1 while the text
+# paths used 0, and no call passed a seed. Env overrides exist so the
+# nondet_probe harness can A/B without code edits:
+#   SR_EXTRACT_TEMPERATURE  float, default 0
+#   SR_EXTRACT_SEED         int, default 42; set to "none" to omit the param
+# Vision models may ignore seed; that is a measurement result, not a reason
+# to skip sending it.
+DEFAULT_EXTRACT_TEMPERATURE = 0.0
+DEFAULT_EXTRACT_SEED = 42
+
+# --- N-run agreement (#11 mitigation, Session 26) ---
+# S26 probe (30 calls, 5 papers) showed qwen-vl-plus ignores `seed` and is not
+# deterministic at temperature=0: source quotes differed run-to-run on 4/5
+# papers, and Ang returned three different tables in three runs (one of them
+# a column shift that passed SOURCE QUOTE CHECK). Sampling controls therefore
+# cannot fix #11; they are kept only so vision and text paths can't drift.
+#
+# Instead every vision extraction is run N times and the numeric fields are
+# voted. `nondet_flag` is ALWAYS written on the result: [] means all N runs
+# agreed on every voted field; a non-empty list names the fields that did
+# not, tagged `majority` (2 of 3 agreed) or `no_majority` (all differed).
+# `["single_run"]` means N=1 and nothing was checked — the key is set so
+# "checked and clean" is never confused with "never ran".
+#   SR_EXTRACT_N_AGREEMENT  int >= 1, default 3
+DEFAULT_EXTRACT_N_AGREEMENT = 3
+
+# Fields voted across runs. Numeric fields are compared after float
+# coercion; label fields after _normalize_label. Source quotes are NOT voted:
+# the quote is carried from a run whose numbers match the chosen values, so
+# SOURCE QUOTE CHECK still tests number-against-its-own-quote.
+AGREEMENT_NUMERIC_FIELDS = (
+    "mean_intervention", "sd_intervention", "n_intervention",
+    "mean_control", "sd_control", "n_control",
+)
+AGREEMENT_LABEL_FIELDS = ("intervention_group", "control_group")
+NONDET_FLAG_SINGLE_RUN = "single_run"
+# `table_shift` marks runs that read different table CELLS (row/column/
+# timepoint) rather than misreading a digit. Two signatures, either suffices:
+#   (a) all four mean/SD fields are non-unanimous;
+#   (b) some run's (mean, sd) pair for one arm equals the chosen pair for the
+#       OTHER arm — a column shift moves the same numbers between arms.
+# S26 acceptance run: Ang's two competing readings shared numbers with arms
+# shifted, and a 2-of-3 majority picked either one depending on the draw.
+# A majority there is not evidence; the reviewer guide treats table_shift
+# like no_majority. Three-of-four alone is NOT enough: the 1-s2.0 paper
+# jittered three fields by one digit (0.85/0.95, 0.92/0.82) with no shift.
+NONDET_FLAG_TABLE_SHIFT = "table_shift"
+
+
+def _sampling_defaults_from_env():
+    """Return (temperature, seed) honouring SR_EXTRACT_* env overrides."""
+    temp = DEFAULT_EXTRACT_TEMPERATURE
+    raw_t = os.environ.get("SR_EXTRACT_TEMPERATURE")
+    if raw_t not in (None, ""):
+        try:
+            temp = float(raw_t)
+        except ValueError:
+            logger.warning("SR_EXTRACT_TEMPERATURE=%r is not a float; using %s",
+                           raw_t, temp)
+    seed = DEFAULT_EXTRACT_SEED
+    raw_s = os.environ.get("SR_EXTRACT_SEED")
+    if raw_s is not None:
+        if raw_s.strip().lower() in ("", "none", "null", "off"):
+            seed = None
+        else:
+            try:
+                seed = int(raw_s)
+            except ValueError:
+                logger.warning("SR_EXTRACT_SEED=%r is not an int; using %s",
+                               raw_s, seed)
+    return temp, seed
+
+
+def _n_agreement_from_env():
+    raw = os.environ.get("SR_EXTRACT_N_AGREEMENT")
+    if raw in (None, ""):
+        return DEFAULT_EXTRACT_N_AGREEMENT
+    try:
+        n = int(raw)
+    except ValueError:
+        logger.warning("SR_EXTRACT_N_AGREEMENT=%r is not an int; using %s",
+                       raw, DEFAULT_EXTRACT_N_AGREEMENT)
+        return DEFAULT_EXTRACT_N_AGREEMENT
+    if n < 1:
+        logger.warning("SR_EXTRACT_N_AGREEMENT=%r < 1; using 1", raw)
+        return 1
+    return n
+
 
 EXTRACTION_PROMPT_TEMPLATE = '''You are a clinical data extractor for a systematic review.
 
@@ -108,9 +198,20 @@ class DataExtractor:
                  pico_outcome: Optional[str] = None,
                  model: str = "qwen-vl-plus",
                  provider: str = "qwen",
-                 api_key: Optional[str] = None):
+                 api_key: Optional[str] = None,
+                 temperature: Optional[float] = None,
+                 seed: Optional[int] = ...,
+                 n_agreement: Optional[int] = None):
         self.provider = provider.lower()
         self.model = model
+        # Explicit kwargs win; otherwise env; otherwise module defaults.
+        # `seed=...` (Ellipsis) means "not passed" so that an explicit
+        # seed=None can still mean "send no seed".
+        env_temp, env_seed = _sampling_defaults_from_env()
+        self.temperature = env_temp if temperature is None else float(temperature)
+        self.seed = env_seed if seed is ... else seed
+        self.n_agreement = (_n_agreement_from_env() if n_agreement is None
+                            else max(1, int(n_agreement)))
         self.pico = pico_criteria or {}
         self.outcome = pico_outcome or self.pico.get("outcome")
 
@@ -141,6 +242,23 @@ class DataExtractor:
             from ..screening.rob2_tool import _openai_compat_creds
             _key, _base = _openai_compat_creds(self.provider, api_key)
             self.client = OpenAI(api_key=_key, base_url=_base)
+
+        logger.info("[SAMPLING] provider=%s model=%s temperature=%s seed=%s "
+                    "n_agreement=%s",
+                    self.provider, self.model, self.temperature, self.seed,
+                    self.n_agreement)
+
+    def _sampling_kwargs(self) -> dict:
+        """kwargs shared by every chat.completions.create call.
+
+        Always sets temperature; sets seed only when configured, because
+        some OpenAI-compatible endpoints reject unknown params rather than
+        ignoring them.
+        """
+        kw = {"temperature": self.temperature}
+        if self.seed is not None:
+            kw["seed"] = self.seed
+        return kw
 
     def _prompt(self) -> str:
         return EXTRACTION_PROMPT_TEMPLATE.format(
@@ -1520,7 +1638,7 @@ for that field - NOT the quoted string "null".
             model=self.model,
             messages=[{"role": "user", "content": prompt}],
             max_tokens=max_tokens,
-            temperature=0,
+            **self._sampling_kwargs(),
         )
         return (resp.choices[0].message.content or "").strip()
 
@@ -1577,10 +1695,144 @@ for that field - NOT the quoted string "null".
                 }
             ],
             max_tokens=4096,
-            temperature=0,
+            **self._sampling_kwargs(),
         )
 
         return (resp.choices[0].message.content or "").strip()
+
+    # ------------------------------------------------------------------
+    # N-run agreement (#11)
+    # ------------------------------------------------------------------
+    def _agreement_key(self, field: str, value):
+        """Comparable form of a voted field; None when absent/uncoercible."""
+        if field in AGREEMENT_LABEL_FIELDS:
+            cleaned = self._clean_group_label(value)
+            if cleaned is None:
+                return None
+            return self._normalize_label(cleaned) or None
+        if field.startswith("n_"):
+            return self._coerce_int(value)
+        f = self._coerce_float(value)
+        return None if f is None else round(f, 6)
+
+    @staticmethod
+    def _looks_like_table_shift(keys: dict, chosen_idx: dict, detail: dict, n: int) -> bool:
+        """See NONDET_FLAG_TABLE_SHIFT. keys[f][j] is run j's comparable value."""
+        core = ("mean_intervention", "sd_intervention", "mean_control", "sd_control")
+        if all(f in detail and detail[f]["kind"] != "unanimous" for f in core):
+            return True
+        def chosen_pair(arm):
+            return tuple(keys[f"{k}_{arm}"][chosen_idx[f"{k}_{arm}"]]
+                         if f"{k}_{arm}" in chosen_idx else None
+                         for k in ("mean", "sd"))
+        want = {"intervention": chosen_pair("control"),
+                "control": chosen_pair("intervention")}
+        if want["intervention"] == want["control"]:
+            return False        # arms genuinely identical; a match proves nothing
+        for arm, other in want.items():
+            if None in other:
+                continue
+            for j in range(n):
+                have = tuple(keys[f"{k}_{arm}"][j] for k in ("mean", "sd"))
+                if have == other:
+                    return True
+        return False
+
+    def _vote_runs(self, runs: list) -> tuple:
+        """Majority-vote AGREEMENT_* fields across coerced run dicts.
+
+        Returns (result, nondet_flag, nondet_detail).
+        - result: a copy of the run that agrees with the vote on the most
+          fields, with every voted field overwritten by the chosen value and
+          each source quote taken from a run that matches the chosen
+          numbers for that arm (falls back to the base run's quote).
+        - nondet_flag: [] if unanimous, else ["<field>:majority" | "<field>:no_majority", ...]
+        - nondet_detail: {field: {"values": [...per run], "chosen": v, "kind": k}}
+        """
+        from collections import Counter
+        n = len(runs)
+        fields = AGREEMENT_NUMERIC_FIELDS + AGREEMENT_LABEL_FIELDS
+        keys = {f: [self._agreement_key(f, r.get(f)) for r in runs] for f in fields}
+
+        chosen_idx = {}     # field -> index of a run holding the chosen value
+        flag, detail = [], {}
+        for f in fields:
+            ks = keys[f]
+            present = [k for k in ks if k is not None]
+            if not present:
+                continue                      # nobody extracted it; nothing to vote
+            counts = Counter(present)
+            top_key, top_n = counts.most_common(1)[0]
+            if top_n == n:
+                kind = "unanimous"
+            elif top_n * 2 > n:
+                kind = "majority"
+            else:
+                kind = "no_majority"
+                top_key = next(k for k in ks if k is not None)   # first run's value
+            idx = ks.index(top_key)
+            chosen_idx[f] = idx
+            detail[f] = {"values": [runs[i].get(f) for i in range(n)],
+                         "chosen": runs[idx].get(f), "kind": kind}
+            if kind != "unanimous":
+                flag.append(f"{f}:{kind}")
+
+        if self._looks_like_table_shift(keys, chosen_idx, detail, n):
+            flag.append(NONDET_FLAG_TABLE_SHIFT)
+
+        # Base run = the one that already holds the chosen value most often.
+        score = [sum(1 for f, i in chosen_idx.items() if keys[f][i] == keys[f][j])
+                 for j in range(n)]
+        base = max(range(n), key=lambda j: score[j])
+        result = dict(runs[base])
+        for f, i in chosen_idx.items():
+            result[f] = runs[i].get(f)
+
+        # Source quotes must belong to the numbers they are meant to support.
+        for arm in ("intervention", "control"):
+            qkey = f"source_quote_{arm}"
+            want = tuple(keys[f"{k}_{arm}"][chosen_idx[f"{k}_{arm}"]]
+                         if f"{k}_{arm}" in chosen_idx else None
+                         for k in ("mean", "sd"))
+            for j in [base] + [j for j in range(n) if j != base]:
+                have = tuple(keys[f"{k}_{arm}"][j] for k in ("mean", "sd"))
+                if have == want and self._value_present(runs[j].get(qkey)):
+                    result[qkey] = runs[j].get(qkey)
+                    break
+        return result, flag, detail
+
+    def _extract_vision_with_agreement(self, base64_images: list, prompt: str,
+                                       filename: str = "") -> tuple:
+        """Call the vision API n_agreement times and vote.
+
+        Returns (result_or_None, nondet_flag, nondet_detail, n_usable).
+        result is None when no run produced a usable extraction.
+        """
+        from ..utils.json_utils import extract_json
+        runs = []
+        for i in range(self.n_agreement):
+            raw = self._call_vision_api(base64_images, prompt)
+            r = self._coerce_extraction_result(extract_json(raw))
+            if isinstance(r, dict) and self._has_usable_extraction_result(r):
+                runs.append(r)
+            else:
+                logger.info("[AGREEMENT] %s run %d/%d unusable",
+                            filename, i + 1, self.n_agreement)
+        if not runs:
+            return None, [], {}, 0
+        if self.n_agreement == 1:
+            return runs[0], [NONDET_FLAG_SINGLE_RUN], {}, 1
+
+        result, flag, detail = self._vote_runs(runs)
+        if len(runs) < self.n_agreement:
+            flag.append(f"usable_runs:{len(runs)}/{self.n_agreement}")
+        logger.info("[AGREEMENT] %s: %d/%d usable runs, nondet_flag=%s",
+                    filename, len(runs), self.n_agreement, flag or "[]")
+        for f, d in detail.items():
+            if d["kind"] != "unanimous":
+                logger.warning("[AGREEMENT] %s %s %s: values=%s chosen=%s",
+                               filename, f, d["kind"], d["values"], d["chosen"])
+        return result, flag, detail, len(runs)
 
     def _call_vision_api(self, base64_images: list, prompt: str) -> str:
         """Send images to vision API."""
@@ -1601,7 +1853,7 @@ for that field - NOT the quoted string "null".
             model=self.model,
             messages=[{"role": "user", "content": content}],
             max_tokens=4096,
-            temperature=0.1,
+            **self._sampling_kwargs(),
         )
 
         return resp.choices[0].message.content.strip()
@@ -1631,24 +1883,24 @@ for that field - NOT the quoted string "null".
                     logger.warning(f"[VISION] No images from {strategy_name} strategy")
                     continue
 
-                raw = self._call_vision_api(base64_images, self._prompt())
-                raw_response = raw
+                r, nondet_flag, nondet_detail, n_usable = \
+                    self._extract_vision_with_agreement(
+                        base64_images, self._prompt(), filename)
+                raw_response = None   # N raw responses; see nondet_detail
 
-                from ..utils.json_utils import extract_json
-                r = self._coerce_extraction_result(extract_json(raw))
-
-                if r and isinstance(r, dict):
-                    if self._has_usable_extraction_result(r):
-                        logger.info(f"[VISION] {strategy_name} strategy found data for {filename}")
-                        r = self._fetch_group_labels_if_missing(
-                            r, filename, base64_images=base64_images)
-                        r.setdefault("extraction_method", f"vision_{strategy_name}")
-                        result = r
-                        break
-                    else:
-                        logger.info(f"[VISION] {strategy_name} strategy found no data, trying next")
+                if r is not None:
+                    logger.info(f"[VISION] {strategy_name} strategy found data for {filename}")
+                    r = self._fetch_group_labels_if_missing(
+                        r, filename, base64_images=base64_images)
+                    r.setdefault("extraction_method", f"vision_{strategy_name}")
+                    r["nondet_flag"] = nondet_flag
+                    r["nondet_detail"] = nondet_detail
+                    r["nondet_runs"] = self.n_agreement
+                    r["nondet_usable_runs"] = n_usable
+                    result = r
+                    break
                 else:
-                    logger.info(f"[VISION] {strategy_name} strategy returned invalid result")
+                    logger.info(f"[VISION] {strategy_name} strategy found no data, trying next")
 
             if not result:
                 try:
@@ -1670,6 +1922,10 @@ for that field - NOT the quoted string "null".
                         if r and isinstance(r, dict) and self._has_usable_extraction_result(r):
                             logger.info(f"[TEXT] Text fallback found usable data for {filename}")
                             r.setdefault("extraction_method", "text_fallback")
+                            r["nondet_flag"] = [NONDET_FLAG_SINGLE_RUN]
+                            r["nondet_detail"] = {}
+                            r["nondet_runs"] = 1
+                            r["nondet_usable_runs"] = 1
                             r = self._fetch_group_labels_if_missing(
                                 r, filename, extracted_text=text_payload)
                             result = r
