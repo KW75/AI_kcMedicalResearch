@@ -63,8 +63,7 @@ Issue numbers below match `README.md` > Known Issues.
 | 19 | macOS launchers untested on macOS | Medium | Hardware-blocked. |
 | 2  | WeasyPrint not installed; PDF report falls back to HTML | Medium | |
 | 3  | Anthropic geo-restricted from dev machine | Low | VPN or skip. |
-| 68 | Source-quote tripwire false-positives on Unicode minus/dash. `_number_in_text` compares ASCII `-` (U+002D) against Unicode `−` (U+2212) etc. and fails. Ang's run today fires the tripwire on both arms despite the numbers being present in the quotes. Fix: normalise U+2212, U+2013, U+2014, U+FE63, U+FF0D to `-` on both value and haystack before comparing. | Medium |
-| 69 | Text-fallback path doesn't recover n_intervention / n_control. Lami's Ns come only from study_overrides.yaml; removing the override leaves both cells empty and Lami silently drops from any pooled estimate. Any future paper routed to text-fallback has the same failure mode. Fix: either a second text-fallback pass targeted at Ns, or a MANDATORY tripwire when text_fallback yields empty Ns. | Medium |
+
 
 
 

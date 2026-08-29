@@ -3,7 +3,7 @@
 A multi-mode AI assistant for medical research, critical appraisal, systematic review, coding, and writing. Uses cloud providers by default (DeepSeek, Qwen, OpenAI, Anthropic, Groq) with optional local Ollama support.
 
     Version: 2.4.13
-    Tests: 566 passed, 3 skipped, 11 deselected
+    Tests: 569 passed, 3 skipped, 11 deselected
            (reproduce with `python -m pytest -m "not live" --tb=short -q`)
     CI: GitHub Actions - Green
     GitHub: https://github.com/KW75/AI_kcMedicalResearch
@@ -272,7 +272,6 @@ them; gaps are closed issues. Closed issues: `Readme/RESOLVED_ISSUES.md`.
 | 19 | macOS launchers untested on macOS. | Medium |
 | 2  | WeasyPrint not installed; PDF report falls back to HTML. | Medium |
 | 3  | Anthropic API geo-restricted from the dev machine. | Low |
-| 69 | Text-fallback path doesn't recover n_intervention / n_control. Lami's Ns come only from study_overrides.yaml; removing the override leaves both cells empty and Lami silently drops from any pooled estimate. Any future paper routed to text-fallback has the same failure mode. Fix: either a second text-fallback pass targeted at Ns, or a MANDATORY tripwire when text_fallback yields empty Ns. | Medium |
 
 
 #9 (SD/SE confusion) and #10 (within- vs between-group) are mitigated by the

@@ -293,6 +293,57 @@ def _log_stage4_summary(meta_audit: list[dict],
                 f"[AGREEMENT]   ({n_extracted - len(voted)} extracted "
                 f"studies were not voted: text fallback or Anthropic path.)")
 
+
+    # --- [SKIP] #69 ------------------------------------------------------
+    # A study that made it past screening and produced usable means/SDs
+    # but got dropped in the effect-size loop (typically because per-arm
+    # Ns were missing) becomes a silent contributor to a smaller pooled
+    # estimate. The extractor's text-fallback path returns means/SDs
+    # from source quotes but not Ns, so any paper routed there without a
+    # study_overrides.yaml entry lands here. The "Skip study:" WARNING
+    # already logs in the effect-size loop, but a single WARNING line
+    # among many is easy to miss; this block promotes it to a
+    # denominator the reviewer has to read.
+    skipped = [r for r in meta_audit
+               if r.get("skip_reason") and not r.get("included_in_meta")]
+    skipped_missing_n = [
+        r for r in skipped
+        if (r.get("mean_intervention") is not None
+            or r.get("mean_control") is not None)
+        and (r.get("n_intervention") is None
+             or r.get("n_control") is None)
+    ]
+    if skipped_missing_n:
+        logger.warning(
+            f"[SKIP] {len(skipped_missing_n)} of {n_extracted} extracted "
+            f"studies had usable means/SDs but were dropped from the "
+            f"pooled estimate for missing per-arm N (typical of the "
+            f"text-fallback path, which does not recover Ns from source "
+            f"quotes). Add n_intervention/n_control to "
+            f"input/sr/study_overrides.yaml with a source-page note, or "
+            f"the pooled estimate silently omits these studies (#69):")
+        for r in skipped_missing_n:
+            logger.warning(
+                f"  - {r.get('first_author','?')} ({r.get('year','')}) "
+                f"[{r.get('filename','?')}]: n_intervention="
+                f"{r.get('n_intervention')!r}, n_control="
+                f"{r.get('n_control')!r}, skip_reason="
+                f"{r.get('skip_reason')!r}")
+    other_skips = [r for r in skipped if r not in skipped_missing_n]
+    if other_skips:
+        logger.warning(
+            f"[SKIP] {len(other_skips)} other studies dropped from the "
+            f"pooled estimate for reasons other than missing Ns:")
+        for r in other_skips:
+            logger.warning(
+                f"  - {r.get('first_author','?')} ({r.get('year','')}): "
+                f"{r.get('skip_reason')}")
+    if not skipped:
+        logger.info(
+            f"[SKIP] 0 of {n_extracted} extracted studies were dropped "
+            f"from the pooled estimate.")
+
+
     # --- [OUTCOME/TIMEPOINT] provenance ----------------------------------
     # Skip rows where the extractor produced nothing AND has no author
     # label - those emit the ugly "? ():" line called out in #66.
