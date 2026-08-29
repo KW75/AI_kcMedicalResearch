@@ -256,7 +256,6 @@ them; gaps are closed issues. Closed issues: `Readme/RESOLVED_ISSUES.md`.
 | 28 | Docker route never executed end to end (no Docker on dev machine). | High |
 | 19 | macOS launchers untested on macOS. | Medium |
 | 2  | WeasyPrint not installed; PDF report falls back to HTML. | Medium |
-| 15 | RoB 2.0 runs independently of `study_overrides.yaml` and may assess OCR text for a hand-entered study. | Low |
 | 3  | Anthropic API geo-restricted from the dev machine. | Low |
 
 #9 (SD/SE confusion) and #10 (within- vs between-group) are mitigated by the

@@ -16,6 +16,7 @@ without reading the closing notes there.
 | 10 | No within- vs between-group detection | MITIGATED v2.4.10/v2.4.13 - `group_timepoint_warning` + tabular multi-timepoint flag. Manual check still required (`REVIEWER_GUIDE.md` 2.2). |
 | 13 | No effect-size plausibility bound | v2.4.9 - `plausibility_flag`, flag only |
 | 14 | PICO file discovery differed UI vs CLI | v2.4.9 |
+| 15 | RoB 2.0 ignores `study_overrides.yaml` | Session 25 - not a bug: RoB is an intentional independent second read (`REVIEWER_GUIDE.md` §5, §6). Verified no override references in `rob2_tool.py` or its tests. |
 | 16 | Streamlit UI kept API keys in `st.session_state` | v2.4.9 - per-session only; "Clear stored keys" button |
 | 17 | `providers.py` probed Ollama at import | v2.4.9 - lazy on first use |
 | 18 | SR heavy imports pulled in for every mode | v2.4.9 |

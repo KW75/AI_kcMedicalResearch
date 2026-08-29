@@ -32,7 +32,6 @@ Issue numbers below match `README.md` > Known Issues.
 | 28 | Docker route never executed end to end | High | Hardware-blocked (no Docker on dev machine). |
 | 19 | macOS launchers untested on macOS | Medium | Hardware-blocked. |
 | 2  | WeasyPrint not installed; PDF report falls back to HTML | Medium | |
-| 15 | RoB 2.0 ignores `study_overrides.yaml` | Low | |
 | 3  | Anthropic geo-restricted from dev machine | Low | VPN or skip. |
 
 ---
