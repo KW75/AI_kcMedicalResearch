@@ -196,9 +196,12 @@ For **every** included study, open the PDF and confirm:
       is reported.
 - [ ] **Any study whose CI excludes every other study's point estimate**
       warrants source verification regardless of I².
-- [ ] **Run the pipeline at least 3 times on the same inputs** and diff
-      `meta_analysis_results.csv`. Extraction is non-deterministic; values
-      that move between runs are not trustworthy until pinned.
+- [ ] **Read `nondet_flag` for every study** (§3.5). The pipeline already
+      runs each vision extraction 3 times and votes; this column is the
+      diff. Any `no_majority` or `table_shift` entry is a mandatory
+      source check before the study contributes to a pooled estimate.
+      If the run used `--n-agreement 1` the column reads `single_run`
+      and you must run 3× and diff `meta_analysis_results.csv` by hand.
 
 ### 3.3 Provenance review
 
@@ -237,6 +240,32 @@ non-deterministic (§6); a study's row in `extracted_data.csv` from run A
 cannot be paired with its RoB judgement from run B, because the two reads
 may disagree on which arms, timepoints, or numbers are present. If you need
 to combine information across runs, first re-verify against source.
+
+### 3.5 Reading `nondet_flag`
+
+Each vision-extracted study is drawn N=3 times (`--n-agreement`, default 3)
+and the numeric fields (mean, SD, N per arm) and both group labels are
+majority-voted. The result lands in `meta_analysis_results.csv` as
+`nondet_flag` and `nondet_runs`; the per-run values are in
+`extracted_data.csv` (`nondet_detail.*` columns) and in the Stage 4
+`[AGREEMENT]` warning lines.
+
+| cell | meaning | action |
+|---|---|---|
+| `unanimous` | all 3 runs agreed on every voted field | normal item-3.1 source check |
+| `field:majority` (one or two fields, no other marker) | 2 of 3 agreed; the majority value is used | recommended: open the PDF, confirm that field |
+| any `field:no_majority` | all 3 runs differed; run-1 value kept and flagged | **mandatory** source check |
+| `table_shift` | the runs read different table cells: all four mean/SD fields disagree, or one arm's (mean, SD) equals the other arm's chosen pair. A 2-of-3 majority here is a coin flip, not evidence (Ang 2010, Session 26: the two readings were drawn 5 and 6 times out of 12) | **mandatory** source check; record the verified cells in `study_overrides.yaml` |
+| `single_run` | run with `--n-agreement 1`; nothing voted | run 3× and diff by hand, or re-run with the default |
+| `not_checked` | extraction error, or Anthropic provider path | n/a |
+
+What the vote does not do: it measures stability, not correctness. Three
+runs can agree on the same wrong cell, and only the source-quote check and
+your item-3.1 read will catch that. Source quotes are not voted, so a
+`source_quote_warning` that appears in one run and not the next is
+expected. A study with a `study_overrides.yaml` entry (Lami) shows
+`unanimous` after the override even when the raw extraction drifted; the
+`MANUAL OVERRIDE` log line shows the raw values.
 
 ---
 
@@ -370,7 +399,7 @@ and RoB 2.0 assessment re-read the PDF independently and are unaffected.
 
 | Limitation | Impact | Mitigation |
 |---|---|---|
-| Extraction is non-deterministic | Same PDF yields different values across runs | Run 3× and diff; pin verified studies via overrides |
+| Extraction is non-deterministic | Same PDF yields different values across runs. Session 26 measured this directly: qwen-vl-plus ignores `seed` and is not deterministic at `temperature=0` | Each vision extraction runs 3× and is majority-voted; read `nondet_flag` (§3.5). `no_majority` / `table_shift` are mandatory source checks. Pin verified studies via overrides |
 | Several corpus PDFs have broken font CMaps | Text layer appears garbled; pipeline falls back to OCR unnecessarily, losing fidelity | Decode with a fixed character offset before OCR fallback |
 | Outcome tables may be embedded images | Values cannot be cross-checked against the text layer | Manual verification is the only check |
 | Author/year heuristics fail on unusual name formats | Wrong study labels | Flagged as `pdf_auto (verify)`; override as needed |

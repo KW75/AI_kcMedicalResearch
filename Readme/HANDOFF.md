@@ -31,20 +31,24 @@ Before treating any Open Issue as work, and before ending the session:
 
 Session 25 caught four doc-lag items (test count; #12 never migrated
 from S24 handoff to RESOLVED_ISSUES; #15 miscategorised as a bug;
-"decimal separator" claim contradicted by `_number_in_text`). This
-checklist exists so those catches happen at session open, not
-mid-work.
+"decimal separator" claim contradicted by `_number_in_text`). Session
+26 caught three more at close: README cited closed #50 in parentheses
+(missed by S25's grep), #66 was closed in S25 but never added to
+RESOLVED_ISSUES (README still cited it in parentheses), and the "cheapest first:
+temperature=0" item had sat for three sessions without anyone grepping
+the call site, where the vision call was at 0.1. This checklist exists
+so those catches happen at session open, not mid-work.
 
 ---
 
-## Current State (Session 25, v2.4.13, 2026-08-29)
+## Current State (Session 26, v2.4.13, 2026-08-29)
 
 | Component      | Status |
 |----------------|--------|
-| Tests          | 526 passed, 3 skipped, 11 deselected (`python -m pytest -m "not live" --tb=short -q`) |
-| CI             | green (64a043d; 19a583e, 7791f43, and 1458834 all confirmed green) |
-| Render deploy  | green — health returns `ok` on 7791f43 (19a583e and 64a043d are CLI/docs only, no UI impact) |
-| SR pipeline    | working via CLI with Qwen (#65 fixed S24); extraction non-deterministic (#11), verify every number |
+| Tests          | 565 passed, 3 skipped, 11 deselected (`python -m pytest -m "not live" --tb=short -q`) |
+| CI             | NOT YET CHECKED on b847c55 / bb48040 / the S26 docs commit — Session 27 priority 1. Last confirmed green: 64a043d (S25). |
+| Render deploy  | not re-checked; S26 commits touch the SR CLI, extractor, and docs only (no UI change). Confirm health returns `ok` in S27. |
+| SR pipeline    | working via CLI with Qwen; vision extraction voted N=3, read `nondet_flag`; Ang's correct reading unverified (#67) |
 | Providers      | DeepSeek (default) / Qwen (SR) / OpenAI / Anthropic / Groq / Ollama (local, never falls back) |
 
 Issue numbers below match `README.md` > Known Issues.
@@ -55,7 +59,7 @@ Issue numbers below match `README.md` > Known Issues.
 
 | #  | Issue | Priority | What to do |
 |----|-------|----------|------------|
-| 11 | Extraction non-determinism (Ang, Jensen, Lami) | High | All three pinned by regression fixtures (Sessions 20-22). Underlying non-determinism unaddressed; mitigation is still run 3x and diff, verify against source quotes. See Session 26 priority 1 for reduction options. |
+| 67 | Ang 2010 reading unverified | High | One reviewer, one PDF, ten minutes: open Ang 2010 Table 2, decide whether intervention/control at week 6 is 32.5 (15.0) / 37.6 (10.0) or 37.6 (10.0) / 45.3 (24.5), write it to `input/sr/study_overrides.yaml` with a `note:` citing page and table. The N=3 vote draws either reading ~50/50 and `table_shift` fires every run; the pipeline cannot decide this. Until done, no pooled estimate including Ang is trustworthy. |
 | 28 | Docker route never executed end to end | High | Hardware-blocked (no Docker on dev machine). |
 | 19 | macOS launchers untested on macOS | Medium | Hardware-blocked. |
 | 2  | WeasyPrint not installed; PDF report falls back to HTML | Medium | |
@@ -63,85 +67,91 @@ Issue numbers below match `README.md` > Known Issues.
 
 ---
 
-## Session 25 Summary
+## Session 26 Summary
 
-Three commits, two of them code. 523 -> 526 tests. Every priority from
-the Session 24 handoff addressed or explicitly deferred; two known
-issues closed (#66, guide nit carryover). No new issues opened.
+Three commits: `b847c55` (extractor + probe + evidence), `bb48040`
+(CSV / Stage-4 / CLI wiring), and the docs commit this file ships in.
+526 -> 565 tests. #11 closed as machine-flagged; #66 migrated to
+RESOLVED_ISSUES (S25 doc lag); #67 opened. Every other priority from
+the S25 handoff explicitly deferred (unchanged from S25).
 
-- **Priority 1 verification (no commit).** Confirmed CI green on
-  `1458834` (Session 24's last code commit) via check-runs API:
-  `test (3.11)` completed, conclusion success. Render
-  `/_stcore/health` returns `HTTP 200 / ok`. `7791f43` (the S24
-  handoff doc commit) also green. Neither hash needed a follow-up
-  code fix; state rolled into this handoff.
+- **#11 cheap branch measured and rejected.** Before touching sampling,
+  grepped the call site: `_call_vision_api` was at `temperature=0.1`
+  while both text paths were at `0`, and no call sent `seed`. Built
+  `SOURCE_CODE/pipelines/sr/scripts/nondet_probe.py` (N runs per PDF,
+  per-field agreement table, JSON out) and ran 5 corpus PDFs x 3 runs
+  at the old setting and at `t=0, seed=42`. Both: 4/5 PDFs disagreed.
+  Source-quote hashes differed run-to-run under identical config, which
+  is impossible if seed were honoured — qwen-vl-plus ignores it and
+  `t=0` is not deterministic. Ang at `t=0` returned three different
+  tables in three runs; run 1 was a column shift that passed SOURCE
+  QUOTE CHECK. Evidence: `Readme/evidence/s26_issue11/*.json`.
+  Sampling controls kept (`SR_EXTRACT_TEMPERATURE`, `SR_EXTRACT_SEED`,
+  default 0/42) only so the vision and text paths can't drift again;
+  `tests/test_extractor_sampling.py` pins that all three call sites
+  share them.
 
-- **#66 closed (19a583e).** Extracted the Stage-4 summary block from
-  `main()` in `SOURCE_CODE/pipelines/sr/main.py` into a module-level
-  `_log_stage4_summary(meta_audit, er, effect_measure)` helper.
-  Introduced a uniform `n_extracted` denominator (any of mean/sd/n per
-  arm, hedges_g, or one of the three tripwire warning fields set) for
-  the four tripwire "clean" branches. Guarded the `[OUTCOME/TIMEPOINT]`
-  provenance block so fully-empty rows no longer emit `? ():` lines.
-  Pinned by `tests/test_stage4_summary.py` (3 cases): zero-extraction
-  prints `0 of 0` and does NOT print the "every extracted value was
-  bound" sentence; one clean study still prints the positive sentence
-  and `0 of 1`; a mixed skipped+extracted meta_audit reports
-  `n_extracted` not `len(meta_audit)`. `[SD/SE CHECK]` kept its
-  partial `_n_checkable` denominator — vision-path studies are "not
-  checkable", not "clean" (Known Issue #9). `[PLAUSIBILITY]` for MD
-  still prints "check skipped (scale-dependent)". Refactor was
-  +272/-83 lines in `main.py` (the helper carries its own rationale
-  comments) plus +126 lines of test.
+- **#11 closed by N=3 agreement (b847c55, bb48040).**
+  `DataExtractor(n_agreement=3)` / `SR_EXTRACT_N_AGREEMENT` /
+  `--n-agreement`. `_extract_vision_with_agreement` calls the vision API
+  N times on the same page images, `_vote_runs` majority-votes
+  mean/sd/n per arm (float/int-coerced) and both group labels
+  (`_normalize_label`-coerced). Source quotes are NOT voted: the quote
+  is carried from a run whose (mean, SD) match the chosen values for
+  that arm, so the quote tripwire still tests a number against its own
+  quote. `nondet_flag` is always written: `[]` unanimous;
+  `field:majority`; `field:no_majority` (run-1 value kept);
+  `table_shift` (all four mean/SD disagree, or one arm's pair equals
+  the other arm's chosen pair; guarded for genuinely identical arms);
+  `usable_runs:k/N`; `["single_run"]` for N=1 and the text fallback.
+  `audit_logger.nondet_flag_to_cell` renders it for
+  `meta_analysis_results.csv` (`unanimous` / `not_checked` / joined);
+  `nondet_flag` and `nondet_runs` added to `write_results` fieldnames.
+  `_log_stage4_summary` prints `[AGREEMENT] k of n voted studies` with
+  a voted-only denominator — an N=1 run prints "not checked", never
+  "0 flagged" — and tags `no_majority`/`table_shift` rows MANDATORY.
+  Cost: ~+20 s and 2 extra vision calls per study.
 
-- **Guide nit closed (64a043d).** `REVIEWER_GUIDE.md` §2.2 branch 2
-  and §6 both listed "decimal separator differences" as a limitation
-  of the number-in-quote matcher. Verified against
-  `SOURCE_CODE/pipelines/sr/src/extraction/data_extractor.py` line
-  1022: `_number_in_text` does
-  `re.escape(candidate).replace("\\.", "[.,]")` before matching, so
-  `1.5` matches `1,5`. The real remaining gaps are unicode-vs-ASCII
-  minus signs and thousands separators; those stay documented. Same
-  lesson as #12 in S24: verify the current source before treating a
-  documented claim as work.
+- **Acceptance run** (`nondet_probe.py --runs 2 --agreement 3`, 5 PDFs):
+  Ang flagged in both runs (all four mean/SD `majority`, `table_shift`
+  after the follow-up); Jensen, 1-s2.0, Lami, zsy234 came out `[]` in
+  both. Tallying every Ang call of the day, the two competing readings
+  were drawn 5 and 6 times of 12 — a coin flip, hence #67.
 
-- **Handoff-vs-artifact catch (this session).** The Session 24 handoff
-  said #66 was in "the four Stage-4 summary lines in `main.py`". The
-  repo has two `main.py` files: the top-level CLI dispatcher
-  (`SOURCE_CODE/main.py`) and the SR sub-pipeline
-  (`SOURCE_CODE/pipelines/sr/main.py`). A grep of the top-level file
-  for `SOURCE QUOTE CHECK` returned nothing; the Stage-4 code was in
-  the latter. Added to durable lessons.
+- **Three findings recorded in the guide, not fixed:** the source-quote
+  tripwire fires non-deterministically (zsy234 #64 warning on 1 of 3
+  runs) because the quote varies while the number holds; Lami's
+  `MANUAL OVERRIDE` masks raw drift (13.79 vs 13.68 mean, 4.22 vs 4.61
+  SD); `outcome_selected` wording varies on Ang ("FIQ pain rating" vs
+  "FIQ pain score"), cosmetic, not voted.
 
-- **Priorities 3 and 4 not touched.** Priority 3 (#11 mitigation)
-  awaits a judgment call on whether reviewer time on the manual
-  run-3x-and-diff step is the bottleneck. Priority 4 (decoder
-  `!`-for-space gap) is an investigation task; no corpus PDF exercises
-  the code path today, and Session 24 already documented that the
-  decoded text keeps `!` where spaces were.
+- **Housekeeping hit in passing.** The probe's error line showed
+  `C:\Users\...\Python311\python.exe` resolving behind a `(.venv)`
+  prompt — the item below is real, not historical. Not fixed.
 
-## Next Session Priorities (Session 26)
+## Next Session Priorities (Session 27)
 
-1. **#11 mitigation, if worth the effort.** Unchanged from S24/S25.
-   Cheapest first: `temperature=0`/`seed` on the Qwen vision call
-   (vision models often ignore seed, may not help). Expensive:
-   internal N=3 agreement with `nondet_flag` (machine-enforces the
-   manual run-3x step). Skip if reviewer time on the manual step is
-   not the bottleneck.
+1. **CI and Render on the three S26 commits.** Check-runs API for
+   `test (3.11)` on `b847c55`, `bb48040`, and the docs commit; health
+   endpoint. None was verified in S26.
 
-2. **Decoder `!`-for-space gap, low.** `_shift_text` shifts letters
-   only, so a +1-shifted PDF's spaces (arriving as `!`) stay as `!`
-   after decode. Fine for the LLM screener; may matter if the
-   extractor's text-fallback ever receives decoded text. Check whether
-   it does before deciding it matters — no corpus PDF exercises this
-   path today.
+2. **#67 — Ang Table 2.** Human task, ten minutes, blocks every pooled
+   estimate that includes Ang. Record the reading in
+   `study_overrides.yaml` with page/table in `note:`, then re-run the
+   corpus once and confirm the Ang row shows the override applied and
+   `table_shift` still fires (the override corrects the value; it does
+   not, and should not, silence the flag).
 
-3. **Housekeeping carryovers** from S24 (still open per current
-   `git status` on any dev machine): add `run_*.log` to `.gitignore`,
-   delete `input/s24_mccrae/` when done with it, verify
-   `.venv\Scripts\` Python is the one resolving, delete stale
-   `%TEMP%\ai_km_run_*.bat` files on any machine that ran the
-   pre-v2.4.7 UI launcher.
+3. **Decide on voting `outcome_selected` / `timepoint_selected`.**
+   Today they are recorded, not voted. Ang's wording varied
+   cosmetically; a run that picks a different *timepoint* would not be
+   flagged by the vote unless the numbers also moved. Probably worth a
+   normalised-label vote like the group labels. Low effort.
+
+4. **Decoder `!`-for-space gap, low.** Unchanged from S25.
+
+5. **Housekeeping carryovers**, unchanged — and the `.venv` item is now
+   confirmed live (see S26 summary).
 
 ## Housekeeping (low priority, carry until done)
 
@@ -232,11 +242,32 @@ issues closed (#66, guide nit carryover). No new issues opened.
 
 - **A regression fixture pins a known failure signature, not the
   failure rate.** Do not conflate "the shape is pinned" with "the
-  paper extracts reliably". Lami and Jensen still need the
-  run-3x-and-diff reviewer step; the fixtures only guarantee that a
-  known good shape won't be falsely rejected and a known bad shape
-  will still be caught. #11's underlying non-determinism is unchanged.
+  paper extracts reliably". The fixtures only guarantee that a known
+  good shape won't be falsely rejected and a known bad shape will
+  still be caught; the S26 `nondet_flag` vote is what measures the
+  rate on each run. The model's non-determinism itself is unchanged.
+
+- **Measure a mitigation before carrying it.** "Try temperature=0 /
+  seed" sat in the handoff for three sessions as the cheap fix for
+  #11. Thirty calls showed the seed was ignored and `t=0` changed
+  nothing. The vision call had also been at 0.1 the whole time — a
+  fact that checklist item 4 (grep the call site) would have found in
+  S24. A mitigation that has never been run is a hypothesis, and a
+  hypothesis carried across sessions starts to read as a plan.
+
+- **A majority is not evidence when the alternatives are structured.**
+  Ang's two readings are the same numbers with the arms shifted; a
+  2-of-3 vote picks either depending on the draw (5 vs 6 of 12). Tag
+  the shape (`table_shift`) and treat it as a tie; do not trust the
+  count. Corollary: a 3-of-4 field disagreement is NOT that shape —
+  the 1-s2.0 paper jittered three fields by one digit with no shift,
+  and a threshold rule would have false-positived it.
+
+- **Overrides hide drift.** `MANUAL OVERRIDE` makes Lami read
+  `unanimous`; the raw values in the override log line disagreed
+  across runs. When a study is overridden, its `nondet_flag` describes
+  the override, not the extractor. Read the log line.
 
 ---
 
-Handoff prepared: 2026-08-29, Session 25.
+Handoff prepared: 2026-08-29, Session 26.

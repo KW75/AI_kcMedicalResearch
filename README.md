@@ -3,7 +3,7 @@
 A multi-mode AI assistant for medical research, critical appraisal, systematic review, coding, and writing. Uses cloud providers by default (DeepSeek, Qwen, OpenAI, Anthropic, Groq) with optional local Ollama support.
 
     Version: 2.4.13
-    Tests: 547 passed, 3 skipped, 11 deselected
+    Tests: 565 passed, 3 skipped, 11 deselected
            (reproduce with `python -m pytest -m "not live" --tb=short -q`)
     CI: GitHub Actions - Green
     GitHub: https://github.com/KW75/AI_kcMedicalResearch
@@ -145,10 +145,13 @@ in source files. `scripts/strip_bom.py` removes them.
 
 Extraction is LLM-based and cannot verify its own semantics. It will emit a
 confident, precise effect size whether or not it understood the paper.
-Extraction is also non-deterministic (#11): the same PDF can yield different
-means/SDs/Ns across runs. Every extracted mean, SD, and N must be checked
-against the source PDF before any pooled estimate is reported. Run at least
-3x and diff.
+Extraction is also non-deterministic: the same PDF can yield different
+means/SDs/Ns across runs, and (measured Session 26) neither `seed` nor
+`temperature=0` changes that on qwen-vl-plus. Every vision extraction is
+therefore run 3 times and majority-voted; disagreement is written to
+`nondet_flag` (see Tripwire columns). Every extracted mean, SD, and N must
+still be checked against the source PDF before any pooled estimate is
+reported - agreement is stability, not correctness.
 
 ### Running it
 
@@ -156,6 +159,7 @@ against the source PDF before any pooled estimate is reported. Run at least
     macOS/Linux:    cp *.pdf input/sr/
 
     python SOURCE_CODE/main.py --mode sr --provider qwen
+    python SOURCE_CODE/main.py --mode sr --provider qwen --n-agreement 1   # single call, no vote
 
 Run directly (not via the launcher menu) so the interactive PICO prompts get a
 real TTY. Outputs:
@@ -178,6 +182,13 @@ These flag studies for a closer look. They never correct or exclude.
   its own quote; SE/SEM in an SD's quote; multiple-timepoint or
   within-subject phrasing; tabular rows with 3+ mean(SD) cells; (text path)
   quote not found verbatim in the source.
+- `nondet_flag` / `nondet_runs` - vision path runs N=3 and votes mean/SD/N
+  per arm and both group labels. `unanimous`; `field:majority` (2 of 3);
+  `field:no_majority` (all differed, run-1 value kept); `table_shift` (runs
+  read different table cells - a majority here is a coin flip);
+  `single_run` (`--n-agreement 1`, nothing voted); `not_checked` (error or
+  Anthropic path). Per-run values are in `extracted_data.csv`
+  (`nondet_detail.*`). See `REVIEWER_GUIDE.md` §3.5.
 
 The quotes land in `extracted_data.csv`
 (`primary_outcome.source_quote_intervention` / `_control`) so every number
@@ -188,14 +199,16 @@ can be audited without reopening the PDF. `extracted_data.csv` also records
 Stage 4 prints a summary block for each check unconditionally - a clean run
 prints "0 flagged of N extracted" with coverage notes. An empty run prints
 "0 flagged of 0 extracted" so a silent-empty run cannot look like a clean
-run (#66). Every audit CSV row carries `run_id`. Stage 2 prints a
+run. The `[AGREEMENT]` block counts voted studies only: an `--n-agreement 1`
+run prints "not checked", never "0 flagged". Every audit CSV row carries `run_id`. Stage 2 prints a
 `[SCREENING]` accounting block; screening retries transient network errors,
 because an error-based drop is not a valid PRISMA exclusion.
 
 These are deterministic pattern checks, not semantic verification. Manual
 verification against the PDF is required regardless of whether any flag
-fired. The Anthropic path runs the source-quote check but not SD/SE or
-group/timepoint (#50).
+fired. The Anthropic path runs the source-quote check and group/timepoint
+check but not the text-line SD/SE check - a permanent limitation, see
+`REVIEWER_GUIDE.md` §6.
 
 ### CMap offset-decode
 
@@ -255,7 +268,7 @@ them; gaps are closed issues. Closed issues: `Readme/RESOLVED_ISSUES.md`.
 
 | #  | Issue | Priority |
 |----|-------|----------|
-| 11 | Extraction is non-deterministic. Ang is bimodal between two value sets; Jensen's means vary in the first decimal; Lami's Ns are chaotic (override catches every variant); McCrae/Karlsson stable. Ang pinned by regression fixtures; Jensen and Lami fixtures pending. **Mitigation:** run 3x and diff, use source quotes. | High |
+| 67 | Ang 2010 reading unverified. The N=3 vote draws either of two table readings about 50/50 (32.5/15.0 vs 37.6/10.0, or 37.6/10.0 vs 45.3/24.5 - the same numbers with arms shifted); `table_shift` flags it every run, but which cells are correct must be confirmed by a human against Table 2 and recorded in `study_overrides.yaml`. Blocks trusting any pooled estimate that includes Ang. | High |
 | 28 | Docker route never executed end to end (no Docker on dev machine). | High |
 | 19 | macOS launchers untested on macOS. | Medium |
 | 2  | WeasyPrint not installed; PDF report falls back to HTML. | Medium |

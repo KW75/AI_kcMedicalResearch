@@ -13,6 +13,7 @@ without reading the closing notes there.
 | 7  | Inner `sr/main.py` `--model` default hardcoded | v2.4.9 - verified None |
 | 8  | Test referenced nonexistent `prompts/coding/*.txt` layout | v2.4.9 |
 | 9  | No SD/SE disambiguation | MITIGATED v2.4.10/v2.4.12 - `sd_se_warning` + source-quote check. Manual check still required (`REVIEWER_GUIDE.md` 3.1). |
+| 11 | Extraction non-deterministic (Ang, Jensen, Lami) | Session 26 (b847c55, bb48040) - MACHINE-FLAGGED. Measured first (`Readme/evidence/s26_issue11/`, 5 PDFs x 3 runs): qwen-vl-plus ignores `seed` and is not deterministic at `temperature=0` - quotes differed run-to-run on 4/5 papers, Ang returned three different tables, one a column shift that passed SOURCE QUOTE CHECK. Sampling controls cannot fix it (kept only so vision and text paths share one setting; vision had been at 0.1). Fix: every vision extraction runs N=3 (`--n-agreement`, `SR_EXTRACT_N_AGREEMENT`), majority-votes mean/sd/n per arm and both group labels, and always writes `nondet_flag` (unanimous / field:majority / field:no_majority / table_shift / single_run / not_checked); source quote carried from a run matching the chosen numbers. Stage 4 `[AGREEMENT]` line uses a voted-only denominator. Acceptance run flagged Ang 2/2, passed the four stable papers. Not a determinism fix: three runs can agree on the same wrong cell; only source quotes catch that. Reopen if a `unanimous` row is found carrying a wrong number. Ang's correct reading is Open Issue #67. `Readme/S26_issue11_closeout.md` has the full evidence. |
 | 10 | No within- vs between-group detection | MITIGATED v2.4.10/v2.4.13 - `group_timepoint_warning` + tabular multi-timepoint flag. Manual check still required (`REVIEWER_GUIDE.md` 2.2). |
 | 12 | CMap offset-decode fallback landed v2.4.13; unconfirmed on a real shifted PDF | v2.4.13 code, closed Session 24 (c6ac1fd) - decoder only runs on the "nearly space-free" failure mode and skips `(cid:` cases by design; all corpus PDFs are either `(cid:` cases or have clean text layers, so the branch cannot be exercised by the current corpus. Pinned by `tests/test_cmap_offset_decode.py` (16 cases). Decoded text keeps `!` where spaces were - fine for the LLM screener, may matter for the extractor's text-fallback if it ever receives decoded text (no corpus PDF exercises this today). |
 | 13 | No effect-size plausibility bound | v2.4.9 - `plausibility_flag`, flag only |
@@ -54,8 +55,10 @@ without reading the closing notes there.
 | 51 | `outcome_selected` / `timepoint_selected` not recorded or surfaced | v2.4.13 - recorded (Session 17), surfaced in Stage 4 `[OUTCOME/TIMEPOINT]` block (Session 19) |
 | 52 | Tabular multi-timepoint rows escaped the source-quote check | v2.4.13 |
 | 61 | Anthropic path bypassed source-quote check | v2.4.13 - ported; SD/SE + group/timepoint remain as #50 |
+| 66 | Stage-4 summary asserted "every extracted value was bound" on an all-empty run | Session 25 (19a583e) - `_log_stage4_summary` with uniform `n_extracted` denominator; zero-extraction prints `0 of 0` and no positive assertion. `tests/test_stage4_summary.py`. |
 | 62 | Suspected `49.0` vs `49` quote-matching bug | Session 21 - not reproducible; `_number_in_text` already tries the integer form. Pinned by test. |
 
 Regression fixtures for Ang's non-deterministic value sets
-(`tests/test_extraction_regression_fixtures.py`, Session 20) are part of
-#11 mitigation, not a separate issue.
+(`tests/test_extraction_regression_fixtures.py`, Session 20) pin failure
+shapes, not the failure rate; they remain in place alongside the Session 26
+`nondet_flag` vote and are not a separate issue.
