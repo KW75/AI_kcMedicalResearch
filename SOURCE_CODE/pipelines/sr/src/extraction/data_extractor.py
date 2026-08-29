@@ -1123,14 +1123,30 @@ class DataExtractor:
     )
     _SE_MARKER = re.compile(r"\b(SE|SEM|standard error)\b", re.IGNORECASE)
 
+
+    # #68: normalise Unicode minus and dashes to ASCII '-' on both value
+    # and haystack before comparing. Without this the source-quote
+    # tripwire false-positives on any paper whose table uses the typeset
+    # minus (U+2212) or an en/em dash for negative numbers - Ang 2010's
+    # week-6 NFR change scores are the canonical case: '−20.2 ± 23.9' in
+    # the quote vs '-20.2' in the extracted value.
+    _MINUS_DASH_CHARS = str.maketrans({
+        "\u2212": "-",   # MINUS SIGN
+        "\u2013": "-",   # EN DASH
+        "\u2014": "-",   # EM DASH
+        "\uFE63": "-",   # SMALL HYPHEN-MINUS
+        "\uFF0D": "-",   # FULLWIDTH HYPHEN-MINUS
+    })
+
     @staticmethod
     def _number_in_text(value, text: str) -> bool:
         """True if `value` appears in `text` as a standalone number."""
-        s = str(value).strip()
+        s = str(value).strip().translate(DataExtractor._MINUS_DASH_CHARS)
+        text = (text or "").translate(DataExtractor._MINUS_DASH_CHARS)
         try:
             f = float(s)
         except (TypeError, ValueError):
-            return s in (text or "")
+            return s in text
 
         candidates = [s]
         if f == int(f):
@@ -1145,6 +1161,9 @@ class DataExtractor:
             if re.search(pattern, text or ""):
                 return True
         return False
+
+
+
 
 
     def _flag_suspect_source_quotes(self, result: dict,

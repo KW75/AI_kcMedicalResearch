@@ -55,9 +55,11 @@ without reading the closing notes there.
 | 51 | `outcome_selected` / `timepoint_selected` not recorded or surfaced | v2.4.13 - recorded (Session 17), surfaced in Stage 4 `[OUTCOME/TIMEPOINT]` block (Session 19) |
 | 52 | Tabular multi-timepoint rows escaped the source-quote check | v2.4.13 |
 | 61 | Anthropic path bypassed source-quote check | v2.4.13 - ported; SD/SE + group/timepoint remain as #50 |
+| 62 | Suspected `49.0` vs `49` quote-matching bug | Session 21 - not reproducible; `_number_in_text` already tries the integer form. Pinned by test. |
 | 66 | Stage-4 summary asserted "every extracted value was bound" on an all-empty run | Session 25 (19a583e) - `_log_stage4_summary` with uniform `n_extracted` denominator; zero-extraction prints `0 of 0` and no positive assertion. `tests/test_stage4_summary.py`. |
 | 67 | Ang 2010 reading unverified | Session 27 - verified against PDF Table <N>, page <N>. Ang stable across N=3 (nondet_flag=[]); outcome=NFR pain rating week 6; values -20.2 (23.9) CBT vs -14.9 (16.4) UC. S26 handoff's "table_shift on FIQ" framing was superseded by pipeline changes before verification. No study_overrides.yaml entry needed. |
-| 62 | Suspected `49.0` vs `49` quote-matching bug | Session 21 - not reproducible; `_number_in_text` already tries the integer form. Pinned by test. |
+| 68 | Source-quote tripwire false-positives on Unicode minus/dash | Session 27 - `_number_in_text` normalises U+2212, U+2013, U+2014, U+FE63, U+FF0D to ASCII `-` on both value and haystack before comparing. Ang 2010's `−20.2` in the source quote now matches `-20.2` in the extracted value. Pinned by `test_number_in_text_unicode_minus_matches_ascii_minus`. |
+
 
 Regression fixtures for Ang's non-deterministic value sets
 (`tests/test_extraction_regression_fixtures.py`, Session 20) pin failure

@@ -402,5 +402,30 @@ def test_source_quote_check_tolerates_extracted_float_vs_integer_quote(extractor
         f"{result['source_quote_warning']!r}"
     )
 
+def test_number_in_text_unicode_minus_matches_ascii_minus():
+    """#68: Ang 2010's quote uses U+2212; extracted value uses ASCII '-'.
+
+    Before the fix, the source-quote tripwire fired on Ang for both arms
+    despite the numbers being present in the quotes. This pins the
+    Unicode-minus / dash normalisation so the false positive can't come
+    back.
+    """
+    from SOURCE_CODE.pipelines.sr.src.extraction.data_extractor import DataExtractor
+
+    # Ang 2010 intervention arm, week 6 NFR pain rating change score.
+    assert DataExtractor._number_in_text(-20.2, "\u221220.2 \u00b1 23.9 for CBT")
+
+    # Control arm from the same paper.
+    assert DataExtractor._number_in_text(-14.9, "\u221214.9 \u00b1 16.4 for UC")
+
+    # En dash and em dash variants (some publishers use these instead).
+    assert DataExtractor._number_in_text(-20.2, "\u201320.2 for CBT")
+    assert DataExtractor._number_in_text(-20.2, "\u201420.2 for CBT")
+
+    # Positive numbers still work (regression guard: don't break the common case).
+    assert DataExtractor._number_in_text(20.2, "20.2 for CBT")
+
+    # A truly-absent number still returns False after normalisation.
+    assert not DataExtractor._number_in_text(-20.3, "\u221220.2 for CBT")
 
 
