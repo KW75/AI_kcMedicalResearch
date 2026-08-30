@@ -41,34 +41,6 @@ so those catches happen at session open, not mid-work.
 
 ---
 
-## Current State (Session 26, v2.4.13, 2026-08-29)
-
-| Component      | Status |
-|----------------|--------|
-| Tests          | 565 passed, 3 skipped, 11 deselected (`python -m pytest -m "not live" --tb=short -q`) |
-| CI             | green (fb69d50; b847c55 and bb48040 also confirmed green) |
-| Render deploy  | not re-checked after fb69d50; S26 commits touch the SR CLI, extractor, and docs only (no UI change). Confirm health returns `ok` at S27 open. |
-| SR pipeline    | working via CLI with Qwen; vision extraction voted N=3, read `nondet_flag`; Ang's correct reading unverified (#67) |
-| Providers      | DeepSeek (default) / Qwen (SR) / OpenAI / Anthropic / Groq / Ollama (local, never falls back) |
-
-Issue numbers below match `README.md` > Known Issues.
-
----
-
-## Open Issues
-
-| #  | Issue | Priority | What to do |
-|----|-------|----------|------------|
-| 28 | Docker route never executed end to end | High | Hardware-blocked (no Docker on dev machine). |
-| 19 | macOS launchers untested on macOS | Medium | Hardware-blocked. |
-| 2  | WeasyPrint not installed; PDF report falls back to HTML | Medium | |
-| 3  | Anthropic geo-restricted from dev machine | Low | VPN or skip. |
-
-
-
-
----
-
 ## Current State (Session 27, v2.4.13, 2026-08-29)
 
 | Component      | Status |
@@ -293,13 +265,6 @@ Three issues resolved.
   `unanimous`; the raw values in the override log line disagreed
   across runs. When a study is overridden, its `nondet_flag` describes
   the override, not the extractor. Read the log line.
-
-  **A handoff describing a run's content is a snapshot, not an invariant.**
-  S26 wrote "Ang shows table_shift on FIQ readings" as a standing property.
-  By S27 the pipeline was extracting NFR-threshold, unanimous, no shift.
-  One session's specific numbers and flags will not survive a code change.
-  Describe behaviours the reviewer must verify, not outputs from a run
-  they can't reproduce.
 
 - **A handoff describing a run's content is a snapshot, not an invariant.**
   S26 wrote "Ang shows table_shift on FIQ readings" as if it were a

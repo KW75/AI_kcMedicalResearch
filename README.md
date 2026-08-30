@@ -74,7 +74,7 @@ Run all commands from the project root:
 | DeepSeek (default) | `--provider deepseek`  | `DEEPSEEK_API_KEY`   | Fast, cost-efficient                        |
 | Qwen               | `--provider qwen`      | `DASHSCOPE_API_KEY`  | Recommended for SR (auto-uses vision model) |
 | OpenAI             | `--provider openai`    | `OPENAI_API_KEY`     | GPT-4 vision                                |
-| Anthropic          | `--provider anthropic` | `ANTHROPIC_API_KEY`  | Claude vision - partial tripwires, see #50  |
+| Anthropic          | `--provider anthropic` | `ANTHROPIC_API_KEY`  | Claude vision - partial tripwires, see REVIEWER_GUIDE.md §6.  |
 | Groq               | `--provider groq`      | `GROQ_API_KEY`       | Fast inference                              |
 | Ollama (local)     | `--provider ollama`    | `OLLAMA_HOST`        | Free, slow, offline; no SR (no vision)      |
 
