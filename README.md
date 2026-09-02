@@ -300,12 +300,12 @@ review's data-collection methods.
 Issue numbers are stable so that HANDOFF.md and commit messages can cite
 them; gaps are closed issues. Closed issues: `Readme/RESOLVED_ISSUES.md`.
 
-| #  | Issue | Priority |
-|----|-------|----------|
-| 28 | Docker route never executed end to end (no Docker on dev machine). | High |
-| 19 | macOS: RESOLVED for the pinned local install. python.org 3.11.9 + requirements-local.txt (pyarrow 12.0.1, chromadb 0.5.23) verified working on Intel macOS 11, 2026-09-02. Anaconda Python still fails (10.9 wheel-tag -> Rust build); launchers now reject conda and guide to python.org. | Resolved |
-| 2  | WeasyPrint not installed; PDF report falls back to HTML. | Medium |
-| 3  | Anthropic API geo-restricted from the dev machine. | Low |
+| #  | Issue | Priority | What to do |
+|----|-------|----------|------------|
+| 28 | Docker route never executed end to end | Won't do (for now) | Deprioritised - colleagues use the python.org 3.11 + venv route (see README Step 1), not Docker. Revisit only if a Docker deployment is actually needed. |
+| 19 | macOS install | RESOLVED | Fixed 2026-09-02. python.org 3.11.9 + requirements-local.txt (pyarrow 12.0.1, chromadb 0.5.23) verified end-to-end on Intel macOS 11. Launchers reject conda and guide to python.org. NOT yet run on Apple Silicon (reasoned from wheel tags). |
+| 2  | WeasyPrint not installed; PDF report falls back to HTML | Medium | |
+| 3  | Anthropic geo-restricted from dev machine | Low | VPN or skip. |
 
 
 #9 (SD/SE confusion) and #10 (within- vs between-group) are mitigated by the
