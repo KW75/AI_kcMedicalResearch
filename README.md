@@ -30,31 +30,65 @@ Local with Docker (supplies its own Python):
 
 The Docker route has not been verified end to end (#28).
 
-Full instructions, including the venv route: `Readme/Setup_Instructions_for_Users.txt`
+Full instructions, including the pinned local install (requirements-local.txt): `Readme/Setup_Instructions_for_Users.txt`
 
-## Local Development (Without Docker)
 
-Requires Python 3.11 or 3.12. Newer versions are rejected at startup
-(several pinned dependencies have no wheels for 3.13+).
+## Local Setup (Windows and macOS)
 
-Launchers create `.venv`, install dependencies, and start the app
-(macOS side untested, #19):
+Setup has two steps: (1) install the app, then (2) choose how it thinks
+(a cloud provider with an API key, or the free local Ollama).
 
-    scripts\windows\AI_kcMedicalResearch_CLI.bat   /  scripts/macos/Mac_kcMedicalResearch_CLI.sh
-    scripts\windows\AI_kcMedicalResearch_UI.bat    /  scripts/macos/Mac_kcMedicalResearch_UI.sh
+### Step 1 - Install the app
 
-Run all commands from the project root:
+Requires python.org Python 3.11 (NOT Anaconda/conda - its macOS build
+targets an old OS and forces source builds that fail, see #19).
 
-    python SOURCE_CODE/main.py                            # coding mode (default)
-    python SOURCE_CODE/main.py --mode writing
-    python SOURCE_CODE/main.py --mode rct_search
-    python SOURCE_CODE/main.py --mode search              # PubMed search
-    python SOURCE_CODE/main.py --mode appraisal
-    python SOURCE_CODE/main.py --mode sr --provider qwen  # systematic review (needs vision)
-    python SOURCE_CODE/main.py --no-stream
-    python SOURCE_CODE/main.py --resume                   # resume from checkpoint
-    python SOURCE_CODE/main.py --dry-run                  # no API calls
-    python scripts/launcher.py                            # menu-driven launcher
+1. Install Python 3.11:
+   https://www.python.org/downloads/release/python-3119/
+   - Windows: run the installer and tick "Add python.exe to PATH".
+   - macOS: choose "macOS 64-bit universal2 installer" (covers Intel and
+     Apple Silicon).
+
+2. Get the code, then run the launcher:
+
+       git clone https://github.com/KW75/AI_kcMedicalResearch.git
+       cd AI_kcMedicalResearch
+
+   - Windows:  double-click  scripts\windows\AI_kcMedicalResearch_CLI.bat
+   - macOS:    in Terminal, run
+               bash scripts/macos/Mac_kcMedicalResearch_CLI.sh
+
+   The launcher builds `.venv`, installs the pinned dependencies from
+   `requirements-local.txt`, and opens the menu. First run takes a few
+   minutes; the screen may look frozen while packages download - this is
+   normal, do not close the window. If a compatible Python 3.11 is not
+   found, the launcher shows a short message with the download link and
+   stops (it never hangs).
+
+Use the UI launchers (`..._UI.bat` / `Mac_..._UI.sh`) for the web interface.
+
+### Step 2 - Choose an AI engine (pick ONE)
+
+The app runs after Step 1 but needs a model to produce output.
+
+Option A - Free / local (Ollama), no API key:
+1. Install Ollama:  https://ollama.com/download
+2. Pull the two models the app uses:
+       ollama pull llama3.2          (the chat model - used by all modes)
+       ollama pull nomic-embed-text  (the embedding model - needed for the
+                                      appraisal and SR pipelines / RAG)
+   (You may pull a larger chat model instead - the app auto-detects and uses
+    the largest one you have; if none is set in .env, it falls back to
+    llama3.2. The embedding model must be nomic-embed-text unless you change
+    EMBEDDING_MODEL in .env.)
+3. Ollama runs in the background after install; the app connects automatically.
+
+
+Option B - Cloud provider (DeepSeek, Qwen, OpenAI, Anthropic, Groq):
+1. Copy `.env.example` to `.env`.
+2. Paste your provider's API key into `.env` (see Providers table).
+   Nothing to download; requires a provider account.
+
 
 ## Modes
 
@@ -269,7 +303,7 @@ them; gaps are closed issues. Closed issues: `Readme/RESOLVED_ISSUES.md`.
 | #  | Issue | Priority |
 |----|-------|----------|
 | 28 | Docker route never executed end to end (no Docker on dev machine). | High |
-| 19 | macOS launchers untested on macOS. | Medium |
+| 19 | macOS: RESOLVED for the pinned local install. python.org 3.11.9 + requirements-local.txt (pyarrow 12.0.1, chromadb 0.5.23) verified working on Intel macOS 11, 2026-09-02. Anaconda Python still fails (10.9 wheel-tag -> Rust build); launchers now reject conda and guide to python.org. | Resolved |
 | 2  | WeasyPrint not installed; PDF report falls back to HTML. | Medium |
 | 3  | Anthropic API geo-restricted from the dev machine. | Low |
 

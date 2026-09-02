@@ -1,0 +1,55 @@
+# requirements-local.txt - pinned install for local desktops (Windows + macOS)
+#
+# WHY THIS FILE EXISTS:
+# The open-ended pins in requirements.txt / requirements-base.txt let pip pull
+# bleeding-edge pyarrow (via chromadb and streamlit). On macOS those newest
+# versions have no prebuilt wheel, so pip builds from source and fails with
+# "can't find Rust compiler" (Known Issue #19).
+#
+# This file pins the exact versions that ship prebuilt wheels for BOTH
+# macosx_x86_64 (Intel) and macosx_arm64 (Apple Silicon) on Python 3.11,
+# so colleagues never hit a source build. Verified working on macOS 11
+# (Intel) with python.org 3.11.9, 2026-09-02.
+#
+# Install:  pip install -r requirements-local.txt
+# Requires: python.org Python 3.11 (NOT Anaconda - see README setup notes).
+
+# --- Core ---
+python-dotenv==1.0.1
+requests==2.32.3
+pyyaml==6.0.2
+anyio==4.4.0
+
+# --- Documents ---
+pypdf==4.3.1
+pymupdf==1.24.10
+python-docx==1.1.2
+docx2txt==0.8
+
+# --- Data / analysis ---
+pandas==2.2.2
+numpy==1.26.4
+scipy==1.13.1
+matplotlib==3.9.2
+pillow==10.4.0
+
+# --- Arrow: PIN FIRST. 12.0.1 is the version with prebuilt macOS wheels
+#     for both Intel (macosx_10_14_x86_64) and Apple Silicon (macosx_11_0_arm64)
+#     on cp311. Newer pyarrow drops the older-macOS wheels -> Rust build. ---
+pyarrow==12.0.1
+
+# --- UI ---
+streamlit==1.38.0
+
+# --- Providers ---
+anthropic==0.34.2
+openai==1.43.0
+groq==0.11.0
+
+# --- RAG / vector store (hard dependency: utils/rag.py imports chromadb at
+#     module top level, so the app crashes without it). 0.5.23 installs
+#     cleanly against pyarrow 12.0.1. ---
+chromadb==0.5.23
+
+# --- Windows-only: legacy .doc support ---
+pywin32==306; platform_system == "Windows"

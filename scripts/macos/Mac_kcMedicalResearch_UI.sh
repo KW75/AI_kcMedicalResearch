@@ -1,17 +1,12 @@
 #!/bin/bash
 # =============================================================================
 #  Mac_kcMedicalResearch_UI.sh
-#  v2.4.8  |  Streamlit UI launcher
+#  v2.4.13  |  Streamlit UI launcher
 #
-#  Mirrors scripts/windows/AI_kcMedicalResearch_UI.bat - runs in the project
-#  virtualenv, NOT in Docker. For Docker use:  cd docker && docker compose up ui
-#
-#  Location: scripts/macos/   (resolves project root two levels up)
+#  Run with:  bash scripts/macos/Mac_kcMedicalResearch_UI.sh
+#  (Running via bash avoids zsh choking on '#' comment lines.)
 # =============================================================================
-
 set -uo pipefail
-
-RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; BLUE='\033[0;34m'; NC='\033[0m'
 
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$PROJECT_DIR"
@@ -19,117 +14,95 @@ cd "$PROJECT_DIR"
 PY="$PROJECT_DIR/.venv/bin/python"
 PIP="$PROJECT_DIR/.venv/bin/pip"
 APP="$PROJECT_DIR/SOURCE_CODE/ui/app.py"
-PORT=8501
-URL="http://localhost:${PORT}"
 
 echo ""
 echo "  ============================================================"
-echo "   AI kcMedical Research  |  Streamlit UI  |  v2.4.8"
-echo "  ============================================================"
-echo "   Project : $PROJECT_DIR"
+echo "   AI kcMedical Research  |  Streamlit UI  |  v2.4.13"
+echo "   Project: $PROJECT_DIR"
 echo "  ============================================================"
 echo ""
 
-# --- Guard: app present ------------------------------------------------------
+show_install_message() {
+    echo ""
+    echo "  ------------------------------------------------------------"
+    echo "   This app needs Python 3.11."
+    echo ""
+    echo "   1. Download it here:"
+    echo "      https://www.python.org/downloads/release/python-3119/"
+    echo "      (choose \"macOS 64-bit universal2 installer\")"
+    echo ""
+    echo "   2. Open the downloaded file and click through Install."
+    echo ""
+    echo "   3. Start this app again."
+    echo "  ------------------------------------------------------------"
+    echo ""
+    read -r -p "  Press Enter to close..."
+}
+
+# --- GUARD: app present ------------------------------------------------------
 if [ ! -f "$APP" ]; then
-    echo -e "  ${RED}[ERROR]${NC} UI app not found at SOURCE_CODE/ui/app.py"
-    echo "   Expected: $APP"
-    echo ""
-    read -r -p "Press Enter to exit..."
+    echo "  [ERROR] UI app not found at SOURCE_CODE/ui/app.py"
+    read -r -p "  Press Enter to close..."
     exit 1
 fi
 
-# --- Guard: port free --------------------------------------------------------
-if lsof -nP -iTCP:"$PORT" -sTCP:LISTEN &> /dev/null; then
-    echo -e "  ${YELLOW}[WARNING]${NC} Port $PORT is already in use."
-    echo "   Another instance may be running. Try opening $URL"
-    echo ""
-    read -r -p "Press Enter to exit..."
-    exit 1
-fi
-
-# --- Create .venv if missing --------------------------------------------------
+# --- CHECK / CREATE .venv ----------------------------------------------------
 if [ ! -x "$PY" ]; then
-    echo -e "  ${BLUE}[SETUP]${NC} .venv not found. Looking for a supported Python..."
-
+    # Find a genuine python.org / non-conda Python 3.11.
     PYBIN=""
-    for candidate in python3.12 python3.11 python3; do
-        if command -v "$candidate" &> /dev/null; then
-            if "$candidate" -c 'import sys; raise SystemExit(0 if (3,11) <= sys.version_info[:2] < (3,13) else 1)' 2>/dev/null; then
-                PYBIN="$candidate"
-                break
-            fi
+    for candidate in \
+        /Library/Frameworks/Python.framework/Versions/3.11/bin/python3.11 \
+        /usr/local/bin/python3.11 \
+        /opt/homebrew/bin/python3.11 \
+        python3.11; do
+        found="$(command -v "$candidate" 2>/dev/null || true)"
+        [ -z "$found" ] && continue
+        case "$found" in *conda*|*anaconda*|*miniconda*) continue ;; esac
+        if "$found" -c 'import sys; raise SystemExit(0 if sys.version_info[:2]==(3,11) else 1)' 2>/dev/null; then
+            PYBIN="$found"; break
         fi
     done
 
     if [ -z "$PYBIN" ]; then
-        echo -e "  ${RED}[ERROR]${NC} No Python 3.11 or 3.12 found."
-        echo ""
-        echo "   This project does not support Python 3.13+ - several pinned"
-        echo "   dependencies have no wheels for it."
-        echo ""
-        echo "   Install 3.12:  brew install python@3.12"
-        echo "              or  https://www.python.org/downloads/release/python-3129/"
-        echo ""
-        echo "   Or use Docker, which supplies its own Python:"
-        echo "     cd docker && docker compose up ui"
-        echo ""
-        read -r -p "Press Enter to exit..."
+        show_install_message
         exit 1
     fi
 
-    echo -e "  ${BLUE}[SETUP]${NC} Using $("$PYBIN" -c 'import sys; print(sys.executable)')"
+    echo "  Using Python: $PYBIN"
     echo ""
-    if ! "$PYBIN" -m venv .venv; then
-        echo -e "  ${RED}[ERROR]${NC} Failed to create .venv."
-        read -r -p "Press Enter to exit..."
-        exit 1
-    fi
+    "$PYBIN" -m venv .venv || { echo "  [ERROR] Could not create the app environment."; read -r -p "  Press Enter to close..."; exit 1; }
 
-    echo -e "  ${BLUE}[SETUP]${NC} Installing dependencies - this takes a few minutes..."
-    "$PIP" install --upgrade pip --quiet
-    if ! "$PIP" install -r requirements.txt --quiet; then
-        echo -e "  ${RED}[ERROR]${NC} Failed to install dependencies."
-        read -r -p "Press Enter to exit..."
+    echo "  Setting up, please wait - this can take a few minutes."
+    echo "  The screen may look frozen. That is normal - do NOT close this window."
+    echo ""
+    "$PIP" install --upgrade pip
+    if ! "$PIP" install -r requirements-local.txt; then
+        echo ""
+        echo "  [ERROR] Could not install the app's components."
+        show_install_message
         exit 1
     fi
-    echo -e "  ${GREEN}[OK]${NC} Dependencies installed."
+    echo ""
+    echo "  Setup complete."
     echo ""
 fi
 
-# --- Warn if .env missing ----------------------------------------------------
+# --- WARN IF .env MISSING ----------------------------------------------------
 if [ ! -f "$PROJECT_DIR/.env" ]; then
     echo "  ------------------------------------------------------------"
-    echo -e "   ${YELLOW}NOTE${NC}: no .env file found in the project root."
-    echo "   Cloud providers need API keys:  cp .env.example .env"
-    echo "   Or run offline with:  --provider ollama"
+    echo "   NOTE: no .env file found."
+    echo "   To use a cloud provider, copy .env.example to .env and add"
+    echo "   your API key. To use the free local option, set up Ollama"
+    echo "   (see README Step 2)."
     echo "  ------------------------------------------------------------"
     echo ""
 fi
 
-# --- Launch ------------------------------------------------------------------
-echo "  ------------------------------------------------------------"
-echo "   Launching Streamlit UI"
-echo "   Browser : $URL  - opens automatically"
-echo "   Startup : ~7 seconds - please wait"
-echo "   Stop    : Ctrl+C in this window"
-echo "  ------------------------------------------------------------"
+# --- LAUNCH (Streamlit UI) ---------------------------------------------------
+echo "  Starting the web interface at http://localhost:8501"
+echo "  (Close this window or press Ctrl+C to stop.)"
 echo ""
-
-# Streamlit opens the browser itself once the server is listening. Do not add
-# a separate `open` call - it produces a second tab and fires too early.
-"$PY" -m streamlit run "$APP" \
-    --server.port="$PORT" \
-    --server.headless=false \
-    --server.runOnSave=false \
-    --browser.gatherUsageStats=false
+"$PY" -m streamlit run "$APP" --server.port=8501 --browser.gatherUsageStats=false
 RC=$?
-
-echo ""
-if [ "$RC" -ne 0 ]; then
-    echo -e "  ${YELLOW}[EXIT]${NC} Streamlit exited with code $RC."
-else
-    echo "  Streamlit UI stopped."
-fi
-echo ""
 exit "$RC"
+

@@ -292,4 +292,60 @@ Three issues resolved.
 ---
 
 Handoff prepared: 2026-08-29, Session 27.
+---
 
+## Session - 2026-09-02 - macOS install (Issue #19) RESOLVED
+
+Tested the macOS launchers on real hardware (Intel, macOS 11.7.11).
+
+Root cause of #19 (chain):
+- Launcher picked the first python.org/system python3.11 on PATH; on the
+  test Mac only Anaconda's 3.11 existed. Anaconda's build reports platform
+  tag macosx_10_9, below the floor of modern pyarrow wheels -> pip source
+  build -> "can't find Rust compiler".
+- pyarrow is pulled in by BOTH chromadb (requirements-base) and
+  streamlit (unpinned). Even the pinned render file (streamlit 1.38.0)
+  triggered a source build because the interpreter's 10.9 tag rejected the
+  newer pyarrow wheel.
+- MACOSX_DEPLOYMENT_TARGET was empty - the 10.9 tag came from the python.org
+  3.11.9 build itself, not an env var.
+
+Fix (generic, all Macs):
+- Standardize on python.org 3.11.9 universal2 (Intel + Apple Silicon).
+- New requirements-local.txt: fully pinned, pyarrow==12.0.1 (has prebuilt
+  cp311 wheels for macosx_10_14_x86_64 AND macosx_11_0_arm64), chromadb==0.5.23.
+  Installs with no Rust build.
+- chromadb is a HARD dependency: utils/rag.py imports it at module top level;
+  main.py imports the appraisal pipeline unconditionally -> app crashes on
+  ModuleNotFoundError without it. (The requirements.txt comment claiming OCR/RAG
+  degrade gracefully is wrong for chromadb - fix or note this.)
+
+Launcher changes (all four scripts, v2.4.13):
+- Reject conda/anaconda pythons; require genuine 3.11.
+- If none found, print friendly "install Python 3.11" message + link, then
+  stop (no hang).
+- Install from requirements-local.txt, drop --quiet, add "screen may look
+  frozen" reassurance line.
+- macOS: build .venv from the python.org framework path; run via `bash`.
+
+Verified: launcher -> menu -> Coding pipeline ran end to end, wrote output
+and reports, returned to menu. (ollama "Connection refused" is expected -
+Ollama not running; app fell back and completed, so plumbing is proven.)
+
+Setup is now documented as two steps: (1) install app, (2) choose AI engine
+(Ollama OR cloud API key).
+
+Resolved this session:
+- Ollama models (offline route):
+  - Chat: app auto-detects the largest pulled model; falls back to "llama3.2"
+    (providers.py:211). OLLAMA_MODEL in .env overrides.
+  - Embeddings (RAG - appraisal/SR pipelines): defaults to "nomic-embed-text"
+    (main.py:261, rag.py:30). EMBEDDING_MODEL in .env overrides.
+  - README Step 2 tells colleagues to pull BOTH:
+        ollama pull llama3.2
+        ollama pull nomic-embed-text
+
+Open follow-ups:
+- Verify requirements-local.txt on Apple Silicon ...
+- Consider wrapping `import chromadb` in try/except ...
+- #28 Docker still unverified.

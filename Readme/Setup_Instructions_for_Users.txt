@@ -1,296 +1,134 @@
-AI kcMedicalResearch - Setup Instructions for Users
-Version 2.4.8 | 2026-08-17
+============================================================
+   AI kcMedical Research - Setup Guide
+   For first-time users. No technical knowledge needed.
+============================================================
 
+You only do this ONCE. It takes about 15-20 minutes, mostly
+waiting for downloads. Follow the steps in order.
 
-============================================
-Option 1: Use the Web App (No Install)
-============================================
 
-Live Web App:  https://ai-kcmedicalresearch.onrender.com
-Health Check:  https://ai-kcmedicalresearch.onrender.com/_stcore/health
+------------------------------------------------------------
+ STEP 1  -  Install Python (the app needs this to run)
+------------------------------------------------------------
 
-Open the link in any browser. No Docker, no Python, no setup, no API key.
-First load may take ~30 seconds if the service was asleep.
+1. Go to:
+   https://www.python.org/downloads/release/python-3119/
 
-This is the right choice for most people. Use Option 2 or 3 if you need to
-process your own PDFs locally, or need to work offline.
+2. Scroll to the bottom of the page to the "Files" list.
 
-DO NOT USE THE HOSTED APP FOR CONFIDENTIAL OR PATIENT-IDENTIFIABLE DATA.
-Anything you enter is sent to a third-party host and then to a cloud AI
-provider. For confidential work install locally and use --provider ollama,
-which keeps everything on your own machine. See the Providers section.
+   - On Windows:  click "Windows installer (64-bit)".
+   - On a Mac:    click "macOS 64-bit universal2 installer".
 
-Note: the hosted app does not include the RAG / embedding features, and the
-systematic review pipeline is best run locally where its interactive prompts
-have a real terminal.
+3. Open the file you just downloaded.
 
+4. WINDOWS ONLY - IMPORTANT:
+   On the first screen, tick the box that says
+   "Add python.exe to PATH", THEN click "Install Now".
 
-============================================
-Option 2: Run Locally with Docker
-============================================
+   MAC: just click through and accept the defaults.
 
-You need: Docker Desktop, and an API key for at least one provider.
+5. When it says it is finished, close the installer.
 
-    Docker Desktop
-        Windows / macOS : https://www.docker.com/products/docker-desktop
-        Linux           : https://docs.docker.com/engine/install/
+------------------------------------------------------------
+ STEP 2  -  Download the app
+------------------------------------------------------------
 
-    API keys - you need your OWN. Keys are never included in the image.
-        DeepSeek (default, cheap)     https://platform.deepseek.com
-        Qwen / DashScope (needed for  https://dashscope.aliyuncs.com
-          the SR pipeline - vision)
-        Groq (free tier, optional)    https://console.groq.com
+1. Go to:
+   https://github.com/KW75/AI_kcMedicalResearch
 
-    Set a spending limit in each provider's console.
+2. Look for the green button near the top that says
+   "<> Code" and click it.
 
+3. In the small menu that opens, click "Download ZIP".
 
-Step 1 - Get the code
+4. The download is a compressed folder. Open it (unzip it):
 
-    git clone https://github.com/KW75/AI_kcMedicalResearch.git
-    cd AI_kcMedicalResearch
+   - On Windows:  find the downloaded ZIP file (usually in
+     your "Downloads" folder), right-click it, and choose
+     "Extract All...", then click "Extract".
 
+   - On a Mac:    double-click the downloaded ZIP file and it
+     will unzip on its own.
 
-Step 2 - Create your .env
+5. You now have a folder called "AI_kcMedicalResearch"
+   (it may have "-main" on the end - that is fine).
+   Move it somewhere easy to find, such as your Desktop
+   or Documents.
 
-    Windows:      copy .env.example .env
-    macOS/Linux:  cp .env.example .env
 
-    Then open .env in a text editor and fill in the keys you have.
-    At minimum set DEEPSEEK_API_KEY, plus DASHSCOPE_API_KEY if you want to
-    run systematic reviews.
+------------------------------------------------------------
+ STEP 3  -  Start the app
+------------------------------------------------------------
 
-    IMPORTANT - no quotes around values:
-        correct    DEEPSEEK_API_KEY=sk-abc123
-        wrong      DEEPSEEK_API_KEY="sk-abc123"
-    Docker passes the quotes through as part of the key.
+Open the "AI_kcMedicalResearch" folder, then:
 
-    .env stays on your machine. It is excluded from git and from the Docker
-    image, so your keys are never shared.
+   - On Windows:
+     Go into the  scripts  folder, then the  windows  folder.
+     Double-click:  AI_kcMedicalResearch_CLI
 
+   - On a Mac:
+     Open the "Terminal" app, type the word  bash  followed by
+     a space, then drag the file
+        scripts/macos/Mac_kcMedicalResearch_CLI.sh
+     into the Terminal window, and press Enter.
 
-Step 3 - Run
+The FIRST time you run it, the app sets itself up. This takes
+a few minutes.
 
-    From the docker/ folder:
+  >>> The screen may look frozen or stuck. THIS IS NORMAL. <<<
+  >>> Do NOT close the window. Just wait until a menu appears. <<<
 
-        cd docker
+If a message tells you to install Python, go back to Step 1.
 
-    Interactive CLI menu (all six pipelines):
 
-        docker compose run --rm cli
+------------------------------------------------------------
+ STEP 4  -  Choose how the app "thinks" (pick ONE)
+------------------------------------------------------------
 
-    Streamlit web UI, then open http://localhost:8501:
+The app is now installed, but it needs a "brain" to work.
+You have two choices. Pick whichever suits you.
 
-        docker compose up ui
 
-    Stop the UI with Ctrl+C.
+  CHOICE A - Free, private, runs on your own computer
+  ---------------------------------------------------
+  Best if you work with confidential or patient data.
 
-    The first run builds the image and takes 5-10 minutes. Later runs start
-    in seconds.
+  1. Install "Ollama" from:  https://ollama.com/download
+     Open the file and click through to install it.
 
-    After pulling code changes, rebuild:
+  2. Open the "Terminal" (Mac) or "Command Prompt" (Windows)
+     and type these two lines, pressing Enter after each:
 
-        docker compose build
+         ollama pull llama3.2
+         ollama pull nomic-embed-text
 
+     (These download the free AI. It may take a while.)
 
-Where your files go
--------------------
+  3. That's it. The app will find it automatically.
 
-    Put input files in    input/<mode>/     e.g. input/sr/ for review PDFs
-    Results appear in     output/<mode>/
-    Full audit trail in   reports/
 
-    These folders are mounted into the container, so files you add on your
-    machine appear inside it immediately, and results are written back out.
+  CHOICE B - Cloud AI (needs an account key)
+  ------------------------------------------
+  Best if you don't want large downloads. Note: your text is
+  sent to an outside company, so do NOT use this for
+  confidential or patient-identifiable data.
 
+  1. In the app folder, find the file called  .env.example
+     Make a copy of it and rename the copy to just  .env
 
-============================================
-Option 3: Run Locally without Docker
-============================================
+  2. Open  .env  in Notepad (Windows) or TextEdit (Mac).
 
-For developers. Needs Python 3.11 or 3.12.
+  3. Paste in the API key your team lead gives you, next to
+     the matching provider name, then save the file.
 
-    NOTE: Python 3.13 and 3.14 are not currently supported. Several pinned
-    dependencies do not build on them. If python.org offers only a newer
-    version, use Option 2 (Docker) instead - Docker supplies its own Python
-    and ignores whatever you have installed.
 
-    git clone https://github.com/KW75/AI_kcMedicalResearch.git
-    cd AI_kcMedicalResearch
+------------------------------------------------------------
+ DONE
+------------------------------------------------------------
 
-    python -m venv .venv
-    .venv\Scripts\activate            # Windows
-    source .venv/bin/activate         # macOS/Linux
+Start the app again (Step 3) whenever you want to use it.
+After the first time, it opens straight to the menu.
 
-    pip install -r requirements.txt
-
-    copy .env.example .env            # then add your keys
-
-    python scripts/launcher.py        # menu
-    python SOURCE_CODE/main.py        # direct
-
-    Startup takes about 7 seconds while dependencies load.
-
-    If the interpreter is unsupported, main.py stops with the supported range,
-    a Python 3.12 download link, and the Docker alternative - rather than a
-    pip or import error.
-
-Convenience launchers (do the venv setup for you)
-
-    These create .venv on first run, install dependencies, and start the app.
-    Both platforms behave identically; both use the virtualenv, not Docker.
-
-    Windows:
-        scripts\windows\AI_kcMedicalResearch_CLI.bat     menu launcher
-        scripts\windows\AI_kcMedicalResearch_UI.bat      Streamlit UI
-        scripts\windows\activate_venv.bat                venv shell
-
-    macOS/Linux:
-        chmod +x scripts/macos/*.sh                      first time only
-        ./scripts/macos/Mac_kcMedicalResearch_CLI.sh     menu launcher
-        ./scripts/macos/Mac_kcMedicalResearch_UI.sh      Streamlit UI
-
-    NOT YET VERIFIED on macOS: the launchers changed from Docker-based to
-    venv-based in v2.4.8 and have not been run on a Mac.
-
-Optional OCR support (scanned PDFs, legacy .doc)
-
-    pip install -r requirements-ocr.txt
-
-    This also needs system binaries that pip cannot install:
-
-        Tesseract  Windows: https://github.com/UB-Mannheim/tesseract/wiki
-                   macOS:   brew install tesseract
-                   Linux:   sudo apt-get install tesseract-ocr
-
-        Poppler    Windows: https://github.com/oschwartz10612/poppler-windows/releases
-                   macOS:   brew install poppler
-                   Linux:   sudo apt-get install poppler-utils
-
-    Then set TESSERACT_PATH and POPPLER_PATH in .env.
-    Without OCR the app runs normally and reports OCR as unavailable.
-
-
-============================================
-Providers
-============================================
-
-CONFIDENTIALITY - READ THIS BEFORE PROCESSING PATIENT DATA
-
-    Ollama is the ONLY provider that keeps your input on your own machine.
-    Every other provider transmits the prompt to an external API.
-
-    For confidential or patient-identifiable data, use:
-
-        python SOURCE_CODE/main.py --provider ollama
-
-    Requests to Ollama never fall back to a cloud provider, even if Ollama
-    times out. The run fails and tells you nothing was sent externally.
-
-    Before v2.4.8 this was not true: --provider ollama produced the chain
-    [ollama, deepseek, qwen, groq], so an Ollama timeout silently sent the
-    prompt to DeepSeek and printed a success line. If you processed
-    confidential data with an earlier version, treat it as having left the
-    machine.
-
-    Ollama cannot run SR mode - no vision support. SR works on published
-    papers, so a cloud provider is appropriate there.
-
-Default is DeepSeek. On transient errors (timeout, 429, 502, 503) the app
-automatically tries the next provider in FALLBACK_PROVIDERS
-(default: deepseek,qwen,groq). Authentication errors do not fall back.
-
-Override per run with --provider:
-
-    python SOURCE_CODE/main.py --mode writing --provider groq
-
-Systematic review needs a vision-capable provider: qwen, openai, anthropic
-or groq. DeepSeek and Ollama cannot do SR.
-
-Qwen uses two models: QWEN_MODEL (qwen-plus-latest) for text, and
-QWEN_VISION_MODEL (qwen-vl-max) for SR page images. SR selects the vision
-model automatically; no --model flag needed.
-
-
-Local AI with Ollama (free, offline, optional)
----------------------------------------------
-
-    Install: https://ollama.com/download
-    Pull a model:  ollama pull llama3.2
-
-    python SOURCE_CODE/main.py --provider ollama
-
-    The app auto-detects the best installed model.
-
-    Limitations: slow with large models, frequent timeouts on the coding and
-    writing pipelines, and no vision - so Ollama cannot run SR.
-
-    In Docker, the container reaches Ollama on your machine via
-    host.docker.internal; docker-compose.yml already sets this.
-
-
-============================================
-Systematic Review Pipeline - READ FIRST
-============================================
-
-Before using SR output in an actual review, read:
-
-    Readme/REVIEWER_GUIDE.md
-
-Extraction is LLM-based and cannot verify its own semantics. It will produce
-a confident, precisely-quantified effect size whether or not it understood
-the paper. Two failure modes are documented and unfixed:
-
-    - a reported standard error can be read as a standard deviation
-    - a within-subject before/after change can be extracted as though it
-      were an intervention-versus-control comparison
-
-Both have been observed producing a large, entirely invalid effect size that
-passed every stage of the pipeline without a warning.
-
-Extraction is also non-deterministic: the same PDF can yield different
-numbers on consecutive runs.
-
-Therefore: every mean, SD and sample size must be checked against the source
-PDF before any pooled estimate is reported. Reviewer-verified corrections go
-in input/sr/study_overrides.yaml, and every one is logged so it can be
-declared in your methods section.
-
-Run SR directly rather than through a menu, so the interactive PICO prompts
-get a real terminal:
-
-    python SOURCE_CODE/main.py --mode sr --provider qwen
-
-
-============================================
-Troubleshooting
-============================================
-
-Docker not found            Install Docker Desktop
-Docker not running          Start Docker Desktop and wait for the whale icon
-Build fails                 Check your internet connection; retry - transient
-                              PyPI failures are common
-Port 8501 in use            Another instance is running; stop it or open
-                              http://localhost:8501
-UI shows a blank page       Wait ~15 seconds and refresh; the server starts
-                              after the container does
-Auth error from provider    Check .env has no quotes around the key value
-Ollama unreachable          In Docker use host.docker.internal, not localhost
-SR extracts nothing         Use a vision provider (qwen). DeepSeek cannot
-                              read page images
-pip install fails           You are probably on Python 3.13+. Use Docker,
-                              or install Python 3.12
-Python 3.11 unavailable     Use Docker; it supplies its own Python. Or:
-                              macOS  brew install python@3.12
-                              Win    https://www.python.org/downloads/release/python-3129/
-"Requires Python 3.11 or     Expected. Rebuild .venv with a supported
-  3.12" on startup            interpreter, or use Docker
-Garbled source / SyntaxError Run python scripts/check_no_bom.py
-Mac .sh will not run         chmod +x scripts/macos/*.sh
-
-
-============================================
-Getting Help
-============================================
-
-GitHub Issues:  https://github.com/KW75/AI_kcMedicalResearch/issues
-Documentation:  README.md, Readme/HANDOFF.md, Readme/REVIEWER_GUIDE.md
+Stuck? Take a screenshot of what you see and send it to your
+team lead or IT contact.
+============================================================
