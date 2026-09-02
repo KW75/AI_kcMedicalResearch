@@ -55,8 +55,13 @@ targets an old OS and forces source builds that fail, see #19).
        cd AI_kcMedicalResearch
 
    - Windows:  double-click  scripts\windows\AI_kcMedicalResearch_CLI.bat
-   - macOS:    in Terminal, run
-               bash scripts/macos/Mac_kcMedicalResearch_CLI.sh
+
+   - macOS:    open Terminal, then run BOTH lines below. The first moves into
+               the project folder; the second starts the app. You must run it
+               from the project root, or the file will not be found.
+
+                   cd ~/AI_kcMedicalResearch
+                   bash scripts/macos/Mac_kcMedicalResearch_CLI.sh
 
    The launcher builds `.venv`, installs the pinned dependencies from
    `requirements-local.txt`, and opens the menu. First run takes a few
