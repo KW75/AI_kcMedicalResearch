@@ -97,14 +97,28 @@ You have two choices. Pick whichever suits you.
      Open the file and click through to install it.
 
   2. Open the "Terminal" (Mac) or "Command Prompt" (Windows)
-     and type these two lines, pressing Enter after each:
+     and type these lines, pressing Enter after each:
 
-         ollama pull llama3.2
+         ollama pull qwen2.5:14b-instruct
          ollama pull nomic-embed-text
 
-     (These download the free AI. It may take a while.)
+     (Big download - allow time. If your computer is older or
+      slow, use  qwen2.5:7b-instruct  instead of the 14b.)
 
-  3. That's it. The app will find it automatically.
+  3. In the app folder, open the file called  .env  in Notepad
+     (Windows) or TextEdit (Mac). Find this line:
+
+         # OLLAMA_MODEL=llama3.2:latest  # Auto-detected if commented out
+
+     Replace it with (no # at the start):
+
+         OLLAMA_MODEL=qwen2.5:14b-instruct
+
+     (Use  qwen2.5:7b-instruct  here if you pulled the 7b.)
+     Save the file.
+
+  4. Keep Ollama running while you use the app. That's it.
+
 
 
   CHOICE B - Cloud AI (needs an account key)
@@ -128,6 +142,12 @@ You have two choices. Pick whichever suits you.
 
 Start the app again (Step 3) whenever you want to use it.
 After the first time, it opens straight to the menu.
+
+Note on code generation: the app checks its own code over
+several passes, so it can take a few minutes on a local model.
+If you see a file marked "MAXITER_WARNING", the code is still
+there and usually works - it just didn't pass every automatic
+check. This is normal for the local (free) AI.
 
 Stuck? Take a screenshot of what you see and send it to your
 team lead or IT contact.

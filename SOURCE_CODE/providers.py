@@ -321,9 +321,22 @@ def call_ollama_provider(
             raise RuntimeError("Ollama returned an empty response.")
         return response_text
     except urllib.error.HTTPError as exc:
+        # 404 = the model has not been pulled yet. Give a plain-language fix
+        # instead of "HTTP error 404: Not Found", which means nothing to a
+        # non-technical user on their first run.
+        if exc.code == 404:
+            raise RuntimeError(
+                f"The local AI model '{model}' is not installed yet.\n"
+                f"Open a terminal and run:  ollama pull {model}\n"
+                f"Then start the app again."
+            ) from exc
         raise RuntimeError(f"Ollama HTTP error {exc.code}: {exc.reason}") from exc
     except urllib.error.URLError as exc:
-        raise RuntimeError(f"Ollama connection error: {exc.reason}") from exc
+        # Connection refused = Ollama app isn't running.
+        raise RuntimeError(
+            f"Cannot reach the local AI at {OLLAMA_HOST}. "
+            f"Make sure the Ollama app is running, then try again."
+        ) from exc
 
 
 def call_deepseek_provider(

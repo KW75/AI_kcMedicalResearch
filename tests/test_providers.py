@@ -7,7 +7,6 @@ import sys
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 import json
-
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "SOURCE_CODE"))
@@ -216,3 +215,27 @@ class TestDefaultModel:
     def test_unknown_provider_returns_empty(self):
         from providers import get_default_model
         assert get_default_model("nonexistent") == ""
+
+
+def test_ollama_404_tells_user_to_pull_model(monkeypatch):
+    """A 404 from Ollama (model not pulled yet) must produce an actionable
+    'ollama pull <model>' message, not the raw 'HTTP error 404: Not Found'
+    that a non-technical user cannot act on. Runs without a live server."""
+    import urllib.error
+    import providers
+
+    def fake_urlopen(req, timeout=0):
+        raise urllib.error.HTTPError(
+            url="http://localhost:11434/api/generate",
+            code=404, msg="Not Found", hdrs=None, fp=None,
+        )
+
+    monkeypatch.setattr(providers, "urlopen", fake_urlopen)
+
+    with pytest.raises(RuntimeError) as exc:
+        providers.call_ollama_provider("hello", model="qwen2.5:14b-instruct")
+
+    message = str(exc.value)
+    assert "ollama pull qwen2.5:14b-instruct" in message
+    assert "not installed" in message.lower()
+

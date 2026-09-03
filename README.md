@@ -3,7 +3,7 @@
 A multi-mode AI assistant for medical research, critical appraisal, systematic review, coding, and writing. Uses cloud providers by default (DeepSeek, Qwen, OpenAI, Anthropic, Groq) with optional local Ollama support.
 
     Version: 2.4.13
-    Tests: 569 passed, 3 skipped, 11 deselected
+    Tests: 570 passed, 3 skipped, 11 deselected
            (reproduce with `python -m pytest -m "not live" --tb=short -q`)
     CI: GitHub Actions - Green
     GitHub: https://github.com/KW75/AI_kcMedicalResearch
@@ -79,15 +79,21 @@ The app runs after Step 1 but needs a model to produce output.
 Option A - Free / local (Ollama), no API key:
 1. Install Ollama:  https://ollama.com/download
 2. Pull the two models the app uses:
-       ollama pull llama3.2          (the chat model - used by all modes)
-       ollama pull nomic-embed-text  (the embedding model - needed for the
-                                      appraisal and SR pipelines / RAG)
-   (You may pull a larger chat model instead - the app auto-detects and uses
-    the largest one you have; if none is set in .env, it falls back to
-    llama3.2. The embedding model must be nomic-embed-text unless you change
-    EMBEDDING_MODEL in .env.)
-3. Ollama runs in the background after install; the app connects automatically.
+       ollama pull qwen2.5:14b-instruct   (the chat model - used by all modes;
+                                           use qwen2.5:7b-instruct on older or
+                                           slower machines)
+       ollama pull nomic-embed-text       (the embedding model - needed for the
+                                           appraisal and SR pipelines / RAG)
+3. Copy `.env.example` to `.env` and confirm this line matches the model you
+   pulled (already set by default):
+       OLLAMA_MODEL=qwen2.5:14b-instruct
+   (If you pulled a different chat model, put its exact name here, or comment
+    the line out to let the app auto-pick the largest model you have. The
+    embedding model must stay nomic-embed-text unless you change EMBEDDING_MODEL.)
+4. Ollama runs in the background after install; the app connects automatically.
 
+Note: llama3.2 (3B) was the previous default but is too small for reliable
+code generation - use qwen2.5 as above.
 
 Option B - Cloud provider (DeepSeek, Qwen, OpenAI, Anthropic, Groq):
 1. Copy `.env.example` to `.env`.
@@ -115,7 +121,7 @@ Option B - Cloud provider (DeepSeek, Qwen, OpenAI, Anthropic, Groq):
 | OpenAI             | `--provider openai`    | `OPENAI_API_KEY`     | GPT-4 vision                                |
 | Anthropic          | `--provider anthropic` | `ANTHROPIC_API_KEY`  | Claude vision - partial tripwires, see REVIEWER_GUIDE.md §6.  |
 | Groq               | `--provider groq`      | `GROQ_API_KEY`       | Fast inference                              |
-| Ollama (local)     | `--provider ollama`    | `OLLAMA_HOST`        | Free, slow, offline; no SR (no vision)      |
+| Ollama (local)     | `--provider ollama`    | `OLLAMA_HOST`, `OLLAMA_MODEL` | Free, offline; no SR (no vision). Set OLLAMA_MODEL (default qwen2.5:14b-instruct). |
 
 On transient errors (timeout, 429, 502, 503) the system tries the next
 provider. Default chain: DeepSeek -> Qwen -> Groq (`FALLBACK_PROVIDERS`).
@@ -145,6 +151,7 @@ Copy `.env.example` to `.env`. `.env` is gitignored.
     FALLBACK_PROVIDERS=deepseek,qwen,groq
 
     OLLAMA_HOST=http://localhost:11434
+    OLLAMA_MODEL=qwen2.5:14b-instruct
     OLLAMA_CONTEXT=32768
     OLLAMA_NUM_PREDICT=8192
     OLLAMA_TEMPERATURE=0.3

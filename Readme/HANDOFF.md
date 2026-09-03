@@ -45,7 +45,7 @@ so those catches happen at session open, not mid-work.
 
 | Component      | Status |
 |----------------|--------|
-| Tests          | 569 passed, 3 skipped, 11 deselected (`python -m pytest -m "not live" --tb=short -q`) |
+| Tests          | 570 passed, 3 skipped, 11 deselected (`python -m pytest -m "not live" --tb=short -q`) |
 | CI             | green (28e616e; 3a9081b and 6813b12 also confirmed green) |
 | Render deploy  | health returned `ok` on 28e616e (S27 close) |
 | SR pipeline    | working via CLI with Qwen; Ang 2010 verified against PDF (NFR week 6, unanimous N=3); text-fallback drops now surface in Stage 4 `[SKIP]` block |
@@ -125,6 +125,32 @@ Three issues resolved.
   inputs, not just fixtures. The S25/#66 Stage-4 "cheapest first
   temperature=0" carryover is no longer relevant (closed in S26); the
   `.venv` housekeeping item from S26 was not re-verified this session.
+
+## Session 28 Summary
+
+Local-model recommendation changed from llama3.2 to qwen2.5:14b-instruct
+(config only, no pipeline logic change). Reason: llama3.2 (3B) was too weak
+for code generation - the coding Builder's Reviewer/Tester loop never
+converged. qwen2.5:14b is strong on synopsis/appraisal prose (the
+confidentiality-critical local use) and adequate for demo code.
+qwen2.5:7b-instruct offered as the low-resource fallback.
+
+- `.env.example`: OLLAMA_MODEL uncommented and set to qwen2.5:14b-instruct.
+  Added confidentiality note on EMBEDDING_PROVIDER (keep = ollama; openai
+  sends document chunks out). Added MAXITER_WARNING note for demo code.
+- README: Step 2 Option A and Providers table updated to qwen2.5.
+- `call_ollama_provider` (providers.py): friendlier errors - 404 now prints
+  "run: ollama pull <model>"; connection-refused now says "make sure Ollama
+  is running". [APPLY + add test pinning the 404->pull-message mapping;
+  existing tests may assert the old "HTTP error 404" string - run suite.]
+
+Verified by code review only: confirmed coding pipeline honours OLLAMA_MODEL
+(coding.py uses an injected call_llm_fn, no hard-coded model); confirmed
+Ollama never falls back to cloud (LOCAL_ONLY_PROVIDERS in providers.py);
+confirmed DASHSCOPE_ANTHROPIC_URL / DASHSCOPE_OPENAI_URL are dead config
+(unused in providers.py, main.py, streaming.py). NOT yet verified on real
+hardware: a 14B pull and a demo run converging. Do before rollout.
+
 
 ## Next Session Priorities (Session 28)
 
