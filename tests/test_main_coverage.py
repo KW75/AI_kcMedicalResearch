@@ -141,13 +141,17 @@ class TestCliRouting:
     to run_sr_launcher() and must never reach main()/choose_role().
 
     validate_api_keys is patched throughout so these tests do not depend
-    on provider keys being present in the environment.
+    on provider keys being present in the environment. Every call passes
+    --confirm-cloud: these tests pin routing, not consent, and the default
+    provider depends on .env. The consent gate is pinned in
+    tests/test_data_destinations.py.
     """
 
     @patch('SOURCE_CODE.main.validate_api_keys')
     @patch('SOURCE_CODE.main.run_sr_launcher')
     def test_sr_mode_routes_to_launcher(self, mock_launcher, _mock_keys):
-        main.run_cli(main.parse_args(['--mode', 'sr', '--provider', 'qwen']))
+        main.run_cli(main.parse_args(
+            ['--mode', 'sr', '--provider', 'qwen', '--confirm-cloud']))
         mock_launcher.assert_called_once_with(provider='qwen', model=None)
 
     @patch('SOURCE_CODE.main.validate_api_keys')
@@ -155,41 +159,41 @@ class TestCliRouting:
     @patch('SOURCE_CODE.main.run_sr_launcher')
     def test_sr_mode_never_reaches_choose_role(self, _mock_launcher,
                                                mock_choose_role, _mock_keys):
-        main.run_cli(main.parse_args(['--mode', 'sr']))
+        main.run_cli(main.parse_args(['--mode', 'sr', '--confirm-cloud']))
         mock_choose_role.assert_not_called()
 
     @patch('SOURCE_CODE.main.validate_api_keys')
     @patch('SOURCE_CODE.main.handle_coding_mode')
     def test_coding_mode_routes_to_handler(self, mock_handler, _mock_keys):
-        main.run_cli(main.parse_args(['--mode', 'coding']))
+        main.run_cli(main.parse_args(['--mode', 'coding', '--confirm-cloud']))
         mock_handler.assert_called_once_with(
             provider=main.DEFAULT_PROVIDER, model=None, dry_run=False)
 
     @patch('SOURCE_CODE.main.validate_api_keys')
     @patch('SOURCE_CODE.main.handle_writing_mode')
     def test_writing_mode_routes_to_handler(self, mock_handler, _mock_keys):
-        main.run_cli(main.parse_args(['--mode', 'writing']))
+        main.run_cli(main.parse_args(['--mode', 'writing', '--confirm-cloud']))
         mock_handler.assert_called_once_with(
             provider=main.DEFAULT_PROVIDER, model=None, dry_run=False)
 
     @patch('SOURCE_CODE.main.validate_api_keys')
     @patch('SOURCE_CODE.main.handle_appraisal_mode')
     def test_appraisal_mode_routes_to_handler(self, mock_handler, _mock_keys):
-        main.run_cli(main.parse_args(['--mode', 'appraisal']))
+        main.run_cli(main.parse_args(['--mode', 'appraisal', '--confirm-cloud']))
         mock_handler.assert_called_once_with(
             provider=main.DEFAULT_PROVIDER, model=None, dry_run=False)
 
     @patch('SOURCE_CODE.main.validate_api_keys')
     @patch('SOURCE_CODE.main.run_rct_search_pipeline')
     def test_rct_search_mode_routes_to_pipeline(self, mock_pipeline, _mock_keys):
-        main.run_cli(main.parse_args(['--mode', 'rct_search']))
+        main.run_cli(main.parse_args(['--mode', 'rct_search', '--confirm-cloud']))
         mock_pipeline.assert_called_once_with(
             provider=main.DEFAULT_PROVIDER, model=None, dry_run=False)
 
     @patch('SOURCE_CODE.main.validate_api_keys')
     @patch('SOURCE_CODE.main.handle_search_mode')
     def test_search_mode_routes_to_handler(self, mock_handler, _mock_keys):
-        main.run_cli(main.parse_args(['--mode', 'search']))
+        main.run_cli(main.parse_args(['--mode', 'search', '--confirm-cloud']))
         mock_handler.assert_called_once_with(
             provider=main.DEFAULT_PROVIDER, model=None, sub_mode=None)
 
@@ -199,7 +203,7 @@ class TestCliRouting:
         # only happen programmatically - but a silent fallthrough to main()
         # is exactly how the SR KeyError path (#43) arose. run_cli must fail
         # loudly on a mode with no dispatch branch.
-        args = main.parse_args(['--mode', 'coding'])
+        args = main.parse_args(['--mode', 'coding', '--confirm-cloud'])
         args.mode = 'bogus'
         with pytest.raises(ValueError, match='no dispatch branch'):
             main.run_cli(args)

@@ -529,6 +529,22 @@ def _is_transient_error(error: Exception) -> bool:
     return any(phrase in msg for phrase in _TRANSIENT_PHRASES)
 
 
+def provider_attempt_order(provider: str, chain: list[str] | None) -> list[str]:
+    """Providers call_ai_with_fallback will try, in order.
+
+    Single source of truth for both the fallback loop and the cloud warning
+    shown to the user, so what the user is told cannot drift from what is
+    actually tried. A local-only provider is never followed by anything.
+    """
+    if provider in LOCAL_ONLY_PROVIDERS:
+        return [provider]
+    ordered = [provider]
+    for p in chain or []:
+        if p not in ordered:
+            ordered.append(p)
+    return ordered
+
+
 def call_ai_with_fallback(
     prompt: str,
     provider: str = None,
@@ -547,10 +563,7 @@ def call_ai_with_fallback(
     # one usable for confidential or patient-identifiable input. Falling back
     # to a cloud API would transmit data the user chose to keep local.
     # A timeout is not consent to send data elsewhere.
-    if provider in LOCAL_ONLY_PROVIDERS:
-        ordered = [provider]
-    else:
-        ordered = [provider] + [p for p in chain if p != provider]
+    ordered = provider_attempt_order(provider, chain)
 
     last_error = None
     for attempt_provider in ordered:

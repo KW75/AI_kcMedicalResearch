@@ -4,7 +4,7 @@ A multi-mode AI assistant for medical research, critical appraisal, systematic r
 
 
     Version: 2.4.13
-    Tests: 575 passed, 3 skipped, 11 deselected
+    Tests: 600 passed, 3 skipped, 11 deselected
            (reproduce with `python -m pytest -m "not live" --tb=short -q`)
     CI: GitHub Actions - Green
     GitHub: https://github.com/KW75/AI_kcMedicalResearch
@@ -123,6 +123,8 @@ Option B - Cloud provider (DeepSeek, Qwen, OpenAI, Anthropic, Groq):
 | Anthropic          | `--provider anthropic` | `ANTHROPIC_API_KEY`  | Claude vision - partial tripwires, see REVIEWER_GUIDE.md §6.  |
 | Groq               | `--provider groq`      | `GROQ_API_KEY`       | Fast inference                              |
 | Ollama (default)   | `--provider ollama`    | `OLLAMA_HOST`, `OLLAMA_MODEL` | Free, offline; no SR (no vision). Set OLLAMA_MODEL (default qwen2.5:14b-instruct). |
+
+**Confidentiality gate.** Ollama runs entirely on your machine and starts without any prompt. If you choose a cloud provider, the app first lists every external service your input could be sent to (the chosen provider plus any `FALLBACK_PROVIDERS` backups) and asks `Continue? [y/N]`. Pressing Enter cancels. For scripted or non-interactive runs, add `--confirm-cloud` to accept explicitly; without it, a run with no keyboard attached is refused. Search modes always contact PubMed / Europe PMC (and DuckDuckGo for Search) with your search terms, even when the AI model is local.
 
 On transient errors (timeout, 429, 502, 503) the system tries the next
 provider. Default chain: DeepSeek -> Qwen -> Groq (`FALLBACK_PROVIDERS`).
