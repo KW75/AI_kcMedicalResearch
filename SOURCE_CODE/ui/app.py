@@ -471,13 +471,59 @@ def _is_cloud_environment() -> bool:
         os.environ.get('RENDER_GIT_COMMIT'),
     ])
 
-def _launch_terminal(mode: str, provider: str, model: str, submode: str = "", prompt: str = "") -> str:
+
+_LOCAL_PROVIDERS = {"ollama"}
+
+
+def _build_cli_cmd(mode: str, provider: str, model: str, submode: str = "",
+                   confirm_cloud: bool = False) -> list:
+    """The one CLI command both launch paths use.
+
+    --confirm-cloud is added only after the user ticked consent, and never
+    for a local provider.
+    """
+    cmd = [sys.executable, str(MAIN_PY), "--mode", mode, "--provider", provider]
+    if model and model.strip():
+        cmd += ["--model", model.strip()]
+    if mode == "search" and submode:
+        cmd += ["--sub", submode]
+    if mode == "coding" and submode:
+        for role in ("Builder", "Reviewer", "Tester"):
+            if role in submode:
+                cmd += ["--role", role]
+                break
+    if confirm_cloud and provider not in _LOCAL_PROVIDERS:
+        cmd.append("--confirm-cloud")
+    return cmd
+
+
+def _cli_module():
+    """Import SOURCE_CODE.main lazily (Streamlit only puts ui/ on sys.path)."""
+    for p in (str(PROJECT_ROOT), str(SOURCE_CODE_DIR)):
+        if p not in sys.path:
+            sys.path.append(p)
+    from SOURCE_CODE import main as cli
+    return cli
+
+def _cloud_destinations(mode: str, provider: str) -> list:
+    """Display names of every cloud provider this job may reach, in attempt order.
+
+    Computed by main.data_destinations so the UI and the CLI cannot disagree.
+    """
+    cli = _cli_module()
+    return [cli.PROVIDER_LABELS.get(p, p)
+            for p in cli.data_destinations(mode, provider)
+            if p not in cli.LOCAL_ONLY_PROVIDERS]
+
+def _launch_terminal(mode: str, provider: str, model: str, submode: str = "", prompt: str = "",
+                     confirm_cloud: bool = False) -> str:
     """Launch CLI - detects environment and runs appropriately."""
     if _is_cloud_environment():
-        return _run_cli_cloud(mode, provider, model, submode, prompt)
-    return _launch_terminal_local(mode, provider, model, submode)
+        return _run_cli_cloud(mode, provider, model, submode, prompt, confirm_cloud=confirm_cloud)
+    return _launch_terminal_local(mode, provider, model, submode, confirm_cloud=confirm_cloud)
 
-def _run_cli_cloud(mode: str, provider: str, model: str, submode: str = "", prompt: str = "") -> str:
+def _run_cli_cloud(mode: str, provider: str, model: str, submode: str = "", prompt: str = "",
+                   confirm_cloud: bool = False) -> str:
     """Run CLI directly in cloud environment."""
     # Save prompt if provided
     if prompt.strip():
@@ -485,21 +531,9 @@ def _run_cli_cloud(mode: str, provider: str, model: str, submode: str = "", prom
         prompt_file.parent.mkdir(parents=True, exist_ok=True)
         prompt_file.write_text(prompt.strip(), encoding="utf-8")
     
-    # Build command
-    cmd_parts = [sys.executable, str(SOURCE_CODE_DIR / "main.py"), "--mode", mode, "--provider", provider]
-    
-    # Add sub-mode for search
-    if mode == "search" and submode:
-        cmd_parts += ["--sub", submode]
-    
-    # Add submode flags for coding
-    if mode == "coding" and submode:
-        if "Builder" in submode:
-            cmd_parts += ["--role", "Builder"]
-        elif "Reviewer" in submode:
-            cmd_parts += ["--role", "Reviewer"]
-        elif "Tester" in submode:
-            cmd_parts += ["--role", "Tester"]
+    # Build command (shared with the local path so the two cannot drift)
+    cmd_parts = _build_cli_cmd(mode, provider, model, submode, confirm_cloud=confirm_cloud)
+
     
     st.code("$ " + " ".join(cmd_parts))
     
@@ -516,6 +550,7 @@ def _run_cli_cloud(mode: str, provider: str, model: str, submode: str = "", prom
             
             result = subprocess.run(
                 cmd_parts,
+                stdin=subprocess.DEVNULL,  # no keyboard: CLI must never wait for [y/N]
                 cwd=str(PROJECT_ROOT),
                 capture_output=True,
                 text=True,
@@ -543,23 +578,11 @@ def _run_cli_cloud(mode: str, provider: str, model: str, submode: str = "", prom
             st.error(f"❌ Error: {exc}")
             return f"error: {exc}"
 
-def _launch_terminal_local(mode: str, provider: str, model: str, submode: str = "") -> str:
+def _launch_terminal_local(mode: str, provider: str, model: str, submode: str = "",
+                           confirm_cloud: bool = False) -> str:
     """Launch terminal locally with API keys from session."""
-    py = sys.executable
-    mp = str(MAIN_PY)
     base = str(PROJECT_ROOT)
-    
-    cmd_parts = [py, mp, "--mode", mode, "--provider", provider]
-    if model.strip():
-        cmd_parts += ["--model", model.strip()]
-    
-    if mode == "coding" and submode:
-        if "Builder" in submode:
-            cmd_parts += ["--role", "Builder"]
-        elif "Reviewer" in submode:
-            cmd_parts += ["--role", "Reviewer"]
-        elif "Tester" in submode:
-            cmd_parts += ["--role", "Tester"]
+    cmd_parts = _build_cli_cmd(mode, provider, model, submode, confirm_cloud=confirm_cloud)
     
     cmd_str = " ".join(f'"{p}"' if " " in p else p for p in cmd_parts)
     env_vars = _get_env_with_api_keys()
@@ -1006,20 +1029,59 @@ def _mode_page(mode: str) -> None:
     
     st.divider()
     
-    run_label = f"▶️ Run {cfg['label']}"
+    # --- v2.5 cloud gate: same destinations the CLI lists (main.data_destinations) ---
+    cloud_names: list = []
+    search_names: list = []
+    gate_error = None
+    try:
+        cli = _cli_module()
+        search_names = cli.SEARCH_SERVICES.get(mode, [])
+        if provider not in _LOCAL_PROVIDERS:
+            cloud_names = _cloud_destinations(mode, provider)
+    except Exception as exc:  # fail closed: never run a cloud job blind
+        gate_error = str(exc)
+
+    if search_names:
+        st.info("Search terms will be sent to: " + ", ".join(search_names)
+                + " (this happens even when the AI model is local).")
+
+    confirm_cloud = False
+    if gate_error and provider not in _LOCAL_PROVIDERS:
+        st.error(f"Could not determine where this job's data would be sent ({gate_error}). "
+                 "Cloud run disabled - choose Ollama.")
+    elif cloud_names:
+        lines = "\n".join(f"- {n}" for n in cloud_names)
+        msg = ("**Cloud provider selected.** Input for this job will be sent to an external server:\n\n"
+               f"{lines}\n\n"
+               "The first is your chosen provider; any others are backups used only if it is busy or times out.\n\n"
+               "Do not use for patient-identifiable or confidential data.")
+        if _is_cloud_environment():
+            msg += ("\n\nNote: this hosted app runs on Render's servers, so files uploaded here have already "
+                    "left your computer. For confidential work, install the app locally and use Ollama.")
+        st.warning(msg)
+        confirm_cloud = st.checkbox(
+            "I confirm this job contains no patient-identifiable or confidential data",
+            key=f"confirm_cloud_{mode}",
+        )
+
+    run_disabled = (bool(gate_error) and provider not in _LOCAL_PROVIDERS) or (bool(cloud_names) and not confirm_cloud)
+
+    run_label = f"Run {cfg['label']}"
     if mode == "coding" and submode:
         run_label += f" ({submode})"
-    
-    if st.button(run_label, type="primary", use_container_width=True, key=f"run_{mode}"):
+
+    if st.button(run_label, type="primary", use_container_width=True, key=f"run_{mode}",
+                 disabled=run_disabled):
         if not _validate_mode(mode):
             st.error(f"Invalid mode: {mode}")
             return
-        
+
         if not _validate_provider(provider):
             st.error(f"Invalid provider: {provider}")
             return
-        
-        result = _launch_terminal(mode, provider, model, submode or "")
+
+        result = _launch_terminal(mode, provider, model, submode or "", confirm_cloud=confirm_cloud)
+
         if result == "ok":
             st.success(f"✅ **{cfg['label']}** session launched in a new terminal window.")
             st.info("💻 Work in the terminal window. When done, use the Output browser above to find your results in `output/{mode}/`.")

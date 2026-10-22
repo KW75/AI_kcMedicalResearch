@@ -126,6 +126,8 @@ Option B - Cloud provider (DeepSeek, Qwen, OpenAI, Anthropic, Groq):
 
 **Confidentiality gate.** Ollama runs entirely on your machine and starts without any prompt. If you choose a cloud provider, the app first lists every external service your input could be sent to (the chosen provider plus any `FALLBACK_PROVIDERS` backups) and asks `Continue? [y/N]`. Pressing Enter cancels. For scripted or non-interactive runs, add `--confirm-cloud` to accept explicitly; without it, a run with no keyboard attached is refused. Search modes always contact PubMed / Europe PMC (and DuckDuckGo for Search) with your search terms, even when the AI model is local.
 
+The Streamlit UI shows the same list and keeps the Run button disabled until you tick a consent box; on the hosted (Render) version, uploaded files are already on Render's servers, so use a local install with Ollama for confidential work.
+
 On transient errors (timeout, 429, 502, 503) the system tries the next
 provider. Default chain: DeepSeek -> Qwen -> Groq (`FALLBACK_PROVIDERS`).
 Auth errors (401, 403) never fall back.
