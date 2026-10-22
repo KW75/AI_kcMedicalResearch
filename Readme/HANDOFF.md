@@ -45,7 +45,7 @@ so those catches happen at session open, not mid-work.
 
 | Component      | Status |
 |----------------|--------|
-| Tests          | 571 passed, 3 skipped, 11 deselected (`python -m pytest -m "not live" --tb=short -q`) |
+| Tests          | 573 passed, 3 skipped, 11 deselected (`python -m pytest -m "not live" --tb=short -q`) |
 | CI             | green (455b2d8; 28e616e; 3a9081b and 6813b12 also confirmed green) |
 | Render deploy  | health returned `ok` on 28e616e (S27 close) |
 | SR pipeline    | working via CLI with Qwen; Ang 2010 verified against PDF (NFR week 6, unanimous N=3); text-fallback drops now surface in Stage 4 `[SKIP]` block |
@@ -318,6 +318,13 @@ hardware: a 14B pull and a demo run converging. Do before rollout.
 
 ---
 
+- **A lookup default is a routing decision.** `dict.get(provider,
+  urls["deepseek"])` looks like defensive coding, but it sends data to a
+  company the user never chose. When the value decides where data goes,
+  an unknown key must raise an error, not fall back. Found in SR screening
+  (S29); safe only because a different file happened to call it correctly.
+
+
 Handoff prepared: 2026-08-29, Session 27.
 ---
 
@@ -376,3 +383,44 @@ Open follow-ups:
 - Verify requirements-local.txt on Apple Silicon ...
 - Consider wrapping `import chromadb` in try/except ...
 - #28 Docker still unverified.
+
+---
+
+## Session 29 - 2026-10-22 - branch v2.5-major-updates
+
+Goal for v2.5: local-first for confidentiality. Ollama is the default;
+cloud is chosen per job with a warning; nothing ever switches from local
+to cloud automatically.
+
+On main before branching:
+- `d20cae8`: Ollama fallback default llama3.2 -> `OLLAMA_DEFAULT_MODEL`
+  (qwen2.5:14b-instruct) in providers.py. New test pins README and
+  .env.example `OLLAMA_MODEL=` lines to the constant.
+- Verified by reading the code: Ollama never falls back to cloud, on the
+  streaming route (stream_ai -> _stream_ollama only) or the batch route
+  (call_ai_with_fallback chain = [ollama]). The 2026-09-02 macOS note
+  "app fell back and completed" cannot have been Ollama falling back to
+  cloud; that run must have used another provider.
+
+On branch:
+- SR screening could send article text to DeepSeek.
+  `RelevanceScreener.screen_by_pdf_path` used
+  `provider_urls.get(provider, provider_urls["deepseek"])`, so
+  provider="anthropic" or an unknown name POSTed the text to
+  api.deepseek.com. The normal pipeline never reached it: for Anthropic,
+  Stage 1 uploads every PDF (an upload failure stops the run) and
+  screen_batch routes by file_id. So no past run leaked. The route is now
+  refused with an error. Pinned by
+  `tests/test_screener_provider_routing.py`, which failed before the fix.
+
+Noted, not fixed:
+- rob2_tool.py reads `OLLAMA_URL`; the rest of the app reads `OLLAMA_HOST`.
+- main.py SR route uses raw `OLLAMA_MODEL`, not `_resolve_ollama_model()`.
+- An Ollama SR run screens locally, then fails at extraction (no vision).
+  It should stop at the start, like the DeepSeek warning.
+- main.call_ai swallows streaming errors (`except Exception: pass`), so an
+  Ollama failure waits through two timeouts. Revisit with time limits.
+- RelevanceScreener defaults to provider="anthropic",
+  model="claude-opus-4-7"; rct_search and main.py functions default to
+  provider="deepseek".
+

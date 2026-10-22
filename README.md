@@ -3,7 +3,7 @@
 A multi-mode AI assistant for medical research, critical appraisal, systematic review, coding, and writing. Uses cloud providers by default (DeepSeek, Qwen, OpenAI, Anthropic, Groq) with optional local Ollama support.
 
     Version: 2.4.13
-    Tests: 571 passed, 3 skipped, 11 deselected
+    Tests: 573 passed, 3 skipped, 11 deselected
            (reproduce with `python -m pytest -m "not live" --tb=short -q`)
     CI: GitHub Actions - Green
     GitHub: https://github.com/KW75/AI_kcMedicalResearch
@@ -332,3 +332,43 @@ sections 3.1 and 2.2.
 4. Run tests: `python -m pytest -m "not live" --tb=short -q`
 5. Commit and push
 6. Create a pull request
+
+---
+
+## Session 29 - 2026-10-22 - branch v2.5-major-updates
+
+Goal for v2.5: local-first for confidentiality. Ollama is the default;
+cloud is chosen per job with a warning; nothing ever switches from local
+to cloud automatically.
+
+On main before branching:
+- `d20cae8`: Ollama fallback default llama3.2 -> `OLLAMA_DEFAULT_MODEL`
+  (qwen2.5:14b-instruct) in providers.py. New test pins README and
+  .env.example `OLLAMA_MODEL=` lines to the constant.
+- Verified by reading the code: Ollama never falls back to cloud, on the
+  streaming route (stream_ai -> _stream_ollama only) or the batch route
+  (call_ai_with_fallback chain = [ollama]). The 2026-09-02 macOS note
+  "app fell back and completed" cannot have been Ollama falling back to
+  cloud; that run must have used another provider.
+
+On branch:
+- SR screening could send article text to DeepSeek.
+  `RelevanceScreener.screen_by_pdf_path` used
+  `provider_urls.get(provider, provider_urls["deepseek"])`, so
+  provider="anthropic" or an unknown name POSTed the text to
+  api.deepseek.com. The normal pipeline never reached it: for Anthropic,
+  Stage 1 uploads every PDF (an upload failure stops the run) and
+  screen_batch routes by file_id. So no past run leaked. The route is now
+  refused with an error. Pinned by
+  `tests/test_screener_provider_routing.py`, which failed before the fix.
+
+Noted, not fixed:
+- rob2_tool.py reads `OLLAMA_URL`; the rest of the app reads `OLLAMA_HOST`.
+- main.py SR route uses raw `OLLAMA_MODEL`, not `_resolve_ollama_model()`.
+- An Ollama SR run screens locally, then fails at extraction (no vision).
+  It should stop at the start, like the DeepSeek warning.
+- main.call_ai swallows streaming errors (`except Exception: pass`), so an
+  Ollama failure waits through two timeouts. Revisit with time limits.
+- RelevanceScreener defaults to provider="anthropic",
+  model="claude-opus-4-7"; rct_search and main.py functions default to
+  provider="deepseek".
