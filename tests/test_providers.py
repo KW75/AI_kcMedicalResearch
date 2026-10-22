@@ -264,3 +264,32 @@ def test_ollama_404_tells_user_to_pull_model(monkeypatch):
     assert "ollama pull qwen2.5:14b-instruct" in message
     assert "not installed" in message.lower()
 
+class TestLocalFirstDefault:
+    """Local-first: with no DEFAULT_PROVIDER in .env, input must stay local."""
+
+    def test_code_default_provider_is_local_only(self):
+        from providers import CODE_DEFAULT_PROVIDER, LOCAL_ONLY_PROVIDERS
+        assert CODE_DEFAULT_PROVIDER in LOCAL_ONLY_PROVIDERS, (
+            f"CODE_DEFAULT_PROVIDER={CODE_DEFAULT_PROVIDER} sends input off this "
+            f"machine when .env sets no provider"
+        )
+
+    def test_docs_name_the_same_default_provider_as_code(self):
+        """README and .env.example must show the default the code uses."""
+        import re
+        from providers import CODE_DEFAULT_PROVIDER
+
+        root = Path(__file__).resolve().parent.parent
+        pattern = re.compile(r"^\s*DEFAULT_PROVIDER=(\S+)", re.MULTILINE)
+
+        for name in ("README.md", ".env.example"):
+            text = (root / name).read_text(encoding="utf-8")
+            found = pattern.findall(text)
+            assert found, f"{name}: no uncommented DEFAULT_PROVIDER= line found"
+            for value in found:
+                assert value == CODE_DEFAULT_PROVIDER, (
+                    f"{name} says DEFAULT_PROVIDER={value}, "
+                    f"but providers.CODE_DEFAULT_PROVIDER is {CODE_DEFAULT_PROVIDER}"
+                )
+
+

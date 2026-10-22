@@ -45,11 +45,11 @@ so those catches happen at session open, not mid-work.
 
 | Component      | Status |
 |----------------|--------|
-| Tests          | 573 passed, 3 skipped, 11 deselected (`python -m pytest -m "not live" --tb=short -q`) |
+| Tests          | 575 passed, 3 skipped, 11 deselected (`python -m pytest -m "not live" --tb=short -q`) |
 | CI             | green (455b2d8; 28e616e; 3a9081b and 6813b12 also confirmed green) |
 | Render deploy  | health returned `ok` on 28e616e (S27 close) |
 | SR pipeline    | working via CLI with Qwen; Ang 2010 verified against PDF (NFR week 6, unanimous N=3); text-fallback drops now surface in Stage 4 `[SKIP]` block |
-| Providers      | DeepSeek (default) / Qwen (SR) / OpenAI / Anthropic / Groq / Ollama (local, never falls back) |
+| Providers      | Ollama (default, local) / DeepSeek / Qwen (SR) / OpenAI / Anthropic / Groq / Ollama (local, never falls back) |
 
 Issue numbers below match `README.md` > Known Issues.
 
@@ -424,3 +424,26 @@ Noted, not fixed:
   model="claude-opus-4-7"; rct_search and main.py functions default to
   provider="deepseek".
 
+- Local-first default: `providers.py` falls back to
+  `CODE_DEFAULT_PROVIDER = "ollama"` when .env sets no DEFAULT_PROVIDER
+  (or a blank one); README and .env.example now say
+  `DEFAULT_PROVIDER=ollama`. Eight tests that compared the provider to
+  the word "deepseek" now compare to `main.DEFAULT_PROVIDER`, so they pass
+  whatever a machine's .env says (they passed before only because CI and
+  the dev .env both set deepseek). New tests: the code default must be in
+  LOCAL_ONLY_PROVIDERS; README and .env.example must match the code.
+- Decided: Streamlit UI stays (option A). Only launcher menu item 8
+  "Pipeline UI" is removed, swapped for OCR in update #5.
+- Decided: cloud fallback stays (option B), but the cloud warning must
+  list every provider the job may reach, built from FALLBACK_PROVIDERS.
+
+Housekeeping added:
+- CI uses `runs-on: ubuntu-latest`, moving to Ubuntu 26 from 2026-10-19.
+  If "Install system dependencies" goes red with no code change, pin
+  `ubuntu-24.04`.
+- CI run shows 44 warnings that local runs don't (unpinned `>=` versions
+  in requirements-base.txt). Not failing; look when convenient.
+- main.py SR Anthropic warning cites "Known Issue #61", which is not in
+  the Known Issues table; point it at REVIEWER_GUIDE.md section 6.
+- Render UI provider dropdown starts on ollama (index=0) but Render has
+  no Ollama; set a cloud default when running on Render.

@@ -16,7 +16,7 @@ class TestMainArgumentParsing:
         with patch('sys.argv', ['main.py', '--mode', 'coding']):
             args = main.parse_args()
             assert args.mode == 'coding'
-            assert args.provider == 'deepseek'
+            assert args.provider == main.DEFAULT_PROVIDER
 
     def test_parse_args_with_provider(self):
         with patch('sys.argv', ['main.py', '--mode', 'coding', '--provider', 'openai']):
@@ -163,35 +163,35 @@ class TestCliRouting:
     def test_coding_mode_routes_to_handler(self, mock_handler, _mock_keys):
         main.run_cli(main.parse_args(['--mode', 'coding']))
         mock_handler.assert_called_once_with(
-            provider='deepseek', model=None, dry_run=False)
+            provider=main.DEFAULT_PROVIDER, model=None, dry_run=False)
 
     @patch('SOURCE_CODE.main.validate_api_keys')
     @patch('SOURCE_CODE.main.handle_writing_mode')
     def test_writing_mode_routes_to_handler(self, mock_handler, _mock_keys):
         main.run_cli(main.parse_args(['--mode', 'writing']))
         mock_handler.assert_called_once_with(
-            provider='deepseek', model=None, dry_run=False)
+            provider=main.DEFAULT_PROVIDER, model=None, dry_run=False)
 
     @patch('SOURCE_CODE.main.validate_api_keys')
     @patch('SOURCE_CODE.main.handle_appraisal_mode')
     def test_appraisal_mode_routes_to_handler(self, mock_handler, _mock_keys):
         main.run_cli(main.parse_args(['--mode', 'appraisal']))
         mock_handler.assert_called_once_with(
-            provider='deepseek', model=None, dry_run=False)
+            provider=main.DEFAULT_PROVIDER, model=None, dry_run=False)
 
     @patch('SOURCE_CODE.main.validate_api_keys')
     @patch('SOURCE_CODE.main.run_rct_search_pipeline')
     def test_rct_search_mode_routes_to_pipeline(self, mock_pipeline, _mock_keys):
         main.run_cli(main.parse_args(['--mode', 'rct_search']))
         mock_pipeline.assert_called_once_with(
-            provider='deepseek', model=None, dry_run=False)
+            provider=main.DEFAULT_PROVIDER, model=None, dry_run=False)
 
     @patch('SOURCE_CODE.main.validate_api_keys')
     @patch('SOURCE_CODE.main.handle_search_mode')
     def test_search_mode_routes_to_handler(self, mock_handler, _mock_keys):
         main.run_cli(main.parse_args(['--mode', 'search']))
         mock_handler.assert_called_once_with(
-            provider='deepseek', model=None, sub_mode=None)
+            provider=main.DEFAULT_PROVIDER, model=None, sub_mode=None)
 
     @patch('SOURCE_CODE.main.validate_api_keys')
     def test_undispatched_mode_raises(self, _mock_keys):

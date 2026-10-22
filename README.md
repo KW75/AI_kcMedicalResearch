@@ -1,9 +1,10 @@
 # AI kcMedical Research
 
-A multi-mode AI assistant for medical research, critical appraisal, systematic review, coding, and writing. Uses cloud providers by default (DeepSeek, Qwen, OpenAI, Anthropic, Groq) with optional local Ollama support.
+A multi-mode AI assistant for medical research, critical appraisal, systematic review, coding, and writing. Local-first: uses Ollama on your own machine by default, so input stays local. Cloud providers (DeepSeek, Qwen, OpenAI, Anthropic, Groq) are available when you choose one for a job.
+
 
     Version: 2.4.13
-    Tests: 573 passed, 3 skipped, 11 deselected
+    Tests: 575 passed, 3 skipped, 11 deselected
            (reproduce with `python -m pytest -m "not live" --tb=short -q`)
     CI: GitHub Actions - Green
     GitHub: https://github.com/KW75/AI_kcMedicalResearch
@@ -116,12 +117,12 @@ Option B - Cloud provider (DeepSeek, Qwen, OpenAI, Anthropic, Groq):
 
 | Provider           | Flag                   | Env variable         | Notes                                       |
 |--------------------|------------------------|----------------------|---------------------------------------------|
-| DeepSeek (default) | `--provider deepseek`  | `DEEPSEEK_API_KEY`   | Fast, cost-efficient                        |
+| DeepSeek           | `--provider deepseek`  | `DEEPSEEK_API_KEY`   | Fast, cost-efficient                        |
 | Qwen               | `--provider qwen`      | `DASHSCOPE_API_KEY`  | Recommended for SR (auto-uses vision model) |
 | OpenAI             | `--provider openai`    | `OPENAI_API_KEY`     | GPT-4 vision                                |
 | Anthropic          | `--provider anthropic` | `ANTHROPIC_API_KEY`  | Claude vision - partial tripwires, see REVIEWER_GUIDE.md §6.  |
 | Groq               | `--provider groq`      | `GROQ_API_KEY`       | Fast inference                              |
-| Ollama (local)     | `--provider ollama`    | `OLLAMA_HOST`, `OLLAMA_MODEL` | Free, offline; no SR (no vision). Set OLLAMA_MODEL (default qwen2.5:14b-instruct). |
+| Ollama (default)   | `--provider ollama`    | `OLLAMA_HOST`, `OLLAMA_MODEL` | Free, offline; no SR (no vision). Set OLLAMA_MODEL (default qwen2.5:14b-instruct). |
 
 On transient errors (timeout, 429, 502, 503) the system tries the next
 provider. Default chain: DeepSeek -> Qwen -> Groq (`FALLBACK_PROVIDERS`).
@@ -147,7 +148,7 @@ non-TTY environments use batch mode automatically.
 
 Copy `.env.example` to `.env`. `.env` is gitignored.
 
-    DEFAULT_PROVIDER=deepseek
+    DEFAULT_PROVIDER=ollama
     FALLBACK_PROVIDERS=deepseek,qwen,groq
 
     OLLAMA_HOST=http://localhost:11434

@@ -39,7 +39,11 @@ DASHSCOPE_BASE_URL = os.environ.get(
 )
 QWEN_MODEL = os.getenv("QWEN_MODEL", "qwen-plus-latest")
 QWEN_VISION_MODEL = os.getenv("QWEN_VISION_MODEL", "qwen-vl-max")
-DEFAULT_PROVIDER = os.getenv("DEFAULT_PROVIDER", "deepseek")
+# Used when .env does not set DEFAULT_PROVIDER (or sets it blank).
+# Local-first: input stays on this machine unless the user deliberately
+# chooses a cloud provider.
+CODE_DEFAULT_PROVIDER = "ollama"
+DEFAULT_PROVIDER = os.getenv("DEFAULT_PROVIDER") or CODE_DEFAULT_PROVIDER
 
 # Fallback chain (configurable via .env)
 FALLBACK_PROVIDERS = [
