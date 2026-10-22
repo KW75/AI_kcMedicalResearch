@@ -107,8 +107,9 @@ class TestOllamaAutoDetect:
             result = _ollama_detect_best_model("http://localhost:11434")
         assert result == "llama3.2:latest"
 
+   
     def test_empty_models_returns_default(self):
-        from providers import _ollama_detect_best_model
+        from providers import _ollama_detect_best_model, OLLAMA_DEFAULT_MODEL
         mock_response = json.dumps({"models": []}).encode()
 
         mock_resp = MagicMock()
@@ -118,13 +119,37 @@ class TestOllamaAutoDetect:
 
         with patch("urllib.request.urlopen", return_value=mock_resp):
             result = _ollama_detect_best_model("http://localhost:11434")
-        assert result == "llama3.2"
+        assert result == OLLAMA_DEFAULT_MODEL
 
     def test_connection_failure_returns_default(self):
-        from providers import _ollama_detect_best_model
+        from providers import _ollama_detect_best_model, OLLAMA_DEFAULT_MODEL
         with patch("urllib.request.urlopen", side_effect=Exception("timeout")):
             result = _ollama_detect_best_model("http://localhost:11434")
-        assert result == "llama3.2"
+        assert result == OLLAMA_DEFAULT_MODEL
+
+    def test_docs_name_the_same_default_model_as_code(self):
+        """README and .env.example must recommend the model the code falls back to.
+
+        Session 28 changed the docs to qwen2.5 while the code still fell back
+        to llama3.2, and nothing caught it. Every uncommented OLLAMA_MODEL=
+        line in both files must match OLLAMA_DEFAULT_MODEL. Each file must
+        contain at least one such line, so the test can't pass on nothing.
+        """
+        import re
+        from providers import OLLAMA_DEFAULT_MODEL
+
+        root = Path(__file__).resolve().parent.parent
+        pattern = re.compile(r"^\s*OLLAMA_MODEL=(\S+)", re.MULTILINE)
+
+        for name in ("README.md", ".env.example"):
+            text = (root / name).read_text(encoding="utf-8")
+            found = pattern.findall(text)
+            assert found, f"{name}: no uncommented OLLAMA_MODEL= line found"
+            for value in found:
+                assert value == OLLAMA_DEFAULT_MODEL, (
+                    f"{name} says OLLAMA_MODEL={value}, "
+                    f"but providers.OLLAMA_DEFAULT_MODEL is {OLLAMA_DEFAULT_MODEL}"
+                )
 
 
 class TestFallbackChain:
