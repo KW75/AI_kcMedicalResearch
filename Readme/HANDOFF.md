@@ -452,3 +452,76 @@ Housekeeping added:
 - UI cloud gate (commit 3): `ui/app.py` gets `_build_cli_cmd()` (one command for both launch paths; fixes dropped `--model` on Render and dropped `--sub` locally), `_cloud_destinations()` (via `main.data_destinations`, so UI and CLI cannot disagree), and a consent checkbox that disables Run until ticked. It passes `--confirm-cloud` only for cloud providers. The Render path uses `stdin=subprocess.DEVNULL`. If the destinations can't be worked out, cloud Run is disabled (fails closed). New tests: tests/test_ui_cloud_gate.py (24). Suite: 624 passed.
 - Follow-ups (not urgent): Linux launcher `&& read` skips the pause when a job fails (the window closes before the error can be read); the Run success message says "new terminal window" even on Render; mojibake (`??`) in UI strings; `_is_cloud_environment()` treats `STREAMLIT_SERVER_PORT` as cloud; the UI has no Search sub-mode picker; 44 CI warnings; `rct_search.call_ai` returns a `[MOCK]` response on import failure; `.gitattributes` for CRLF.
 
+# AI_kcMedicalResearch – v2.5 handoff (Session 29 close, 2026-10-22)
+
+## How to work with me
+- Windows, PowerShell, project root `D:\AI_kcMedicalResearch`. Every new window first:
+  `cd D:\AI_kcMedicalResearch` then `.venv\Scripts\Activate.ps1` (prompt must show `(.venv)`).
+- Give instructions ONE STEP AT A TIME. Read-only inspection before any edit. Test-first (failing tests, then code).
+- Edit files in VS Code only, never PowerShell `Set-Content` etc. (BOM risk).
+- Every change: `python scripts/check_no_bom.py` → `python -m pytest -m "not live" --tb=short -q` → update test count in README.md line 7 + Readme/HANDOFF.md → commit → push.
+- If any check prints something unexpected, stop and paste it before committing.
+- PowerShell: `Select-String` has no `-Recurse` (pipe from `Get-ChildItem`). CRLF→LF warnings are harmless.
+
+## Product goal
+Health professionals keep data confidential: local (Ollama) first. Cloud providers are optional, chosen per job,
+with an explicit warning + consent. Local model choice exists so users can match the model to their hardware.
+
+## Repo / branch state
+- GitHub: https://github.com/KW75/AI_kcMedicalResearch ; Render (deploys from main): https://ai-kcmedicalresearch.onrender.com
+- `main` at `d20cae8` (Ollama fallback default → OLLAMA_DEFAULT_MODEL = qwen2.5:14b-instruct). CI green, Render health ok.
+- Working branch `v2.5-major-updates`; draft PR #1 "v2.5: local-first major updates": https://github.com/KW75/AI_kcMedicalResearch/pull/1
+  (CI only runs on push to main / PRs into main.)
+- Branch commits: `0640741` SR screener refuses unrouted providers (was sending text to DeepSeek) ·
+  `8c7b97a` DEFAULT_PROVIDER falls back to ollama; tests independent of .env ·
+  `7bbf1b4` CLI cloud gate ([y/N], `--confirm-cloud`, `provider_attempt_order`) ·
+  `eb6661e` UI cloud gate (consent checkbox, `_build_cli_cmd`, stdin=DEVNULL on Render).
+- Tests: 624 passed, 3 skipped, 11 deselected (local + CI). CI shows 44 warnings (not urgent).
+
+## Open items to confirm first
+1. DONE (Session 30): README test count corrected to 624 and committed together with this handoff block.
+2. Browser check not yet reported: `python SOURCE_CODE/main.py --ui` → Writing. ollama: no warning, Run enabled.
+   deepseek: warning (DeepSeek, Qwen (Alibaba)), Run disabled until consent ticked. Don't click Run.
+3. Decide: merge PR #1 now (local-first work is complete) or keep it open until all 5 updates are done.
+
+## Durable policies (decided)
+- Ollama = code default (`providers.CODE_DEFAULT_PROVIDER`); never falls back to cloud (`LOCAL_ONLY_PROVIDERS`).
+- Cloud only by explicit per-job choice. Warning lists every destination (chosen provider + FALLBACK_PROVIDERS backups,
+  read at run time). Enter = cancel. With no keyboard and no `--confirm-cloud`, the job is refused. Consent is never saved.
+- SR lists only the chosen provider (no fallback chain); SR needs vision (Qwen/OpenAI/Anthropic/Groq). Ollama/DeepSeek blocked.
+- Search modes always send search terms to PubMed/Europe PMC (+DuckDuckGo for Search); the banner says so even for local runs.
+- The UI reuses `main.data_destinations()` (one source of truth). If destinations can't be worked out, cloud Run is disabled (fails closed).
+- Streamlit stays (option A): remove only launcher menu option 8 "Pipeline UI" (replaced by OCR, update #5). Keep `--ui` and Render.
+- Lesson: a lookup default is a routing decision (`dict.get(provider, urls["deepseek"])` leaked data).
+
+## Remaining v2.5 updates (suggested order)
+1. **#1 Ollama model picker**: list pulled models with sizes (from `/api/tags`), skip embedding models (embed/nomic/all-minilm),
+   default `OLLAMA_DEFAULT_MODEL`. Places: `scripts/launcher.py` `pick_provider` (~line 353), `SOURCE_CODE/ui/app.py` Provider selectbox (~line 926),
+   `providers._ollama_detect_best_model`. Handle qwen3 thinking mode (no Ollama off-switch like cloud `enable_thinking: False`).
+   Review OLLAMA_CONTEXT=32768 for small hardware.
+   Pulled locally: gemma4:e4b 6.6 GB, qwen3:8b 5.2 GB, qwen2.5:14b-instruct 9.0 GB, llama3.2:latest 2.0 GB, nomic-embed-text 274 MB.
+2. **#3 Writing mode**: Topic and Article tracks offer only the stand-alone editor mode.
+3. **#2 Time limit per action/iteration**: default 15 min; options 30 min, 1 hr, until finished; needs clean cancel.
+   (UI cloud path currently uses `UIConfig.TIMEOUT`.)
+4. **#5 OCR** replaces launcher option 8 "Pipeline UI" (pytesseract already used in `relevance_screener.py`).
+5. **#4 Data Analysis pipeline** replaces Dry Run (launcher option 7 / `--dry-run`): data file → Python/R/Excel statistics →
+   Ollama model explains/checks/reports.
+
+## Follow-ups (not urgent)
+- Linux launcher `&& read` skips the pause when a job fails (window closes before the error can be read).
+- Run success message says "new terminal window" even on Render.
+- Mojibake (`??`, odd characters) in app.py UI strings.
+- `_is_cloud_environment()` treats `STREAMLIT_SERVER_PORT` as cloud.
+- UI has no Search sub-mode picker.
+- `rct_search.call_ai` returns a `[MOCK]` response if its import fails (should raise).
+- 44 CI warnings (unpinned `>=` versions in requirements-base.txt).
+- Add `.gitattributes` for line endings.
+- ubuntu-latest moved to Ubuntu 26 (Oct 2026). If "Install system dependencies" fails, pin `runs-on: ubuntu-24.04`.
+
+## Environment notes
+- Local `.env`: DEFAULT_PROVIDER=deepseek (overrides code default; consider changing to ollama), FALLBACK_PROVIDERS=deepseek,qwen,
+  EMBEDDING_PROVIDER=ollama. `.env` is never committed.
+- `.env.example`: DEFAULT_PROVIDER=ollama, FALLBACK_PROVIDERS=deepseek,qwen,groq.
+
+## First request for the new chat
+"Confirm the open items above, then start update #1 (Ollama model picker), one step at a time, read-only first."
