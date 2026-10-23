@@ -45,7 +45,7 @@ so those catches happen at session open, not mid-work.
 
 | Component      | Status |
 |----------------|--------|
-| Tests          | 624 passed, 3 skipped, 11 deselected (`python -m pytest -m "not live" --tb=short -q`) |
+| Tests          | 627 passed, 3 skipped, 11 deselected (`python -m pytest -m "not live" --tb=short -q`) |
 | CI             | green (455b2d8; 28e616e; 3a9081b and 6813b12 also confirmed green) |
 | Render deploy  | health returned `ok` on 28e616e (S27 close) |
 | SR pipeline    | working via CLI with Qwen; Ang 2010 verified against PDF (NFR week 6, unanimous N=3); text-fallback drops now surface in Stage 4 `[SKIP]` block |
@@ -447,9 +447,9 @@ Housekeeping added:
   the Known Issues table; point it at REVIEWER_GUIDE.md section 6.
 - Render UI provider dropdown starts on ollama (index=0) but Render has
   no Ollama; set a cloud default when running on Render.
-- Cloud gate (v2.5 item 2 policy): `providers.provider_attempt_order()` is now the single source of fallback order and is used by `call_ai_with_fallback`. `main.data_destinations()` / `main.confirm_data_destinations()` list every external destination before a cloud job; `run_cli` refuses unless the user types y or passes `--confirm-cloud`; with no TTY and no flag, it refuses. SR lists only the chosen provider (no fallback chain). Search modes name PubMed / Europe PMC / DuckDuckGo even for local runs. New tests: tests/test_data_destinations.py (25). TestCliRouting tests now pass `--confirm-cloud`. Suite: 624 passed.
+- Cloud gate (v2.5 item 2 policy): `providers.provider_attempt_order()` is now the single source of fallback order and is used by `call_ai_with_fallback`. `main.data_destinations()` / `main.confirm_data_destinations()` list every external destination before a cloud job; `run_cli` refuses unless the user types y or passes `--confirm-cloud`; with no TTY and no flag, it refuses. SR lists only the chosen provider (no fallback chain). Search modes name PubMed / Europe PMC / DuckDuckGo even for local runs. New tests: tests/test_data_destinations.py (25). TestCliRouting tests now pass `--confirm-cloud`. Suite: 627 passed.
 
-- UI cloud gate (commit 3): `ui/app.py` gets `_build_cli_cmd()` (one command for both launch paths; fixes dropped `--model` on Render and dropped `--sub` locally), `_cloud_destinations()` (via `main.data_destinations`, so UI and CLI cannot disagree), and a consent checkbox that disables Run until ticked. It passes `--confirm-cloud` only for cloud providers. The Render path uses `stdin=subprocess.DEVNULL`. If the destinations can't be worked out, cloud Run is disabled (fails closed). New tests: tests/test_ui_cloud_gate.py (24). Suite: 624 passed.
+- UI cloud gate (commit 3): `ui/app.py` gets `_build_cli_cmd()` (one command for both launch paths; fixes dropped `--model` on Render and dropped `--sub` locally), `_cloud_destinations()` (via `main.data_destinations`, so UI and CLI cannot disagree), and a consent checkbox that disables Run until ticked. It passes `--confirm-cloud` only for cloud providers. The Render path uses `stdin=subprocess.DEVNULL`. If the destinations can't be worked out, cloud Run is disabled (fails closed). New tests: tests/test_ui_cloud_gate.py (24). Suite: 627 passed.
 - Follow-ups (not urgent): Linux launcher `&& read` skips the pause when a job fails (the window closes before the error can be read); the Run success message says "new terminal window" even on Render; mojibake (`??`) in UI strings; `_is_cloud_environment()` treats `STREAMLIT_SERVER_PORT` as cloud; the UI has no Search sub-mode picker; 44 CI warnings; `rct_search.call_ai` returns a `[MOCK]` response on import failure; `.gitattributes` for CRLF.
 
 # AI_kcMedicalResearch – v2.5 handoff (Session 29 close, 2026-10-22)
@@ -476,12 +476,11 @@ with an explicit warning + consent. Local model choice exists so users can match
   `8c7b97a` DEFAULT_PROVIDER falls back to ollama; tests independent of .env ·
   `7bbf1b4` CLI cloud gate ([y/N], `--confirm-cloud`, `provider_attempt_order`) ·
   `eb6661e` UI cloud gate (consent checkbox, `_build_cli_cmd`, stdin=DEVNULL on Render).
-- Tests: 624 passed, 3 skipped, 11 deselected (local + CI). CI shows 44 warnings (not urgent).
+- Tests: 627 passed, 3 skipped, 11 deselected (local + CI). CI shows 44 warnings (not urgent).
 
 ## Open items to confirm first
 1. DONE (Session 30): README test count corrected to 624 and committed together with this handoff block.
-2. Browser check not yet reported: `python SOURCE_CODE/main.py --ui` → Writing. ollama: no warning, Run enabled.
-   deepseek: warning (DeepSeek, Qwen (Alibaba)), Run disabled until consent ticked. Don't click Run.
+2. DONE (Session 30): browser check passed. ollama: no warning, Run enabled. deepseek: warning lists DeepSeek and Qwen (Alibaba), Run disabled until consent ticked.
 3. Decide: merge PR #1 now (local-first work is complete) or keep it open until all 5 updates are done.
 
 ## Durable policies (decided)
@@ -497,7 +496,7 @@ with an explicit warning + consent. Local model choice exists so users can match
 ## Remaining v2.5 updates (suggested order)
 1. **#1 Ollama model picker**: list pulled models with sizes (from `/api/tags`), skip embedding models (embed/nomic/all-minilm),
    default `OLLAMA_DEFAULT_MODEL`. Places: `scripts/launcher.py` `pick_provider` (~line 353), `SOURCE_CODE/ui/app.py` Provider selectbox (~line 926),
-   `providers._ollama_detect_best_model`. Handle qwen3 thinking mode (no Ollama off-switch like cloud `enable_thinking: False`).
+   `providers._ollama_detect_best_model`. Thinking mode DONE (Session 30): every Ollama request sends `think: false`. Measured on Ollama 0.40.8: qwen3:8b used 229 tokens without it and 3 with it, same answer; qwen2.5 accepts it without error.
    Review OLLAMA_CONTEXT=32768 for small hardware.
    Pulled locally: gemma4:e4b 6.6 GB, qwen3:8b 5.2 GB, qwen2.5:14b-instruct 9.0 GB, llama3.2:latest 2.0 GB, nomic-embed-text 274 MB.
 2. **#3 Writing mode**: Topic and Article tracks offer only the stand-alone editor mode.
@@ -525,3 +524,22 @@ with an explicit warning + consent. Local model choice exists so users can match
 
 ## First request for the new chat
 "Confirm the open items above, then start update #1 (Ollama model picker), one step at a time, read-only first."
+
+## Session 30 - 2026-10-23 - branch v2.5-major-updates
+
+- `3485d34`: README test count 624; Session 29 handoff block committed.
+- Browser check of the UI cloud gate passed (open item 2).
+- Ollama thinking off: `"think": False` added to all three Ollama requests
+  (`providers.ollama_probe_performance`, `providers.call_ollama_provider`,
+  `streaming._stream_ollama`). qwen3 and gemma4 think by default
+  (`ollama show`: thinking default true). Streaming especially needed it:
+  while a model thinks, Ollama leaves `response` empty, so the user saw
+  nothing. Tests: `TestOllamaThinkOff` (2) in test_providers.py and
+  `test_ollama_streaming_sends_think_false`. Suite: 627 passed.
+- Noted, not fixed: `_stream_ollama` uses raw `OLLAMA_MODEL`, not
+  `_resolve_ollama_model()`, so it sends an empty model name when .env sets
+  none. Fix in the model-picker commit.
+- Next: update #1 model picker. Default becomes gemma4:e4b. Ranks come from
+  the 2026-10 model comparison doc (1 = best); params, size, context,
+  vision and thinking are read live from Ollama. gemma4 vision is not used
+  yet: `call_ollama_provider` sends text only, so OCR waits for update #5.

@@ -138,6 +138,7 @@ def ollama_probe_performance(host: str = None, model: str = None) -> dict:
     payload = json.dumps({
         "model": model,
         "prompt": probe_prompt,
+        "think": False,  # qwen3/gemma4 think by default; see TestOllamaThinkOff
         "stream": False,
         "options": {
             "num_predict": 64,
@@ -309,6 +310,7 @@ def call_ollama_provider(
         "model": model,
         "prompt": prompt,
         "stream": False,
+        "think": False,  # qwen3/gemma4 think by default; see TestOllamaThinkOff
         "options": {
             "num_predict": max_tokens,
             "num_ctx": int(os.getenv("OLLAMA_CONTEXT", "32768")),
