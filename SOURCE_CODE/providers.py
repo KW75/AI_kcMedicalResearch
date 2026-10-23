@@ -59,7 +59,7 @@ LOCAL_ONLY_PROVIDERS = {"ollama"}
 # Default local model and model listing live in ollama_models.py, so the
 # launcher, the UI and this module share one value.
 from ollama_models import OLLAMA_DEFAULT_MODEL, choose_default, list_ollama_models  # noqa: E402
-
+import time_limits
 
 # Ollama performance thresholds
 OLLAMA_MIN_TOKENS_PER_SECOND = float(os.getenv("OLLAMA_MIN_TOKENS_PER_SECOND", "10"))
@@ -309,7 +309,7 @@ def call_ollama_provider(
         method="POST",
     )
     try:
-        with urlopen(req, timeout=900) as resp:
+        with urlopen(req, timeout=time_limits.get_limit()) as resp:
             data = json.loads(resp.read())
         response_text = data.get("response", "")
         if not response_text:

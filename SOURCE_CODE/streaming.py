@@ -22,6 +22,7 @@ import os
 import sys
 import urllib.error
 import urllib.request
+import time_limits
 from typing import Generator
 
 from dotenv import load_dotenv
@@ -97,7 +98,7 @@ def _stream_openai_compatible(
 
     req = urllib.request.Request(url, data=payload, headers=headers, method="POST")
     try:
-        resp = urllib.request.urlopen(req, timeout=900)
+        resp = urllib.request.urlopen(req, timeout=time_limits.get_limit())
         yield from _parse_sse_lines(resp)
         resp.close()
     except urllib.error.HTTPError as exc:
@@ -127,7 +128,7 @@ def _stream_anthropic(prompt: str, model: str = None) -> Generator[str, None, No
 
     req = urllib.request.Request(url, data=payload, headers=headers, method="POST")
     try:
-        resp = urllib.request.urlopen(req, timeout=900)
+        resp = urllib.request.urlopen(req, timeout=time_limits.get_limit())
         for raw_line in resp:
             line = raw_line.decode("utf-8", errors="replace").strip()
             if not line or not line.startswith("data: "):
@@ -172,7 +173,7 @@ def _stream_ollama(prompt: str, model: str = None) -> Generator[str, None, None]
 
     req = urllib.request.Request(url, data=payload, headers=headers, method="POST")
     try:
-        resp = urllib.request.urlopen(req, timeout=900)
+        resp = urllib.request.urlopen(req, timeout=time_limits.get_limit())
         for raw_line in resp:
             line = raw_line.decode("utf-8", errors="replace").strip()
             if not line:

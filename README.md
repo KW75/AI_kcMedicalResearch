@@ -4,7 +4,7 @@ A multi-mode AI assistant for medical research, critical appraisal, systematic r
 
 
     Version: 2.4.13
-    Tests: 668 passed, 3 skipped, 11 deselected
+    Tests: 709 passed, 3 skipped, 11 deselected
            (reproduce with `python -m pytest -m "not live" --tb=short -q`)
     CI: GitHub Actions - Green
     GitHub: https://github.com/KW75/AI_kcMedicalResearch
@@ -112,6 +112,13 @@ Option B - Cloud provider (DeepSeek, Qwen, OpenAI, Anthropic, Groq):
 1. Copy `.env.example` to `.env`.
 2. Paste your provider's API key into `.env` (see Providers table).
    Nothing to download; requires a provider account.
+
+Time limit (Option A and B): each AI call stops after 15 minutes by default.
+Large local models on slower machines may need longer. Choose with
+`--time-limit 15|30|60|none` (minutes; `none` = wait until the model
+finishes, stop with Ctrl+C). Example:
+`python SOURCE_CODE/main.py --mode writing --time-limit 60`
+
 
 
 ## Modes

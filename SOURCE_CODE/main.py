@@ -2277,7 +2277,11 @@ def parse_args(args: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--confirm-cloud",  action="store_true", default=False,
                         help="Agree in advance to send this job's input to the cloud "
                              "provider(s) listed in the warning (for runs with no "
-                             "keyboard, e.g. the web UI)")   
+                             "keyboard, e.g. the web UI)") 
+    parser.add_argument("--time-limit",     type=str.lower, default="15",
+                        choices=["15", "30", "60", "none"],
+                        help="Maximum time for each AI call in minutes: 15 (default), "
+                             "30, 60, or none = wait until the model finishes")      
     parser.add_argument("--list-sessions",  action="store_true", default=False)
     parser.add_argument("--read-session",   type=str, default=None, metavar="FILENAME")
     parser.add_argument("--delete-session", type=str, default=None, metavar="FILENAME")
@@ -2298,7 +2302,11 @@ def parse_args(args: list[str] | None = None) -> argparse.Namespace:
                         help="Launch the main Streamlit UI")
     parser.add_argument('--sub', '--submode', type=str, default=None,
                     help='Sub-mode selection: 1=Topic Search, 2=Article Search')
-    return parser.parse_args(args)
+    ns = parser.parse_args(args)
+    import time_limits  # stdlib-only; every entry point goes through parse_args
+    time_limits.set_limit(time_limits.parse(ns.time_limit))
+    return ns
+
 
 
 # ---------------------------------------------------------------------------

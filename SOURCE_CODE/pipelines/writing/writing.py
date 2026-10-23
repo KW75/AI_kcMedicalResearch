@@ -21,6 +21,7 @@ sys.path.insert(0, str(SOURCE_CODE_DIR))
 from utils.path_utils import PATH_MANAGER, get_input_dir, get_output_dir
 from utils.document_reader import DocumentReader
 from utils.rag import RAGUtils
+import time_limits
 
 try:
     from docx import Document
@@ -119,13 +120,14 @@ def _call_llm(
         except Exception as exc:
             error_holder.append(exc)
 
+    limit = time_limits.get_limit()
     with _Spinner(spinner_message):
         t = threading.Thread(target=_run, daemon=True)
         t.start()
-        t.join(timeout=900)  # 15-minute timeout (large local models need more time)
+        finished = time_limits.wait_for(t, limit)  # v2.5: --time-limit 15/30/60/none
 
-    if t.is_alive():
-        return "[ERROR] LLM call timed out after 15 minutes."
+    if not finished:
+        return f"[ERROR] LLM call timed out after {time_limits.describe(limit)}."
     if error_holder:
         return f"[ERROR] LLM call failed: {error_holder[0]}"
     if not result_holder:
