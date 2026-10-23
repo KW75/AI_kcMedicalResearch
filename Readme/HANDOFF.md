@@ -580,3 +580,128 @@ with an explicit warning + consent. Local model choice exists so users can match
   UI model picker: _ollama_model_choices() (lazy import of ollama_models, never queried for cloud providers or on Render); dropdown replaces the text box for Ollama; _local_run_blocked() disables Run when no local model is found. Bug found in browser check: local_block assigned inside the cloud-gate if (UnboundLocalError on every Ollama page). Fixed, and test_every_mode_page_renders_with_ollama_down (Streamlit AppTest) now renders every mode page so this kind of bug fails the suite. Tests tests/test_ui_model_picker.py (11). Suite: 668 passed.
   Time limit (backend): new stdlib-only time_limits.py (choices 15/30/60/none, default 15; wait_for() joins in 1 s steps so Ctrl+C works). main.parse_args() reads --time-limit and calls set_limit() once. The coding/writing watchdogs, the Ollama call and all three streaming urlopen timeouts read get_limit(); no hard-coded 900 s left. Error message names the actual limit. Limitations: (1) a timed-out call keeps running on its daemon thread, so Ollama keeps generating and the next call waits behind it; (2) a streaming timeout is the longest gap between chunks, not the total time; (3) with none, Ctrl+C may not interrupt a non-streaming Ollama call outside coding/writing on Windows, but closing the window always works. Launcher question and UI dropdown: next commit. Tests test_time_limits.py (23), test_time_limit_wiring.py (18). Suite: 709 passed.
   Time limit (launcher + UI): launcher pick_time_limit() asked after provider/model (Enter = 15 min adds no flag; skipped for --dry-run via time_limit_flag()); UI 'Time limit per AI call' dropdown (time_limits lazy-imported like ollama_models), passed through _launch_terminal to both _launch_terminal_local and _run_cli_cloud, then _build_cli_cmd(time_limit=...), which adds --time-limit only when not 15. Fixed during work: launcher from time_limits import had been indented inside the sys.path if-block. Tests: launcher +6, test_ui_time_limit.py (8). Suite: 723 passed.
+  ## Session 31 handoff: OCR pipeline + Editor mode (written end of Session 30)
+
+### State at end of Session 30
+- Repo: D:\AI_kcMedicalResearch, Windows, PowerShell, `.venv`, Python 3.11.
+- Branch `v2.5-major-updates`, HEAD `a375494`, PR #1 open with 8 commits.
+- Tests: 723 passed, 3 skipped, 11 deselected (`python -m pytest -m "not live" --tb=short -q`).
+  CI was green up to `f58bad6` (709). CI on `a375494` (723) not yet confirmed.
+- Ollama 0.40.8. Pulled: gemma4:e4b (default, 7.5B, vision), qwen3:8b,
+  qwen2.5:14b-instruct, nomic-embed-text.
+- Done in v2.5 (all on PR #1):
+  - local-first default and cloud gate;
+  - `think: false` on all Ollama requests (`f836106`);
+  - gemma4:e4b default and `ollama_models.py` (`1df6081`);
+  - launcher model picker (`170c16b`);
+  - UI model dropdown and Run blocked when no local model (`1acb851`);
+  - time limit 15/30/60/none via `--time-limit`, `time_limits.py` (`f58bad6`);
+  - launcher and UI time limit (`a375494`).
+
+### Open items to settle first
+1. Confirm CI green on `a375494` (expect 723 passed).
+2. Decide: merge PR #1 into `main` before starting new work (recommended: OCR and
+   Editor are new features, so they belong on a fresh branch, e.g. `v2.6-ocr-editor`),
+   or keep adding to PR #1. Bump `Version: 2.4.13` in README/main.py at release.
+3. Decide the order. Editor mode is text-only and touches fewer files; OCR needs
+   design decisions first (see A1).
+
+### Working rules (keep these)
+- Read-only inspection first, then a failing test (check it fails for the right
+  reason), then the code, then the full suite, docs, commit and push, then CI.
+- Give edits as "select lines X-Y, paste this full block". Don't describe partial
+  edits in words. When editing several places in one file, work from the bottom up.
+- Don't claim a test result unless it was pasted. A page change needs both the
+  AppTest render test and a browser check.
+- After each commit: update the count in README.md line 7 and HANDOFF.md lines 48 and 479;
+  run `python scripts/check_no_bom.py`.
+- Modules the launcher imports must be stdlib-only (like `ollama_models.py`, `time_limits.py`).
+- `ui/app.py` must lazy-import SOURCE_CODE modules (`_cli_module()`,
+  `_ollama_models_module()`, `_time_limits_module()`). conftest.py hides a missing
+  path, so tests pass but the real app crashes.
+- Ollama is in `LOCAL_ONLY_PROVIDERS`: it never falls back to cloud. Keep it that way
+  for any mode that handles patient documents.
+
+### Task A: OCR pipeline (local, gemma4:e4b)
+Known facts:
+- `ollama show gemma4:e4b` lists capabilities: completion, vision, audio, tools,
+  thinking, with a clip projector. Ollama `/api/generate` accepts `"images": [<base64>]`.
+- The app sends no images to Ollama today. `call_ollama_provider`
+  (providers.py) and `_stream_ollama` (streaming.py) send text only.
+- `providers.PROVIDER_CAPABILITIES["ollama"]["vision"]` is False for every model.
+  `ollama_models.model_capabilities(host, name)` (/api/show) already tells
+  per model whether it has vision. Use that, not a fixed flag.
+- Launcher `BLOCKED_FOR_SR = {'ollama','deepseek'}`; main.py ~1495-1520 warns that SR
+  needs vision. Unblocking SR for vision-capable Ollama models is a separate decision.
+- The time limit applies (images are slower; users may need 30/60/none).
+
+Decisions needed (ask the user before writing code):
+- A1. A new mode `--mode ocr` (input/ocr -> output/ocr), or OCR as a step inside other
+  modes (e.g. scanned PDFs in SR/appraisal)? Or both: the mode first, reused later?
+- A2. Input types: images only (png/jpg), or scanned PDFs too? PDFs need page
+  rendering. Check which library is already installed before adding one.
+- A3. Output: plain text, markdown, or both? One file per input, or per page?
+- A4. Ollama only (confidential documents), or allow cloud vision providers behind the
+  cloud gate?
+- A5. If the chosen model has no vision: block Run with a warning, the same pattern
+  as `_local_run_blocked()`.
+
+First read-only commands:
+    Get-ChildItem -Path SOURCE_CODE -Recurse -Include *.py | Select-String -Pattern "fitz|pdf2image|PIL|Image\.open|pytesseract|base64|supports_vision|\"images\"" | Select-Object Path, LineNumber, Line | Format-Table -Wrap
+    Select-String -Path requirements*.txt -Pattern "pymupdf|fitz|pdf2image|pillow|tesseract" 
+    Select-String -Path SOURCE_CODE\providers.py -Pattern "def call_\w+_provider|def call_ai|vision" | Select-Object LineNumber, Line
+
+Places a new mode must be added (found in Session 30):
+- main.py `--mode` choices (~line 2266) and the dispatch block (~2398-2442);
+- launcher `MODES`, `_MODE_INPUT_MAP`, `show_help()` entries;
+- ui/app.py `MODES` (the AppTest render test loops over it automatically);
+- `main.data_destinations` / `SEARCH_SERVICES` (cloud gate);
+- README modes table; help guide (`Readme/flashcard-help.html`).
+
+### Task B: Editor mode (merge writing + editing + review)
+Goal (user's words): simplify the writing mode, both the Topic track and the Article
+track, into one "editor mode" that merges writing, editing and review.
+
+Known facts:
+- `SOURCE_CODE/pipelines/writing/writing.py`: `_call_llm` (~line 105) with the
+  time-limit watchdog. Role calls: writer_out (~573), editor_out (~596), qa_out (~618),
+  editor_out (~670), qa_out (~713). That looks like two flows (draft, and edit
+  existing), but this is NOT verified.
+- main.py imports from `pipelines.writing.writing` (~1908, ~1914); `--report` calls
+  `generate_writing_report(provider, model)` (~2406).
+- NOT yet seen: how the "Topic track" and "Article track" are chosen today.
+  Note `--sub` 1=Topic Search / 2=Article Search belongs to SEARCH mode. Confirm with
+  the user which "Topic/Article" is meant, and inspect before designing.
+
+Decisions needed:
+- B1. Name: rename `writing` to `editor` and keep `--mode writing` as an alias so
+  existing scripts and docs work? Or keep the flag and just change the behaviour?
+- B2. One combined LLM pass (write+edit+review in one prompt; fewer calls, faster
+  on local models), or keep the internal roles but show the user one mode and one
+  output? Trade-off: one pass is faster; separate review catches more.
+- B3. Tracks become submodes of editor: Topic = draft from a topic/outline,
+  Article = revise an existing manuscript. Same output shape for both?
+- B4. Output: revised text + a short change log + review comments, in one file
+  or separate files?
+
+First read-only commands:
+    Select-String -Path SOURCE_CODE\pipelines\writing\writing.py -Pattern "^def |topic|article|track|_call_llm\(" | Select-Object LineNumber, Line | Format-Table -Wrap
+    Select-String -Path SOURCE_CODE\main.py -Pattern "writing|topic|article" | Select-Object LineNumber, Line | Format-Table -Wrap
+    Select-String -Path SOURCE_CODE\ui\app.py -Pattern "writing|topic|article|submode" | Select-Object LineNumber, Line | Format-Table -Wrap
+    Get-ChildItem -Path tests -Filter *.py | Select-String -Pattern "writing" | Group-Object Path | Select-Object Count, Name
+
+Tests that will be affected:
+- `tests/test_time_limit_wiring.py` imports `pipelines.writing.writing._call_llm`;
+- `tests/test_ui_model_picker.py::test_every_mode_page_renders_with_ollama_down`
+  (loops over MODES);
+- `tests/test_ui_time_limit.py` (uses "writing" mode and key `time_limit_writing`);
+- launcher tests; cloud gate tests (`data_destinations` per mode);
+- whatever the last command above lists.
+
+### Known limitations carried forward
+- A timed-out call keeps running on its daemon thread. Ollama keeps generating and
+  the next call waits behind it.
+- A streaming timeout is the longest gap between chunks, not the total time.
+- With `--time-limit none`, Ctrl+C may not interrupt a non-streaming Ollama call
+  outside coding/writing on Windows. Closing the window always works.
+- CI shows 44 warnings (unpinned versions); not urgent.
