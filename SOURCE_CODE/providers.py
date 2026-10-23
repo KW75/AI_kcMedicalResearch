@@ -56,9 +56,9 @@ FALLBACK_PROVIDERS = [
 # retried against a cloud provider, because the input may be confidential.
 LOCAL_ONLY_PROVIDERS = {"ollama"}
 
-# Model used when OLLAMA_MODEL is unset and auto-detection finds nothing.
-# Must match the chat model README Step 2 tells colleagues to pull.
-OLLAMA_DEFAULT_MODEL = "qwen2.5:14b-instruct"
+# Default local model and model listing live in ollama_models.py, so the
+# launcher, the UI and this module share one value.
+from ollama_models import OLLAMA_DEFAULT_MODEL, choose_default, list_ollama_models  # noqa: E402
 
 
 # Ollama performance thresholds
@@ -92,34 +92,18 @@ def supports_vision(provider: str) -> bool:
 # Ollama auto-detect best model
 # ---------------------------------------------------------------------------
 def _ollama_detect_best_model(host: str = "http://localhost:11434") -> str:
-    """Query Ollama /api/tags and return the largest non-embedding model available."""
-    SKIP_PATTERNS = ("embed", "nomic", "all-minilm")
-    try:
-        req = urllib.request.Request(f"{host}/api/tags", method="GET")
-        with urllib.request.urlopen(req, timeout=5) as resp:
-            data = json.loads(resp.read())
-        models = data.get("models", [])
-        if not models:
-            return OLLAMA_DEFAULT_MODEL
-        candidates = []
-        for m in models:
-            name = m.get("name", "")
-            if any(skip in name.lower() for skip in SKIP_PATTERNS):
-                continue
-            param_str = m.get("details", {}).get("parameter_size", "0B")
-            try:
-                size = float(param_str.replace("B", "").replace("M", "e-3").replace("K", "e-6"))
-            except (ValueError, TypeError):
-                size = 0
-            candidates.append((name, size))
-        if not candidates:
-            return OLLAMA_DEFAULT_MODEL
-        candidates.sort(key=lambda x: x[1], reverse=True)
-        best = candidates[0][0]
-        print(f"[ollama] Auto-detected best model: {best} ({candidates[0][1]:.1f}B params)")
-        return best
-    except Exception:
+    """Pick the Ollama model to use when OLLAMA_MODEL is unset.
+
+    OLLAMA_DEFAULT_MODEL if it is pulled, otherwise the largest pulled chat
+    model. OLLAMA_DEFAULT_MODEL if nothing is pulled or Ollama is down.
+    """
+    models = list_ollama_models(host)
+    if not models:
         return OLLAMA_DEFAULT_MODEL
+    best = choose_default(models)
+    size = next((m["params_b"] for m in models if m["name"] == best), 0.0)
+    print(f"[ollama] Auto-detected best model: {best} ({size:.1f}B params)")
+    return best
 
 
 # ---------------------------------------------------------------------------

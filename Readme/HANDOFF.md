@@ -45,7 +45,7 @@ so those catches happen at session open, not mid-work.
 
 | Component      | Status |
 |----------------|--------|
-| Tests          | 627 passed, 3 skipped, 11 deselected (`python -m pytest -m "not live" --tb=short -q`) |
+| Tests          | 648 passed, 3 skipped, 11 deselected (`python -m pytest -m "not live" --tb=short -q`) |
 | CI             | green (455b2d8; 28e616e; 3a9081b and 6813b12 also confirmed green) |
 | Render deploy  | health returned `ok` on 28e616e (S27 close) |
 | SR pipeline    | working via CLI with Qwen; Ang 2010 verified against PDF (NFR week 6, unanimous N=3); text-fallback drops now surface in Stage 4 `[SKIP]` block |
@@ -476,7 +476,7 @@ with an explicit warning + consent. Local model choice exists so users can match
   `8c7b97a` DEFAULT_PROVIDER falls back to ollama; tests independent of .env ·
   `7bbf1b4` CLI cloud gate ([y/N], `--confirm-cloud`, `provider_attempt_order`) ·
   `eb6661e` UI cloud gate (consent checkbox, `_build_cli_cmd`, stdin=DEVNULL on Render).
-- Tests: 627 passed, 3 skipped, 11 deselected (local + CI). CI shows 44 warnings (not urgent).
+- Tests: 648 passed, 3 skipped, 11 deselected (local + CI). CI shows 44 warnings (not urgent).
 
 ## Open items to confirm first
 1. DONE (Session 30): README test count corrected to 624 and committed together with this handoff block.
@@ -543,3 +543,22 @@ with an explicit warning + consent. Local model choice exists so users can match
   the 2026-10 model comparison doc (1 = best); params, size, context,
   vision and thinking are read live from Ollama. gemma4 vision is not used
   yet: `call_ollama_provider` sends text only, so OCR waits for update #5.
+- `f836106`: think=false commit (above).
+- Default local model -> gemma4:e4b. New `SOURCE_CODE/ollama_models.py`
+  (stdlib only, so the launcher can import it) holds OLLAMA_DEFAULT_MODEL,
+  MODEL_RANKS (2026-10 comparison, 1 = best), list_ollama_models (/api/tags,
+  skips embedding models, smallest first), model_capabilities (/api/show),
+  choose_default (default if pulled, else largest), rank_label,
+  missing_ranked, describe. providers.py imports the default from it;
+  _ollama_detect_best_model now uses choose_default. README Step 2,
+  Providers row, sample .env and .env.example now name gemma4:e4b
+  (needs Ollama 0.30.9+; qwen3:4b as low-resource option). Docs do NOT
+  mention the picker yet: it is not built. Tests: tests/test_ollama_models.py
+  (21). Suite: 648 passed.
+- Next: launcher picker (pick_provider returns
+  '--provider ollama --model <name>'; caller at launcher.py ~614 joins and
+  splits flags, so this is safe), then UI dropdown (app.py ~951 text box
+  -> selectbox when provider is ollama and models are found; text box
+  otherwise, e.g. Render), then fix _stream_ollama raw OLLAMA_MODEL.
+- Noted: the launcher does not load .env, so ollama_models uses
+  OLLAMA_HOST from the process environment or localhost:11434.

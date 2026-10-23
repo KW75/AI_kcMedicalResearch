@@ -4,7 +4,7 @@ A multi-mode AI assistant for medical research, critical appraisal, systematic r
 
 
     Version: 2.4.13
-    Tests: 627 passed, 3 skipped, 11 deselected
+    Tests: 648 passed, 3 skipped, 11 deselected
            (reproduce with `python -m pytest -m "not live" --tb=short -q`)
     CI: GitHub Actions - Green
     GitHub: https://github.com/KW75/AI_kcMedicalResearch
@@ -80,21 +80,26 @@ The app runs after Step 1 but needs a model to produce output.
 Option A - Free / local (Ollama), no API key:
 1. Install Ollama:  https://ollama.com/download
 2. Pull the two models the app uses:
-       ollama pull qwen2.5:14b-instruct   (the chat model - used by all modes;
-                                           use qwen2.5:7b-instruct on older or
-                                           slower machines)
+       ollama pull gemma4:e4b             (the chat model - used by all modes;
+                                           about 6.6 GB; needs Ollama 0.30.9 or
+                                           newer. On older or slower machines
+                                           use qwen3:4b, about 2.5 GB)
        ollama pull nomic-embed-text       (the embedding model - needed for the
                                            appraisal and SR pipelines / RAG)
 3. Copy `.env.example` to `.env` and confirm this line matches the model you
    pulled (already set by default):
-       OLLAMA_MODEL=qwen2.5:14b-instruct
+       OLLAMA_MODEL=gemma4:e4b
    (If you pulled a different chat model, put its exact name here, or comment
-    the line out to let the app auto-pick the largest model you have. The
-    embedding model must stay nomic-embed-text unless you change EMBEDDING_MODEL.)
+    the line out to let the app pick: gemma4:e4b if pulled, otherwise the
+    largest model you have. The embedding model must stay nomic-embed-text
+    unless you change EMBEDDING_MODEL.)
 4. Ollama runs in the background after install; the app connects automatically.
 
-Note: llama3.2 (3B) was the previous default but is too small for reliable
-code generation - use qwen2.5 as above.
+Note: v2.5 changed the default from qwen2.5:14b-instruct to gemma4:e4b. In
+the 2026-10 local model comparison gemma4:e4b ranked best for coding and
+second for reasoning, is smaller (6.6 GB vs 9.0 GB), and is the only one of
+the five that reads images (for the planned OCR mode). qwen2.5:14b-instruct
+still works if you already have it.
 
 Option B - Cloud provider (DeepSeek, Qwen, OpenAI, Anthropic, Groq):
 1. Copy `.env.example` to `.env`.
@@ -122,7 +127,8 @@ Option B - Cloud provider (DeepSeek, Qwen, OpenAI, Anthropic, Groq):
 | OpenAI             | `--provider openai`    | `OPENAI_API_KEY`     | GPT-4 vision                                |
 | Anthropic          | `--provider anthropic` | `ANTHROPIC_API_KEY`  | Claude vision - partial tripwires, see REVIEWER_GUIDE.md §6.  |
 | Groq               | `--provider groq`      | `GROQ_API_KEY`       | Fast inference                              |
-| Ollama (default)   | `--provider ollama`    | `OLLAMA_HOST`, `OLLAMA_MODEL` | Free, offline; no SR (no vision). Set OLLAMA_MODEL (default qwen2.5:14b-instruct). |
+| Ollama (default)   | `--provider ollama`    | `OLLAMA_HOST`, `OLLAMA_MODEL` | Free, offline. Not for SR yet (the app does not send images to Ollama). Set OLLAMA_MODEL (default gemma4:e4b). |
+
 
 **Confidentiality gate.** Ollama runs entirely on your machine and starts without any prompt. If you choose a cloud provider, the app first lists every external service your input could be sent to (the chosen provider plus any `FALLBACK_PROVIDERS` backups) and asks `Continue? [y/N]`. Pressing Enter cancels. For scripted or non-interactive runs, add `--confirm-cloud` to accept explicitly; without it, a run with no keyboard attached is refused. Search modes always contact PubMed / Europe PMC (and DuckDuckGo for Search) with your search terms, even when the AI model is local.
 
@@ -156,7 +162,7 @@ Copy `.env.example` to `.env`. `.env` is gitignored.
     FALLBACK_PROVIDERS=deepseek,qwen,groq
 
     OLLAMA_HOST=http://localhost:11434
-    OLLAMA_MODEL=qwen2.5:14b-instruct
+    OLLAMA_MODEL=gemma4:e4b
     OLLAMA_CONTEXT=32768
     OLLAMA_NUM_PREDICT=8192
     OLLAMA_TEMPERATURE=0.3
