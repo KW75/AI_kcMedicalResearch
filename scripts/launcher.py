@@ -24,6 +24,17 @@ except ImportError:
 BASE   = Path(__file__).resolve().parent.parent
 PYTHON = sys.executable
 
+# Ollama model list, default and descriptions, shared with the app so the
+# launcher and the UI show the same thing. ollama_models.py is stdlib only.
+_SOURCE_DIR = str(BASE / 'SOURCE_CODE')
+if _SOURCE_DIR not in sys.path:
+    sys.path.append(_SOURCE_DIR)
+from ollama_models import (  # noqa: E402
+    RANKS_SOURCE, choose_default, describe, list_ollama_models,
+    missing_ranked, model_capabilities,
+)
+
+
 
 def _project_meta() -> tuple[str, str]:
     """Parse (VERSION, supported-Python range) from SOURCE_CODE/main.py.
@@ -350,6 +361,51 @@ def pick_mode():
 # -----------------------------------------------------------------------------
 #  Provider selection menu
 # -----------------------------------------------------------------------------
+def pick_ollama_model() -> str:
+    """Ask which pulled Ollama model to use.
+
+    Returns the model name, or '' if Ollama cannot be reached (the app then
+    chooses a model itself). Enter picks the default.
+    """
+    models = list_ollama_models()
+    if not models:
+        print()
+        print(f'  {WARN}!  Could not list Ollama models. Is the Ollama app running?{RESET}')
+        print(f'  {INFO}   Continuing without a model choice; the app will pick one.{RESET}')
+        return ''
+
+    default = choose_default(models)
+    caps = {m['name']: model_capabilities(None, m['name']) for m in models}
+    missing = missing_ranked(models)
+
+    while True:
+        print()
+        section_header('SELECT  LOCAL  MODEL')
+        print()
+        for i, m in enumerate(models, start=1):
+            mark = f'  {GOOD}(default){RESET}' if m['name'] == default else ''
+            print(f'  {ACCENT}{i}{RESET}  {TEXT}{describe(m, caps[m["name"]])}{RESET}{mark}')
+        print()
+        print(f'  {INFO}Ranks: {RANKS_SOURCE}. Image/OCR = the model can read images;{RESET}')
+        print(f'  {INFO}the app does not send images to Ollama yet (OCR mode is planned).{RESET}')
+        if missing:
+            print()
+            print(f'  {INFO}Also in the comparison, not installed yet:{RESET}')
+            for name in missing:
+                print(f'     {INFO}ollama pull {name}{RESET}')
+        print()
+
+        choice = safe_input(
+            f'  {ACCENT}>> Enter choice [1-{len(models)}] or Enter for {default}: {RESET}',
+            default='',
+        ).strip()
+        if choice == '':
+            return default
+        if choice.isdigit() and 1 <= int(choice) <= len(models):
+            return models[int(choice) - 1]['name']
+        print(f'\n  {ERR}Invalid choice. Please enter 1-{len(models)} or press Enter.{RESET}')
+
+
 def pick_provider(mode_flag: str = '') -> str:
     is_sr = (mode_flag == '--mode sr')
 
@@ -425,7 +481,12 @@ def pick_provider(mode_flag: str = '') -> str:
             safe_input(f'  {INFO}Press Enter to choose again...{RESET}')
             continue
 
+        if prov_id == 'ollama':
+            model = pick_ollama_model()
+            if model:
+                return f'{prov_flag} --model {model}'
         return prov_flag
+
 
 
 # -----------------------------------------------------------------------------

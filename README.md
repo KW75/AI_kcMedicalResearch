@@ -4,7 +4,7 @@ A multi-mode AI assistant for medical research, critical appraisal, systematic r
 
 
     Version: 2.4.13
-    Tests: 648 passed, 3 skipped, 11 deselected
+    Tests: 657 passed, 3 skipped, 11 deselected
            (reproduce with `python -m pytest -m "not live" --tb=short -q`)
     CI: GitHub Actions - Green
     GitHub: https://github.com/KW75/AI_kcMedicalResearch
@@ -94,6 +94,13 @@ Option A - Free / local (Ollama), no API key:
     largest model you have. The embedding model must stay nomic-embed-text
     unless you change EMBEDDING_MODEL.)
 4. Ollama runs in the background after install; the app connects automatically.
+5. When you choose Ollama in the CLI launcher, it lists the models you have
+   pulled with their size, whether they read images (Image/OCR), and their
+   coding and reasoning ranks from the 2026-10 local model comparison
+   (1 = best). Press Enter for the default (gemma4:e4b) or type a number to
+   match the model to your hardware. Ranked models you have not pulled are
+   shown as `ollama pull ...` commands.
+
 
 Note: v2.5 changed the default from qwen2.5:14b-instruct to gemma4:e4b. In
 the 2026-10 local model comparison gemma4:e4b ranked best for coding and

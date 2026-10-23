@@ -45,7 +45,7 @@ so those catches happen at session open, not mid-work.
 
 | Component      | Status |
 |----------------|--------|
-| Tests          | 648 passed, 3 skipped, 11 deselected (`python -m pytest -m "not live" --tb=short -q`) |
+| Tests          | 657 passed, 3 skipped, 11 deselected (`python -m pytest -m "not live" --tb=short -q`) |
 | CI             | green (455b2d8; 28e616e; 3a9081b and 6813b12 also confirmed green) |
 | Render deploy  | health returned `ok` on 28e616e (S27 close) |
 | SR pipeline    | working via CLI with Qwen; Ang 2010 verified against PDF (NFR week 6, unanimous N=3); text-fallback drops now surface in Stage 4 `[SKIP]` block |
@@ -476,7 +476,7 @@ with an explicit warning + consent. Local model choice exists so users can match
   `8c7b97a` DEFAULT_PROVIDER falls back to ollama; tests independent of .env ·
   `7bbf1b4` CLI cloud gate ([y/N], `--confirm-cloud`, `provider_attempt_order`) ·
   `eb6661e` UI cloud gate (consent checkbox, `_build_cli_cmd`, stdin=DEVNULL on Render).
-- Tests: 648 passed, 3 skipped, 11 deselected (local + CI). CI shows 44 warnings (not urgent).
+- Tests: 657 passed, 3 skipped, 11 deselected (local + CI). CI shows 44 warnings (not urgent).
 
 ## Open items to confirm first
 1. DONE (Session 30): README test count corrected to 624 and committed together with this handoff block.
@@ -562,3 +562,18 @@ with an explicit warning + consent. Local model choice exists so users can match
   otherwise, e.g. Render), then fix _stream_ollama raw OLLAMA_MODEL.
 - Noted: the launcher does not load .env, so ollama_models uses
   OLLAMA_HOST from the process environment or localhost:11434.
+- `1df6081`: gemma4 default + ollama_models.py commit (above).
+- Launcher model picker: `pick_ollama_model()` in scripts/launcher.py lists
+  pulled models (describe line, `(default)` mark, `ollama pull` hints for
+  ranked models not pulled). Enter = default. If Ollama is unreachable it
+  warns and returns '' (no --model; the app picks). `pick_provider` asks
+  only after the SR block, and returns '--provider ollama --model <name>'.
+  The launcher imports ollama_models by appending SOURCE_CODE to sys.path.
+  First launcher tests: tests/test_launcher_model_picker.py (9), which load
+  the launcher by path with a dummy colorama. Checked by hand on the dev
+  machine: 4 models listed, gemma4 default with Image/OCR yes, llama3.2 not
+  ranked, pull hints shown, command included --model gemma4:e4b.
+  README Step 2 item 5 describes the launcher picker only. Suite: 657 passed.
+- Next: UI dropdown (app.py ~951: selectbox when provider is ollama and
+  models are found; text box otherwise, e.g. Render), then fix
+  _stream_ollama raw OLLAMA_MODEL, then update #2 time limit.
