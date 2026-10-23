@@ -515,6 +515,53 @@ def _cloud_destinations(mode: str, provider: str) -> list:
             for p in cli.data_destinations(mode, provider)
             if p not in cli.LOCAL_ONLY_PROVIDERS]
 
+_RENDER_VARS = ("RENDER", "RENDER_SERVICE_ID", "RENDER_GIT_COMMIT")
+
+
+def _ollama_models_module():
+    """Import ollama_models lazily (Streamlit only puts ui/ on sys.path)."""
+    p = str(SOURCE_CODE_DIR)
+    if p not in sys.path:
+        sys.path.append(p)
+    import ollama_models
+    return ollama_models
+
+
+def _ollama_model_choices(provider: str) -> tuple:
+    """(choices, default) for the local model dropdown.
+
+    choices is [(name, description)], using the same descriptions and default
+    as the CLI launcher. Returns ([], "") when the free-text box should be
+    shown instead: a cloud provider, the hosted (Render) app, or Ollama not
+    reachable. Only the RENDER* variables are checked, not
+    _is_cloud_environment(), because that one treats STREAMLIT_SERVER_PORT
+    as cloud.
+    """
+    if provider not in _LOCAL_PROVIDERS or any(os.environ.get(v) for v in _RENDER_VARS):
+        return [], ""
+    om = _ollama_models_module()
+    models = om.list_ollama_models()
+    if not models:
+        return [], ""
+    choices = [(m["name"], om.describe(m, om.model_capabilities(None, m["name"])))
+               for m in models]
+    return choices, om.choose_default(models)
+
+def _local_run_blocked(provider: str, ollama_choices: list) -> str:
+    """Reason to disable Run for a local job, or "" if it may run.
+
+    provider=ollama with no models found means Ollama is not running (or this
+    is the hosted app, which has no Ollama); the job could only fail.
+    """
+    if provider not in _LOCAL_PROVIDERS or ollama_choices:
+        return ""
+    if any(os.environ.get(v) for v in _RENDER_VARS):
+        return ("The hosted version has no local AI (Ollama). Choose a cloud provider, "
+                "or install the app on your own computer for confidential work.")
+    return ("No local Ollama models found. Start the Ollama app (or run `ollama pull "
+            "gemma4:e4b` if you have no models), then refresh this page.")
+
+
 def _launch_terminal(mode: str, provider: str, model: str, submode: str = "", prompt: str = "",
                      confirm_cloud: bool = False) -> str:
     """Launch CLI - detects environment and runs appropriately."""
@@ -948,10 +995,28 @@ def _mode_page(mode: str) -> None:
         with col_p:
             provider = st.selectbox("Provider", PROVIDERS, index=0, key=f"provider_{mode}")
         with col_m:
-            model = st.text_input("Model (leave blank for default)", "", key=f"model_{mode}")
-            if provider != "ollama":
-                st.caption(f"💡 Requires {_get_api_key_env_name(provider)} in environment or sidebar")
-    
+            ollama_choices, ollama_default = _ollama_model_choices(provider)
+            if ollama_choices:
+                names = [n for n, _ in ollama_choices]
+                labels = dict(ollama_choices)
+                model = st.selectbox(
+                    "Local model",
+                    names,
+                    index=names.index(ollama_default) if ollama_default in names else 0,
+                    format_func=lambda n: f"{labels[n]}  (default)" if n == ollama_default else labels[n],
+                    key=f"ollama_model_{mode}",
+                )
+                st.caption(f"Ranks: {_ollama_models_module().RANKS_SOURCE}. Image/OCR = the model "
+                           f"can read images; the app does not send images to Ollama yet.")
+            else:
+                model = st.text_input("Model (leave blank for default)", "", key=f"model_{mode}")
+                if provider == "ollama":
+                    st.caption("No local Ollama models found (Ollama not running, or this is the "
+                               "hosted version). Leave blank to let the app pick.")
+                else:
+                    st.caption(f"💡 Requires {_get_api_key_env_name(provider)} in environment or sidebar")
+
+
     # File upload
     if mode == "sr":
         st.markdown("**Upload article PDFs to** `input/sr/`  —  Accepted: .pdf")
@@ -1064,7 +1129,14 @@ def _mode_page(mode: str) -> None:
             key=f"confirm_cloud_{mode}",
         )
 
-    run_disabled = (bool(gate_error) and provider not in _LOCAL_PROVIDERS) or (bool(cloud_names) and not confirm_cloud)
+    local_block = _local_run_blocked(provider, ollama_choices)
+    if local_block:
+        st.warning(local_block)
+
+    run_disabled = (bool(local_block)
+                    or (bool(gate_error) and provider not in _LOCAL_PROVIDERS)
+                    or (bool(cloud_names) and not confirm_cloud))
+
 
     run_label = f"Run {cfg['label']}"
     if mode == "coding" and submode:

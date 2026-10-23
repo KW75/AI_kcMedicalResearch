@@ -4,7 +4,7 @@ A multi-mode AI assistant for medical research, critical appraisal, systematic r
 
 
     Version: 2.4.13
-    Tests: 657 passed, 3 skipped, 11 deselected
+    Tests: 668 passed, 3 skipped, 11 deselected
            (reproduce with `python -m pytest -m "not live" --tb=short -q`)
     CI: GitHub Actions - Green
     GitHub: https://github.com/KW75/AI_kcMedicalResearch
@@ -99,7 +99,7 @@ Option A - Free / local (Ollama), no API key:
    coding and reasoning ranks from the 2026-10 local model comparison
    (1 = best). Press Enter for the default (gemma4:e4b) or type a number to
    match the model to your hardware. Ranked models you have not pulled are
-   shown as `ollama pull ...` commands.
+   shown as `ollama pull ...` commands. The web UI (--ui) shows the same list as a dropdown when the provider is Ollama. If Ollama isn't running or no model is pulled, Run is disabled with a warning.
 
 
 Note: v2.5 changed the default from qwen2.5:14b-instruct to gemma4:e4b. In

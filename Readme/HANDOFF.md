@@ -45,7 +45,7 @@ so those catches happen at session open, not mid-work.
 
 | Component      | Status |
 |----------------|--------|
-| Tests          | 657 passed, 3 skipped, 11 deselected (`python -m pytest -m "not live" --tb=short -q`) |
+| Tests          | 668 passed, 3 skipped, 11 deselected (`python -m pytest -m "not live" --tb=short -q`) |
 | CI             | green (455b2d8; 28e616e; 3a9081b and 6813b12 also confirmed green) |
 | Render deploy  | health returned `ok` on 28e616e (S27 close) |
 | SR pipeline    | working via CLI with Qwen; Ang 2010 verified against PDF (NFR week 6, unanimous N=3); text-fallback drops now surface in Stage 4 `[SKIP]` block |
@@ -476,7 +476,7 @@ with an explicit warning + consent. Local model choice exists so users can match
   `8c7b97a` DEFAULT_PROVIDER falls back to ollama; tests independent of .env ·
   `7bbf1b4` CLI cloud gate ([y/N], `--confirm-cloud`, `provider_attempt_order`) ·
   `eb6661e` UI cloud gate (consent checkbox, `_build_cli_cmd`, stdin=DEVNULL on Render).
-- Tests: 657 passed, 3 skipped, 11 deselected (local + CI). CI shows 44 warnings (not urgent).
+- Tests: 668 passed, 3 skipped, 11 deselected (local + CI). CI shows 44 warnings (not urgent).
 
 ## Open items to confirm first
 1. DONE (Session 30): README test count corrected to 624 and committed together with this handoff block.
@@ -573,7 +573,8 @@ with an explicit warning + consent. Local model choice exists so users can match
   the launcher by path with a dummy colorama. Checked by hand on the dev
   machine: 4 models listed, gemma4 default with Image/OCR yes, llama3.2 not
   ranked, pull hints shown, command included --model gemma4:e4b.
-  README Step 2 item 5 describes the launcher picker only. Suite: 657 passed.
+  README Step 2 item 5 mentions both the launcher and the UI. Suite: 657 passed.
 - Next: UI dropdown (app.py ~951: selectbox when provider is ollama and
   models are found; text box otherwise, e.g. Render), then fix
   _stream_ollama raw OLLAMA_MODEL, then update #2 time limit.
+  UI model picker: _ollama_model_choices() (lazy import of ollama_models, never queried for cloud providers or on Render); dropdown replaces the text box for Ollama; _local_run_blocked() disables Run when no local model is found. Bug found in browser check: local_block assigned inside the cloud-gate if (UnboundLocalError on every Ollama page). Fixed, and test_every_mode_page_renders_with_ollama_down (Streamlit AppTest) now renders every mode page so this kind of bug fails the suite. Tests tests/test_ui_model_picker.py (11). Suite: 668 passed.
