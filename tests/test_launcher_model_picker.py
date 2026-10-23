@@ -97,3 +97,42 @@ class TestPickProviderWiring:
              patch.object(launcher, "safe_input", side_effect=["1", "", "2"]):
             assert launcher.pick_provider("--mode sr") == "--provider qwen"
         fake_pick.assert_not_called()
+
+class TestPickTimeLimit:
+    """v2.5: launcher asks the time limit per AI call. Enter = 15 min and adds
+    no flag, so the command is unchanged from before."""
+
+    def _ask(self, launcher, inputs):
+        with patch.object(launcher, "safe_input", side_effect=inputs) as fake:
+            result = launcher.pick_time_limit()
+        return result, fake.call_count
+
+    def test_enter_keeps_15_minutes_and_adds_no_flag(self, launcher):
+        assert self._ask(launcher, [""]) == ("", 1)
+
+    def test_number_picks_that_limit(self, launcher):
+        for choice, flag in [("1", ""), ("2", "--time-limit 30"),
+                             ("3", "--time-limit 60"), ("4", "--time-limit none")]:
+            assert self._ask(launcher, [choice]) == (flag, 1), choice
+
+    def test_invalid_choice_asks_again(self, launcher):
+        assert self._ask(launcher, ["9", "x", "2"]) == ("--time-limit 30", 3)
+
+    def test_menu_lists_every_choice_with_default_marked(self, launcher, capsys):
+        import time_limits
+        self._ask(launcher, [""])
+        out = capsys.readouterr().out
+        for label in time_limits.LABELS.values():
+            assert label in out
+        assert "(default)" in out
+
+
+class TestTimeLimitFlag:
+    def test_dry_run_never_asks(self, launcher):
+        with patch.object(launcher, "pick_time_limit",
+                          side_effect=AssertionError("asked on --dry-run")):
+            assert launcher.time_limit_flag("--dry-run") == ""
+
+    def test_ai_modes_ask(self, launcher):
+        with patch.object(launcher, "pick_time_limit", return_value="--time-limit 60"):
+            assert launcher.time_limit_flag("--mode writing") == "--time-limit 60"

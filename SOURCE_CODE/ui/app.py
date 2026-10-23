@@ -476,11 +476,12 @@ _LOCAL_PROVIDERS = {"ollama"}
 
 
 def _build_cli_cmd(mode: str, provider: str, model: str, submode: str = "",
-                   confirm_cloud: bool = False) -> list:
+                   confirm_cloud: bool = False, time_limit: str = "15") -> list:
     """The one CLI command both launch paths use.
 
     --confirm-cloud is added only after the user ticked consent, and never
-    for a local provider.
+    for a local provider. --time-limit is added only when it is not the
+    default 15 minutes (same rule as the launcher).
     """
     cmd = [sys.executable, str(MAIN_PY), "--mode", mode, "--provider", provider]
     if model and model.strip():
@@ -494,7 +495,16 @@ def _build_cli_cmd(mode: str, provider: str, model: str, submode: str = "",
                 break
     if confirm_cloud and provider not in _LOCAL_PROVIDERS:
         cmd.append("--confirm-cloud")
+    if time_limit and time_limit != "15":  # v2.5: 15 is the default, add nothing
+        cmd += ["--time-limit", time_limit]
     return cmd
+
+def _time_limits_module():
+    """Lazy import of time_limits (Streamlit only puts ui/ on sys.path)."""
+    if str(SOURCE_CODE_DIR) not in sys.path:
+        sys.path.append(str(SOURCE_CODE_DIR))
+    import time_limits
+    return time_limits
 
 
 def _cli_module():
@@ -563,15 +573,19 @@ def _local_run_blocked(provider: str, ollama_choices: list) -> str:
 
 
 def _launch_terminal(mode: str, provider: str, model: str, submode: str = "", prompt: str = "",
-                     confirm_cloud: bool = False) -> str:
+                     confirm_cloud: bool = False, time_limit: str = "15") -> str:
     """Launch CLI - detects environment and runs appropriately."""
     if _is_cloud_environment():
-        return _run_cli_cloud(mode, provider, model, submode, prompt, confirm_cloud=confirm_cloud)
-    return _launch_terminal_local(mode, provider, model, submode, confirm_cloud=confirm_cloud)
+        return _run_cli_cloud(mode, provider, model, submode, prompt,
+                              confirm_cloud=confirm_cloud, time_limit=time_limit)
+    return _launch_terminal_local(mode, provider, model, submode,
+                                  confirm_cloud=confirm_cloud, time_limit=time_limit)
 
 def _run_cli_cloud(mode: str, provider: str, model: str, submode: str = "", prompt: str = "",
-                   confirm_cloud: bool = False) -> str:
+                   confirm_cloud: bool = False, time_limit: str = "15") -> str:
     """Run CLI directly in cloud environment."""
+
+
     # Save prompt if provided
     if prompt.strip():
         prompt_file = INPUT_DIR / mode / "instructions.txt"
@@ -579,7 +593,8 @@ def _run_cli_cloud(mode: str, provider: str, model: str, submode: str = "", prom
         prompt_file.write_text(prompt.strip(), encoding="utf-8")
     
     # Build command (shared with the local path so the two cannot drift)
-    cmd_parts = _build_cli_cmd(mode, provider, model, submode, confirm_cloud=confirm_cloud)
+    cmd_parts = _build_cli_cmd(mode, provider, model, submode, confirm_cloud=confirm_cloud,
+                               time_limit=time_limit)
 
     
     st.code("$ " + " ".join(cmd_parts))
@@ -626,10 +641,11 @@ def _run_cli_cloud(mode: str, provider: str, model: str, submode: str = "", prom
             return f"error: {exc}"
 
 def _launch_terminal_local(mode: str, provider: str, model: str, submode: str = "",
-                           confirm_cloud: bool = False) -> str:
+                           confirm_cloud: bool = False, time_limit: str = "15") -> str:
     """Launch terminal locally with API keys from session."""
     base = str(PROJECT_ROOT)
-    cmd_parts = _build_cli_cmd(mode, provider, model, submode, confirm_cloud=confirm_cloud)
+    cmd_parts = _build_cli_cmd(mode, provider, model, submode, confirm_cloud=confirm_cloud,
+                               time_limit=time_limit)
     
     cmd_str = " ".join(f'"{p}"' if " " in p else p for p in cmd_parts)
     env_vars = _get_env_with_api_keys()
@@ -1016,6 +1032,15 @@ def _mode_page(mode: str) -> None:
                 else:
                     st.caption(f"💡 Requires {_get_api_key_env_name(provider)} in environment or sidebar")
 
+        tl = _time_limits_module()
+        time_limit = st.selectbox(
+            "Time limit per AI call",
+            list(tl.CHOICES),
+            index=list(tl.CHOICES).index(tl.DEFAULT),
+            format_func=lambda k: tl.LABELS[k],
+            key=f"time_limit_{mode}",
+            help="Large local models on slower machines may need longer.",
+        )
 
     # File upload
     if mode == "sr":
@@ -1152,7 +1177,8 @@ def _mode_page(mode: str) -> None:
             st.error(f"Invalid provider: {provider}")
             return
 
-        result = _launch_terminal(mode, provider, model, submode or "", confirm_cloud=confirm_cloud)
+        result = _launch_terminal(mode, provider, model, submode or "", confirm_cloud=confirm_cloud,
+                                  time_limit=time_limit)
 
         if result == "ok":
             st.success(f"✅ **{cfg['label']}** session launched in a new terminal window.")

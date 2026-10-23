@@ -29,11 +29,12 @@ PYTHON = sys.executable
 _SOURCE_DIR = str(BASE / 'SOURCE_CODE')
 if _SOURCE_DIR not in sys.path:
     sys.path.append(_SOURCE_DIR)
+
 from ollama_models import (  # noqa: E402
     RANKS_SOURCE, choose_default, describe, list_ollama_models,
     missing_ranked, model_capabilities,
 )
-
+from time_limits import CHOICES as TIME_CHOICES, DEFAULT as TIME_DEFAULT, LABELS as TIME_LABELS  # noqa: E402
 
 
 def _project_meta() -> tuple[str, str]:
@@ -406,6 +407,35 @@ def pick_ollama_model() -> str:
         print(f'\n  {ERR}Invalid choice. Please enter 1-{len(models)} or press Enter.{RESET}')
 
 
+def pick_time_limit() -> str:
+    """Ask the maximum time per AI call.
+
+    Returns '' for the default (15 min), so the command is unchanged,
+    otherwise '--time-limit 30' / '60' / 'none'.
+    """
+    keys = list(TIME_CHOICES)
+    print()
+    print(f'  {TEXT}Time limit per AI call (large local models may need longer):{RESET}')
+    for i, key in enumerate(keys, 1):
+        print(f'    {ACCENT}{i}{RESET}  {TEXT}{TIME_LABELS[key]}{RESET}')
+    while True:
+        raw = (safe_input(f'  {ACCENT}>> Enter choice [1-{len(keys)}] '
+                          f'or Enter for 15 minutes:{RESET} ') or '').strip()
+        if raw == '':
+            return ''
+        if raw.isdigit() and 1 <= int(raw) <= len(keys):
+            key = keys[int(raw) - 1]
+            return '' if key == TIME_DEFAULT else f'--time-limit {key}'
+        print(f'  {WARN}!  Please type a number from 1 to {len(keys)}.{RESET}')
+
+
+def time_limit_flag(mode_flag: str) -> str:
+    """--dry-run never calls the AI, so it is not asked."""
+    if mode_flag == '--dry-run':
+        return ''
+    return pick_time_limit()
+
+
 def pick_provider(mode_flag: str = '') -> str:
     is_sr = (mode_flag == '--mode sr')
 
@@ -673,8 +703,9 @@ def main() -> None:
                 check_input_folder(input_mode)
 
             prov_flag = pick_provider(mode_flag)
+            time_flag = time_limit_flag(mode_flag)
 
-            flags = [f for f in [mode_flag, prov_flag] if f]
+            flags = [f for f in [mode_flag, prov_flag, time_flag] if f]
             cmd   = [PYTHON, str(BASE / "SOURCE_CODE" / 'main.py')] + ' '.join(flags).split()
             _run_cmd(cmd, label=label or '')
 

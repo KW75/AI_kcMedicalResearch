@@ -4,7 +4,7 @@ A multi-mode AI assistant for medical research, critical appraisal, systematic r
 
 
     Version: 2.4.13
-    Tests: 709 passed, 3 skipped, 11 deselected
+    Tests: 723 passed, 3 skipped, 11 deselected
            (reproduce with `python -m pytest -m "not live" --tb=short -q`)
     CI: GitHub Actions - Green
     GitHub: https://github.com/KW75/AI_kcMedicalResearch
@@ -118,6 +118,7 @@ Large local models on slower machines may need longer. Choose with
 `--time-limit 15|30|60|none` (minutes; `none` = wait until the model
 finishes, stop with Ctrl+C). Example:
 `python SOURCE_CODE/main.py --mode writing --time-limit 60`
+The launcher asks for it after the model (Enter = 15 minutes), and the web UI has a "Time limit per AI call" dropdown.
 
 
 
