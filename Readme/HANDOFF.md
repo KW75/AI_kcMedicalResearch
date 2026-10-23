@@ -45,11 +45,11 @@ so those catches happen at session open, not mid-work.
 
 | Component      | Status |
 |----------------|--------|
-| Tests          | 571 passed, 3 skipped, 11 deselected (`python -m pytest -m "not live" --tb=short -q`) |
+| Tests          | 723 passed, 3 skipped, 11 deselected (`python -m pytest -m "not live" --tb=short -q`) |
 | CI             | green (455b2d8; 28e616e; 3a9081b and 6813b12 also confirmed green) |
 | Render deploy  | health returned `ok` on 28e616e (S27 close) |
 | SR pipeline    | working via CLI with Qwen; Ang 2010 verified against PDF (NFR week 6, unanimous N=3); text-fallback drops now surface in Stage 4 `[SKIP]` block |
-| Providers      | DeepSeek (default) / Qwen (SR) / OpenAI / Anthropic / Groq / Ollama (local, never falls back) |
+| Providers      | Ollama (default, local) / DeepSeek / Qwen (SR) / OpenAI / Anthropic / Groq / Ollama (local, never falls back) |
 
 Issue numbers below match `README.md` > Known Issues.
 
@@ -318,6 +318,13 @@ hardware: a 14B pull and a demo run converging. Do before rollout.
 
 ---
 
+- **A lookup default is a routing decision.** `dict.get(provider,
+  urls["deepseek"])` looks like defensive coding, but it sends data to a
+  company the user never chose. When the value decides where data goes,
+  an unknown key must raise an error, not fall back. Found in SR screening
+  (S29); safe only because a different file happened to call it correctly.
+
+
 Handoff prepared: 2026-08-29, Session 27.
 ---
 
@@ -376,3 +383,325 @@ Open follow-ups:
 - Verify requirements-local.txt on Apple Silicon ...
 - Consider wrapping `import chromadb` in try/except ...
 - #28 Docker still unverified.
+
+---
+
+## Session 29 - 2026-10-22 - branch v2.5-major-updates
+
+Goal for v2.5: local-first for confidentiality. Ollama is the default;
+cloud is chosen per job with a warning; nothing ever switches from local
+to cloud automatically.
+
+On main before branching:
+- `d20cae8`: Ollama fallback default llama3.2 -> `OLLAMA_DEFAULT_MODEL`
+  (qwen2.5:14b-instruct) in providers.py. New test pins README and
+  .env.example `OLLAMA_MODEL=` lines to the constant.
+- Verified by reading the code: Ollama never falls back to cloud, on the
+  streaming route (stream_ai -> _stream_ollama only) or the batch route
+  (call_ai_with_fallback chain = [ollama]). The 2026-09-02 macOS note
+  "app fell back and completed" cannot have been Ollama falling back to
+  cloud; that run must have used another provider.
+
+On branch:
+- SR screening could send article text to DeepSeek.
+  `RelevanceScreener.screen_by_pdf_path` used
+  `provider_urls.get(provider, provider_urls["deepseek"])`, so
+  provider="anthropic" or an unknown name POSTed the text to
+  api.deepseek.com. The normal pipeline never reached it: for Anthropic,
+  Stage 1 uploads every PDF (an upload failure stops the run) and
+  screen_batch routes by file_id. So no past run leaked. The route is now
+  refused with an error. Pinned by
+  `tests/test_screener_provider_routing.py`, which failed before the fix.
+
+Noted, not fixed:
+- rob2_tool.py reads `OLLAMA_URL`; the rest of the app reads `OLLAMA_HOST`.
+- main.py SR route uses raw `OLLAMA_MODEL`, not `_resolve_ollama_model()`.
+- An Ollama SR run screens locally, then fails at extraction (no vision).
+  It should stop at the start, like the DeepSeek warning.
+- main.call_ai swallows streaming errors (`except Exception: pass`), so an
+  Ollama failure waits through two timeouts. Revisit with time limits.
+- RelevanceScreener defaults to provider="anthropic",
+  model="claude-opus-4-7"; rct_search and main.py functions default to
+  provider="deepseek".
+
+- Local-first default: `providers.py` falls back to
+  `CODE_DEFAULT_PROVIDER = "ollama"` when .env sets no DEFAULT_PROVIDER
+  (or a blank one); README and .env.example now say
+  `DEFAULT_PROVIDER=ollama`. Eight tests that compared the provider to
+  the word "deepseek" now compare to `main.DEFAULT_PROVIDER`, so they pass
+  whatever a machine's .env says (they passed before only because CI and
+  the dev .env both set deepseek). New tests: the code default must be in
+  LOCAL_ONLY_PROVIDERS; README and .env.example must match the code.
+- Decided: Streamlit UI stays (option A). Only launcher menu item 8
+  "Pipeline UI" is removed, swapped for OCR in update #5.
+- Decided: cloud fallback stays (option B), but the cloud warning must
+  list every provider the job may reach, built from FALLBACK_PROVIDERS.
+
+Housekeeping added:
+- CI uses `runs-on: ubuntu-latest`, moving to Ubuntu 26 from 2026-10-19.
+  If "Install system dependencies" goes red with no code change, pin
+  `ubuntu-24.04`.
+- CI run shows 44 warnings that local runs don't (unpinned `>=` versions
+  in requirements-base.txt). Not failing; look when convenient.
+- main.py SR Anthropic warning cites "Known Issue #61", which is not in
+  the Known Issues table; point it at REVIEWER_GUIDE.md section 6.
+- Render UI provider dropdown starts on ollama (index=0) but Render has
+  no Ollama; set a cloud default when running on Render.
+- Cloud gate (v2.5 item 2 policy): `providers.provider_attempt_order()` is now the single source of fallback order and is used by `call_ai_with_fallback`. `main.data_destinations()` / `main.confirm_data_destinations()` list every external destination before a cloud job; `run_cli` refuses unless the user types y or passes `--confirm-cloud`; with no TTY and no flag, it refuses. SR lists only the chosen provider (no fallback chain). Search modes name PubMed / Europe PMC / DuckDuckGo even for local runs. New tests: tests/test_data_destinations.py (25). TestCliRouting tests now pass `--confirm-cloud`. Suite: 627 passed.
+
+- UI cloud gate (commit 3): `ui/app.py` gets `_build_cli_cmd()` (one command for both launch paths; fixes dropped `--model` on Render and dropped `--sub` locally), `_cloud_destinations()` (via `main.data_destinations`, so UI and CLI cannot disagree), and a consent checkbox that disables Run until ticked. It passes `--confirm-cloud` only for cloud providers. The Render path uses `stdin=subprocess.DEVNULL`. If the destinations can't be worked out, cloud Run is disabled (fails closed). New tests: tests/test_ui_cloud_gate.py (24). Suite: 627 passed.
+- Follow-ups (not urgent): Linux launcher `&& read` skips the pause when a job fails (the window closes before the error can be read); the Run success message says "new terminal window" even on Render; mojibake (`??`) in UI strings; `_is_cloud_environment()` treats `STREAMLIT_SERVER_PORT` as cloud; the UI has no Search sub-mode picker; 44 CI warnings; `rct_search.call_ai` returns a `[MOCK]` response on import failure; `.gitattributes` for CRLF.
+
+# AI_kcMedicalResearch – v2.5 handoff (Session 29 close, 2026-10-22)
+
+## How to work with me
+- Windows, PowerShell, project root `D:\AI_kcMedicalResearch`. Every new window first:
+  `cd D:\AI_kcMedicalResearch` then `.venv\Scripts\Activate.ps1` (prompt must show `(.venv)`).
+- Give instructions ONE STEP AT A TIME. Read-only inspection before any edit. Test-first (failing tests, then code).
+- Edit files in VS Code only, never PowerShell `Set-Content` etc. (BOM risk).
+- Every change: `python scripts/check_no_bom.py` → `python -m pytest -m "not live" --tb=short -q` → update test count in README.md line 7 + Readme/HANDOFF.md → commit → push.
+- If any check prints something unexpected, stop and paste it before committing.
+- PowerShell: `Select-String` has no `-Recurse` (pipe from `Get-ChildItem`). CRLF→LF warnings are harmless.
+
+## Product goal
+Health professionals keep data confidential: local (Ollama) first. Cloud providers are optional, chosen per job,
+with an explicit warning + consent. Local model choice exists so users can match the model to their hardware.
+
+## Repo / branch state
+- GitHub: https://github.com/KW75/AI_kcMedicalResearch ; Render (deploys from main): https://ai-kcmedicalresearch.onrender.com
+- `main` at `d20cae8` (Ollama fallback default → OLLAMA_DEFAULT_MODEL = qwen2.5:14b-instruct). CI green, Render health ok.
+- Working branch `v2.5-major-updates`; draft PR #1 "v2.5: local-first major updates": https://github.com/KW75/AI_kcMedicalResearch/pull/1
+  (CI only runs on push to main / PRs into main.)
+- Branch commits: `0640741` SR screener refuses unrouted providers (was sending text to DeepSeek) ·
+  `8c7b97a` DEFAULT_PROVIDER falls back to ollama; tests independent of .env ·
+  `7bbf1b4` CLI cloud gate ([y/N], `--confirm-cloud`, `provider_attempt_order`) ·
+  `eb6661e` UI cloud gate (consent checkbox, `_build_cli_cmd`, stdin=DEVNULL on Render).
+- Tests: 723 passed, 3 skipped, 11 deselected (local + CI). CI shows 44 warnings (not urgent).
+
+## Open items to confirm first
+1. DONE (Session 30): README test count corrected to 624 and committed together with this handoff block.
+2. DONE (Session 30): browser check passed. ollama: no warning, Run enabled. deepseek: warning lists DeepSeek and Qwen (Alibaba), Run disabled until consent ticked.
+3. Decide: merge PR #1 now (local-first work is complete) or keep it open until all 5 updates are done.
+
+## Durable policies (decided)
+- Ollama = code default (`providers.CODE_DEFAULT_PROVIDER`); never falls back to cloud (`LOCAL_ONLY_PROVIDERS`).
+- Cloud only by explicit per-job choice. Warning lists every destination (chosen provider + FALLBACK_PROVIDERS backups,
+  read at run time). Enter = cancel. With no keyboard and no `--confirm-cloud`, the job is refused. Consent is never saved.
+- SR lists only the chosen provider (no fallback chain); SR needs vision (Qwen/OpenAI/Anthropic/Groq). Ollama/DeepSeek blocked.
+- Search modes always send search terms to PubMed/Europe PMC (+DuckDuckGo for Search); the banner says so even for local runs.
+- The UI reuses `main.data_destinations()` (one source of truth). If destinations can't be worked out, cloud Run is disabled (fails closed).
+- Streamlit stays (option A): remove only launcher menu option 8 "Pipeline UI" (replaced by OCR, update #5). Keep `--ui` and Render.
+- Lesson: a lookup default is a routing decision (`dict.get(provider, urls["deepseek"])` leaked data).
+
+## Remaining v2.5 updates (suggested order)
+1. **#1 Ollama model picker**: list pulled models with sizes (from `/api/tags`), skip embedding models (embed/nomic/all-minilm),
+   default `OLLAMA_DEFAULT_MODEL`. Places: `scripts/launcher.py` `pick_provider` (~line 353), `SOURCE_CODE/ui/app.py` Provider selectbox (~line 926),
+   `providers._ollama_detect_best_model`. Thinking mode DONE (Session 30): every Ollama request sends `think: false`. Measured on Ollama 0.40.8: qwen3:8b used 229 tokens without it and 3 with it, same answer; qwen2.5 accepts it without error.
+   Review OLLAMA_CONTEXT=32768 for small hardware.
+   Pulled locally: gemma4:e4b 6.6 GB, qwen3:8b 5.2 GB, qwen2.5:14b-instruct 9.0 GB, llama3.2:latest 2.0 GB, nomic-embed-text 274 MB.
+2. **#3 Writing mode**: Topic and Article tracks offer only the stand-alone editor mode.
+3. **#2 Time limit per action/iteration**: default 15 min; options 30 min, 1 hr, until finished; needs clean cancel.
+   (UI cloud path currently uses `UIConfig.TIMEOUT`.)
+4. **#5 OCR** replaces launcher option 8 "Pipeline UI" (pytesseract already used in `relevance_screener.py`).
+5. **#4 Data Analysis pipeline** replaces Dry Run (launcher option 7 / `--dry-run`): data file → Python/R/Excel statistics →
+   Ollama model explains/checks/reports.
+
+## Follow-ups (not urgent)
+- Linux launcher `&& read` skips the pause when a job fails (window closes before the error can be read).
+- Run success message says "new terminal window" even on Render.
+- Mojibake (`??`, odd characters) in app.py UI strings.
+- `_is_cloud_environment()` treats `STREAMLIT_SERVER_PORT` as cloud.
+- UI has no Search sub-mode picker.
+- `rct_search.call_ai` returns a `[MOCK]` response if its import fails (should raise).
+- 44 CI warnings (unpinned `>=` versions in requirements-base.txt).
+- Add `.gitattributes` for line endings.
+- ubuntu-latest moved to Ubuntu 26 (Oct 2026). If "Install system dependencies" fails, pin `runs-on: ubuntu-24.04`.
+
+## Environment notes
+- Local `.env`: DEFAULT_PROVIDER=deepseek (overrides code default; consider changing to ollama), FALLBACK_PROVIDERS=deepseek,qwen,
+  EMBEDDING_PROVIDER=ollama. `.env` is never committed.
+- `.env.example`: DEFAULT_PROVIDER=ollama, FALLBACK_PROVIDERS=deepseek,qwen,groq.
+
+## First request for the new chat
+"Confirm the open items above, then start update #1 (Ollama model picker), one step at a time, read-only first."
+
+## Session 30 - 2026-10-23 - branch v2.5-major-updates
+
+- `3485d34`: README test count 624; Session 29 handoff block committed.
+- Browser check of the UI cloud gate passed (open item 2).
+- Ollama thinking off: `"think": False` added to all three Ollama requests
+  (`providers.ollama_probe_performance`, `providers.call_ollama_provider`,
+  `streaming._stream_ollama`). qwen3 and gemma4 think by default
+  (`ollama show`: thinking default true). Streaming especially needed it:
+  while a model thinks, Ollama leaves `response` empty, so the user saw
+  nothing. Tests: `TestOllamaThinkOff` (2) in test_providers.py and
+  `test_ollama_streaming_sends_think_false`. Suite: 627 passed.
+- Noted, not fixed: `_stream_ollama` uses raw `OLLAMA_MODEL`, not
+  `_resolve_ollama_model()`, so it sends an empty model name when .env sets
+  none. Fix in the model-picker commit.
+- Next: update #1 model picker. Default becomes gemma4:e4b. Ranks come from
+  the 2026-10 model comparison doc (1 = best); params, size, context,
+  vision and thinking are read live from Ollama. gemma4 vision is not used
+  yet: `call_ollama_provider` sends text only, so OCR waits for update #5.
+- `f836106`: think=false commit (above).
+- Default local model -> gemma4:e4b. New `SOURCE_CODE/ollama_models.py`
+  (stdlib only, so the launcher can import it) holds OLLAMA_DEFAULT_MODEL,
+  MODEL_RANKS (2026-10 comparison, 1 = best), list_ollama_models (/api/tags,
+  skips embedding models, smallest first), model_capabilities (/api/show),
+  choose_default (default if pulled, else largest), rank_label,
+  missing_ranked, describe. providers.py imports the default from it;
+  _ollama_detect_best_model now uses choose_default. README Step 2,
+  Providers row, sample .env and .env.example now name gemma4:e4b
+  (needs Ollama 0.30.9+; qwen3:4b as low-resource option). Docs do NOT
+  mention the picker yet: it is not built. Tests: tests/test_ollama_models.py
+  (21). Suite: 648 passed.
+- Next: launcher picker (pick_provider returns
+  '--provider ollama --model <name>'; caller at launcher.py ~614 joins and
+  splits flags, so this is safe), then UI dropdown (app.py ~951 text box
+  -> selectbox when provider is ollama and models are found; text box
+  otherwise, e.g. Render), then fix _stream_ollama raw OLLAMA_MODEL.
+- Noted: the launcher does not load .env, so ollama_models uses
+  OLLAMA_HOST from the process environment or localhost:11434.
+- `1df6081`: gemma4 default + ollama_models.py commit (above).
+- Launcher model picker: `pick_ollama_model()` in scripts/launcher.py lists
+  pulled models (describe line, `(default)` mark, `ollama pull` hints for
+  ranked models not pulled). Enter = default. If Ollama is unreachable it
+  warns and returns '' (no --model; the app picks). `pick_provider` asks
+  only after the SR block, and returns '--provider ollama --model <name>'.
+  The launcher imports ollama_models by appending SOURCE_CODE to sys.path.
+  First launcher tests: tests/test_launcher_model_picker.py (9), which load
+  the launcher by path with a dummy colorama. Checked by hand on the dev
+  machine: 4 models listed, gemma4 default with Image/OCR yes, llama3.2 not
+  ranked, pull hints shown, command included --model gemma4:e4b.
+  README Step 2 item 5 mentions both the launcher and the UI. Suite: 657 passed.
+- Next: UI dropdown (app.py ~951: selectbox when provider is ollama and
+  models are found; text box otherwise, e.g. Render), then fix
+  _stream_ollama raw OLLAMA_MODEL, then update #2 time limit.
+  UI model picker: _ollama_model_choices() (lazy import of ollama_models, never queried for cloud providers or on Render); dropdown replaces the text box for Ollama; _local_run_blocked() disables Run when no local model is found. Bug found in browser check: local_block assigned inside the cloud-gate if (UnboundLocalError on every Ollama page). Fixed, and test_every_mode_page_renders_with_ollama_down (Streamlit AppTest) now renders every mode page so this kind of bug fails the suite. Tests tests/test_ui_model_picker.py (11). Suite: 668 passed.
+  Time limit (backend): new stdlib-only time_limits.py (choices 15/30/60/none, default 15; wait_for() joins in 1 s steps so Ctrl+C works). main.parse_args() reads --time-limit and calls set_limit() once. The coding/writing watchdogs, the Ollama call and all three streaming urlopen timeouts read get_limit(); no hard-coded 900 s left. Error message names the actual limit. Limitations: (1) a timed-out call keeps running on its daemon thread, so Ollama keeps generating and the next call waits behind it; (2) a streaming timeout is the longest gap between chunks, not the total time; (3) with none, Ctrl+C may not interrupt a non-streaming Ollama call outside coding/writing on Windows, but closing the window always works. Launcher question and UI dropdown: next commit. Tests test_time_limits.py (23), test_time_limit_wiring.py (18). Suite: 709 passed.
+  Time limit (launcher + UI): launcher pick_time_limit() asked after provider/model (Enter = 15 min adds no flag; skipped for --dry-run via time_limit_flag()); UI 'Time limit per AI call' dropdown (time_limits lazy-imported like ollama_models), passed through _launch_terminal to both _launch_terminal_local and _run_cli_cloud, then _build_cli_cmd(time_limit=...), which adds --time-limit only when not 15. Fixed during work: launcher from time_limits import had been indented inside the sys.path if-block. Tests: launcher +6, test_ui_time_limit.py (8). Suite: 723 passed.
+  ## Session 31 handoff: OCR pipeline + Editor mode (written end of Session 30)
+
+### State at end of Session 30
+- Repo: D:\AI_kcMedicalResearch, Windows, PowerShell, `.venv`, Python 3.11.
+- Branch `v2.5-major-updates`, HEAD `a375494`, PR #1 open with 8 commits.
+- Tests: 723 passed, 3 skipped, 11 deselected (`python -m pytest -m "not live" --tb=short -q`).
+  CI was green up to `f58bad6` (709). CI on `a375494` (723) not yet confirmed.
+- Ollama 0.40.8. Pulled: gemma4:e4b (default, 7.5B, vision), qwen3:8b,
+  qwen2.5:14b-instruct, nomic-embed-text.
+- Done in v2.5 (all on PR #1):
+  - local-first default and cloud gate;
+  - `think: false` on all Ollama requests (`f836106`);
+  - gemma4:e4b default and `ollama_models.py` (`1df6081`);
+  - launcher model picker (`170c16b`);
+  - UI model dropdown and Run blocked when no local model (`1acb851`);
+  - time limit 15/30/60/none via `--time-limit`, `time_limits.py` (`f58bad6`);
+  - launcher and UI time limit (`a375494`).
+
+### Open items to settle first
+1. Confirm CI green on `a375494` (expect 723 passed).
+2. Decide: merge PR #1 into `main` before starting new work (recommended: OCR and
+   Editor are new features, so they belong on a fresh branch, e.g. `v2.6-ocr-editor`),
+   or keep adding to PR #1. Bump `Version: 2.4.13` in README/main.py at release.
+3. Decide the order. Editor mode is text-only and touches fewer files; OCR needs
+   design decisions first (see A1).
+
+### Working rules (keep these)
+- Read-only inspection first, then a failing test (check it fails for the right
+  reason), then the code, then the full suite, docs, commit and push, then CI.
+- Give edits as "select lines X-Y, paste this full block". Don't describe partial
+  edits in words. When editing several places in one file, work from the bottom up.
+- Don't claim a test result unless it was pasted. A page change needs both the
+  AppTest render test and a browser check.
+- After each commit: update the count in README.md line 7 and HANDOFF.md lines 48 and 479;
+  run `python scripts/check_no_bom.py`.
+- Modules the launcher imports must be stdlib-only (like `ollama_models.py`, `time_limits.py`).
+- `ui/app.py` must lazy-import SOURCE_CODE modules (`_cli_module()`,
+  `_ollama_models_module()`, `_time_limits_module()`). conftest.py hides a missing
+  path, so tests pass but the real app crashes.
+- Ollama is in `LOCAL_ONLY_PROVIDERS`: it never falls back to cloud. Keep it that way
+  for any mode that handles patient documents.
+
+### Task A: OCR pipeline (local, gemma4:e4b)
+Known facts:
+- `ollama show gemma4:e4b` lists capabilities: completion, vision, audio, tools,
+  thinking, with a clip projector. Ollama `/api/generate` accepts `"images": [<base64>]`.
+- The app sends no images to Ollama today. `call_ollama_provider`
+  (providers.py) and `_stream_ollama` (streaming.py) send text only.
+- `providers.PROVIDER_CAPABILITIES["ollama"]["vision"]` is False for every model.
+  `ollama_models.model_capabilities(host, name)` (/api/show) already tells
+  per model whether it has vision. Use that, not a fixed flag.
+- Launcher `BLOCKED_FOR_SR = {'ollama','deepseek'}`; main.py ~1495-1520 warns that SR
+  needs vision. Unblocking SR for vision-capable Ollama models is a separate decision.
+- The time limit applies (images are slower; users may need 30/60/none).
+
+Decisions needed (ask the user before writing code):
+- A1. A new mode `--mode ocr` (input/ocr -> output/ocr), or OCR as a step inside other
+  modes (e.g. scanned PDFs in SR/appraisal)? Or both: the mode first, reused later?
+- A2. Input types: images only (png/jpg), or scanned PDFs too? PDFs need page
+  rendering. Check which library is already installed before adding one.
+- A3. Output: plain text, markdown, or both? One file per input, or per page?
+- A4. Ollama only (confidential documents), or allow cloud vision providers behind the
+  cloud gate?
+- A5. If the chosen model has no vision: block Run with a warning, the same pattern
+  as `_local_run_blocked()`.
+
+First read-only commands:
+    Get-ChildItem -Path SOURCE_CODE -Recurse -Include *.py | Select-String -Pattern "fitz|pdf2image|PIL|Image\.open|pytesseract|base64|supports_vision|\"images\"" | Select-Object Path, LineNumber, Line | Format-Table -Wrap
+    Select-String -Path requirements*.txt -Pattern "pymupdf|fitz|pdf2image|pillow|tesseract" 
+    Select-String -Path SOURCE_CODE\providers.py -Pattern "def call_\w+_provider|def call_ai|vision" | Select-Object LineNumber, Line
+
+Places a new mode must be added (found in Session 30):
+- main.py `--mode` choices (~line 2266) and the dispatch block (~2398-2442);
+- launcher `MODES`, `_MODE_INPUT_MAP`, `show_help()` entries;
+- ui/app.py `MODES` (the AppTest render test loops over it automatically);
+- `main.data_destinations` / `SEARCH_SERVICES` (cloud gate);
+- README modes table; help guide (`Readme/flashcard-help.html`).
+
+### Task B: Editor mode (merge writing + editing + review)
+Goal (user's words): simplify the writing mode, both the Topic track and the Article
+track, into one "editor mode" that merges writing, editing and review.
+
+Known facts:
+- `SOURCE_CODE/pipelines/writing/writing.py`: `_call_llm` (~line 105) with the
+  time-limit watchdog. Role calls: writer_out (~573), editor_out (~596), qa_out (~618),
+  editor_out (~670), qa_out (~713). That looks like two flows (draft, and edit
+  existing), but this is NOT verified.
+- main.py imports from `pipelines.writing.writing` (~1908, ~1914); `--report` calls
+  `generate_writing_report(provider, model)` (~2406).
+- NOT yet seen: how the "Topic track" and "Article track" are chosen today.
+  Note `--sub` 1=Topic Search / 2=Article Search belongs to SEARCH mode. Confirm with
+  the user which "Topic/Article" is meant, and inspect before designing.
+
+Decisions needed:
+- B1. Name: rename `writing` to `editor` and keep `--mode writing` as an alias so
+  existing scripts and docs work? Or keep the flag and just change the behaviour?
+- B2. One combined LLM pass (write+edit+review in one prompt; fewer calls, faster
+  on local models), or keep the internal roles but show the user one mode and one
+  output? Trade-off: one pass is faster; separate review catches more.
+- B3. Tracks become submodes of editor: Topic = draft from a topic/outline,
+  Article = revise an existing manuscript. Same output shape for both?
+- B4. Output: revised text + a short change log + review comments, in one file
+  or separate files?
+
+First read-only commands:
+    Select-String -Path SOURCE_CODE\pipelines\writing\writing.py -Pattern "^def |topic|article|track|_call_llm\(" | Select-Object LineNumber, Line | Format-Table -Wrap
+    Select-String -Path SOURCE_CODE\main.py -Pattern "writing|topic|article" | Select-Object LineNumber, Line | Format-Table -Wrap
+    Select-String -Path SOURCE_CODE\ui\app.py -Pattern "writing|topic|article|submode" | Select-Object LineNumber, Line | Format-Table -Wrap
+    Get-ChildItem -Path tests -Filter *.py | Select-String -Pattern "writing" | Group-Object Path | Select-Object Count, Name
+
+Tests that will be affected:
+- `tests/test_time_limit_wiring.py` imports `pipelines.writing.writing._call_llm`;
+- `tests/test_ui_model_picker.py::test_every_mode_page_renders_with_ollama_down`
+  (loops over MODES);
+- `tests/test_ui_time_limit.py` (uses "writing" mode and key `time_limit_writing`);
+- launcher tests; cloud gate tests (`data_destinations` per mode);
+- whatever the last command above lists.
+
+### Known limitations carried forward
+- A timed-out call keeps running on its daemon thread. Ollama keeps generating and
+  the next call waits behind it.
+- A streaming timeout is the longest gap between chunks, not the total time.
+- With `--time-limit none`, Ctrl+C may not interrupt a non-streaming Ollama call
+  outside coding/writing on Windows. Closing the window always works.
+- CI shows 44 warnings (unpinned versions); not urgent.

@@ -134,3 +134,22 @@ class TestTeeStream:
 
         assert result == "ABC"
         assert displayed == ["A", "B", "C"]
+
+
+def test_ollama_streaming_sends_think_false():
+    """Streaming must send think=False too: while a model thinks, Ollama
+    leaves `response` empty, so the user would see nothing until it finishes."""
+    from streaming import _stream_ollama
+    sent = {}
+    lines = [json.dumps({"response": "42", "done": True}).encode() + b"\n"]
+    mock_resp = MagicMock()
+    mock_resp.__iter__ = lambda self: iter(lines)
+    mock_resp.close = MagicMock()
+
+    def fake_urlopen(req, timeout=0):
+        sent["body"] = json.loads(req.data)
+        return mock_resp
+
+    with patch("urllib.request.urlopen", side_effect=fake_urlopen):
+        assert list(_stream_ollama("hi", model="qwen3:8b")) == ["42"]
+    assert sent["body"].get("think") is False

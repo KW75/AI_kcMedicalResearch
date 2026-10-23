@@ -358,13 +358,25 @@ from providers import (
     call_deepseek_provider,
     call_groq_provider,
     call_qwen_provider,
-    call_ai_with_fallback,
+    call_ai_with_fallback,    
+    provider_attempt_order,
+    LOCAL_ONLY_PROVIDERS,
 )
 
 
 # PROVIDERS dict -- re-exported from providers.py
 from providers import PROVIDERS
 
+
+
+def _fallback_chain_from_env() -> list[str]:
+    """FALLBACK_PROVIDERS from the environment, read at call time.
+
+    Shared by call_ai (what is actually tried) and data_destinations (what
+    the cloud warning tells the user), so the two cannot drift apart.
+    """
+    fallback_raw = os.getenv("FALLBACK_PROVIDERS", "deepseek,qwen,groq")
+    return [p.strip() for p in fallback_raw.split(",") if p.strip()]
 
 
 def call_ai(
@@ -378,8 +390,7 @@ def call_ai(
     If stream=True and running in a terminal, streams tokens to console.
     Uses fallback chain from FALLBACK_PROVIDERS env var on transient errors.
     """
-    fallback_raw = os.getenv("FALLBACK_PROVIDERS", "deepseek,qwen,groq")
-    fallback_chain = [p.strip() for p in fallback_raw.split(",") if p.strip()]
+    fallback_chain = _fallback_chain_from_env()
 
     if stream and sys.stdout.isatty():
         try:
@@ -401,6 +412,97 @@ def call_ai(
 
     fn = PROVIDERS.get(provider, call_ollama_provider)
     return fn(prompt, model=model)
+
+
+# ---------------------------------------------------------------------------
+# Where a job's data goes: banner and cloud consent (v2.5 local-first)
+# ---------------------------------------------------------------------------
+SEARCH_SERVICES = {
+    "search":     ["PubMed", "Europe PMC", "DuckDuckGo"],
+    "rct_search": ["PubMed", "Europe PMC"],
+}
+
+PROVIDER_LABELS = {
+    "ollama":    "Ollama",
+    "deepseek":  "DeepSeek",
+    "qwen":      "Qwen (Alibaba)",
+    "openai":    "OpenAI",
+    "anthropic": "Anthropic",
+    "groq":      "Groq",
+}
+
+
+def data_destinations(mode: str, provider: str) -> list[str]:
+    """Every AI provider this job's input may be sent to, in attempt order.
+
+    SR calls its provider directly (no fallback chain), so it lists only the
+    chosen provider. Other modes go through call_ai -> call_ai_with_fallback.
+    """
+    if mode == "sr":
+        return [provider]
+    return provider_attempt_order(provider, _fallback_chain_from_env())
+
+
+def confirm_data_destinations(
+    mode: str,
+    provider: str,
+    model: str | None = None,
+    *,
+    confirm_cloud: bool = False,
+    stdin_is_tty: bool | None = None,
+    input_fn=input,
+) -> bool:
+    """Print where this job's data goes; return True only if it may run.
+
+    Local AI: banner only, never a prompt. Cloud: list every provider the
+    job may reach, then require --confirm-cloud or a typed "y". With no
+    keyboard and no flag the job is refused: it never hangs and never
+    proceeds silently.
+    """
+    if stdin_is_tty is None:
+        try:
+            stdin_is_tty = sys.stdin.isatty()
+        except Exception:
+            stdin_is_tty = False
+
+    services = SEARCH_SERVICES.get(mode, [])
+    cloud = [p for p in data_destinations(mode, provider)
+             if p not in LOCAL_ONLY_PROVIDERS]
+    detail = f", model {model}" if model else ""
+
+    print()
+    if not cloud:
+        if services:
+            print(f"[LOCAL AI] The AI runs on this machine (Ollama{detail}).")
+            print(f"           But search terms are sent to: {', '.join(services)}.")
+            print("           Do not put patient-identifiable details in search terms.")
+        else:
+            print(f"[LOCAL] Input stays on this machine (Ollama{detail}).")
+        print()
+        return True
+
+    names = [PROVIDER_LABELS.get(p, p) for p in cloud]
+    print("[CLOUD] Input for this job will be sent to an external server:")
+    print(f"        {names[0]} (chosen)")
+    if len(names) > 1:
+        print(f"        or, if it is busy or times out: {', '.join(names[1:])}")
+    if services:
+        print(f"        Search terms are also sent to: {', '.join(services)}.")
+    print("        Do not use for patient-identifiable or confidential data.")
+
+    if confirm_cloud:
+        print("        Confirmed in advance with --confirm-cloud.")
+        print()
+        return True
+    if not stdin_is_tty:
+        print("        Not run: there is no keyboard to confirm. Re-run with")
+        print("        --confirm-cloud to agree, or use --provider ollama to stay local.")
+        return False
+    try:
+        answer = input_fn("        Continue? [y/N]: ").strip().lower()
+    except (EOFError, KeyboardInterrupt):
+        answer = ""
+    return answer in ("y", "yes")
 
 
 # ---------------------------------------------------------------------------
@@ -2172,6 +2274,14 @@ def parse_args(args: list[str] | None = None) -> argparse.Namespace:
                         help="Starting role for --revise pipeline (default: Builder)")
     parser.add_argument("--provider",       type=str, default=DEFAULT_PROVIDER,
                         choices=["ollama", "openai", "anthropic", "deepseek", "groq", "qwen"])
+    parser.add_argument("--confirm-cloud",  action="store_true", default=False,
+                        help="Agree in advance to send this job's input to the cloud "
+                             "provider(s) listed in the warning (for runs with no "
+                             "keyboard, e.g. the web UI)") 
+    parser.add_argument("--time-limit",     type=str.lower, default="15",
+                        choices=["15", "30", "60", "none"],
+                        help="Maximum time for each AI call in minutes: 15 (default), "
+                             "30, 60, or none = wait until the model finishes")      
     parser.add_argument("--list-sessions",  action="store_true", default=False)
     parser.add_argument("--read-session",   type=str, default=None, metavar="FILENAME")
     parser.add_argument("--delete-session", type=str, default=None, metavar="FILENAME")
@@ -2192,7 +2302,11 @@ def parse_args(args: list[str] | None = None) -> argparse.Namespace:
                         help="Launch the main Streamlit UI")
     parser.add_argument('--sub', '--submode', type=str, default=None,
                     help='Sub-mode selection: 1=Topic Search, 2=Article Search')
-    return parser.parse_args(args)
+    ns = parser.parse_args(args)
+    import time_limits  # stdlib-only; every entry point goes through parse_args
+    time_limits.set_limit(time_limits.parse(ns.time_limit))
+    return ns
+
 
 
 # ---------------------------------------------------------------------------
@@ -2257,6 +2371,12 @@ def run_cli(args: argparse.Namespace) -> None:
             validate_api_keys(args.provider)
         except (EnvironmentError, ValueError) as e:
             print(e)
+            sys.exit(1)
+        if not confirm_data_destinations(
+            args.mode, args.provider, args.model,
+            confirm_cloud=args.confirm_cloud,
+        ):
+            print("Job not run.")
             sys.exit(1)
 
     if args.list_sessions:

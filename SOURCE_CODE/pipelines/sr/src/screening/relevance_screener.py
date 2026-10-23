@@ -250,7 +250,18 @@ class RelevanceScreener:
                 "groq":     os.environ.get("GROQ_API_KEY", ""),
                 "ollama":   "ollama",
             }
-            url     = provider_urls.get(self.provider, provider_urls["deepseek"])
+            if self.provider not in provider_urls:
+                # Never route article text to a provider the user did not
+                # choose. Anthropic screening goes through screen_by_file_id
+                # (Stage 1 uploads every PDF); any other name is refused.
+                raise ValueError(
+                    f"Screening refused for provider '{self.provider}': no "
+                    f"text-screening route for this provider, so the article "
+                    f"text was NOT sent anywhere. Anthropic screening requires "
+                    f"an uploaded file_id (see screen_batch)."
+                )
+            url     = provider_urls[self.provider]
+
             api_key = api_key_map.get(self.provider, "")
             payload = _json.dumps({
                 "model":      self.model,

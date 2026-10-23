@@ -251,10 +251,15 @@ class TestE2EValidation:
         # (validation is bypassed in __main__ when dry_run=True)
 
     def test_parse_args_defaults(self):
-        """parse_args returns correct defaults."""
+        """parse_args returns correct defaults.
+
+        The provider default comes from .env (DEFAULT_PROVIDER), so it is
+        compared with the module's own value, not a hard-coded name.
+        """
+        import sys
         args = parse_args([])
         assert args.mode == "coding"
-        assert args.provider == "deepseek"
+        assert args.provider == sys.modules[parse_args.__module__].DEFAULT_PROVIDER
         assert args.dry_run is False
         assert args.report is False
         assert args.revise is False

@@ -1,9 +1,10 @@
 # AI kcMedical Research
 
-A multi-mode AI assistant for medical research, critical appraisal, systematic review, coding, and writing. Uses cloud providers by default (DeepSeek, Qwen, OpenAI, Anthropic, Groq) with optional local Ollama support.
+A multi-mode AI assistant for medical research, critical appraisal, systematic review, coding, and writing. Local-first: uses Ollama on your own machine by default, so input stays local. Cloud providers (DeepSeek, Qwen, OpenAI, Anthropic, Groq) are available when you choose one for a job.
+
 
     Version: 2.4.13
-    Tests: 571 passed, 3 skipped, 11 deselected
+    Tests: 723 passed, 3 skipped, 11 deselected
            (reproduce with `python -m pytest -m "not live" --tb=short -q`)
     CI: GitHub Actions - Green
     GitHub: https://github.com/KW75/AI_kcMedicalResearch
@@ -79,26 +80,46 @@ The app runs after Step 1 but needs a model to produce output.
 Option A - Free / local (Ollama), no API key:
 1. Install Ollama:  https://ollama.com/download
 2. Pull the two models the app uses:
-       ollama pull qwen2.5:14b-instruct   (the chat model - used by all modes;
-                                           use qwen2.5:7b-instruct on older or
-                                           slower machines)
+       ollama pull gemma4:e4b             (the chat model - used by all modes;
+                                           about 6.6 GB; needs Ollama 0.30.9 or
+                                           newer. On older or slower machines
+                                           use qwen3:4b, about 2.5 GB)
        ollama pull nomic-embed-text       (the embedding model - needed for the
                                            appraisal and SR pipelines / RAG)
 3. Copy `.env.example` to `.env` and confirm this line matches the model you
    pulled (already set by default):
-       OLLAMA_MODEL=qwen2.5:14b-instruct
+       OLLAMA_MODEL=gemma4:e4b
    (If you pulled a different chat model, put its exact name here, or comment
-    the line out to let the app auto-pick the largest model you have. The
-    embedding model must stay nomic-embed-text unless you change EMBEDDING_MODEL.)
+    the line out to let the app pick: gemma4:e4b if pulled, otherwise the
+    largest model you have. The embedding model must stay nomic-embed-text
+    unless you change EMBEDDING_MODEL.)
 4. Ollama runs in the background after install; the app connects automatically.
+5. When you choose Ollama in the CLI launcher, it lists the models you have
+   pulled with their size, whether they read images (Image/OCR), and their
+   coding and reasoning ranks from the 2026-10 local model comparison
+   (1 = best). Press Enter for the default (gemma4:e4b) or type a number to
+   match the model to your hardware. Ranked models you have not pulled are
+   shown as `ollama pull ...` commands. The web UI (--ui) shows the same list as a dropdown when the provider is Ollama. If Ollama isn't running or no model is pulled, Run is disabled with a warning.
 
-Note: llama3.2 (3B) was the previous default but is too small for reliable
-code generation - use qwen2.5 as above.
+
+Note: v2.5 changed the default from qwen2.5:14b-instruct to gemma4:e4b. In
+the 2026-10 local model comparison gemma4:e4b ranked best for coding and
+second for reasoning, is smaller (6.6 GB vs 9.0 GB), and is the only one of
+the five that reads images (for the planned OCR mode). qwen2.5:14b-instruct
+still works if you already have it.
 
 Option B - Cloud provider (DeepSeek, Qwen, OpenAI, Anthropic, Groq):
 1. Copy `.env.example` to `.env`.
 2. Paste your provider's API key into `.env` (see Providers table).
    Nothing to download; requires a provider account.
+
+Time limit (Option A and B): each AI call stops after 15 minutes by default.
+Large local models on slower machines may need longer. Choose with
+`--time-limit 15|30|60|none` (minutes; `none` = wait until the model
+finishes, stop with Ctrl+C). Example:
+`python SOURCE_CODE/main.py --mode writing --time-limit 60`
+The launcher asks for it after the model (Enter = 15 minutes), and the web UI has a "Time limit per AI call" dropdown.
+
 
 
 ## Modes
@@ -116,12 +137,17 @@ Option B - Cloud provider (DeepSeek, Qwen, OpenAI, Anthropic, Groq):
 
 | Provider           | Flag                   | Env variable         | Notes                                       |
 |--------------------|------------------------|----------------------|---------------------------------------------|
-| DeepSeek (default) | `--provider deepseek`  | `DEEPSEEK_API_KEY`   | Fast, cost-efficient                        |
+| DeepSeek           | `--provider deepseek`  | `DEEPSEEK_API_KEY`   | Fast, cost-efficient                        |
 | Qwen               | `--provider qwen`      | `DASHSCOPE_API_KEY`  | Recommended for SR (auto-uses vision model) |
 | OpenAI             | `--provider openai`    | `OPENAI_API_KEY`     | GPT-4 vision                                |
 | Anthropic          | `--provider anthropic` | `ANTHROPIC_API_KEY`  | Claude vision - partial tripwires, see REVIEWER_GUIDE.md §6.  |
 | Groq               | `--provider groq`      | `GROQ_API_KEY`       | Fast inference                              |
-| Ollama (local)     | `--provider ollama`    | `OLLAMA_HOST`, `OLLAMA_MODEL` | Free, offline; no SR (no vision). Set OLLAMA_MODEL (default qwen2.5:14b-instruct). |
+| Ollama (default)   | `--provider ollama`    | `OLLAMA_HOST`, `OLLAMA_MODEL` | Free, offline. Not for SR yet (the app does not send images to Ollama). Set OLLAMA_MODEL (default gemma4:e4b). |
+
+
+**Confidentiality gate.** Ollama runs entirely on your machine and starts without any prompt. If you choose a cloud provider, the app first lists every external service your input could be sent to (the chosen provider plus any `FALLBACK_PROVIDERS` backups) and asks `Continue? [y/N]`. Pressing Enter cancels. For scripted or non-interactive runs, add `--confirm-cloud` to accept explicitly; without it, a run with no keyboard attached is refused. Search modes always contact PubMed / Europe PMC (and DuckDuckGo for Search) with your search terms, even when the AI model is local.
+
+The Streamlit UI shows the same list and keeps the Run button disabled until you tick a consent box; on the hosted (Render) version, uploaded files are already on Render's servers, so use a local install with Ollama for confidential work.
 
 On transient errors (timeout, 429, 502, 503) the system tries the next
 provider. Default chain: DeepSeek -> Qwen -> Groq (`FALLBACK_PROVIDERS`).
@@ -147,11 +173,11 @@ non-TTY environments use batch mode automatically.
 
 Copy `.env.example` to `.env`. `.env` is gitignored.
 
-    DEFAULT_PROVIDER=deepseek
+    DEFAULT_PROVIDER=ollama
     FALLBACK_PROVIDERS=deepseek,qwen,groq
 
     OLLAMA_HOST=http://localhost:11434
-    OLLAMA_MODEL=qwen2.5:14b-instruct
+    OLLAMA_MODEL=gemma4:e4b
     OLLAMA_CONTEXT=32768
     OLLAMA_NUM_PREDICT=8192
     OLLAMA_TEMPERATURE=0.3
@@ -332,3 +358,43 @@ sections 3.1 and 2.2.
 4. Run tests: `python -m pytest -m "not live" --tb=short -q`
 5. Commit and push
 6. Create a pull request
+
+---
+
+## Session 29 - 2026-10-22 - branch v2.5-major-updates
+
+Goal for v2.5: local-first for confidentiality. Ollama is the default;
+cloud is chosen per job with a warning; nothing ever switches from local
+to cloud automatically.
+
+On main before branching:
+- `d20cae8`: Ollama fallback default llama3.2 -> `OLLAMA_DEFAULT_MODEL`
+  (qwen2.5:14b-instruct) in providers.py. New test pins README and
+  .env.example `OLLAMA_MODEL=` lines to the constant.
+- Verified by reading the code: Ollama never falls back to cloud, on the
+  streaming route (stream_ai -> _stream_ollama only) or the batch route
+  (call_ai_with_fallback chain = [ollama]). The 2026-09-02 macOS note
+  "app fell back and completed" cannot have been Ollama falling back to
+  cloud; that run must have used another provider.
+
+On branch:
+- SR screening could send article text to DeepSeek.
+  `RelevanceScreener.screen_by_pdf_path` used
+  `provider_urls.get(provider, provider_urls["deepseek"])`, so
+  provider="anthropic" or an unknown name POSTed the text to
+  api.deepseek.com. The normal pipeline never reached it: for Anthropic,
+  Stage 1 uploads every PDF (an upload failure stops the run) and
+  screen_batch routes by file_id. So no past run leaked. The route is now
+  refused with an error. Pinned by
+  `tests/test_screener_provider_routing.py`, which failed before the fix.
+
+Noted, not fixed:
+- rob2_tool.py reads `OLLAMA_URL`; the rest of the app reads `OLLAMA_HOST`.
+- main.py SR route uses raw `OLLAMA_MODEL`, not `_resolve_ollama_model()`.
+- An Ollama SR run screens locally, then fails at extraction (no vision).
+  It should stop at the start, like the DeepSeek warning.
+- main.call_ai swallows streaming errors (`except Exception: pass`), so an
+  Ollama failure waits through two timeouts. Revisit with time limits.
+- RelevanceScreener defaults to provider="anthropic",
+  model="claude-opus-4-7"; rct_search and main.py functions default to
+  provider="deepseek".

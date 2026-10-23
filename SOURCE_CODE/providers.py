@@ -39,7 +39,11 @@ DASHSCOPE_BASE_URL = os.environ.get(
 )
 QWEN_MODEL = os.getenv("QWEN_MODEL", "qwen-plus-latest")
 QWEN_VISION_MODEL = os.getenv("QWEN_VISION_MODEL", "qwen-vl-max")
-DEFAULT_PROVIDER = os.getenv("DEFAULT_PROVIDER", "deepseek")
+# Used when .env does not set DEFAULT_PROVIDER (or sets it blank).
+# Local-first: input stays on this machine unless the user deliberately
+# chooses a cloud provider.
+CODE_DEFAULT_PROVIDER = "ollama"
+DEFAULT_PROVIDER = os.getenv("DEFAULT_PROVIDER") or CODE_DEFAULT_PROVIDER
 
 # Fallback chain (configurable via .env)
 FALLBACK_PROVIDERS = [
@@ -52,10 +56,10 @@ FALLBACK_PROVIDERS = [
 # retried against a cloud provider, because the input may be confidential.
 LOCAL_ONLY_PROVIDERS = {"ollama"}
 
-# Model used when OLLAMA_MODEL is unset and auto-detection finds nothing.
-# Must match the chat model README Step 2 tells colleagues to pull.
-OLLAMA_DEFAULT_MODEL = "qwen2.5:14b-instruct"
-
+# Default local model and model listing live in ollama_models.py, so the
+# launcher, the UI and this module share one value.
+from ollama_models import OLLAMA_DEFAULT_MODEL, choose_default, list_ollama_models  # noqa: E402
+import time_limits
 
 # Ollama performance thresholds
 OLLAMA_MIN_TOKENS_PER_SECOND = float(os.getenv("OLLAMA_MIN_TOKENS_PER_SECOND", "10"))
@@ -88,34 +92,18 @@ def supports_vision(provider: str) -> bool:
 # Ollama auto-detect best model
 # ---------------------------------------------------------------------------
 def _ollama_detect_best_model(host: str = "http://localhost:11434") -> str:
-    """Query Ollama /api/tags and return the largest non-embedding model available."""
-    SKIP_PATTERNS = ("embed", "nomic", "all-minilm")
-    try:
-        req = urllib.request.Request(f"{host}/api/tags", method="GET")
-        with urllib.request.urlopen(req, timeout=5) as resp:
-            data = json.loads(resp.read())
-        models = data.get("models", [])
-        if not models:
-            return OLLAMA_DEFAULT_MODEL
-        candidates = []
-        for m in models:
-            name = m.get("name", "")
-            if any(skip in name.lower() for skip in SKIP_PATTERNS):
-                continue
-            param_str = m.get("details", {}).get("parameter_size", "0B")
-            try:
-                size = float(param_str.replace("B", "").replace("M", "e-3").replace("K", "e-6"))
-            except (ValueError, TypeError):
-                size = 0
-            candidates.append((name, size))
-        if not candidates:
-            return OLLAMA_DEFAULT_MODEL
-        candidates.sort(key=lambda x: x[1], reverse=True)
-        best = candidates[0][0]
-        print(f"[ollama] Auto-detected best model: {best} ({candidates[0][1]:.1f}B params)")
-        return best
-    except Exception:
+    """Pick the Ollama model to use when OLLAMA_MODEL is unset.
+
+    OLLAMA_DEFAULT_MODEL if it is pulled, otherwise the largest pulled chat
+    model. OLLAMA_DEFAULT_MODEL if nothing is pulled or Ollama is down.
+    """
+    models = list_ollama_models(host)
+    if not models:
         return OLLAMA_DEFAULT_MODEL
+    best = choose_default(models)
+    size = next((m["params_b"] for m in models if m["name"] == best), 0.0)
+    print(f"[ollama] Auto-detected best model: {best} ({size:.1f}B params)")
+    return best
 
 
 # ---------------------------------------------------------------------------
@@ -134,6 +122,7 @@ def ollama_probe_performance(host: str = None, model: str = None) -> dict:
     payload = json.dumps({
         "model": model,
         "prompt": probe_prompt,
+        "think": False,  # qwen3/gemma4 think by default; see TestOllamaThinkOff
         "stream": False,
         "options": {
             "num_predict": 64,
@@ -305,6 +294,7 @@ def call_ollama_provider(
         "model": model,
         "prompt": prompt,
         "stream": False,
+        "think": False,  # qwen3/gemma4 think by default; see TestOllamaThinkOff
         "options": {
             "num_predict": max_tokens,
             "num_ctx": int(os.getenv("OLLAMA_CONTEXT", "32768")),
@@ -319,7 +309,7 @@ def call_ollama_provider(
         method="POST",
     )
     try:
-        with urlopen(req, timeout=900) as resp:
+        with urlopen(req, timeout=time_limits.get_limit()) as resp:
             data = json.loads(resp.read())
         response_text = data.get("response", "")
         if not response_text:
@@ -525,6 +515,22 @@ def _is_transient_error(error: Exception) -> bool:
     return any(phrase in msg for phrase in _TRANSIENT_PHRASES)
 
 
+def provider_attempt_order(provider: str, chain: list[str] | None) -> list[str]:
+    """Providers call_ai_with_fallback will try, in order.
+
+    Single source of truth for both the fallback loop and the cloud warning
+    shown to the user, so what the user is told cannot drift from what is
+    actually tried. A local-only provider is never followed by anything.
+    """
+    if provider in LOCAL_ONLY_PROVIDERS:
+        return [provider]
+    ordered = [provider]
+    for p in chain or []:
+        if p not in ordered:
+            ordered.append(p)
+    return ordered
+
+
 def call_ai_with_fallback(
     prompt: str,
     provider: str = None,
@@ -543,10 +549,7 @@ def call_ai_with_fallback(
     # one usable for confidential or patient-identifiable input. Falling back
     # to a cloud API would transmit data the user chose to keep local.
     # A timeout is not consent to send data elsewhere.
-    if provider in LOCAL_ONLY_PROVIDERS:
-        ordered = [provider]
-    else:
-        ordered = [provider] + [p for p in chain if p != provider]
+    ordered = provider_attempt_order(provider, chain)
 
     last_error = None
     for attempt_provider in ordered:
