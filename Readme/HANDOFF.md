@@ -45,7 +45,7 @@ so those catches happen at session open, not mid-work.
 
 | Component      | Status |
 |----------------|--------|
-| Tests          | 723 passed, 3 skipped, 11 deselected (`python -m pytest -m "not live" --tb=short -q`) |
+| Tests          | 725 passed, 3 skipped, 11 deselected (`python -m pytest -m "not live" --tb=short -q`) |
 | CI             | green (455b2d8; 28e616e; 3a9081b and 6813b12 also confirmed green) |
 | Render deploy  | health returned `ok` on 28e616e (S27 close) |
 | SR pipeline    | working via CLI with Qwen; Ang 2010 verified against PDF (NFR week 6, unanimous N=3); text-fallback drops now surface in Stage 4 `[SKIP]` block |
@@ -613,8 +613,9 @@ with an explicit warning + consent. Local model choice exists so users can match
   edits in words. When editing several places in one file, work from the bottom up.
 - Don't claim a test result unless it was pasted. A page change needs both the
   AppTest render test and a browser check.
-- After each commit: update the count in README.md line 7 and HANDOFF.md lines 48 and 479;
-  run `python scripts/check_no_bom.py`.
+- After each commit: update the count in README.md line 7 and in the Current State
+  table in HANDOFF.md (line 48) only. Counts inside session blocks are history:
+  leave them, and add a new session note instead. Then run `python scripts/check_no_bom.py`.
 - Modules the launcher imports must be stdlib-only (like `ollama_models.py`, `time_limits.py`).
 - `ui/app.py` must lazy-import SOURCE_CODE modules (`_cli_module()`,
   `_ollama_models_module()`, `_time_limits_module()`). conftest.py hides a missing
@@ -705,3 +706,24 @@ Tests that will be affected:
 - With `--time-limit none`, Ctrl+C may not interrupt a non-streaming Ollama call
   outside coding/writing on Windows. Closing the window always works.
 - CI shows 44 warnings (unpinned versions); not urgent.
+
+## Session 31 - 2026-10-26 - branch v2.5-major-updates
+
+- `_stream_ollama` (streaming.py) now uses `_resolve_ollama_model()` instead
+  of the raw `OLLAMA_MODEL`. Before, with no `--model` and no OLLAMA_MODEL in
+  .env, streaming sent an empty model name, while the batch route
+  auto-detected. The launcher and UI pickers usually pass `--model`, which hid
+  the bug. Session 30 planned this fix for the model-picker commit, but it was
+  never made; a grep at session open found it. Tests:
+  `test_ollama_streaming_resolves_model_when_none_configured` (failed before
+  the fix with `'' == 'sentinel-model:1b'`) and
+  `test_ollama_streaming_explicit_model_wins`.
+  Suite: 725 passed, 3 skipped, 11 deselected.
+- Follow-up: streaming.py probably no longer uses `OLLAMA_MODEL`. If you drop
+  it from the import, also remove the two
+  `monkeypatch.setattr(streaming, "OLLAMA_MODEL", "")` lines in
+  tests/test_streaming.py, or they fail with AttributeError.
+- Doc drift noted, not fixed: line 479 (Session 29 close block) says
+  723 passed, but the suite was about 624-627 then. The old rule "update lines
+  48 and 479" overwrote it. Fix it in a separate docs commit.
+- CI on `a375494` still not confirmed.

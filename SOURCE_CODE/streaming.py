@@ -31,7 +31,7 @@ load_dotenv()
 
 # Import config from providers module
 from providers import (
-    OLLAMA_HOST, OLLAMA_MODEL,
+    OLLAMA_HOST, OLLAMA_MODEL, _resolve_ollama_model,
     OPENAI_API_KEY, OPENAI_MODEL,
     ANTHROPIC_API_KEY, ANTHROPIC_MODEL,
     DEEPSEEK_API_KEY, DEEPSEEK_MODEL,
@@ -155,7 +155,7 @@ def _stream_anthropic(prompt: str, model: str = None) -> Generator[str, None, No
 
 def _stream_ollama(prompt: str, model: str = None) -> Generator[str, None, None]:
     """Stream from local Ollama (native streaming, not SSE)."""
-    model = model or OLLAMA_MODEL
+    model = model or _resolve_ollama_model()
     url = f"{OLLAMA_HOST}/api/generate"
     body = {
         "model": model,
