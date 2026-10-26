@@ -20,19 +20,9 @@ locally with `--provider ollama` (see Providers).
 
 Hosted app, nothing to install: https://ai-kcmedicalresearch.onrender.com
 
-Local with Docker (supplies its own Python):
-
-    git clone https://github.com/KW75/AI_kcMedicalResearch.git
-    cd AI_kcMedicalResearch
-    copy .env.example .env          # then add your API keys
-    cd docker
-    docker compose run --rm cli     # interactive CLI
-    docker compose up ui            # Streamlit UI on :8501
-
-The Docker route has not been verified end to end (#28).
-
-Full instructions, including the pinned local install (requirements-local.txt): `Readme/Setup_Instructions_for_Users.txt`
-
+Local install (python.org Python 3.11 + venv, Windows and macOS): see
+Local Setup below. Full instructions, including the pinned local install
+(requirements-local.txt): `Readme/Setup_Instructions_for_Users.txt`
 
 ## Local Setup (Windows and macOS)
 
@@ -156,10 +146,6 @@ Auth errors (401, 403) never fall back.
 **Ollama never falls back to a cloud provider**, even on timeout. It is the
 only provider that keeps input on your own machine.
 
-Ollama in Docker: `localhost` is the container. The Docker launchers set
-`OLLAMA_HOST=http://host.docker.internal:11434`; set it yourself if running
-a container by hand.
-
 Qwen and vision: `QWEN_MODEL` (default `qwen-plus-latest`) is text-only. SR
 automatically uses `QWEN_VISION_MODEL` (default `qwen-vl-max`); no `--model`
 flag needed.
@@ -213,7 +199,7 @@ in source files. `scripts/strip_bom.py` removes them.
 
 ## SR Pipeline
 
-**READ `Readme/REVIEWER_GUIDE.md` BEFORE USING SR OUTPUT IN A REVIEW.**
+**READ `docs/sr/REVIEWER_GUIDE.md` BEFORE USING SR OUTPUT IN A REVIEW.**
 
 Extraction is LLM-based and cannot verify its own semantics. It will emit a
 confident, precise effect size whether or not it understood the paper.
@@ -321,7 +307,7 @@ disable extraction for overridden studies.
 Overrides affect extraction and meta-analysis only. Screening and RoB 2.0
 re-read the PDF independently — this is intentional; RoB is a bias
 assessment about the same reviewer's data and should not be influenced by
-reviewer-entered values. See `Readme/REVIEWER_GUIDE.md` §5-6.
+reviewer-entered values. See `docs/sr/REVIEWER_GUIDE.md` §5-6.
 
 The end of Stage 3 prints a DATA PROVENANCE SUMMARY listing every study with
 overridden values or auto-derived metadata. Both must be described in the
@@ -340,7 +326,6 @@ them; gaps are closed issues. Closed issues: `Readme/RESOLVED_ISSUES.md`.
 
 | #  | Issue | Priority | What to do |
 |----|-------|----------|------------|
-| 28 | Docker route never executed end to end | Won't do (for now) | Deprioritised - colleagues use the python.org 3.11 + venv route (see README Step 1), not Docker. Revisit only if a Docker deployment is actually needed. |
 | 19 | macOS install | RESOLVED | Fixed 2026-09-02. python.org 3.11.9 + requirements-local.txt (pyarrow 12.0.1, chromadb 0.5.23) verified end-to-end on Intel macOS 11. Launchers reject conda and guide to python.org. NOT yet run on Apple Silicon (reasoned from wheel tags). |
 | 2  | WeasyPrint not installed; PDF report falls back to HTML | Medium | |
 | 3  | Anthropic geo-restricted from dev machine | Low | VPN or skip. |

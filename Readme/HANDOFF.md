@@ -59,7 +59,6 @@ Issue numbers below match `README.md` > Known Issues.
 
 | #  | Issue | Priority | What to do |
 |----|-------|----------|------------|
-| 28 | Docker route never executed end to end | Won't do (for now) | Deprioritised - colleagues use the python.org 3.11 + venv route (see README Step 1), not Docker. Revisit only if a Docker deployment is actually needed. |
 | 19 | macOS install | RESOLVED | Fixed 2026-09-02. python.org 3.11.9 + requirements-local.txt (pyarrow 12.0.1, chromadb 0.5.23) verified end-to-end on Intel macOS 11. Launchers reject conda and guide to python.org. NOT yet run on Apple Silicon (reasoned from wheel tags). |
 | 2  | WeasyPrint not installed; PDF report falls back to HTML | Medium | |
 | 3  | Anthropic geo-restricted from dev machine | Low | VPN or skip. |
@@ -727,3 +726,20 @@ Tests that will be affected:
   723 passed, but the suite was about 624-627 then. The old rule "update lines
   48 and 479" overwrote it. Fix it in a separate docs commit.
 - CI on `a375494` still not confirmed.
+- Cleanup: `Readme/REVIEWER_GUIDE.md` moved to `docs/sr/REVIEWER_GUIDE.md`
+  (exact copy, recorded as a rename). `tests/test_source_quote_doc_sync.py`
+  finds it with rglob, so it needs no change, but it fails if two copies exist.
+  The SR messages in `pipelines/sr/main.py` (3) and the comment in
+  `data_extractor.py` still say just `REVIEWER_GUIDE.md`; add the folder later.
+- `docker/` removed; #28 closed as Won't do (in RESOLVED_ISSUES). Render was
+  confirmed as `runtime: python` in render.yaml. Removed with it: the README
+  "Local with Docker" quick start and its "not verified" line, the "Ollama in
+  Docker" note, and the flashcard Docker block (its two scripts were already
+  missing).
+- The archive, RESOLVED_ISSUES.md and the S26 evidence JSONs had been deleted
+  by accident; restored. The evidence is needed for Session 28 priority 2.
+- Noted, not fixed: the flashcard-help.html footer says v2.4.6, 401 tests and
+  "DeepSeek default". Update it in its own commit.
+- Noted, not fixed: `Get-Content -Index` and `Select-String` give different
+  HANDOFF line numbers after line 48 (off by 2), probably a stray line-break
+  character. Search by text, not by line number, until it is found.
