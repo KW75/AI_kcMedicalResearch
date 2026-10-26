@@ -48,7 +48,7 @@ so those catches happen at session open, not mid-work.
 |----------------|--------|
 | Tests          | 737 passed, 3 skipped, 11 deselected (`python -m pytest -m "not live" --tb=short -q`) |
 | CI             | green (455b2d8; 28e616e; 3a9081b and 6813b12 also confirmed green) |
-| Render deploy  | health ok on 55d4fd3 (2026-10-26); env had only PYTHON_VERSION, so added DASHSCOPE_API_KEY + DEFAULT_PROVIDER=qwen (dashboard, not render.yaml); hosted runs then blocked by chromadb import, fixed on v2.6-ocr-editor (needs merge to main) |
+| Render deploy  | <merge hash> live 2026-10-26; DEFAULT_PROVIDER=qwen + DASHSCOPE_API_KEY on the service's own Environment tab; qwen prompt OK on live app |
 | SR pipeline    | working via CLI with Qwen; Ang 2010 verified against PDF (NFR week 6, unanimous N=3); text-fallback drops now surface in Stage 4 `[SKIP]` block |
 | Providers      | Ollama (default, local) / DeepSeek / Qwen (SR) / OpenAI / Anthropic / Groq / Ollama (local, never falls back) |
 
@@ -781,3 +781,4 @@ Tests that will be affected:
   (`* text=auto`, `*.sh eol=lf`, `*.bat eol=crlf`, ...); only the BOM was wrong.
 - Render fix: utils/rag.py imported chromadb at module level; requirements-render.txt omits it, so the UI cloud gate (imports main -> pipelines -> utils.rag) failed and every hosted cloud run was blocked ("Could not determine where this job's data would be sent"). Import moved into _get_client(); all three RAG call sites in main.py already catch errors, so hosted runs print "[RAG] Indexing skipped" and continue. tests/test_render_without_chromadb.py hides chromadb in a subprocess (local and CI both install it, so nothing else could catch this). Suite: 737 passed.
 - Lesson: render.yaml is not applied (service created by hand); the Render dashboard is the source of truth for env vars.
+- Lesson: Render env vars go on the web service's own Environment tab (service → left menu → Environment → Edit), not a project environment, an env group, or the "+ New" service form. Changes need Save, rebuild, and deploy. Never paste keys into chat; one was exposed and rotated this session.
