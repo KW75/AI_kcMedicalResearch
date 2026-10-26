@@ -41,7 +41,8 @@ so those catches happen at session open, not mid-work.
 
 ---
 
-## Current State (Session 27, v2.4.13, 2026-08-29)
+## Current State (Session 31, v2.5.0, 2026-10-26)
+
 
 | Component      | Status |
 |----------------|--------|
@@ -758,3 +759,7 @@ Tests that will be affected:
 - Noted, not fixed: on the home page the Systematic Review card is taller
   than the other five (icon/text sit lower), so its buttons do not line up.
   Cosmetic; fix the card CSS in app.py in its own commit.
+- Version bumped 2.4.13 -> 2.5.0 for the v2.5 merge: main.py VERSION, README
+  line 6, and the four launcher scripts (header comment + banner each).
+  Historical mentions of 2.4.13 (archive, RESOLVED_ISSUES, REVIEWER_GUIDE,
+  test comments) left as they are. The flashcard footer still says v2.4.6.

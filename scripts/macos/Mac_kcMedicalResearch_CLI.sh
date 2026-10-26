@@ -1,7 +1,7 @@
 #!/bin/bash
 # =============================================================================
 #  Mac_kcMedicalResearch_CLI.sh
-#  v2.4.13  |  Menu-driven CLI launcher (scripts/launcher.py)
+#  v2.5.0  |  Menu-driven CLI launcher (scripts/launcher.py)
 #
 #  Run with:  bash scripts/macos/Mac_kcMedicalResearch_CLI.sh
 #  (Running via bash avoids zsh choking on '#' comment lines.)
@@ -17,7 +17,7 @@ LAUNCHER="$PROJECT_DIR/scripts/launcher.py"
 
 echo ""
 echo "  ============================================================"
-echo "   AI kcMedical Research  |  CLI Launcher  |  v2.4.13"
+echo "   AI kcMedical Research  |  CLI Launcher  |  v2.5.0"
 echo "   Project: $PROJECT_DIR"
 echo "  ============================================================"
 echo ""

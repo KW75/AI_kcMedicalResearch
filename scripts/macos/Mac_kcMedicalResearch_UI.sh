@@ -1,7 +1,7 @@
 #!/bin/bash
 # =============================================================================
 #  Mac_kcMedicalResearch_UI.sh
-#  v2.4.13  |  Streamlit UI launcher
+#  v2.5.0  |  Streamlit UI launcher
 #
 #  Run with:  bash scripts/macos/Mac_kcMedicalResearch_UI.sh
 #  (Running via bash avoids zsh choking on '#' comment lines.)
@@ -17,7 +17,7 @@ APP="$PROJECT_DIR/SOURCE_CODE/ui/app.py"
 
 echo ""
 echo "  ============================================================"
-echo "   AI kcMedical Research  |  Streamlit UI  |  v2.4.13"
+echo "   AI kcMedical Research  |  Streamlit UI  |  v2.5.0"
 echo "   Project: $PROJECT_DIR"
 echo "  ============================================================"
 echo ""
