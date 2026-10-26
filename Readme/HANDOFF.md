@@ -48,7 +48,7 @@ so those catches happen at session open, not mid-work.
 |----------------|--------|
 | Tests          | 743 passed, 3 skipped, 11 deselected (`python -m pytest -m "not live" --tb=short -q`) |
 | CI             | green (455b2d8; 28e616e; 3a9081b and 6813b12 also confirmed green) |
-| Render deploy  | <merge hash> live 2026-10-26; DEFAULT_PROVIDER=qwen + DASHSCOPE_API_KEY on the service's own Environment tab; qwen prompt OK on live app |
+| Render deploy | 2a37319 live; DEFAULT_PROVIDER=qwen only, no API key on Render; users enter their own key in the sidebar (tested OK) |
 | SR pipeline    | working via CLI with Qwen; Ang 2010 verified against PDF (NFR week 6, unanimous N=3); text-fallback drops now surface in Stage 4 `[SKIP]` block |
 | Providers      | Ollama (default, local) / DeepSeek / Qwen (SR) / OpenAI / Anthropic / Groq / Ollama (local, never falls back) |
 
