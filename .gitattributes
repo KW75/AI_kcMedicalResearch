@@ -1,4 +1,4 @@
-﻿# Default: normalise text files in the repo, native in the working tree.
+# Default: normalise text files in the repo, native in the working tree.
 * text=auto
 
 # Shell scripts MUST be LF. CRLF breaks the shebang on macOS/Linux

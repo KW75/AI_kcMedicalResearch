@@ -46,9 +46,9 @@ so those catches happen at session open, not mid-work.
 
 | Component      | Status |
 |----------------|--------|
-| Tests          | 732 passed, 3 skipped, 11 deselected (`python -m pytest -m "not live" --tb=short -q`) |
+| Tests          | 737 passed, 3 skipped, 11 deselected (`python -m pytest -m "not live" --tb=short -q`) |
 | CI             | green (455b2d8; 28e616e; 3a9081b and 6813b12 also confirmed green) |
-| Render deploy  | health returned `ok` on 28e616e (S27 close) |
+| Render deploy  | health ok on 55d4fd3 (2026-10-26); env had only PYTHON_VERSION, so added DASHSCOPE_API_KEY + DEFAULT_PROVIDER=qwen (dashboard, not render.yaml); hosted runs then blocked by chromadb import, fixed on v2.6-ocr-editor (needs merge to main) |
 | SR pipeline    | working via CLI with Qwen; Ang 2010 verified against PDF (NFR week 6, unanimous N=3); text-fallback drops now surface in Stage 4 `[SKIP]` block |
 | Providers      | Ollama (default, local) / DeepSeek / Qwen (SR) / OpenAI / Anthropic / Groq / Ollama (local, never falls back) |
 
@@ -763,3 +763,21 @@ Tests that will be affected:
   line 6, and the four launcher scripts (header comment + banner each).
   Historical mentions of 2.4.13 (archive, RESOLVED_ISSUES, REVIEWER_GUIDE,
   test comments) left as they are. The flashcard footer still says v2.4.6.
+- Merged PR #1 into main (`55d4fd3`); suite 732 on main. New branch
+  `v2.6-ocr-editor` for the work below and for OCR / Editor mode.
+- BOM checker blind spot: `check_no_bom.py` filtered by `path.suffix`, and
+  Python gives dotfiles no suffix (`Path(".gitattributes").suffix == ""`), so
+  no dotfile was ever checked. The real `.gitattributes` had a BOM: git read
+  BOM + `#` as a rule and printed "Default: is not a valid attribute name" on
+  every command. Fix: `CHECK_NAMES` (.gitattributes, .gitignore, .env.example,
+  .editorconfig; never .env) in both check_no_bom.py and strip_bom.py.
+  strip_bom.py had its own copy of the lists and the same blind spot, so the
+  checker's "Fix with strip_bom.py" advice would have skipped the file.
+  BOM removed with strip_bom.py itself. Tests:
+  `test_dotfiles_without_a_suffix_are_scanned`, new tests/test_strip_bom.py
+  (list sync with check_no_bom.py + dotfile strip). All failed before the fix.
+  Suite: 735 passed, 3 skipped, 11 deselected.
+- Corrects the follow-up "add .gitattributes for line endings": it exists
+  (`* text=auto`, `*.sh eol=lf`, `*.bat eol=crlf`, ...); only the BOM was wrong.
+- Render fix: utils/rag.py imported chromadb at module level; requirements-render.txt omits it, so the UI cloud gate (imports main -> pipelines -> utils.rag) failed and every hosted cloud run was blocked ("Could not determine where this job's data would be sent"). Import moved into _get_client(); all three RAG call sites in main.py already catch errors, so hosted runs print "[RAG] Indexing skipped" and continue. tests/test_render_without_chromadb.py hides chromadb in a subprocess (local and CI both install it, so nothing else could catch this). Suite: 737 passed.
+- Lesson: render.yaml is not applied (service created by hand); the Render dashboard is the source of truth for env vars.

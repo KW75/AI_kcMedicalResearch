@@ -43,6 +43,16 @@ CHECK_SUFFIXES = {
     ".html", ".css", ".js",
 }
 
+# Dotfiles have no suffix to Python (Path(".gitattributes").suffix == ""),
+# so CHECK_SUFFIXES can never match them. Check these by exact name.
+# .env is left out on purpose: it holds API keys and is never tracked.
+CHECK_NAMES = {
+    ".gitattributes",
+    ".gitignore",
+    ".env.example",
+    ".editorconfig",
+}
+
 BOM = b"\xef\xbb\xbf"
 
 
@@ -57,7 +67,7 @@ def scan(root: Path) -> list[Path]:
             continue
         if is_ignored(path.relative_to(root)):
             continue
-        if path.suffix.lower() not in CHECK_SUFFIXES:
+        if path.suffix.lower() not in CHECK_SUFFIXES and path.name not in CHECK_NAMES:
             continue
         try:
             with path.open("rb") as fh:
