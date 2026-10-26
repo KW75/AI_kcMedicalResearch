@@ -172,3 +172,21 @@ def test_main_returns_1_and_names_offenders(
     assert "FAIL" in captured.out
     assert "scripts/buggy.py" in captured.out.replace("\\", "/")
     assert "python scripts/strip_bom.py" in captured.out
+
+
+def test_dotfiles_without_a_suffix_are_scanned(tmp_path):
+    """Path('.gitattributes').suffix is '', so a suffix-only filter never
+    checked dotfiles. Session 31 found a BOM in the real .gitattributes this
+    way: git read the BOM + '#' as a rule and printed
+    'Default: is not a valid attribute name' on every command."""
+    names = [".gitattributes", ".gitignore", ".env.example"]
+    for name in names:
+        (tmp_path / name).write_bytes(check_no_bom.BOM + b"# comment\n")
+    clean = tmp_path / "clean"
+    clean.mkdir()
+    for name in names:
+        (clean / name).write_bytes(b"# comment\n")
+
+    offenders = {p.relative_to(tmp_path).as_posix()
+                 for p in check_no_bom.scan(tmp_path)}
+    assert offenders == set(names)

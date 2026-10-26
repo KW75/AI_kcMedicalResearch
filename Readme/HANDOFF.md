@@ -46,7 +46,7 @@ so those catches happen at session open, not mid-work.
 
 | Component      | Status |
 |----------------|--------|
-| Tests          | 732 passed, 3 skipped, 11 deselected (`python -m pytest -m "not live" --tb=short -q`) |
+| Tests          | 735 passed, 3 skipped, 11 deselected (`python -m pytest -m "not live" --tb=short -q`) |
 | CI             | green (455b2d8; 28e616e; 3a9081b and 6813b12 also confirmed green) |
 | Render deploy  | health returned `ok` on 28e616e (S27 close) |
 | SR pipeline    | working via CLI with Qwen; Ang 2010 verified against PDF (NFR week 6, unanimous N=3); text-fallback drops now surface in Stage 4 `[SKIP]` block |
@@ -763,3 +763,19 @@ Tests that will be affected:
   line 6, and the four launcher scripts (header comment + banner each).
   Historical mentions of 2.4.13 (archive, RESOLVED_ISSUES, REVIEWER_GUIDE,
   test comments) left as they are. The flashcard footer still says v2.4.6.
+- Merged PR #1 into main (`55d4fd3`); suite 732 on main. New branch
+  `v2.6-ocr-editor` for the work below and for OCR / Editor mode.
+- BOM checker blind spot: `check_no_bom.py` filtered by `path.suffix`, and
+  Python gives dotfiles no suffix (`Path(".gitattributes").suffix == ""`), so
+  no dotfile was ever checked. The real `.gitattributes` had a BOM: git read
+  BOM + `#` as a rule and printed "Default: is not a valid attribute name" on
+  every command. Fix: `CHECK_NAMES` (.gitattributes, .gitignore, .env.example,
+  .editorconfig; never .env) in both check_no_bom.py and strip_bom.py.
+  strip_bom.py had its own copy of the lists and the same blind spot, so the
+  checker's "Fix with strip_bom.py" advice would have skipped the file.
+  BOM removed with strip_bom.py itself. Tests:
+  `test_dotfiles_without_a_suffix_are_scanned`, new tests/test_strip_bom.py
+  (list sync with check_no_bom.py + dotfile strip). All failed before the fix.
+  Suite: 735 passed, 3 skipped, 11 deselected.
+- Corrects the follow-up "add .gitattributes for line endings": it exists
+  (`* text=auto`, `*.sh eol=lf`, `*.bat eol=crlf`, ...); only the BOM was wrong.

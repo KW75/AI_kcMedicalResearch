@@ -42,6 +42,16 @@ CHECK_SUFFIXES = {
     ".html", ".css", ".js",
 }
 
+# Must match check_no_bom.py exactly; tests/test_strip_bom.py checks this.
+# Dotfiles have no suffix to Python (Path(".gitattributes").suffix == ""),
+# so they are matched by exact name. .env is left out: it holds API keys.
+CHECK_NAMES = {
+    ".gitattributes",
+    ".gitignore",
+    ".env.example",
+    ".editorconfig",
+}
+
 BOM = b"\xef\xbb\xbf"
 
 
@@ -56,7 +66,7 @@ def strip(root: Path) -> list[Path]:
             continue
         if is_ignored(path.relative_to(root)):
             continue
-        if path.suffix.lower() not in CHECK_SUFFIXES:
+        if path.suffix.lower() not in CHECK_SUFFIXES and path.name not in CHECK_NAMES:
             continue
         try:
             with path.open("rb") as fh:
