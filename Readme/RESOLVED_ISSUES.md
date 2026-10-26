@@ -30,6 +30,7 @@ without reading the closing notes there.
 | 25 | Auth errors mentioning "connection" were retried | v2.4.9 - status-code check |
 | 26 | No test that Ollama never reaches cloud | v2.4.9 - `tests/test_provider_fallback.py` |
 | 27 | Windows/macOS launchers used different mechanisms | v2.4.8 - both venv |
+| 28 | Docker route never executed end to end | Won't do - `docker/` removed in v2.5 (Session 31). Setup is python.org 3.11 + venv (README Step 1); Render uses `runtime: python` (render.yaml). |
 | 29 | Test exercised an impossible `main(mode='sr')` path | v2.4.12 - `run_cli(args)` |
 | 30 | Ctrl+C during startup raised raw traceback | v2.4.9 |
 | 31 | Provider-select box misaligned on CJK terminals | v2.4.9 |

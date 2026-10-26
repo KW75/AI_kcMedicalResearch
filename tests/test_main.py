@@ -293,7 +293,7 @@ class TestMainParsing:
     def test_parse_args_default(self):
         args = main.parse_args([])
         assert args.mode == "coding"
-        assert args.provider == "deepseek"
+        assert args.provider == main.DEFAULT_PROVIDER
         assert args.model is None
 
     def test_parse_args_with_provider(self):

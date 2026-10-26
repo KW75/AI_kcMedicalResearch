@@ -471,35 +471,148 @@ def _is_cloud_environment() -> bool:
         os.environ.get('RENDER_GIT_COMMIT'),
     ])
 
-def _launch_terminal(mode: str, provider: str, model: str, submode: str = "", prompt: str = "") -> str:
+
+_LOCAL_PROVIDERS = {"ollama"}
+
+
+def _build_cli_cmd(mode: str, provider: str, model: str, submode: str = "",
+                   confirm_cloud: bool = False, time_limit: str = "15") -> list:
+    """The one CLI command both launch paths use.
+
+    --confirm-cloud is added only after the user ticked consent, and never
+    for a local provider. --time-limit is added only when it is not the
+    default 15 minutes (same rule as the launcher).
+    """
+    cmd = [sys.executable, str(MAIN_PY), "--mode", mode, "--provider", provider]
+    if model and model.strip():
+        cmd += ["--model", model.strip()]
+    if mode == "search" and submode:
+        cmd += ["--sub", submode]
+    if mode == "coding" and submode:
+        for role in ("Builder", "Reviewer", "Tester"):
+            if role in submode:
+                cmd += ["--role", role]
+                break
+    if confirm_cloud and provider not in _LOCAL_PROVIDERS:
+        cmd.append("--confirm-cloud")
+    if time_limit and time_limit != "15":  # v2.5: 15 is the default, add nothing
+        cmd += ["--time-limit", time_limit]
+    return cmd
+
+def _time_limits_module():
+    """Lazy import of time_limits (Streamlit only puts ui/ on sys.path)."""
+    if str(SOURCE_CODE_DIR) not in sys.path:
+        sys.path.append(str(SOURCE_CODE_DIR))
+    import time_limits
+    return time_limits
+
+
+def _cli_module():
+    """Import SOURCE_CODE.main lazily (Streamlit only puts ui/ on sys.path)."""
+    for p in (str(PROJECT_ROOT), str(SOURCE_CODE_DIR)):
+        if p not in sys.path:
+            sys.path.append(p)
+    from SOURCE_CODE import main as cli
+    return cli
+
+def _cloud_destinations(mode: str, provider: str) -> list:
+    """Display names of every cloud provider this job may reach, in attempt order.
+
+    Computed by main.data_destinations so the UI and the CLI cannot disagree.
+    """
+    cli = _cli_module()
+    return [cli.PROVIDER_LABELS.get(p, p)
+            for p in cli.data_destinations(mode, provider)
+            if p not in cli.LOCAL_ONLY_PROVIDERS]
+
+_RENDER_VARS = ("RENDER", "RENDER_SERVICE_ID", "RENDER_GIT_COMMIT")
+
+
+def _ollama_models_module():
+    """Import ollama_models lazily (Streamlit only puts ui/ on sys.path)."""
+    p = str(SOURCE_CODE_DIR)
+    if p not in sys.path:
+        sys.path.append(p)
+    import ollama_models
+    return ollama_models
+
+
+def _ollama_model_choices(provider: str) -> tuple:
+    """(choices, default) for the local model dropdown.
+
+    choices is [(name, description)], using the same descriptions and default
+    as the CLI launcher. Returns ([], "") when the free-text box should be
+    shown instead: a cloud provider, the hosted (Render) app, or Ollama not
+    reachable. Only the RENDER* variables are checked, not
+    _is_cloud_environment(), because that one treats STREAMLIT_SERVER_PORT
+    as cloud.
+    """
+    if provider not in _LOCAL_PROVIDERS or any(os.environ.get(v) for v in _RENDER_VARS):
+        return [], ""
+    om = _ollama_models_module()
+    models = om.list_ollama_models()
+    if not models:
+        return [], ""
+    choices = [(m["name"], om.describe(m, om.model_capabilities(None, m["name"])))
+               for m in models]
+    return choices, om.choose_default(models)
+
+def _local_run_blocked(provider: str, ollama_choices: list) -> str:
+    """Reason to disable Run for a local job, or "" if it may run.
+
+    provider=ollama with no models found means Ollama is not running (or this
+    is the hosted app, which has no Ollama); the job could only fail.
+    """
+    if provider not in _LOCAL_PROVIDERS or ollama_choices:
+        return ""
+    if any(os.environ.get(v) for v in _RENDER_VARS):
+        return ("The hosted version has no local AI (Ollama). Choose a cloud provider, "
+                "or install the app on your own computer for confidential work.")
+    return ("No local Ollama models found. Start the Ollama app (or run `ollama pull "
+            "gemma4:e4b` if you have no models), then refresh this page.")
+
+def _default_provider_index() -> int:
+    """Index into PROVIDERS for the Provider dropdown's starting value.
+
+    Locally: always Ollama (local-first), whatever DEFAULT_PROVIDER says.
+    On the hosted app: a cloud DEFAULT_PROVIDER if set, else the first cloud
+    provider in PROVIDERS. Never a local provider there: Render has no Ollama,
+    so Run would start blocked. Only the RENDER* variables are checked, not
+    _is_cloud_environment(), because render.yaml also sets
+    STREAMLIT_SERVER_PORT and that check would move local users off Ollama.
+    """
+    if not any(os.environ.get(v) for v in _RENDER_VARS):
+        return PROVIDERS.index("ollama")
+    wanted = os.environ.get("DEFAULT_PROVIDER", "").strip().lower()
+    if wanted in PROVIDERS and wanted not in _LOCAL_PROVIDERS:
+        return PROVIDERS.index(wanted)
+    return next(i for i, p in enumerate(PROVIDERS) if p not in _LOCAL_PROVIDERS)
+
+
+def _launch_terminal(mode: str, provider: str, model: str, submode: str = "", prompt: str = "",
+                     confirm_cloud: bool = False, time_limit: str = "15") -> str:
     """Launch CLI - detects environment and runs appropriately."""
     if _is_cloud_environment():
-        return _run_cli_cloud(mode, provider, model, submode, prompt)
-    return _launch_terminal_local(mode, provider, model, submode)
+        return _run_cli_cloud(mode, provider, model, submode, prompt,
+                              confirm_cloud=confirm_cloud, time_limit=time_limit)
+    return _launch_terminal_local(mode, provider, model, submode,
+                                  confirm_cloud=confirm_cloud, time_limit=time_limit)
 
-def _run_cli_cloud(mode: str, provider: str, model: str, submode: str = "", prompt: str = "") -> str:
+def _run_cli_cloud(mode: str, provider: str, model: str, submode: str = "", prompt: str = "",
+                   confirm_cloud: bool = False, time_limit: str = "15") -> str:
     """Run CLI directly in cloud environment."""
+
+
     # Save prompt if provided
     if prompt.strip():
         prompt_file = INPUT_DIR / mode / "instructions.txt"
         prompt_file.parent.mkdir(parents=True, exist_ok=True)
         prompt_file.write_text(prompt.strip(), encoding="utf-8")
     
-    # Build command
-    cmd_parts = [sys.executable, str(SOURCE_CODE_DIR / "main.py"), "--mode", mode, "--provider", provider]
-    
-    # Add sub-mode for search
-    if mode == "search" and submode:
-        cmd_parts += ["--sub", submode]
-    
-    # Add submode flags for coding
-    if mode == "coding" and submode:
-        if "Builder" in submode:
-            cmd_parts += ["--role", "Builder"]
-        elif "Reviewer" in submode:
-            cmd_parts += ["--role", "Reviewer"]
-        elif "Tester" in submode:
-            cmd_parts += ["--role", "Tester"]
+    # Build command (shared with the local path so the two cannot drift)
+    cmd_parts = _build_cli_cmd(mode, provider, model, submode, confirm_cloud=confirm_cloud,
+                               time_limit=time_limit)
+
     
     st.code("$ " + " ".join(cmd_parts))
     
@@ -516,6 +629,7 @@ def _run_cli_cloud(mode: str, provider: str, model: str, submode: str = "", prom
             
             result = subprocess.run(
                 cmd_parts,
+                stdin=subprocess.DEVNULL,  # no keyboard: CLI must never wait for [y/N]
                 cwd=str(PROJECT_ROOT),
                 capture_output=True,
                 text=True,
@@ -543,23 +657,12 @@ def _run_cli_cloud(mode: str, provider: str, model: str, submode: str = "", prom
             st.error(f"❌ Error: {exc}")
             return f"error: {exc}"
 
-def _launch_terminal_local(mode: str, provider: str, model: str, submode: str = "") -> str:
+def _launch_terminal_local(mode: str, provider: str, model: str, submode: str = "",
+                           confirm_cloud: bool = False, time_limit: str = "15") -> str:
     """Launch terminal locally with API keys from session."""
-    py = sys.executable
-    mp = str(MAIN_PY)
     base = str(PROJECT_ROOT)
-    
-    cmd_parts = [py, mp, "--mode", mode, "--provider", provider]
-    if model.strip():
-        cmd_parts += ["--model", model.strip()]
-    
-    if mode == "coding" and submode:
-        if "Builder" in submode:
-            cmd_parts += ["--role", "Builder"]
-        elif "Reviewer" in submode:
-            cmd_parts += ["--role", "Reviewer"]
-        elif "Tester" in submode:
-            cmd_parts += ["--role", "Tester"]
+    cmd_parts = _build_cli_cmd(mode, provider, model, submode, confirm_cloud=confirm_cloud,
+                               time_limit=time_limit)
     
     cmd_str = " ".join(f'"{p}"' if " " in p else p for p in cmd_parts)
     env_vars = _get_env_with_api_keys()
@@ -923,12 +1026,39 @@ def _mode_page(mode: str) -> None:
     with st.expander("⚙️ Provider / Model settings", expanded=True):
         col_p, col_m = st.columns(2)
         with col_p:
-            provider = st.selectbox("Provider", PROVIDERS, index=0, key=f"provider_{mode}")
+            provider = st.selectbox("Provider", PROVIDERS, index=_default_provider_index(), key=f"provider_{mode}")        
         with col_m:
-            model = st.text_input("Model (leave blank for default)", "", key=f"model_{mode}")
-            if provider != "ollama":
-                st.caption(f"💡 Requires {_get_api_key_env_name(provider)} in environment or sidebar")
-    
+            ollama_choices, ollama_default = _ollama_model_choices(provider)
+            if ollama_choices:
+                names = [n for n, _ in ollama_choices]
+                labels = dict(ollama_choices)
+                model = st.selectbox(
+                    "Local model",
+                    names,
+                    index=names.index(ollama_default) if ollama_default in names else 0,
+                    format_func=lambda n: f"{labels[n]}  (default)" if n == ollama_default else labels[n],
+                    key=f"ollama_model_{mode}",
+                )
+                st.caption(f"Ranks: {_ollama_models_module().RANKS_SOURCE}. Image/OCR = the model "
+                           f"can read images; the app does not send images to Ollama yet.")
+            else:
+                model = st.text_input("Model (leave blank for default)", "", key=f"model_{mode}")
+                if provider == "ollama":
+                    st.caption("No local Ollama models found (Ollama not running, or this is the "
+                               "hosted version). Leave blank to let the app pick.")
+                else:
+                    st.caption(f"💡 Requires {_get_api_key_env_name(provider)} in environment or sidebar")
+
+        tl = _time_limits_module()
+        time_limit = st.selectbox(
+            "Time limit per AI call",
+            list(tl.CHOICES),
+            index=list(tl.CHOICES).index(tl.DEFAULT),
+            format_func=lambda k: tl.LABELS[k],
+            key=f"time_limit_{mode}",
+            help="Large local models on slower machines may need longer.",
+        )
+
     # File upload
     if mode == "sr":
         st.markdown("**Upload article PDFs to** `input/sr/`  —  Accepted: .pdf")
@@ -1006,20 +1136,67 @@ def _mode_page(mode: str) -> None:
     
     st.divider()
     
-    run_label = f"▶️ Run {cfg['label']}"
+    # --- v2.5 cloud gate: same destinations the CLI lists (main.data_destinations) ---
+    cloud_names: list = []
+    search_names: list = []
+    gate_error = None
+    try:
+        cli = _cli_module()
+        search_names = cli.SEARCH_SERVICES.get(mode, [])
+        if provider not in _LOCAL_PROVIDERS:
+            cloud_names = _cloud_destinations(mode, provider)
+    except Exception as exc:  # fail closed: never run a cloud job blind
+        gate_error = str(exc)
+
+    if search_names:
+        st.info("Search terms will be sent to: " + ", ".join(search_names)
+                + " (this happens even when the AI model is local).")
+
+    confirm_cloud = False
+    if gate_error and provider not in _LOCAL_PROVIDERS:
+        st.error(f"Could not determine where this job's data would be sent ({gate_error}). "
+                 "Cloud run disabled - choose Ollama.")
+    elif cloud_names:
+        lines = "\n".join(f"- {n}" for n in cloud_names)
+        msg = ("**Cloud provider selected.** Input for this job will be sent to an external server:\n\n"
+               f"{lines}\n\n"
+               "The first is your chosen provider; any others are backups used only if it is busy or times out.\n\n"
+               "Do not use for patient-identifiable or confidential data.")
+        if _is_cloud_environment():
+            msg += ("\n\nNote: this hosted app runs on Render's servers, so files uploaded here have already "
+                    "left your computer. For confidential work, install the app locally and use Ollama.")
+        st.warning(msg)
+        confirm_cloud = st.checkbox(
+            "I confirm this job contains no patient-identifiable or confidential data",
+            key=f"confirm_cloud_{mode}",
+        )
+
+    local_block = _local_run_blocked(provider, ollama_choices)
+    if local_block:
+        st.warning(local_block)
+
+    run_disabled = (bool(local_block)
+                    or (bool(gate_error) and provider not in _LOCAL_PROVIDERS)
+                    or (bool(cloud_names) and not confirm_cloud))
+
+
+    run_label = f"Run {cfg['label']}"
     if mode == "coding" and submode:
         run_label += f" ({submode})"
-    
-    if st.button(run_label, type="primary", use_container_width=True, key=f"run_{mode}"):
+
+    if st.button(run_label, type="primary", use_container_width=True, key=f"run_{mode}",
+                 disabled=run_disabled):
         if not _validate_mode(mode):
             st.error(f"Invalid mode: {mode}")
             return
-        
+
         if not _validate_provider(provider):
             st.error(f"Invalid provider: {provider}")
             return
-        
-        result = _launch_terminal(mode, provider, model, submode or "")
+
+        result = _launch_terminal(mode, provider, model, submode or "", confirm_cloud=confirm_cloud,
+                                  time_limit=time_limit)
+
         if result == "ok":
             st.success(f"✅ **{cfg['label']}** session launched in a new terminal window.")
             st.info("💻 Work in the terminal window. When done, use the Output browser above to find your results in `output/{mode}/`.")

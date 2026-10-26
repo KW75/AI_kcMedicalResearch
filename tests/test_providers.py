@@ -264,3 +264,80 @@ def test_ollama_404_tells_user_to_pull_model(monkeypatch):
     assert "ollama pull qwen2.5:14b-instruct" in message
     assert "not installed" in message.lower()
 
+class TestLocalFirstDefault:
+    """Local-first: with no DEFAULT_PROVIDER in .env, input must stay local."""
+
+    def test_code_default_provider_is_local_only(self):
+        from providers import CODE_DEFAULT_PROVIDER, LOCAL_ONLY_PROVIDERS
+        assert CODE_DEFAULT_PROVIDER in LOCAL_ONLY_PROVIDERS, (
+            f"CODE_DEFAULT_PROVIDER={CODE_DEFAULT_PROVIDER} sends input off this "
+            f"machine when .env sets no provider"
+        )
+
+    def test_docs_name_the_same_default_provider_as_code(self):
+        """README and .env.example must show the default the code uses."""
+        import re
+        from providers import CODE_DEFAULT_PROVIDER
+
+        root = Path(__file__).resolve().parent.parent
+        pattern = re.compile(r"^\s*DEFAULT_PROVIDER=(\S+)", re.MULTILINE)
+
+        for name in ("README.md", ".env.example"):
+            text = (root / name).read_text(encoding="utf-8")
+            found = pattern.findall(text)
+            assert found, f"{name}: no uncommented DEFAULT_PROVIDER= line found"
+            for value in found:
+                assert value == CODE_DEFAULT_PROVIDER, (
+                    f"{name} says DEFAULT_PROVIDER={value}, "
+                    f"but providers.CODE_DEFAULT_PROVIDER is {CODE_DEFAULT_PROVIDER}"
+                )
+
+class TestOllamaThinkOff:
+    """Every Ollama request must send think=False.
+
+    qwen3 and gemma4 think by default (`ollama show`: thinking default true).
+    Measured Session 30 on Ollama 0.40.8: qwen3:8b used 229 tokens with no
+    think field and 3 with think=False, same answer. qwen2.5 (no thinking
+    support) accepts think=False without error, so it is safe on every call.
+    """
+
+    @staticmethod
+    def _fake_resp(body):
+        mock_resp = MagicMock()
+        mock_resp.read.return_value = json.dumps(body).encode()
+        mock_resp.__enter__ = lambda s: s
+        mock_resp.__exit__ = MagicMock(return_value=False)
+        return mock_resp
+
+    def test_call_ollama_provider_sends_think_false(self, monkeypatch):
+        import providers
+        sent = {}
+
+        def fake_urlopen(req, timeout=0):
+            sent["body"] = json.loads(req.data)
+            return self._fake_resp({"response": "42"})
+
+        monkeypatch.setattr(providers, "urlopen", fake_urlopen)
+        assert providers.call_ollama_provider("hi", model="qwen3:8b") == "42"
+        assert sent["body"].get("think") is False
+
+    def test_probe_sends_think_false(self):
+        import providers
+        sent = []
+
+        def fake_urlopen(req, timeout=0):
+            if req.data is not None:  # POST /api/generate
+                sent.append(json.loads(req.data))
+                return self._fake_resp(
+                    {"response": "1", "eval_count": 3, "eval_duration": 1_000_000}
+                )
+            return self._fake_resp({"models": []})  # GET /api/tags (model size)
+
+        with patch("urllib.request.urlopen", side_effect=fake_urlopen):
+            result = providers.ollama_probe_performance(
+                host="http://localhost:11434", model="qwen3:8b"
+            )
+        # The probe swallows exceptions; reachable=True proves the mock was hit.
+        assert result["reachable"] is True
+        assert sent and sent[0].get("think") is False
+

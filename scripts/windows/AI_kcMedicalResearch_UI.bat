@@ -1,7 +1,7 @@
 @echo off
 :: =============================================================================
 ::  AI_kcMedicalResearch_UI.bat
-::  v2.4.13  |  Streamlit UI Launcher
+::  v2.5.0  |  Streamlit UI Launcher
 ::
 ::  Location: scripts\windows\   (resolves project root two levels up)
 :: =============================================================================
@@ -103,7 +103,7 @@ exit /b !RC!
 :print_header
 echo.
 echo   ============================================================
-echo    AI kcMedical Research  ^|  Pipeline UI  ^|  v2.4.13
+echo    AI kcMedical Research  ^|  Pipeline UI  ^|  v2.5.0
 echo   ============================================================
 echo    Project : !PROJECT_DIR!
 echo   ============================================================

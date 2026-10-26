@@ -24,6 +24,18 @@ except ImportError:
 BASE   = Path(__file__).resolve().parent.parent
 PYTHON = sys.executable
 
+# Ollama model list, default and descriptions, shared with the app so the
+# launcher and the UI show the same thing. ollama_models.py is stdlib only.
+_SOURCE_DIR = str(BASE / 'SOURCE_CODE')
+if _SOURCE_DIR not in sys.path:
+    sys.path.append(_SOURCE_DIR)
+
+from ollama_models import (  # noqa: E402
+    RANKS_SOURCE, choose_default, describe, list_ollama_models,
+    missing_ranked, model_capabilities,
+)
+from time_limits import CHOICES as TIME_CHOICES, DEFAULT as TIME_DEFAULT, LABELS as TIME_LABELS  # noqa: E402
+
 
 def _project_meta() -> tuple[str, str]:
     """Parse (VERSION, supported-Python range) from SOURCE_CODE/main.py.
@@ -350,6 +362,80 @@ def pick_mode():
 # -----------------------------------------------------------------------------
 #  Provider selection menu
 # -----------------------------------------------------------------------------
+def pick_ollama_model() -> str:
+    """Ask which pulled Ollama model to use.
+
+    Returns the model name, or '' if Ollama cannot be reached (the app then
+    chooses a model itself). Enter picks the default.
+    """
+    models = list_ollama_models()
+    if not models:
+        print()
+        print(f'  {WARN}!  Could not list Ollama models. Is the Ollama app running?{RESET}')
+        print(f'  {INFO}   Continuing without a model choice; the app will pick one.{RESET}')
+        return ''
+
+    default = choose_default(models)
+    caps = {m['name']: model_capabilities(None, m['name']) for m in models}
+    missing = missing_ranked(models)
+
+    while True:
+        print()
+        section_header('SELECT  LOCAL  MODEL')
+        print()
+        for i, m in enumerate(models, start=1):
+            mark = f'  {GOOD}(default){RESET}' if m['name'] == default else ''
+            print(f'  {ACCENT}{i}{RESET}  {TEXT}{describe(m, caps[m["name"]])}{RESET}{mark}')
+        print()
+        print(f'  {INFO}Ranks: {RANKS_SOURCE}. Image/OCR = the model can read images;{RESET}')
+        print(f'  {INFO}the app does not send images to Ollama yet (OCR mode is planned).{RESET}')
+        if missing:
+            print()
+            print(f'  {INFO}Also in the comparison, not installed yet:{RESET}')
+            for name in missing:
+                print(f'     {INFO}ollama pull {name}{RESET}')
+        print()
+
+        choice = safe_input(
+            f'  {ACCENT}>> Enter choice [1-{len(models)}] or Enter for {default}: {RESET}',
+            default='',
+        ).strip()
+        if choice == '':
+            return default
+        if choice.isdigit() and 1 <= int(choice) <= len(models):
+            return models[int(choice) - 1]['name']
+        print(f'\n  {ERR}Invalid choice. Please enter 1-{len(models)} or press Enter.{RESET}')
+
+
+def pick_time_limit() -> str:
+    """Ask the maximum time per AI call.
+
+    Returns '' for the default (15 min), so the command is unchanged,
+    otherwise '--time-limit 30' / '60' / 'none'.
+    """
+    keys = list(TIME_CHOICES)
+    print()
+    print(f'  {TEXT}Time limit per AI call (large local models may need longer):{RESET}')
+    for i, key in enumerate(keys, 1):
+        print(f'    {ACCENT}{i}{RESET}  {TEXT}{TIME_LABELS[key]}{RESET}')
+    while True:
+        raw = (safe_input(f'  {ACCENT}>> Enter choice [1-{len(keys)}] '
+                          f'or Enter for 15 minutes:{RESET} ') or '').strip()
+        if raw == '':
+            return ''
+        if raw.isdigit() and 1 <= int(raw) <= len(keys):
+            key = keys[int(raw) - 1]
+            return '' if key == TIME_DEFAULT else f'--time-limit {key}'
+        print(f'  {WARN}!  Please type a number from 1 to {len(keys)}.{RESET}')
+
+
+def time_limit_flag(mode_flag: str) -> str:
+    """--dry-run never calls the AI, so it is not asked."""
+    if mode_flag == '--dry-run':
+        return ''
+    return pick_time_limit()
+
+
 def pick_provider(mode_flag: str = '') -> str:
     is_sr = (mode_flag == '--mode sr')
 
@@ -425,7 +511,12 @@ def pick_provider(mode_flag: str = '') -> str:
             safe_input(f'  {INFO}Press Enter to choose again...{RESET}')
             continue
 
+        if prov_id == 'ollama':
+            model = pick_ollama_model()
+            if model:
+                return f'{prov_flag} --model {model}'
         return prov_flag
+
 
 
 # -----------------------------------------------------------------------------
@@ -612,8 +703,9 @@ def main() -> None:
                 check_input_folder(input_mode)
 
             prov_flag = pick_provider(mode_flag)
+            time_flag = time_limit_flag(mode_flag)
 
-            flags = [f for f in [mode_flag, prov_flag] if f]
+            flags = [f for f in [mode_flag, prov_flag, time_flag] if f]
             cmd   = [PYTHON, str(BASE / "SOURCE_CODE" / 'main.py')] + ' '.join(flags).split()
             _run_cmd(cmd, label=label or '')
 
