@@ -333,6 +333,32 @@ _QA_PERSONA = {
 }
 
 
+# ---------------------------------------------------------------------------
+# One-pass Writing mode: split the single AI answer into document + review
+# ---------------------------------------------------------------------------
+
+REVIEW_MARKER = "=== REVIEW ==="
+REVIEW_MISSING = (
+    "Review missing: the model did not separate the review from the document."
+)
+
+
+def _split_document_and_review(text: str) -> tuple[str, str]:
+    """Cut the AI answer at the REVIEW_MARKER line into (document, review).
+
+    The marker only counts on a line of its own (surrounding spaces allowed).
+    If the marker is missing, or nothing follows it, no text is lost: the
+    document keeps the text and the review says the review is missing.
+    """
+    lines = text.splitlines()
+    for i, line in enumerate(lines):
+        if line.strip() == REVIEW_MARKER:
+            document = "\n".join(lines[:i]).strip()
+            review = "\n".join(lines[i + 1:]).strip()
+            return document, (review or REVIEW_MISSING)
+    return text, REVIEW_MISSING
+
+
 def _system_prompt(guidelines: str, role: str, track: str) -> str:
     personas = {
         "Writer": _WRITER_PERSONA,
