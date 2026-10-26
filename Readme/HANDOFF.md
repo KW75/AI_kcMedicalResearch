@@ -45,7 +45,7 @@ so those catches happen at session open, not mid-work.
 
 | Component      | Status |
 |----------------|--------|
-| Tests          | 725 passed, 3 skipped, 11 deselected (`python -m pytest -m "not live" --tb=short -q`) |
+| Tests          | 732 passed, 3 skipped, 11 deselected (`python -m pytest -m "not live" --tb=short -q`) |
 | CI             | green (455b2d8; 28e616e; 3a9081b and 6813b12 also confirmed green) |
 | Render deploy  | health returned `ok` on 28e616e (S27 close) |
 | SR pipeline    | working via CLI with Qwen; Ang 2010 verified against PDF (NFR week 6, unanimous N=3); text-fallback drops now surface in Stage 4 `[SKIP]` block |
@@ -743,3 +743,18 @@ Tests that will be affected:
 - Noted, not fixed: `Get-Content -Index` and `Select-String` give different
   HANDOFF line numbers after line 48 (off by 2), probably a stray line-break
   character. Search by text, not by line number, until it is found.
+- Hosted app's Provider dropdown no longer starts on Ollama. New
+  `_default_provider_index()` in ui/app.py: locally always Ollama (even if
+  .env sets DEFAULT_PROVIDER or STREAMLIT_SERVER_PORT is set); on Render (only
+  the RENDER* variables count) a cloud DEFAULT_PROVIDER if set, else the first
+  cloud provider in PROVIDERS. Before, Render visitors landed on Ollama with
+  Run blocked. This closes the Session 29 follow-up "Render UI provider dropdown
+  starts on ollama". render.yaml does not set DEFAULT_PROVIDER; check the
+  Render dashboard, since the fallback (openai) needs an OpenAI key there.
+  Tests: TestDefaultProviderIndex (6) and
+  test_render_page_does_not_start_on_ollama (AppTest; failed before the fix
+  with 'ollama' not in {'ollama'}). Browser check: local starts on ollama,
+  RENDER=true starts on a cloud provider. Suite: 732 passed, 3 skipped, 11 deselected.
+- Noted, not fixed: on the home page the Systematic Review card is taller
+  than the other five (icon/text sit lower), so its buttons do not line up.
+  Cosmetic; fix the card CSS in app.py in its own commit.

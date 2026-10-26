@@ -571,6 +571,23 @@ def _local_run_blocked(provider: str, ollama_choices: list) -> str:
     return ("No local Ollama models found. Start the Ollama app (or run `ollama pull "
             "gemma4:e4b` if you have no models), then refresh this page.")
 
+def _default_provider_index() -> int:
+    """Index into PROVIDERS for the Provider dropdown's starting value.
+
+    Locally: always Ollama (local-first), whatever DEFAULT_PROVIDER says.
+    On the hosted app: a cloud DEFAULT_PROVIDER if set, else the first cloud
+    provider in PROVIDERS. Never a local provider there: Render has no Ollama,
+    so Run would start blocked. Only the RENDER* variables are checked, not
+    _is_cloud_environment(), because render.yaml also sets
+    STREAMLIT_SERVER_PORT and that check would move local users off Ollama.
+    """
+    if not any(os.environ.get(v) for v in _RENDER_VARS):
+        return PROVIDERS.index("ollama")
+    wanted = os.environ.get("DEFAULT_PROVIDER", "").strip().lower()
+    if wanted in PROVIDERS and wanted not in _LOCAL_PROVIDERS:
+        return PROVIDERS.index(wanted)
+    return next(i for i, p in enumerate(PROVIDERS) if p not in _LOCAL_PROVIDERS)
+
 
 def _launch_terminal(mode: str, provider: str, model: str, submode: str = "", prompt: str = "",
                      confirm_cloud: bool = False, time_limit: str = "15") -> str:
@@ -1009,7 +1026,7 @@ def _mode_page(mode: str) -> None:
     with st.expander("⚙️ Provider / Model settings", expanded=True):
         col_p, col_m = st.columns(2)
         with col_p:
-            provider = st.selectbox("Provider", PROVIDERS, index=0, key=f"provider_{mode}")
+            provider = st.selectbox("Provider", PROVIDERS, index=_default_provider_index(), key=f"provider_{mode}")        
         with col_m:
             ollama_choices, ollama_default = _ollama_model_choices(provider)
             if ollama_choices:

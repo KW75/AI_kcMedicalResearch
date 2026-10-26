@@ -122,3 +122,47 @@ def test_every_mode_page_renders_with_ollama_down(monkeypatch):
         at.session_state["page"] = mode
         at.run()
         assert not at.exception, f"{mode}: {at.exception[0].message}"
+
+
+class TestDefaultProviderIndex:
+    """The Provider dropdown starts on Ollama locally (local-first), but never
+    on the hosted app: Render has no Ollama, so Run would start blocked."""
+
+    def test_local_starts_on_ollama_even_with_port_and_env_default(self, monkeypatch):
+        monkeypatch.setenv("STREAMLIT_SERVER_PORT", "8501")
+        monkeypatch.setenv("DEFAULT_PROVIDER", "deepseek")
+        assert app.PROVIDERS[app._default_provider_index()] == "ollama"
+
+    def test_render_never_starts_on_a_local_provider(self, monkeypatch):
+        monkeypatch.setenv("RENDER", "true")
+        monkeypatch.delenv("DEFAULT_PROVIDER", raising=False)
+        assert app.PROVIDERS[app._default_provider_index()] not in app._LOCAL_PROVIDERS
+
+    def test_render_uses_cloud_default_provider(self, monkeypatch):
+        monkeypatch.setenv("RENDER", "true")
+        monkeypatch.setenv("DEFAULT_PROVIDER", "qwen")
+        assert app.PROVIDERS[app._default_provider_index()] == "qwen"
+
+    @pytest.mark.parametrize("value", ["ollama", "no-such-provider", ""])
+    def test_render_ignores_local_or_unknown_default(self, monkeypatch, value):
+        monkeypatch.setenv("RENDER", "true")
+        monkeypatch.setenv("DEFAULT_PROVIDER", value)
+        assert app.PROVIDERS[app._default_provider_index()] not in app._LOCAL_PROVIDERS
+
+
+def test_render_page_does_not_start_on_ollama(monkeypatch):
+    """Page-level check: on Render the Provider dropdown's starting value is a
+    cloud provider, so a first visit does not land on a blocked Run button."""
+    from streamlit.testing.v1 import AppTest
+    import ollama_models
+
+    monkeypatch.setenv("RENDER", "true")
+    monkeypatch.delenv("DEFAULT_PROVIDER", raising=False)
+    monkeypatch.setattr(ollama_models, "list_ollama_models", lambda *a, **k: [])
+
+    mode = next(iter(app.MODES))
+    at = AppTest.from_file(str(Path(app.__file__)), default_timeout=30)
+    at.session_state["page"] = mode
+    at.run()
+    assert not at.exception, f"{mode}: {at.exception[0].message}"
+    assert at.selectbox(key=f"provider_{mode}").value not in app._LOCAL_PROVIDERS
