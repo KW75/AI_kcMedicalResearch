@@ -368,3 +368,52 @@ class TestUseFilesChoice:
         assert all("new_doc" in n for n in names)
         assert not any("source" in n for n in names)
         assert (paths["input"] / "source.txt").exists(), "file must never be deleted"
+
+# ---------------------------------------------------------------------------
+# Fallback split: model wrote "Stage" headings instead of the marker
+# ---------------------------------------------------------------------------
+STAGED_ANSWER = (
+    "## Stage 1 - Writer Draft\n\n# Title\n\nDRAFT TEXT\n\n"
+    "## Stage 2 - Editor Polish\n\n# Title\n\nPOLISHED TEXT\n\n"
+    "## Stage 3 - Reviewer QA Report\n\n| Item | PASS |\n\n"
+    "**RECOMMENDATION:** APPROVE\n"
+)
+
+
+class TestStageHeadingFallback:
+
+    def test_stage_headings_split_into_polished_doc_and_review(self):
+        doc, review = w._split_document_and_review(STAGED_ANSWER)
+        assert "POLISHED TEXT" in doc
+        assert "DRAFT TEXT" not in doc
+        assert "Stage" not in doc
+        assert "RECOMMENDATION" not in doc
+        assert "RECOMMENDATION" in review
+        assert review != w.REVIEW_MISSING
+
+    def test_stage_3_only_doc_is_text_before_it(self):
+        text = "# Title\n\nBODY\n\n## Stage 3 - Reviewer QA Report\n\nRECOMMENDATION: APPROVE"
+        doc, review = w._split_document_and_review(text)
+        assert "BODY" in doc and "Stage" not in doc
+        assert "RECOMMENDATION: APPROVE" in review
+
+    def test_qa_report_heading_also_splits(self):
+        text = "# Title\n\nBODY\n\n## QA Report\n\nRECOMMENDATION: REVISE MINOR"
+        doc, review = w._split_document_and_review(text)
+        assert "BODY" in doc and "QA Report" not in doc
+        assert "REVISE MINOR" in review
+
+    def test_ordinary_review_heading_does_not_split(self):
+        text = "# Title\n\n## Review of the literature\n\nBODY"
+        doc, review = w._split_document_and_review(text)
+        assert "Review of the literature" in doc
+        assert review == w.REVIEW_MISSING
+
+    def test_marker_still_wins_over_stage_headings(self):
+        text = "## Stage 3 - x\n\nDOC\n=== REVIEW ===\nREAL REVIEW"
+        doc, review = w._split_document_and_review(text)
+        assert "REAL REVIEW" in review and "REAL REVIEW" not in doc
+
+    def test_system_prompt_forbids_stage_headings(self):
+        p = w._one_pass_system_prompt("", w.TRACK_REPORT).lower()
+        assert "stage headings" in p

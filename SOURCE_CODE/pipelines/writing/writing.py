@@ -390,19 +390,51 @@ REVIEW_MISSING = (
 )
 
 
-def _split_document_and_review(text: str) -> tuple[str, str]:
-    """Cut the AI answer at the REVIEW_MARKER line into (document, review).
+# Headings a model may write when it echoes the stages instead of using the
+# marker. Only headings (lines starting with #) count, so ordinary text such
+# as "## Review of the literature" never triggers a split.
+_STAGE_HEADING = r"^\s*#{1,6}\s*stage\s*\d"
+_EDITOR_STAGE_HEADING = r"^\s*#{1,6}\s*stage\s*2\b"
+_REVIEW_STAGE_HEADING = r"^\s*#{1,6}\s*(stage\s*3\b|(reviewer\s+)?qa\s+report\b)"
 
-    The marker only counts on a line of its own (surrounding spaces allowed).
-    If the marker is missing, or nothing follows it, no text is lost: the
-    document keeps the text and the review says the review is missing.
+
+def _clean_staged_document(document: str) -> str:
+    """If the model wrote a draft and a polished version under 'Stage'
+    headings, keep only the polished (Stage 2) text, and drop any leftover
+    stage heading lines."""
+    import re
+    lines = document.splitlines()
+    for i, line in enumerate(lines):
+        if re.match(_EDITOR_STAGE_HEADING, line, re.I):
+            lines = lines[i + 1:]
+            break
+    lines = [l for l in lines if not re.match(_STAGE_HEADING, l, re.I)]
+    return "\n".join(lines).strip()
+
+
+def _split_document_and_review(text: str) -> tuple[str, str]:
+    """Cut the AI answer into (document, review).
+
+    1. The REVIEW_MARKER line wins (on a line of its own, spaces allowed).
+    2. Fallback: a 'Stage 3' or 'QA Report' heading starts the review.
+    3. Otherwise no text is lost: the document keeps the text and the
+       review says the review is missing.
+    In cases 1 and 2, a duplicated draft under 'Stage' headings is dropped.
     """
+    import re
     lines = text.splitlines()
     for i, line in enumerate(lines):
         if line.strip() == REVIEW_MARKER:
-            document = "\n".join(lines[:i]).strip()
+            document = _clean_staged_document("\n".join(lines[:i]))
             review = "\n".join(lines[i + 1:]).strip()
             return document, (review or REVIEW_MISSING)
+    for i, line in enumerate(lines):
+        if re.match(_REVIEW_STAGE_HEADING, line, re.I):
+            document = _clean_staged_document("\n".join(lines[:i]))
+            review = "\n".join(lines[i + 1:]).strip()
+            if document and review:
+                return document, review
+            break
     return text, REVIEW_MISSING
 
 
@@ -413,16 +445,20 @@ def _one_pass_system_prompt(guidelines: str, track: str) -> str:
     improvement to a persona also reaches one-pass mode.
     """
     base = (
-        "You work in three stages within a single answer: first as the writer, "
-        "then as the editor polishing your own draft, then as the reviewer of "
-        "the final document.\n\n"
-        "## Stage 1 - Writer\n"
+        "Work in three steps inside a single answer, silently: write the "
+        "document, polish it as its editor, then review the final version.\n"
+        "Do NOT write stage headings (such as 'Stage 1', 'Writer Draft' or "
+        "'Editor Polish') and do NOT include your draft. Output only the final "
+        "polished document, then the review marker line, then the review, "
+        "exactly as the Output Format in the user message says.\n\n"
+        "### Writer role\n"
         f"{_WRITER_PERSONA[track]}\n\n"
-        "## Stage 2 - Editor\n"
+        "### Editor role\n"
         f"{_EDITOR_PERSONA[track]}\n\n"
-        "## Stage 3 - Reviewer\n"
+        "### Reviewer role\n"
         f"{_QA_PERSONA[track]}"
     )
+
     if guidelines:
         return (
             f"{base}\n\n"
