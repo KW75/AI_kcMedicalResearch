@@ -417,3 +417,136 @@ class TestStageHeadingFallback:
     def test_system_prompt_forbids_stage_headings(self):
         p = w._one_pass_system_prompt("", w.TRACK_REPORT).lower()
         assert "stage headings" in p
+
+# ---------------------------------------------------------------------------
+# Synopsis track: one document summarising ALL files in input/writing/
+# ---------------------------------------------------------------------------
+SYN_ANSWER = "# Synopsis\n\nSYNOPSIS BODY\n=== REVIEW ===\nRECOMMENDATION: APPROVE"
+
+
+def _syn_run(tmp_path, files, local=True, answer=SYN_ANSWER):
+    """Run run_synopsis with a fake file list and a fake AI.
+    Return (list of user prompts sent, paths dict)."""
+    paths = {
+        "doc_root": tmp_path / "docs",
+        "input": tmp_path / "input",
+        "output": tmp_path / "output",
+        "reports": tmp_path / "reports",
+    }
+    for p in paths.values():
+        p.mkdir(parents=True, exist_ok=True)
+    calls = []
+
+    def fake_llm(system_prompt, user_prompt):
+        calls.append(user_prompt)
+        return answer
+
+    with _patch("pipelines.writing.writing._paths", return_value=paths), \
+         _patch("pipelines.writing.writing._load_input_files",
+                return_value=list(files)):
+        w.run_synopsis(
+            direct_instructions=["Summarise"],
+            call_llm_fn=fake_llm,
+            verbose=False,
+            local=local,
+        )
+    return calls, paths
+
+
+class TestSynopsisTrack:
+
+    def test_track_constant_and_default(self):
+        assert w.TRACK_SYNOPSIS == "synopsis"
+        assert w.DEFAULT_WORDS[w.TRACK_SYNOPSIS] == 1500
+
+    def test_label(self):
+        assert "synopsis" in w._TRACK_LABELS[w.TRACK_SYNOPSIS].lower()
+
+    def test_role_texts_exist_and_differ(self):
+        for table in (w._WRITER_PERSONA, w._EDITOR_PERSONA, w._QA_PERSONA):
+            text = table[w.TRACK_SYNOPSIS]
+            assert text
+            for other in (w.TRACK_TOPIC, w.TRACK_ARTICLE, w.TRACK_REPORT):
+                assert text != table[other]
+
+    def test_unreadable_reason_placeholders(self):
+        for placeholder in (
+            "[Could not read notes.docx]",
+            "[PDF scan.pdf contained no extractable text]",
+            "[PDF reading requires PyMuPDF: pip install pymupdf]",
+            "[Could not read PDF x.pdf: boom]",
+            "",
+        ):
+            assert w._unreadable_reason(placeholder), placeholder
+
+    def test_unreadable_reason_normal_text(self):
+        assert w._unreadable_reason("Real clinical text [1] here.") is None
+
+    def test_user_prompt_lists_all_sources(self):
+        p = w._synopsis_user_prompt(
+            ["Focus on dengue"], [("a", "TEXT A"), ("b", "TEXT B")], 1500
+        )
+        assert "TEXT A" in p and "TEXT B" in p
+        assert "Focus on dengue" in p
+        assert "1500" in p
+        assert w.REVIEW_MARKER in p.splitlines()
+
+
+class TestRunSynopsis:
+
+    FILES = [("one", "TEXT ONE", ".txt"), ("two", "TEXT TWO", ".pdf")]
+
+    def test_one_call_one_document_for_all_files(self, tmp_path):
+        calls, paths = _syn_run(tmp_path, self.FILES)
+        assert len(calls) == 1
+        assert "TEXT ONE" in calls[0] and "TEXT TWO" in calls[0]
+        names = sorted(p.name for p in paths["output"].iterdir())
+        assert len(names) == 3
+        assert all(n.startswith("WRITING_SYNOPSIS_") for n in names)
+        assert any(n.endswith("_REVIEW.md") for n in names)
+        assert any(n.endswith(".docx") for n in names)
+
+    def test_document_and_review_split(self, tmp_path):
+        _, paths = _syn_run(tmp_path, self.FILES)
+        doc = next(p for p in paths["output"].glob("*.md")
+                   if not p.name.endswith("_REVIEW.md"))
+        review = next(paths["output"].glob("*_REVIEW.md"))
+        assert "SYNOPSIS BODY" in doc.read_text(encoding="utf-8")
+        assert "RECOMMENDATION" not in doc.read_text(encoding="utf-8")
+        assert "RECOMMENDATION: APPROVE" in review.read_text(encoding="utf-8")
+
+    def test_no_files_stops_without_ai_call(self, tmp_path, capsys):
+        calls, paths = _syn_run(tmp_path, [])
+        assert calls == []
+        assert "Synopsis needs files in input/writing/" in capsys.readouterr().out
+        assert list(paths["output"].iterdir()) == []
+
+    def test_unreadable_file_skipped(self, tmp_path, capsys):
+        files = [("good", "GOOD TEXT", ".txt"),
+                 ("scan", "[PDF scan.pdf contained no extractable text]", ".pdf")]
+        calls, _ = _syn_run(tmp_path, files)
+        out = capsys.readouterr().out
+        assert "[SKIP]" in out and "scan" in out
+        assert len(calls) == 1
+        assert "GOOD TEXT" in calls[0]
+        assert "no extractable text" not in calls[0]
+
+    def test_all_unreadable_stops(self, tmp_path, capsys):
+        files = [("scan", "[PDF scan.pdf contained no extractable text]", ".pdf")]
+        calls, _ = _syn_run(tmp_path, files)
+        assert calls == []
+        assert "no readable files" in capsys.readouterr().out.lower()
+
+    def test_local_too_large_stops_with_message(self, tmp_path, capsys, monkeypatch):
+        monkeypatch.setattr(w, "SYNOPSIS_LOCAL_MAX_CHARS", 10)
+        calls, paths = _syn_run(tmp_path, [("big", "x" * 50, ".txt")], local=True)
+        out = capsys.readouterr().out.lower()
+        assert calls == []
+        assert list(paths["output"].iterdir()) == []
+        assert "remove some files" in out
+        assert "cloud provider" in out
+
+    def test_cloud_too_large_still_runs(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(w, "SYNOPSIS_LOCAL_MAX_CHARS", 10)
+        calls, _ = _syn_run(tmp_path, [("big", "x" * 50, ".txt")], local=False)
+        assert len(calls) == 1

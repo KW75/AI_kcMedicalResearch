@@ -970,3 +970,186 @@ def run_qa(
         )
         qa_out = _strip_fences(qa_out)
         _write_report(paths["reports"], "QA", track, stem, timestamp, qa_out)
+
+
+
+# ---------------------------------------------------------------------------
+# Synopsis track: ONE document summarising ALL files in input/writing/
+# ---------------------------------------------------------------------------
+TRACK_SYNOPSIS = "synopsis"
+
+# Register the Synopsis track in the shared tables defined near the top.
+DEFAULT_WORDS[TRACK_SYNOPSIS] = 1500
+_TRACK_LABELS[TRACK_SYNOPSIS] = "synopsis of multiple source documents"
+
+_WRITER_PERSONA[TRACK_SYNOPSIS] = (
+    "You are a medical writer who synthesises several source documents "
+    "(for example research papers, or one patient's clinical records) into "
+    "one clear, accurate synopsis. You cover every source, group related "
+    "findings, note where sources agree or conflict, keep figures, dates and "
+    "medication details exactly as written, and never add facts that are not "
+    "in the sources."
+)
+_EDITOR_PERSONA[TRACK_SYNOPSIS] = (
+    "You are a medical editor checking a multi-source synopsis. You make sure "
+    "every source is represented, facts, numbers and dates match the sources, "
+    "nothing is invented, duplicated points are merged, the structure is "
+    "logical, the language is plain and clear, and the word limit is met."
+)
+_QA_PERSONA[TRACK_SYNOPSIS] = (
+    "You are a quality assurance reviewer for multi-document synopses. You "
+    "check coverage of every source, factual fidelity (numbers, dates, "
+    "medications, findings), absence of fabricated content, handling of "
+    "conflicting information, clarity, structure, word count, and "
+    "confidentiality (no unnecessary patient identifiers). You produce a "
+    "structured QA report with PASS items, FAIL items with specific "
+    "references, and a final RECOMMENDATION: APPROVE / REVISE MINOR / "
+    "REVISE MAJOR."
+)
+
+# Ollama's context (num_ctx, default 32768 tokens) holds prompt + answer.
+# With up to 8192 tokens kept for the answer, ~24,500 tokens (~90,000
+# characters) are left; 80,000 characters of source text leaves room for
+# the guidelines and instructions. Above this, a local run stops.
+SYNOPSIS_LOCAL_MAX_CHARS = 80_000
+
+_UNREADABLE_SIGNS = ("could not read", "no extractable text", "requires pymupdf")
+
+
+def _unreadable_reason(content: str) -> str | None:
+    """Return why a loaded file is unusable, or None if it has real text.
+
+    _load_input_files puts a one-line placeholder such as
+    "[PDF x.pdf contained no extractable text]" in place of unreadable
+    files; those must not be sent to the AI as if they were content.
+    """
+    stripped = (content or "").strip()
+    if not stripped:
+        return "empty file"
+    if (stripped.startswith("[") and stripped.endswith("]")
+            and any(s in stripped.lower() for s in _UNREADABLE_SIGNS)):
+        return stripped[1:-1]
+    return None
+
+
+def _synopsis_user_prompt(
+    direct_instructions: list,
+    sources: list,
+    word_limit: int,
+) -> str:
+    """User prompt for the Synopsis track. sources = [(name, text), ...]."""
+    parts = []
+    if direct_instructions:
+        parts.append("## Direct Task Instructions (highest priority)")
+        parts.extend(f"> {str(i).lstrip('> ').strip()}" for i in direct_instructions)
+        parts.append("")
+    parts.append("## Task")
+    parts.append(
+        f"Write ONE {_TRACK_LABELS[TRACK_SYNOPSIS]} that summarises ALL "
+        f"{len(sources)} source document(s) below together. Cover every "
+        "source, group related points, note where sources agree or "
+        "conflict, and name the source file for key points. Use only "
+        "information from the sources."
+    )
+    parts.append(f"Target word count: {word_limit} words (the synopsis only).")
+    parts.append("")
+    for i, (name, text) in enumerate(sources, 1):
+        parts.append(f"## Source {i}: {name}")
+        parts.append(text.strip())
+        parts.append("")
+    parts.append("## Output Format")
+    parts.append("1. The final polished synopsis in Markdown (no draft, no stage headings).")
+    parts.append("2. Then this line on its own:")
+    parts.append(REVIEW_MARKER)
+    parts.append(
+        "3. Then the review: PASS items, FAIL items with specific references, "
+        "and a final line RECOMMENDATION: APPROVE / REVISE MINOR / REVISE MAJOR."
+    )
+    return "\n".join(parts)
+
+
+def run_synopsis(
+    direct_instructions: list,
+    call_llm_fn: Callable,
+    word_limit: int | None = None,
+    verbose: bool = True,
+    local: bool = True,
+) -> None:
+    """Read ALL files in input/writing/ and write ONE synopsis + review
+    in a single AI call.
+
+    Unreadable files are skipped with a [SKIP] line. With no files, or no
+    readable files, nothing is sent and nothing is written. local=True
+    (Ollama) stops if the files are too large for the context window.
+    Files are never moved or deleted. Stop/skip messages always print.
+    """
+    root      = _project_root()
+    paths     = _paths(root)
+    timestamp = _ts()
+
+    for p in [paths["input"], paths["output"]]:
+        p.mkdir(parents=True, exist_ok=True)
+
+    if word_limit is None:
+        word_limit = DEFAULT_WORDS[TRACK_SYNOPSIS]
+
+    input_files = _load_input_files(paths["input"])
+    if not input_files:
+        print("  [SYNOPSIS] Synopsis needs files in input/writing/ -- nothing was written.")
+        return
+
+    sources = []
+    for stem, content, suffix in input_files:
+        reason = _unreadable_reason(content)
+        if reason:
+            print(f"  [SKIP] {stem}{suffix}: {reason}")
+            continue
+        sources.append((f"{stem}{suffix}", content))
+
+    if not sources:
+        print("  [SYNOPSIS] No readable files in input/writing/ -- nothing was written.")
+        return
+
+    total = sum(len(text) for _, text in sources)
+    if total > SYNOPSIS_LOCAL_MAX_CHARS:
+        if local:
+            print(f"  [SYNOPSIS] Files too large for local AI: {total:,} characters "
+                  f"(limit {SYNOPSIS_LOCAL_MAX_CHARS:,}). Nothing was written.")
+            print("  Remove some files from input/writing/ or change to a cloud provider.")
+            return
+        print(f"  [SYNOPSIS] Note: {total:,} characters of source text; "
+              "large inputs may be slow or costly on cloud providers.")
+
+    guidelines = _load_guidelines(paths["doc_root"], paths["doc_root"])
+
+    if verbose:
+        print(f"\n{'='*60}")
+        print(f"  [WRITING | SYNOPSIS] {len(sources)} file(s)")
+        for name, _ in sources:
+            print(f"    - {name}")
+        print(f"  Word limit: {word_limit}")
+        print(f"{'='*60}")
+        print("\n  Writing, editing and reviewing the synopsis (one AI call)...")
+
+    answer = _call_llm(
+        _one_pass_system_prompt(guidelines, TRACK_SYNOPSIS),
+        _synopsis_user_prompt(direct_instructions, sources, word_limit),
+        call_llm_fn, "Synopsis (one pass)",
+    )
+    document, review = _split_document_and_review(_strip_fences(answer))
+    document = _strip_boilerplate(_strip_fences(document))
+    review   = _strip_fences(review)
+
+    base     = f"WRITING_SYNOPSIS_{timestamp}"
+    doc_md   = paths["output"] / f"{base}.md"
+    doc_docx = paths["output"] / f"{base}.docx"
+    rev_md   = paths["output"] / f"{base}_REVIEW.md"
+
+    _write_text(doc_md, document)
+    _write_docx(doc_docx, document, title=f"SYNOPSIS -- {len(sources)} file(s)")
+    _write_text(rev_md, f"# Review (SYNOPSIS) -- {len(sources)} file(s)\n\n{review}\n")
+
+    if verbose:
+        print("\n  Done: synopsis")
+        print(f"    Document: output/writing/{doc_docx.name}")
+        print(f"    Review:   output/writing/{rev_md.name}")
