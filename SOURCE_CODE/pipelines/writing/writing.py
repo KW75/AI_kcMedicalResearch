@@ -169,12 +169,27 @@ def _load_guidelines(track_doc_path: Path, shared_doc_path: Path) -> str:
     return "\n\n".join(parts)
 
 
+# File types Writing mode can read from input/writing/
+_INPUT_EXTENSIONS = {".md", ".txt", ".docx", ".html", ".tex", ".rst", ".pdf"}
+
+
+def list_input_names(input_dir: Path) -> list:
+    """Names of files in input_dir that Writing mode would read, sorted.
+    Does not open the files (fast; used by the menu to ask the user).
+    """
+    if not input_dir.exists():
+        return []
+    return [
+        f.name for f in sorted(input_dir.iterdir())
+        if f.is_file() and f.suffix.lower() in _INPUT_EXTENSIONS
+    ]
+
 
 def _load_input_files(input_dir: Path) -> list:
     """Load all supported files from input_dir.
     Returns list of (stem, content, suffix) tuples.
     """
-    extensions = {".md", ".txt", ".docx", ".html", ".tex", ".rst", ".pdf"}
+    extensions = _INPUT_EXTENSIONS
     results: list = []
     if not input_dir.exists():
         return results
@@ -780,11 +795,14 @@ def run_one_pass(
     track: str = TRACK_TOPIC,
     word_limit: int | None = None,
     verbose: bool = True,
+    use_files: bool = True,
 ) -> None:
+    
     """Write (or revise) and review in a single AI call per input.
 
     With files in input/writing/, each file is revised on its own. With an
-    empty folder, one document is written from the instructions alone.
+    empty folder, or use_files=False, one document is written from the
+    instructions alone (files are ignored, never moved or deleted).
     Saves to output/writing/: the document (.docx + .md) and the review
     (_REVIEW.md). Nothing is written to reports/writing/.
     """
@@ -799,7 +817,7 @@ def run_one_pass(
         word_limit = DEFAULT_WORDS[track]
 
     guidelines  = _load_guidelines(paths["doc_root"], paths["doc_root"])
-    input_files = _load_input_files(paths["input"])
+    input_files = _load_input_files(paths["input"]) if use_files else []
     is_scratch  = len(input_files) == 0
     subprojects = [("new_doc", "", ".md")] if is_scratch else input_files
 

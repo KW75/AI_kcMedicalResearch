@@ -309,3 +309,62 @@ class TestReportTrack:
         docx, _, reviews = _outputs(paths["output"])
         assert docx[0].name.startswith("WRITING_REPORT_")
         assert reviews[0].name.startswith("WRITING_REPORT_")
+        
+# ---------------------------------------------------------------------------
+# Use files in input/writing/ or ignore them (user choice)
+# ---------------------------------------------------------------------------
+from unittest.mock import patch as _patch
+
+
+class TestUseFilesChoice:
+    """Writing mode lists input files and can ignore them on request."""
+
+    @staticmethod
+    def _paths(tmp_path):
+        paths = {
+            "doc_root": tmp_path / "docs",
+            "input": tmp_path / "input",
+            "output": tmp_path / "output",
+            "reports": tmp_path / "reports",
+        }
+        for p in paths.values():
+            p.mkdir(parents=True, exist_ok=True)
+        return paths
+
+    def test_list_input_names_supported_only_sorted(self, tmp_path):
+        (tmp_path / "b.pdf").write_bytes(b"%PDF-1.4")
+        (tmp_path / "a.txt").write_text("x", encoding="utf-8")
+        (tmp_path / "notes.xyz").write_text("x", encoding="utf-8")
+        (tmp_path / "sub").mkdir()
+        assert w.list_input_names(tmp_path) == ["a.txt", "b.pdf"]
+
+    def test_list_input_names_missing_folder(self, tmp_path):
+        assert w.list_input_names(tmp_path / "nope") == []
+
+    def test_use_files_false_writes_from_scratch(self, tmp_path):
+        paths = self._paths(tmp_path)
+        (paths["input"] / "source.txt").write_text(
+            "SECRET SOURCE TEXT", encoding="utf-8"
+        )
+        calls = []
+
+        def fake_llm(system_prompt, user_prompt):
+            calls.append(user_prompt)
+            return "Doc text\n=== REVIEW ===\nRECOMMENDATION: APPROVE"
+
+        with _patch("pipelines.writing.writing._paths", return_value=paths):
+            w.run_one_pass(
+                direct_instructions=["Write about dengue"],
+                call_llm_fn=fake_llm,
+                track=w.TRACK_TOPIC,
+                verbose=False,
+                use_files=False,
+            )
+
+        assert len(calls) == 1
+        assert "SECRET SOURCE TEXT" not in calls[0]
+        names = [p.name for p in paths["output"].iterdir()]
+        assert names, "documents should be written"
+        assert all("new_doc" in n for n in names)
+        assert not any("source" in n for n in names)
+        assert (paths["input"] / "source.txt").exists(), "file must never be deleted"
