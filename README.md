@@ -4,7 +4,7 @@ A multi-mode AI assistant for medical research, critical appraisal, systematic r
 
 
     Version: 2.5.0
-    Tests: 743 passed, 3 skipped, 11 deselected
+    Tests: 816 passed, 3 skipped, 11 deselected
            (reproduce with `python -m pytest -m "not live" --tb=short -q`)
     CI: GitHub Actions - Green
     GitHub: https://github.com/KW75/AI_kcMedicalResearch
@@ -117,7 +117,7 @@ The launcher asks for it after the model (Enter = 15 minutes), and the web UI ha
 | Mode       | Flag                | Roles                                |
 |------------|---------------------|--------------------------------------|
 | Coding     | `--mode coding`     | Builder, Reviewer, Tester            |
-| Writing    | `--mode writing`    | Writer, Editor, QA                   |
+| Writing    | `--mode writing`    | Writer, Editor, Reviewer (one AI call; tracks: Topic, Article, Report, Synopsis) |
 | RCT Search | `--mode rct_search` | Formulator, Searcher, Validator      |
 | Search     | `--mode search`     | Researcher                           |
 | Appraisal  | `--mode appraisal`  | Appraiser, Methodologist, Summariser |

@@ -1,12 +1,18 @@
 """
-writing.py  - Writing Mode engine (v2.6 one-pass, three tracks)
+writing.py  - Writing Mode engine (v2.6 one-pass, four tracks)
 Tracks:
   topic    - newspaper editorial / opinion, default 800 words
   article  - medical research (journal) article, default 3500 words
   report   - structured abstract / report, default 500 words
-Main flow: run_one_pass - one AI call per input -> document + review.
+  synopsis - ONE synopsis of ALL files in input/writing/, default 1500 words
+             (unreadable files skipped; local AI stops above
+             SYNOPSIS_LOCAL_MAX_CHARS characters)
+Main flow: run_one_pass (topic / article / report) - one AI call per input;
+run_synopsis - one AI call for all files. Each writes a document + review
+to output/writing/.
 Legacy (kept until cleanup): run_writer (Writer - Editor - QA), run_editor, run_qa.
 """
+
 
 import sys
 import threading

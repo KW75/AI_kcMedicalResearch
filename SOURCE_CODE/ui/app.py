@@ -84,13 +84,19 @@ MODES: Dict[str, Dict[str, Any]] = {
         "extensions": [".txt", ".md", ".docx", ".pdf"],
         "instructions": (
             "**How to use Writing mode**\n\n"
-            "1. Drop `.txt`, `.md`, `.docx`, or `.pdf` files into `input/writing/`.\n"
+            "1. Optional: drop `.txt`, `.md`, `.docx`, or `.pdf` files into `input/writing/`.\n"
             "2. Choose your provider and model below.\n"
-            "3. Click **Run Writing** → you will be prompted in the terminal to select:\n"
-            "   - **Topic Track**: Editorial/opinion style (newspaper)\n"
-            "   - **Article Track**: Medical journal article style\n"
-            "4. A structured report is generated.\n"
-            "5. Markdown and Word outputs appear in `output/writing/`."
+            "3. Click **Run Writing** → in the terminal, select a track:\n"
+            "   - **Topic Track**: editorial / opinion (800 words)\n"
+            "   - **Article Track**: medical research article (3,500 words)\n"
+            "   - **Report Track**: abstract / report (500 words)\n"
+            "   - **Synopsis Track**: one synopsis of all files in `input/writing/` (1,500 words)\n"
+            "4. If files are found, you are asked whether to use them. "
+            "Synopsis needs files; the other tracks can write from your instructions alone.\n"
+            "5. One AI call writes, edits and reviews. The document (`.docx` + `.md`) "
+            "and its review (`_REVIEW.md`) appear in `output/writing/`.\n\n"
+            "Cloud providers need your confirmation before any text leaves this machine. "
+            "Do not use them for patient-identifiable data."
         ),
     },
     "appraisal": {

@@ -1903,7 +1903,7 @@ def handle_writing_mode(
     model: str | None = None,
     dry_run: bool = False,
 ) -> None:
-    """Terminal entry point for Writing mode (two-track: topic / article/ report / synopsis)."""
+    """Terminal entry point for Writing mode (four tracks: topic / article / report / synopsis)."""
     try:
         from pipelines.writing.writing import (
             run_one_pass, list_input_names, run_synopsis, input_file_sizes,

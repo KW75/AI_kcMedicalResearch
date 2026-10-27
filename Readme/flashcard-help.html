@@ -99,36 +99,39 @@ python SOURCE_CODE/main.py --dry-run</pre>
   <div><div class="card-title">Writing Mode</div><div class="card-badge">--mode writing</div></div>
 </div>
 <div class="card-body">
-  <div class="section-label">Roles</div>
+  <div class="section-label">Roles (one AI call)</div>
   <span class="pill pill-green">&#9997;&#65039; Writer</span>
   <span class="pill pill-green">&#128196; Editor</span>
-  <span class="pill pill-green">&#9989; QA</span>
+  <span class="pill pill-green">&#9989; Reviewer</span>
   <div class="section-label">Tracks</div>
   <table>
-    <tr><th>Track</th><th>Purpose</th></tr>
-    <tr><td>Topic Track</td><td>Editorial / opinion (newspaper style)</td></tr>
-    <tr><td>Article Track</td><td>Medical journal article</td></tr>
+    <tr><th>Track</th><th>Purpose</th><th>Default words</th></tr>
+    <tr><td>1. Topic Track</td><td>Editorial / opinion</td><td>800</td></tr>
+    <tr><td>2. Article Track</td><td>Medical research article</td><td>3,500</td></tr>
+    <tr><td>3. Report Track</td><td>Abstract / report</td><td>500</td></tr>
+    <tr><td>4. Synopsis Track</td><td>One synopsis of all files in input/writing/</td><td>1,500</td></tr>
   </table>
   <div class="section-label">What it does</div>
   <table>
-    <tr><th>Role</th><th>Purpose</th></tr>
-    <tr><td>Writer</td><td>Drafts content based on your brief and style guide</td></tr>
-    <tr><td>Editor</td><td>Improves clarity, structure, and readability</td></tr>
-    <tr><td>QA</td><td>Checks against editorial standards and quality checklist</td></tr>
+    <tr><th>Step</th><th>Purpose</th></tr>
+    <tr><td>Files question</td><td>Lists files in input/writing/ and asks before using them (Synopsis needs files)</td></tr>
+    <tr><td>One AI call</td><td>Writes, edits and reviews; the review is split off at the === REVIEW === line</td></tr>
+    <tr><td>Size check</td><td>Synopsis on local AI stops above 80,000 characters of text</td></tr>
   </table>
   <div class="section-label">Input</div>
   <table>
     <tr><th>Folder</th><th>File types</th></tr>
     <tr><td><code>input/writing/</code></td><td>.txt .md .pdf .docx</td></tr>
-    <tr><td><code>docs/writing/</code></td><td>project-brief.md, style-guide.md, editorial-standards.md</td></tr>
+    <tr><td><code>docs/writing/</code></td><td>project-brief.md, style-guide.md, editorial-standards.md, qa-checklist.md</td></tr>
   </table>
   <div class="section-label">Run</div>
   <pre>python SOURCE_CODE/main.py --mode writing
-python SOURCE_CODE/main.py --mode writing --report
-python SOURCE_CODE/main.py --mode writing --provider openai</pre>
+      python SOURCE_CODE/main.py --mode writing --report
+      python SOURCE_CODE/main.py --mode writing --provider openai</pre>
   <div class="section-label">Output</div>
   <table>
-    <tr><td>Session transcript</td><td><code>reports/writing/session_*.md</code></td></tr>
+    <tr><td>Document</td><td><code>output/writing/WRITING_&lt;TRACK&gt;_*.docx + .md</code></td></tr>
+    <tr><td>Review</td><td><code>output/writing/WRITING_&lt;TRACK&gt;_*_REVIEW.md</code></td></tr>
     <tr><td>Summary report (--report)</td><td><code>output/writing/writing_report_*.md + .docx</code></td></tr>
   </table>
 </div></div>
