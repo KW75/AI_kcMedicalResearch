@@ -740,6 +740,72 @@ def run_writer(
 
 
 # ---------------------------------------------------------------------------
+# One-pass Writing mode: one AI call per input -> document + review
+# ---------------------------------------------------------------------------
+
+def run_one_pass(
+    direct_instructions: list,
+    call_llm_fn: Callable,
+    track: str = TRACK_TOPIC,
+    word_limit: int | None = None,
+    verbose: bool = True,
+) -> None:
+    """Write (or revise) and review in a single AI call per input.
+
+    With files in input/writing/, each file is revised on its own. With an
+    empty folder, one document is written from the instructions alone.
+    Saves to output/writing/: the document (.docx + .md) and the review
+    (_REVIEW.md). Nothing is written to reports/writing/.
+    """
+    root      = _project_root()
+    paths     = _paths(root)
+    timestamp = _ts()
+
+    for p in [paths["input"], paths["output"]]:
+        p.mkdir(parents=True, exist_ok=True)
+
+    if word_limit is None:
+        word_limit = DEFAULT_WORDS[track]
+
+    guidelines  = _load_guidelines(paths["doc_root"], paths["doc_root"])
+    input_files = _load_input_files(paths["input"])
+    is_scratch  = len(input_files) == 0
+    subprojects = [("new_doc", "", ".md")] if is_scratch else input_files
+
+    for stem, original_content, _suffix in subprojects:
+        if verbose:
+            print(f"\n{'='*60}")
+            print(f"  [WRITING | {track.upper()}] {stem}")
+            print(f"  Word limit: {word_limit}")
+            print(f"{'='*60}")
+            print("\n  Writing, editing and reviewing (one AI call)...")
+
+        answer = _call_llm(
+            _one_pass_system_prompt(guidelines, track),
+            _one_pass_user_prompt(direct_instructions, original_content,
+                                  is_scratch, track, word_limit),
+            call_llm_fn, "Writing (one pass)",
+        )
+        document, review = _split_document_and_review(_strip_fences(answer))
+        document = _strip_boilerplate(_strip_fences(document))
+        review   = _strip_fences(review)
+
+        base     = f"WRITING_{track.upper()}_{stem}_{timestamp}"
+        doc_md   = paths["output"] / f"{base}.md"
+        doc_docx = paths["output"] / f"{base}.docx"
+        rev_md   = paths["output"] / f"{base}_REVIEW.md"
+
+        _write_text(doc_md, document)
+        _write_docx(doc_docx, document, title=f"{track.upper()} -- {stem}")
+        _write_text(rev_md, f"# Review ({track.upper()}) -- {stem}\n\n{review}\n")
+
+        if verbose:
+            print(f"\n  Done: {stem}")
+            print(f"    Document: output/writing/{doc_docx.name}")
+            print(f"    Review:   output/writing/{rev_md.name}")
+
+
+# ---------------------------------------------------------------------------
 # Standalone: Editor
 # ---------------------------------------------------------------------------
 def run_editor(

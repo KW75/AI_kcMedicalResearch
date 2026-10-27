@@ -130,3 +130,116 @@ class TestOnePassUserPrompt:
 
     def test_review_asks_for_recommendation(self):
         assert "RECOMMENDATION" in self._prompt()
+
+
+# ---------------------------------------------------------------------------
+# run_one_pass: one AI call per input, then document (.docx + .md) + review.
+# Folders are redirected to tmp_path, as in test_writing.py.
+# ---------------------------------------------------------------------------
+
+from unittest.mock import patch
+
+FAKE_ANSWER = (
+    "# Dengue Update\n\nDocument body text.\n\n"
+    "=== REVIEW ===\n\nPASS: clear structure.\nRECOMMENDATION: APPROVE\n"
+)
+
+
+def _make_paths(tmp_path):
+    paths = {
+        "doc_root": tmp_path / "docs",
+        "input": tmp_path / "input",
+        "output": tmp_path / "output",
+        "reports": tmp_path / "reports",
+    }
+    for p in paths.values():
+        p.mkdir(parents=True)
+    return paths
+
+
+def _outputs(output_dir):
+    docx = sorted(output_dir.glob("WRITING_*.docx"))
+    reviews = sorted(output_dir.glob("WRITING_*_REVIEW.md"))
+    docs_md = sorted(
+        p for p in output_dir.glob("WRITING_*.md") if not p.name.endswith("_REVIEW.md")
+    )
+    return docx, docs_md, reviews
+
+
+class TestRunOnePass:
+    """run_one_pass makes one AI call per input and saves document + review."""
+
+    def _run(self, tmp_path, answer=FAKE_ANSWER, track=w.TRACK_TOPIC, files=None):
+        paths = _make_paths(tmp_path)
+        for name, text in (files or {}).items():
+            (paths["input"] / name).write_text(text, encoding="utf-8")
+        calls = []
+
+        def fake_llm(system_prompt, user_prompt):
+            calls.append((system_prompt, user_prompt))
+            return answer
+
+        with patch.object(w, "_paths", return_value=paths):
+            w.run_one_pass(
+                direct_instructions=[],
+                call_llm_fn=fake_llm,
+                track=track,
+                verbose=False,
+            )
+        return paths, calls
+
+    def test_scratch_makes_one_ai_call(self, tmp_path):
+        _, calls = self._run(tmp_path)
+        assert len(calls) == 1
+
+    def test_scratch_creates_docx_md_and_review(self, tmp_path):
+        paths, _ = self._run(tmp_path)
+        docx, docs_md, reviews = _outputs(paths["output"])
+        assert len(docx) == 1
+        assert len(docs_md) == 1
+        assert len(reviews) == 1
+
+    def test_document_and_review_are_separated(self, tmp_path):
+        paths, _ = self._run(tmp_path)
+        _, docs_md, reviews = _outputs(paths["output"])
+        doc_text = docs_md[0].read_text(encoding="utf-8")
+        review_text = reviews[0].read_text(encoding="utf-8")
+        assert "Document body text." in doc_text
+        assert "RECOMMENDATION" not in doc_text
+        assert w.REVIEW_MARKER not in doc_text
+        assert "RECOMMENDATION: APPROVE" in review_text
+
+    def test_missing_marker_keeps_text_and_flags_review(self, tmp_path):
+        paths, _ = self._run(tmp_path, answer="# Title\n\nOnly a document, no marker.")
+        _, docs_md, reviews = _outputs(paths["output"])
+        assert "Only a document, no marker." in docs_md[0].read_text(encoding="utf-8")
+        assert "review missing" in reviews[0].read_text(encoding="utf-8").lower()
+
+    def test_input_file_text_goes_into_prompt(self, tmp_path):
+        paths, calls = self._run(
+            tmp_path, files={"dengue_note.txt": "SOURCE TEXT ABC 123"}
+        )
+        assert len(calls) == 1
+        assert "SOURCE TEXT ABC 123" in calls[0][1]
+        docx, _, _ = _outputs(paths["output"])
+        assert "dengue_note" in docx[0].name
+
+    def test_one_call_and_one_document_per_input_file(self, tmp_path):
+        paths, calls = self._run(
+            tmp_path, files={"a.txt": "First text.", "b.txt": "Second text."}
+        )
+        assert len(calls) == 2
+        docx, docs_md, reviews = _outputs(paths["output"])
+        assert len(docx) == 2
+        assert len(docs_md) == 2
+        assert len(reviews) == 2
+
+    def test_nothing_written_to_reports(self, tmp_path):
+        paths, _ = self._run(tmp_path)
+        assert list(paths["reports"].iterdir()) == []
+
+    def test_article_track_in_file_names(self, tmp_path):
+        paths, _ = self._run(tmp_path, track=w.TRACK_ARTICLE)
+        docx, _, reviews = _outputs(paths["output"])
+        assert docx[0].name.startswith("WRITING_ARTICLE_")
+        assert reviews[0].name.startswith("WRITING_ARTICLE_")
