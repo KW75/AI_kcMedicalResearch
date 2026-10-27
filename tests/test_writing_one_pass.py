@@ -52,3 +52,81 @@ class TestSplitDocumentAndReview:
         document, review = _split_document_and_review(text)
         assert document == text
         assert "review missing" in review.lower()
+
+
+
+# ---------------------------------------------------------------------------
+# One-pass prompts. Imported as a module so a missing function fails each
+# test on its own instead of stopping the whole file from loading.
+# ---------------------------------------------------------------------------
+
+from pipelines.writing import writing as w
+
+
+class TestOnePassSystemPrompt:
+    """One system prompt that combines the writer, editor and reviewer roles."""
+
+    def test_combines_all_three_personas_topic(self):
+        sp = w._one_pass_system_prompt("", w.TRACK_TOPIC)
+        assert w._WRITER_PERSONA[w.TRACK_TOPIC] in sp
+        assert w._EDITOR_PERSONA[w.TRACK_TOPIC] in sp
+        assert w._QA_PERSONA[w.TRACK_TOPIC] in sp
+
+    def test_combines_all_three_personas_article(self):
+        sp = w._one_pass_system_prompt("", w.TRACK_ARTICLE)
+        assert w._WRITER_PERSONA[w.TRACK_ARTICLE] in sp
+        assert w._EDITOR_PERSONA[w.TRACK_ARTICLE] in sp
+        assert w._QA_PERSONA[w.TRACK_ARTICLE] in sp
+
+    def test_guidelines_included_when_given(self):
+        sp = w._one_pass_system_prompt("Use British spelling.", w.TRACK_TOPIC)
+        assert "## Guidelines" in sp
+        assert "Use British spelling." in sp
+
+    def test_no_guidelines_heading_when_empty(self):
+        sp = w._one_pass_system_prompt("", w.TRACK_TOPIC)
+        assert "## Guidelines" not in sp
+
+
+class TestOnePassUserPrompt:
+    """The user prompt asks for the document, the marker line, then the review."""
+
+    def _prompt(self, **kw):
+        args = dict(
+            direct_instructions=[],
+            original_content="",
+            is_scratch=True,
+            track=w.TRACK_TOPIC,
+            word_limit=800,
+        )
+        args.update(kw)
+        return w._one_pass_user_prompt(**args)
+
+    def test_marker_on_its_own_line(self):
+        lines = [line.strip() for line in self._prompt().splitlines()]
+        assert w.REVIEW_MARKER in lines
+
+    def test_word_limit_used(self):
+        assert "650 words" in self._prompt(word_limit=650)
+
+    def test_direct_instructions_listed(self):
+        p = self._prompt(direct_instructions=["> Focus on dengue"])
+        assert "DIRECT TASK INSTRUCTIONS" in p
+        assert "- Focus on dengue" in p
+
+    def test_scratch_has_no_source_section(self):
+        p = self._prompt(is_scratch=True)
+        assert "No input document" in p
+        assert "## Source Document" not in p
+
+    def test_source_document_included(self):
+        p = self._prompt(is_scratch=False, original_content="ORIGINAL TEXT 123")
+        assert "## Source Document" in p
+        assert "ORIGINAL TEXT 123" in p
+
+    def test_track_label(self):
+        assert "newspaper editorial" in self._prompt(track=w.TRACK_TOPIC)
+        assert "medical journal article" in self._prompt(track=w.TRACK_ARTICLE)
+
+    def test_review_asks_for_recommendation(self):
+        assert "RECOMMENDATION" in self._prompt()

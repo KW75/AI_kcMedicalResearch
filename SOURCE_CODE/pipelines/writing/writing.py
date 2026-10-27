@@ -359,6 +359,80 @@ def _split_document_and_review(text: str) -> tuple[str, str]:
     return text, REVIEW_MISSING
 
 
+def _one_pass_system_prompt(guidelines: str, track: str) -> str:
+    """One system prompt for one-pass Writing mode: writer, editor and reviewer.
+
+    Reuses the three existing persona texts for the track, so any later
+    improvement to a persona also reaches one-pass mode.
+    """
+    base = (
+        "You work in three stages within a single answer: first as the writer, "
+        "then as the editor polishing your own draft, then as the reviewer of "
+        "the final document.\n\n"
+        "## Stage 1 - Writer\n"
+        f"{_WRITER_PERSONA[track]}\n\n"
+        "## Stage 2 - Editor\n"
+        f"{_EDITOR_PERSONA[track]}\n\n"
+        "## Stage 3 - Reviewer\n"
+        f"{_QA_PERSONA[track]}"
+    )
+    if guidelines:
+        return (
+            f"{base}\n\n"
+            "## Guidelines\n"
+            "Apply the following guidelines throughout your work.\n\n"
+            f"{guidelines}"
+        )
+    return base
+
+
+def _one_pass_user_prompt(
+    direct_instructions: list,
+    original_content: str,
+    is_scratch: bool,
+    track: str,
+    word_limit: int,
+) -> str:
+    """User prompt for one-pass Writing mode: document, marker line, review."""
+    track_label = "newspaper editorial / opinion piece" if track == TRACK_TOPIC \
+        else "medical journal article"
+    parts = []
+    if direct_instructions:
+        parts.append("## DIRECT TASK INSTRUCTIONS (highest priority)")
+        for inst in direct_instructions:
+            parts.append(f"- {inst.lstrip('>').strip()}")
+        parts.append("")
+    if is_scratch:
+        parts.append(
+            f"## Task\n"
+            f"No input document was provided. Using the instructions above, produce a "
+            f"complete {track_label}. Target word count: {word_limit} words. "
+            f"Follow all style and editorial guidelines provided."
+        )
+    else:
+        parts.append("## Source Document")
+        parts.append(original_content)
+        parts.append(
+            f"\n## Task\n"
+            f"Using the source document above and the instructions, produce a complete "
+            f"{track_label}. Target word count: {word_limit} words. "
+            f"Follow all style and editorial guidelines."
+        )
+    parts.append(
+        "\n## Output Format\n"
+        "1. Write the complete final document in Markdown, already edited and "
+        "polished. Do not truncate. Do not include drafts or meta-commentary.\n"
+        "2. Then write this line on its own, exactly as shown:\n\n"
+        f"{REVIEW_MARKER}\n\n"
+        "3. After that line, write a short review of the final document: PASS "
+        "items, FAIL items with specific references, and a RECOMMENDATION: "
+        "APPROVE / REVISE MINOR / REVISE MAJOR.\n\n"
+        f"The target word count ({word_limit} words) applies to the document only, "
+        "not to the review."
+    )
+    return "\n".join(parts)
+
+
 def _system_prompt(guidelines: str, role: str, track: str) -> str:
     personas = {
         "Writer": _WRITER_PERSONA,
