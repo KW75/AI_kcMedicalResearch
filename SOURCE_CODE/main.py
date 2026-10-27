@@ -1906,13 +1906,13 @@ def handle_writing_mode(
     """Terminal entry point for Writing mode (two-track: topic / article)."""
     try:
         from pipelines.writing.writing import (
-            run_one_pass,
+            run_one_pass, list_input_names,
             parse_direct_instructions as _pdi,
             TRACK_TOPIC, TRACK_ARTICLE, TRACK_REPORT, DEFAULT_WORDS,
         )
     except ModuleNotFoundError:
         from pipelines.writing.writing import (
-            run_one_pass,
+            run_one_pass, list_input_names,
             parse_direct_instructions as _pdi,
             TRACK_TOPIC, TRACK_ARTICLE, TRACK_REPORT, DEFAULT_WORDS,
         )
@@ -1950,6 +1950,26 @@ def handle_writing_mode(
     track = track_map[track_choice]
 
     print(f"\n  Track: {track.upper()}")
+
+    # Files in input/writing/: list them and ask before using them.
+    # Files are never moved or deleted; "n" only ignores them for this run.
+    found = list_input_names(INPUT_WRITING)
+    use_files = True
+    if found:
+        print("\n  Files found in input/writing/:")
+        for i, name in enumerate(found, 1):
+            print(f"    {i}. {name}")
+        try:
+            ans = input("  Use these files? [Y/n]: ").strip().lower()
+        except (EOFError, KeyboardInterrupt):
+            ans = ""
+        if ans in ("n", "no"):
+            use_files = False
+            print("  Files ignored - a new document will be written.")
+        else:
+            print(f"  Using {len(found)} file(s): one document + review per file.")
+    else:
+        print("\n  No files in input/writing/ - a new document will be written.")
 
 
     # Word limit (always asked: every run writes a document)
@@ -1991,6 +2011,7 @@ def handle_writing_mode(
         direct_instructions=direct_instructions,
         call_llm_fn=_call_llm_fn,
         track=track,
+        use_files=use_files,
         word_limit=word_limit,
         verbose=True,
     )

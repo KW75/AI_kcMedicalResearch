@@ -1,9 +1,13 @@
 """Tests for the Writing mode terminal menu (main.handle_writing_mode).
 
-New flow: track -> word limit -> instructions -> one call to run_one_pass.
+Flow: track -> (files found? "Use these files? [Y/n]") -> word limit
+-> instructions -> one call to run_one_pass.
 There is no Writer/Editor/QA sub-mode question any more.
 Tracks: 1 Topic (editorial / opinion), 2 Article (medical research articles),
 3 Report (abstract / report).
+
+The file list in input/writing/ is faked, so these tests do not depend on
+what is in the real folder.
 """
 
 import sys
@@ -18,9 +22,9 @@ from SOURCE_CODE import main
 from pipelines.writing.writing import TRACK_TOPIC, TRACK_ARTICLE, TRACK_REPORT
 
 
-def _run_menu(answers):
-    """Run handle_writing_mode with typed answers; return (run_one_pass mock,
-    run_writer mock, list of input() prompts shown)."""
+def _run_menu(answers, files=None):
+    """Run handle_writing_mode with typed answers and a fake file list.
+    Return (run_one_pass mock, run_writer mock, list of input() prompts)."""
     it = iter(answers)
     prompts = []
 
@@ -29,6 +33,8 @@ def _run_menu(answers):
         return next(it, "")  # extra questions get a blank answer
 
     with patch("builtins.input", side_effect=fake_input), \
+         patch("pipelines.writing.writing.list_input_names",
+               return_value=list(files or [])), \
          patch("pipelines.writing.writing.run_one_pass") as one_pass, \
          patch("pipelines.writing.writing.run_writer") as writer:
         main.handle_writing_mode(provider="ollama", model=None, dry_run=True)
@@ -71,3 +77,35 @@ class TestWritingMenu:
         assert "Article Track" in out and "medical research articles" in out
         assert "Report Track" in out and "abstract / report" in out
         assert any("[0-3]" in p for p in prompts)
+
+
+class TestUseFilesQuestion:
+    """Files in input/writing/ are listed and the user confirms using them."""
+
+    FILES = ["paper_one.pdf"]
+
+    def test_files_found_enter_uses_them(self, capsys):
+        one_pass, _, prompts = _run_menu(
+            ["1", "", "", "Focus on dengue", ""], files=self.FILES
+        )
+        assert any("Use these files" in p for p in prompts)
+        assert "paper_one.pdf" in capsys.readouterr().out
+        one_pass.assert_called_once()
+        kwargs = one_pass.call_args.kwargs
+        assert kwargs["use_files"] is True
+        assert kwargs["word_limit"] == 800
+
+    def test_files_found_n_ignores_them(self, capsys):
+        one_pass, _, prompts = _run_menu(
+            ["1", "n", "", "Focus on dengue", ""], files=self.FILES
+        )
+        assert any("Use these files" in p for p in prompts)
+        assert "Files ignored" in capsys.readouterr().out
+        one_pass.assert_called_once()
+        assert one_pass.call_args.kwargs["use_files"] is False
+
+    def test_no_files_no_question_but_says_so(self, capsys):
+        one_pass, _, prompts = _run_menu(["1", "", "Focus on dengue", ""])
+        assert not any("Use these files" in p for p in prompts)
+        assert "No files in input/writing/" in capsys.readouterr().out
+        one_pass.assert_called_once()
