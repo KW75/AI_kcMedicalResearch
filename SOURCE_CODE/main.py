@@ -1903,19 +1903,22 @@ def handle_writing_mode(
     model: str | None = None,
     dry_run: bool = False,
 ) -> None:
-    """Terminal entry point for Writing mode (two-track: topic / article)."""
+    """Terminal entry point for Writing mode (four tracks: topic / article / report / synopsis)."""
     try:
         from pipelines.writing.writing import (
-            run_writer, run_editor, run_qa,
+            run_one_pass, list_input_names, run_synopsis, input_file_sizes,
             parse_direct_instructions as _pdi,
-            TRACK_TOPIC, TRACK_ARTICLE, DEFAULT_WORDS,
+            TRACK_TOPIC, TRACK_ARTICLE, TRACK_REPORT, TRACK_SYNOPSIS,
+            DEFAULT_WORDS, SYNOPSIS_LOCAL_MAX_CHARS,
         )
     except ModuleNotFoundError:
         from pipelines.writing.writing import (
-            run_writer, run_editor, run_qa,
+            run_one_pass, list_input_names, run_synopsis, input_file_sizes,
             parse_direct_instructions as _pdi,
-            TRACK_TOPIC, TRACK_ARTICLE, DEFAULT_WORDS,
+            TRACK_TOPIC, TRACK_ARTICLE, TRACK_REPORT, TRACK_SYNOPSIS,
+            DEFAULT_WORDS, SYNOPSIS_LOCAL_MAX_CHARS,
         )
+
 
     def _call_llm_fn(system_prompt: str, user_prompt: str) -> str:
         if dry_run:
@@ -1930,65 +1933,91 @@ def handle_writing_mode(
     print("\n" + "=" * 60)
     print("  WRITING MODE")
     print("=" * 60)
-    print("  1. Topic Track     - editorial / opinion (newspaper style)")
-    print("  2. Article Track   - medical journal article")
+    print("  1. Topic Track     - editorial / opinion")
+    print("  2. Article Track   - medical research articles")
+    print("  3. Report Track    - abstract / report")
+    print("  4. Synopsis Track  - one synopsis of all files in input/writing/")
     print("  0. Back to menu")
     print("=" * 60)
     try:
-        track_choice = input("Select track [0-2]: ").strip()
+        track_choice = input("Select track [0-4]: ").strip()
     except (EOFError, KeyboardInterrupt):
         print()
         return
     if track_choice == "0" or not track_choice:
         print("Returning to menu.")
         return
-    if track_choice == "1":
-        track = TRACK_TOPIC
-    elif track_choice == "2":
-        track = TRACK_ARTICLE
-    else:
+    track_map = {"1": TRACK_TOPIC, "2": TRACK_ARTICLE, "3": TRACK_REPORT,
+                 "4": TRACK_SYNOPSIS}
+    if track_choice not in track_map:
         print("Invalid choice  - returning to menu.")
         return
+    track = track_map[track_choice]
+    is_synopsis = track == TRACK_SYNOPSIS
 
-    # Sub-mode selection
     print(f"\n  Track: {track.upper()}")
-    print("  " + "-" * 40)
-    print("  1. Writer   - full pipeline: Writer -> Editor -> QA")
-    print("  2. Editor   - standalone: edit documents in input/writing/")
-    print("  3. QA       - standalone: review documents in input/writing/")
-    print("  0. Back")
-    try:
-        sub_choice = input("Select sub-mode [0-3]: ").strip()
-    except (EOFError, KeyboardInterrupt):
-        print()
-        return
-    if sub_choice == "0" or not sub_choice:
-        print("Returning to menu.")
-        return
-    sub_mode_map = {"1": "Writer", "2": "Editor", "3": "QA"}
-    if sub_choice not in sub_mode_map:
-        print("Invalid choice  - returning to menu.")
-        return
-    sub_mode = sub_mode_map[sub_choice]
 
-    # Word limit
-    if sub_mode in ("Writer", "Editor"):
-        default_wl = DEFAULT_WORDS[track]
-        print(f"\n  Default word limit for {track} track: {default_wl}")
+    # Files in input/writing/: list them and ask before using them.
+    # Files are never moved or deleted; "n" only ignores them for this run.
+    found = list_input_names(INPUT_WRITING)
+    use_files = True
+    if is_synopsis:
+        # Synopsis needs files: never written from scratch.
+        if not found:
+            print("\n  Synopsis needs files in input/writing/ - nothing was written.")
+            return
+        print("\n  Reading files to count their text...")
+        sizes = input_file_sizes(INPUT_WRITING)
+        print("\n  Files found in input/writing/ (characters of text):")
+        total = 0
+        for i, (name, chars) in enumerate(sizes, 1):
+            if chars is None:
+                print(f"    {i}. {name} (unreadable - will be skipped)")
+            else:
+                total += chars
+                print(f"    {i}. {name} ({chars:,} chars)")
+        print(f"  Total: {total:,} characters "
+              f"(local AI limit {SYNOPSIS_LOCAL_MAX_CHARS:,})")
+
         try:
-            wl_input = input(
-                f"  Press Enter to keep {default_wl}, or type a number: "
-            ).strip()
+            ans = input("  Use these files for one synopsis? [Y/n]: ").strip().lower()
         except (EOFError, KeyboardInterrupt):
-            wl_input = ""
-        word_limit = int(wl_input) if wl_input.isdigit() and int(wl_input) > 0 \
-            else default_wl
-        print(f"  Word limit set to: {word_limit}\n")
+            ans = ""
+        if ans in ("n", "no"):
+            print("  Synopsis cancelled - nothing was written.")
+            return
+        print(f"  Using {len(found)} file(s): one synopsis + review for all of them.")
+    elif found:
+        print("\n  Files found in input/writing/:")
+        for i, name in enumerate(found, 1):
+            print(f"    {i}. {name}")
+        try:
+            ans = input("  Use these files? [Y/n]: ").strip().lower()
+        except (EOFError, KeyboardInterrupt):
+            ans = ""
+        if ans in ("n", "no"):
+            use_files = False
+            print("  Files ignored - a new document will be written.")
+        else:
+            print(f"  Using {len(found)} file(s): one document + review per file.")
     else:
-        word_limit = DEFAULT_WORDS[track]
+        print("\n  No files in input/writing/ - a new document will be written.")
+
+    # Word limit (always asked: every run writes a document)
+    default_wl = DEFAULT_WORDS[track]
+    print(f"\n  Default word limit for {track} track: {default_wl}")
+    try:
+        wl_input = input(
+            f"  Press Enter to keep {default_wl}, or type a number: "
+        ).strip()
+    except (EOFError, KeyboardInterrupt):
+        wl_input = ""
+    word_limit = int(wl_input) if wl_input.isdigit() and int(wl_input) > 0 \
+        else default_wl
+    print(f"  Word limit set to: {word_limit}\n")
 
     # Instructions
-    print(f"  [{sub_mode.upper()} | {track.upper()}] Enter instructions below.")
+    print(f"  [WRITING | {track.upper()}] Enter instructions below.")
     print("  Lines starting with > are DIRECT TASK INSTRUCTIONS (highest priority).")
     print("  Press ENTER on a blank line when done.\n")
 
@@ -2008,32 +2037,29 @@ def handle_writing_mode(
     direct_instructions = _pdi("\n".join(lines))
     print()
 
-    if sub_mode == "Writer":
-        run_writer(
+    if is_synopsis:
+        run_synopsis(
             direct_instructions=direct_instructions,
             call_llm_fn=_call_llm_fn,
-            track=track,
             word_limit=word_limit,
             verbose=True,
+            local=(provider == "ollama"),
         )
-    elif sub_mode == "Editor":
-        run_editor(
-            direct_instructions=direct_instructions,
-            call_llm_fn=_call_llm_fn,
-            track=track,
-            word_limit=word_limit,
-            verbose=True,
-        )
-    elif sub_mode == "QA":
-        run_qa(
-            direct_instructions=direct_instructions,
-            call_llm_fn=_call_llm_fn,
-            track=track,
-            verbose=True,
-        )
+        print("\n  [WRITING | SYNOPSIS] Finished. See the messages above and "
+              "output/writing/.\n")
+        return
 
-    print(f"\n  [{sub_mode.upper()} | {track.upper()}] Done. "
-          "Check output/writing/ and reports/writing/ for results.\n")
+    run_one_pass(
+        direct_instructions=direct_instructions,
+        call_llm_fn=_call_llm_fn,
+        track=track,
+        use_files=use_files,
+        word_limit=word_limit,
+        verbose=True,
+    )
+
+    print(f"\n  [WRITING | {track.upper()}] Done. "
+          "Check output/writing/ for the document and its review.\n")
 
 
 # ---------------------------------------------------------------------------

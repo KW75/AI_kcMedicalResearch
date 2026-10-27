@@ -41,16 +41,19 @@ so those catches happen at session open, not mid-work.
 
 ---
 
-## Current State (Session 31, v2.5.0, 2026-10-26)
+## Current State (Session 32, v2.5.0 on main, 2026-10-27)
 
 
 | Component      | Status |
 |----------------|--------|
-| Tests          | 737 passed, 3 skipped, 11 deselected (`python -m pytest -m "not live" --tb=short -q`) |
-| CI             | green (455b2d8; 28e616e; 3a9081b and 6813b12 also confirmed green) |
-| Render deploy  | <merge hash> live 2026-10-26; DEFAULT_PROVIDER=qwen + DASHSCOPE_API_KEY on the service's own Environment tab; qwen prompt OK on live app |
+| Tests          | 816 passed, 3 skipped, 11 deselected on v2.6-ocr-editor (`python -m pytest -m "not live" --tb=short -q`); main 737 |
+| Branch         | v2.6-ocr-editor, 17 commits ahead of main (2a37319) incl. this HANDOFF update; not merged |
+| CI             | green (455b2d8; 28e616e; 3a9081b and 6813b12 also confirmed green); v2.6-ocr-editor not checked |
+| Render deploy  | 2a37319 live; DEFAULT_PROVIDER=qwen only, no API key on Render; users enter their own key in the sidebar (tested OK) |
+| Writing mode   | one-pass (write + edit + review in one call); tracks Topic 800 / Article 3,500 / Report 500 / Synopsis 1,500; tested on gemma4:e4b (branch only) |
 | SR pipeline    | working via CLI with Qwen; Ang 2010 verified against PDF (NFR week 6, unanimous N=3); text-fallback drops now surface in Stage 4 `[SKIP]` block |
 | Providers      | Ollama (default, local) / DeepSeek / Qwen (SR) / OpenAI / Anthropic / Groq / Ollama (local, never falls back) |
+
 
 Issue numbers below match `README.md` > Known Issues.
 
@@ -499,7 +502,7 @@ with an explicit warning + consent. Local model choice exists so users can match
    `providers._ollama_detect_best_model`. Thinking mode DONE (Session 30): every Ollama request sends `think: false`. Measured on Ollama 0.40.8: qwen3:8b used 229 tokens without it and 3 with it, same answer; qwen2.5 accepts it without error.
    Review OLLAMA_CONTEXT=32768 for small hardware.
    Pulled locally: gemma4:e4b 6.6 GB, qwen3:8b 5.2 GB, qwen2.5:14b-instruct 9.0 GB, llama3.2:latest 2.0 GB, nomic-embed-text 274 MB.
-2. **#3 Writing mode**: Topic and Article tracks offer only the stand-alone editor mode.
+2. **#3 Writing mode**: RESOLVED in Session 32 (branch v2.6-ocr-editor): one-pass flow, four tracks, files question. See the Session 32 log.
 3. **#2 Time limit per action/iteration**: default 15 min; options 30 min, 1 hr, until finished; needs clean cancel.
    (UI cloud path currently uses `UIConfig.TIMEOUT`.)
 4. **#5 OCR** replaces launcher option 8 "Pipeline UI" (pytesseract already used in `relevance_screener.py`).
@@ -659,45 +662,11 @@ Places a new mode must be added (found in Session 30):
 - `main.data_destinations` / `SEARCH_SERVICES` (cloud gate);
 - README modes table; help guide (`Readme/flashcard-help.html`).
 
-### Task B: Editor mode (merge writing + editing + review)
-Goal (user's words): simplify the writing mode, both the Topic track and the Article
-track, into one "editor mode" that merges writing, editing and review.
+### Task B: Editor mode -> DONE in Session 32 (kept the name "Writing mode")
+B1 name kept (`--mode writing`); B2 one AI pass; B3 tracks: Topic, Article,
+plus new Report and Synopsis; B4 document and review as two files.
+Details, commits and follow-ups: see "Session 32" at the end of this file.
 
-Known facts:
-- `SOURCE_CODE/pipelines/writing/writing.py`: `_call_llm` (~line 105) with the
-  time-limit watchdog. Role calls: writer_out (~573), editor_out (~596), qa_out (~618),
-  editor_out (~670), qa_out (~713). That looks like two flows (draft, and edit
-  existing), but this is NOT verified.
-- main.py imports from `pipelines.writing.writing` (~1908, ~1914); `--report` calls
-  `generate_writing_report(provider, model)` (~2406).
-- NOT yet seen: how the "Topic track" and "Article track" are chosen today.
-  Note `--sub` 1=Topic Search / 2=Article Search belongs to SEARCH mode. Confirm with
-  the user which "Topic/Article" is meant, and inspect before designing.
-
-Decisions needed:
-- B1. Name: rename `writing` to `editor` and keep `--mode writing` as an alias so
-  existing scripts and docs work? Or keep the flag and just change the behaviour?
-- B2. One combined LLM pass (write+edit+review in one prompt; fewer calls, faster
-  on local models), or keep the internal roles but show the user one mode and one
-  output? Trade-off: one pass is faster; separate review catches more.
-- B3. Tracks become submodes of editor: Topic = draft from a topic/outline,
-  Article = revise an existing manuscript. Same output shape for both?
-- B4. Output: revised text + a short change log + review comments, in one file
-  or separate files?
-
-First read-only commands:
-    Select-String -Path SOURCE_CODE\pipelines\writing\writing.py -Pattern "^def |topic|article|track|_call_llm\(" | Select-Object LineNumber, Line | Format-Table -Wrap
-    Select-String -Path SOURCE_CODE\main.py -Pattern "writing|topic|article" | Select-Object LineNumber, Line | Format-Table -Wrap
-    Select-String -Path SOURCE_CODE\ui\app.py -Pattern "writing|topic|article|submode" | Select-Object LineNumber, Line | Format-Table -Wrap
-    Get-ChildItem -Path tests -Filter *.py | Select-String -Pattern "writing" | Group-Object Path | Select-Object Count, Name
-
-Tests that will be affected:
-- `tests/test_time_limit_wiring.py` imports `pipelines.writing.writing._call_llm`;
-- `tests/test_ui_model_picker.py::test_every_mode_page_renders_with_ollama_down`
-  (loops over MODES);
-- `tests/test_ui_time_limit.py` (uses "writing" mode and key `time_limit_writing`);
-- launcher tests; cloud gate tests (`data_destinations` per mode);
-- whatever the last command above lists.
 
 ### Known limitations carried forward
 - A timed-out call keeps running on its daemon thread. Ollama keeps generating and
@@ -782,3 +751,66 @@ Tests that will be affected:
 - Render fix: utils/rag.py imported chromadb at module level; requirements-render.txt omits it, so the UI cloud gate (imports main -> pipelines -> utils.rag) failed and every hosted cloud run was blocked ("Could not determine where this job's data would be sent"). Import moved into _get_client(); all three RAG call sites in main.py already catch errors, so hosted runs print "[RAG] Indexing skipped" and continue. tests/test_render_without_chromadb.py hides chromadb in a subprocess (local and CI both install it, so nothing else could catch this). Suite: 737 passed.
 - Lesson: render.yaml is not applied (service created by hand); the Render dashboard is the source of truth for env vars.
 - Lesson: Render env vars go on the web service's own Environment tab (service → left menu → Environment → Edit), not a project environment, an env group, or the "+ New" service form. Changes need Save, rebuild, and deploy. Never paste keys into chat; one was exposed and rotated this session.
+- input/ guard: tests/test_gitignore_input.py pins that user data in input/ is ignored and only input/sr/pico_sample.json and input/sr/study_overrides.yaml stay committable (rules were already in .gitignore). Verified by commenting out input/* (coding and writing paths then failed). Note: `git check-ignore input` tests the folder name and prints nothing for `input/*`; test a file path instead. Suite: 743 passed.
+- Open: "Apply PICO" (ui/app.py ~line 1101) overwrites tracked SOURCE_CODE/pipelines/sr/config/prisma_criteria.yaml; should write to a user file instead. Until fixed, `git restore` it if it shows as modified.
+
+## Session 32 - 2026-10-27 - branch v2.6-ocr-editor
+
+- Task B (Editor mode) DONE. Name kept as "Writing mode" (`--mode writing`);
+  the user does not need to see an "editor" label. main and Render unchanged
+  (main = origin/main = 2a37319); all work is on branch v2.6-ocr-editor.
+- Decisions:
+  - One AI pass per job: writer, editor and reviewer in one prompt
+    (`run_one_pass`, `run_synopsis` in pipelines/writing/writing.py).
+  - Two output files: document (`.docx` + `.md`) and a separate `_REVIEW.md`,
+    all in output/writing/. Nothing is written to reports/writing/.
+  - Four tracks: 1 Topic (editorial / opinion, 800 words), 2 Article (medical
+    research article, 3,500), 3 Report (abstract / report, 500), 4 Synopsis
+    (one document summarising ALL files in input/writing/, 1,500). Word limit
+    is always asked; Enter keeps the default.
+  - Files question: files in input/writing/ are listed, then
+    "Use these files? [Y/n]". "n" ignores them for this run only; files are
+    never moved or deleted. Empty folder: a new document is written
+    (Synopsis stops: "Synopsis needs files in input/writing/").
+  - Cloud warning applies to the whole Writing mode (confirm_data_destinations
+    runs before any AI call), because users may type confidential text.
+  - Synopsis on Ollama stops before the AI call above 80,000 characters
+    (`SYNOPSIS_LOCAL_MAX_CHARS`; num_ctx 32768 minus ~8192 for the answer):
+    "Remove some files from input/writing/ or change to a cloud provider."
+    The file list shows characters per file, the total and the limit;
+    unreadable files are marked "(unreadable - will be skipped)".
+- writing.py details:
+  - The answer is split at a line `=== REVIEW ===` (`_split_document_and_review`).
+    Fallback: split at a "Stage 3" / "QA Report" heading; if neither is found
+    the document keeps all text and the review says "Review missing: ...".
+  - The prompt no longer contains `## Stage N` headings. gemma4:e4b copied
+    them and wrote the report twice (1,335 words); after the fix the Report
+    track gave 478 words against a 500 target.
+  - `_unreadable_reason` skips placeholder/empty files with `[SKIP] <file>`.
+- Real runs on Ollama gemma4:e4b, all OK: Topic (655/800 words), Article,
+  Report from a 37,395-character PDF, Synopsis from 3 PDFs.
+- Commits: 6d7e666, 49cff65, 6dde284, cef5a8a, fa6f7b2, 8bb2be8, 9750db0,
+  ffc0708, 9e8c9e7, 06f0031, bfefcc7, 6c73d08, 166f038, c303726, 99be9e2
+  (docs), 1f8df30 (HANDOFF tables), plus this log.
+- Tests: 743 -> 816 passed, 3 skipped, 11 deselected. New files:
+  tests/test_writing_one_pass.py, tests/test_writing_menu.py.
+- Follow-ups:
+  - Reviewer is lenient ("FAIL items: None"); consider a stricter QA prompt.
+  - LaTeX such as `$\rightarrow$` appears in output and in Word.
+  - project-brief.md is loaded twice by `_load_guidelines` (harmless).
+  - `_strip_boilerplate` cuts at fixed headings; review whether still needed.
+  - Remove legacy run_writer / run_editor / run_qa and their tests in
+    tests/test_writing.py (still exported by pipelines/writing/__init__.py).
+  - `--mode writing --report` not checked against the new flow.
+  - Render cannot answer terminal menus; hosted Writing mode needs a UI path.
+  - Deferred: pick Synopsis files by number; size check for tracks 1-3.
+- Lessons:
+  - Check syntax after editing main.py:
+    `python -c "import ast; ast.parse(open('SOURCE_CODE/main.py', encoding='utf-8').read()); print('syntax OK')"`
+  - When replacing an import block, delete the old `try:` too (one stray
+    `try:` broke collection of 5 test files).
+  - PowerShell: put `Get-Content ... -Raw` in brackets before `-split`; use
+    single quotes for regex patterns containing double quotes; paste long
+    commands once (a double paste gave `-WrapGet-ChildItem`).
+  - For multi-part edits, compare `git diff --stat` with the expected size
+    before committing: 1f8df30 (+13/-43) was missing this whole log.

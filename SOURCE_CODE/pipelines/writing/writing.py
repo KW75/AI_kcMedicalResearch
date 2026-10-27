@@ -1,11 +1,18 @@
 """
-writing.py  - Writing Mode engine (v1.2 two-track system)
+writing.py  - Writing Mode engine (v2.6 one-pass, four tracks)
 Tracks:
-  topic    - newspaper/editorial style, default 800 words
-  article  - medical journal style, default 3500 words
-Pipeline: Writer  - Editor  - QA (linear)
-Standalone: Editor, QA (require input/writing/ files)
+  topic    - newspaper editorial / opinion, default 800 words
+  article  - medical research (journal) article, default 3500 words
+  report   - structured abstract / report, default 500 words
+  synopsis - ONE synopsis of ALL files in input/writing/, default 1500 words
+             (unreadable files skipped; local AI stops above
+             SYNOPSIS_LOCAL_MAX_CHARS characters)
+Main flow: run_one_pass (topic / article / report) - one AI call per input;
+run_synopsis - one AI call for all files. Each writes a document + review
+to output/writing/.
+Legacy (kept until cleanup): run_writer (Writer - Editor - QA), run_editor, run_qa.
 """
+
 
 import sys
 import threading
@@ -35,10 +42,20 @@ except ImportError:
 # ---------------------------------------------------------------------------
 TRACK_TOPIC   = "topic"
 TRACK_ARTICLE = "article"
+TRACK_REPORT  = "report"
 
 DEFAULT_WORDS = {
     TRACK_TOPIC:   800,
     TRACK_ARTICLE: 3500,
+    TRACK_REPORT:  500,
+}
+
+# What each track is called inside the prompt. A missing track raises an
+# error instead of silently being treated as a journal article.
+_TRACK_LABELS = {
+    TRACK_TOPIC:   "newspaper editorial / opinion piece",
+    TRACK_ARTICLE: "medical journal article",
+    TRACK_REPORT:  "structured abstract / report",
 }
 
 DISCLOSURE = (
@@ -158,12 +175,27 @@ def _load_guidelines(track_doc_path: Path, shared_doc_path: Path) -> str:
     return "\n\n".join(parts)
 
 
+# File types Writing mode can read from input/writing/
+_INPUT_EXTENSIONS = {".md", ".txt", ".docx", ".html", ".tex", ".rst", ".pdf"}
+
+
+def list_input_names(input_dir: Path) -> list:
+    """Names of files in input_dir that Writing mode would read, sorted.
+    Does not open the files (fast; used by the menu to ask the user).
+    """
+    if not input_dir.exists():
+        return []
+    return [
+        f.name for f in sorted(input_dir.iterdir())
+        if f.is_file() and f.suffix.lower() in _INPUT_EXTENSIONS
+    ]
+
 
 def _load_input_files(input_dir: Path) -> list:
     """Load all supported files from input_dir.
     Returns list of (stem, content, suffix) tuples.
     """
-    extensions = {".md", ".txt", ".docx", ".html", ".tex", ".rst", ".pdf"}
+    extensions = _INPUT_EXTENSIONS
     results: list = []
     if not input_dir.exists():
         return results
@@ -296,6 +328,13 @@ _WRITER_PERSONA = {
         "evidence precisely, report effect sizes and confidence intervals, name study "
         "designs correctly, and write in formal academic prose suitable for peer review."
     ),
+    TRACK_REPORT: (
+        "You are a medical report writer who produces clear, factual, structured "
+        "abstracts and reports. You state the purpose, sources or methods, key "
+        "findings and conclusions in a neutral tone, use headings where helpful, and "
+        "never add opinion, persuasion, or claims not supported by the input or the "
+        "instructions."
+    ),
 }
 
 _EDITOR_PERSONA = {
@@ -311,6 +350,13 @@ _EDITOR_PERSONA = {
         "claims are supported by cited evidence, ensure statistical reporting is complete "
         "(effect sizes, CIs, p-values), flag unsupported assertions, and improve academic "
         "prose without altering the scientific content."
+    ),
+    TRACK_REPORT: (
+        "You are a medical report editor. You check that the abstract or report is "
+        "accurate, concise and logically structured (for example Background, Methods, "
+        "Results, Conclusions), remove opinion and unsupported statements, tighten "
+        "wording, keep terminology consistent, and keep within the word count without "
+        "changing the factual content."
     ),
 }
 
@@ -330,7 +376,149 @@ _QA_PERSONA = {
         "PASS items, FAIL items with specific section references, and a "
         "RECOMMENDATION: APPROVE / REVISE MINOR / REVISE MAJOR."
     ),
+    TRACK_REPORT: (
+        "You are a quality assurance reviewer for medical abstracts and reports. You "
+        "review the document for structure, factual accuracy against the source, "
+        "neutral tone, completeness of key findings, clarity, and word count. "
+        "Produce a structured QA report with PASS items, FAIL items with specific "
+        "references, and a RECOMMENDATION: APPROVE / REVISE MINOR / REVISE MAJOR."
+    ),
 }
+
+
+# ---------------------------------------------------------------------------
+# One-pass Writing mode: split the single AI answer into document + review
+# ---------------------------------------------------------------------------
+
+REVIEW_MARKER = "=== REVIEW ==="
+REVIEW_MISSING = (
+    "Review missing: the model did not separate the review from the document."
+)
+
+
+# Headings a model may write when it echoes the stages instead of using the
+# marker. Only headings (lines starting with #) count, so ordinary text such
+# as "## Review of the literature" never triggers a split.
+_STAGE_HEADING = r"^\s*#{1,6}\s*stage\s*\d"
+_EDITOR_STAGE_HEADING = r"^\s*#{1,6}\s*stage\s*2\b"
+_REVIEW_STAGE_HEADING = r"^\s*#{1,6}\s*(stage\s*3\b|(reviewer\s+)?qa\s+report\b)"
+
+
+def _clean_staged_document(document: str) -> str:
+    """If the model wrote a draft and a polished version under 'Stage'
+    headings, keep only the polished (Stage 2) text, and drop any leftover
+    stage heading lines."""
+    import re
+    lines = document.splitlines()
+    for i, line in enumerate(lines):
+        if re.match(_EDITOR_STAGE_HEADING, line, re.I):
+            lines = lines[i + 1:]
+            break
+    lines = [l for l in lines if not re.match(_STAGE_HEADING, l, re.I)]
+    return "\n".join(lines).strip()
+
+
+def _split_document_and_review(text: str) -> tuple[str, str]:
+    """Cut the AI answer into (document, review).
+
+    1. The REVIEW_MARKER line wins (on a line of its own, spaces allowed).
+    2. Fallback: a 'Stage 3' or 'QA Report' heading starts the review.
+    3. Otherwise no text is lost: the document keeps the text and the
+       review says the review is missing.
+    In cases 1 and 2, a duplicated draft under 'Stage' headings is dropped.
+    """
+    import re
+    lines = text.splitlines()
+    for i, line in enumerate(lines):
+        if line.strip() == REVIEW_MARKER:
+            document = _clean_staged_document("\n".join(lines[:i]))
+            review = "\n".join(lines[i + 1:]).strip()
+            return document, (review or REVIEW_MISSING)
+    for i, line in enumerate(lines):
+        if re.match(_REVIEW_STAGE_HEADING, line, re.I):
+            document = _clean_staged_document("\n".join(lines[:i]))
+            review = "\n".join(lines[i + 1:]).strip()
+            if document and review:
+                return document, review
+            break
+    return text, REVIEW_MISSING
+
+
+def _one_pass_system_prompt(guidelines: str, track: str) -> str:
+    """One system prompt for one-pass Writing mode: writer, editor and reviewer.
+
+    Reuses the three existing persona texts for the track, so any later
+    improvement to a persona also reaches one-pass mode.
+    """
+    base = (
+        "Work in three steps inside a single answer, silently: write the "
+        "document, polish it as its editor, then review the final version.\n"
+        "Do NOT write stage headings (such as 'Stage 1', 'Writer Draft' or "
+        "'Editor Polish') and do NOT include your draft. Output only the final "
+        "polished document, then the review marker line, then the review, "
+        "exactly as the Output Format in the user message says.\n\n"
+        "### Writer role\n"
+        f"{_WRITER_PERSONA[track]}\n\n"
+        "### Editor role\n"
+        f"{_EDITOR_PERSONA[track]}\n\n"
+        "### Reviewer role\n"
+        f"{_QA_PERSONA[track]}"
+    )
+
+    if guidelines:
+        return (
+            f"{base}\n\n"
+            "## Guidelines\n"
+            "Apply the following guidelines throughout your work.\n\n"
+            f"{guidelines}"
+        )
+    return base
+
+
+def _one_pass_user_prompt(
+    direct_instructions: list,
+    original_content: str,
+    is_scratch: bool,
+    track: str,
+    word_limit: int,
+) -> str:
+    """User prompt for one-pass Writing mode: document, marker line, review."""
+    track_label = _TRACK_LABELS[track]
+    parts = []
+    if direct_instructions:
+        parts.append("## DIRECT TASK INSTRUCTIONS (highest priority)")
+        for inst in direct_instructions:
+            parts.append(f"- {inst.lstrip('>').strip()}")
+        parts.append("")
+    if is_scratch:
+        parts.append(
+            f"## Task\n"
+            f"No input document was provided. Using the instructions above, produce a "
+            f"complete {track_label}. Target word count: {word_limit} words. "
+            f"Follow all style and editorial guidelines provided."
+        )
+    else:
+        parts.append("## Source Document")
+        parts.append(original_content)
+        parts.append(
+            f"\n## Task\n"
+            f"Using the source document above and the instructions, produce a complete "
+            f"{track_label}. Target word count: {word_limit} words. "
+            f"Follow all style and editorial guidelines."
+        )
+    parts.append(
+        "\n## Output Format\n"
+        "1. Write the complete final document in Markdown, already edited and "
+        "polished. Do not truncate. Do not include drafts or meta-commentary.\n"
+        "2. Then write this line on its own, exactly as shown:\n\n"
+        f"{REVIEW_MARKER}\n\n"
+        "3. After that line, write a short review of the final document: PASS "
+        "items, FAIL items with specific references, and a RECOMMENDATION: "
+        "APPROVE / REVISE MINOR / REVISE MAJOR.\n\n"
+        f"The target word count ({word_limit} words) applies to the document only, "
+        "not to the review."
+    )
+    return "\n".join(parts)
 
 
 def _system_prompt(guidelines: str, role: str, track: str) -> str:
@@ -569,7 +757,7 @@ def run_writer(
 
         sp = {"stem": stem, "status": "started"}
 
-        # ?? WRITER ??????????????????????????????????????????????
+        # -- WRITER --
         if verbose:
             print(f"\n  [WRITER] Generating draft...")
         writer_out = _call_llm(
@@ -592,7 +780,7 @@ def run_writer(
         _write_docx(w_docx, writer_out, title=f"Writer Draft ({track.upper()}) -- {stem}")
         sp["writer_docx"] = w_docx.name
 
-        # ?? EDITOR ??????????????????????????????????????????????
+        # -- EDITOR --
         if verbose:
             print(f"\n  [EDITOR] Editing draft...")
         editor_out = _call_llm(
@@ -614,7 +802,7 @@ def run_writer(
                     title=f"Edited Document ({track.upper()}) -- {stem}")
         sp["editor_docx"] = e_docx.name
 
-        # ?? QA ??????????????????????????????????????????????????
+        # -- QA --
         if verbose:
             print(f"\n  [QA] Running quality check...")
         qa_out = _call_llm(
@@ -637,6 +825,75 @@ def run_writer(
         session_log.append(sp)
 
     _write_session_summary(paths["reports"], timestamp, track, session_log)
+
+
+# ---------------------------------------------------------------------------
+# One-pass Writing mode: one AI call per input -> document + review
+# ---------------------------------------------------------------------------
+
+def run_one_pass(
+    direct_instructions: list,
+    call_llm_fn: Callable,
+    track: str = TRACK_TOPIC,
+    word_limit: int | None = None,
+    verbose: bool = True,
+    use_files: bool = True,
+) -> None:
+    
+    """Write (or revise) and review in a single AI call per input.
+
+    With files in input/writing/, each file is revised on its own. With an
+    empty folder, or use_files=False, one document is written from the
+    instructions alone (files are ignored, never moved or deleted).
+    Saves to output/writing/: the document (.docx + .md) and the review
+    (_REVIEW.md). Nothing is written to reports/writing/.
+    """
+    root      = _project_root()
+    paths     = _paths(root)
+    timestamp = _ts()
+
+    for p in [paths["input"], paths["output"]]:
+        p.mkdir(parents=True, exist_ok=True)
+
+    if word_limit is None:
+        word_limit = DEFAULT_WORDS[track]
+
+    guidelines  = _load_guidelines(paths["doc_root"], paths["doc_root"])
+    input_files = _load_input_files(paths["input"]) if use_files else []
+    is_scratch  = len(input_files) == 0
+    subprojects = [("new_doc", "", ".md")] if is_scratch else input_files
+
+    for stem, original_content, _suffix in subprojects:
+        if verbose:
+            print(f"\n{'='*60}")
+            print(f"  [WRITING | {track.upper()}] {stem}")
+            print(f"  Word limit: {word_limit}")
+            print(f"{'='*60}")
+            print("\n  Writing, editing and reviewing (one AI call)...")
+
+        answer = _call_llm(
+            _one_pass_system_prompt(guidelines, track),
+            _one_pass_user_prompt(direct_instructions, original_content,
+                                  is_scratch, track, word_limit),
+            call_llm_fn, "Writing (one pass)",
+        )
+        document, review = _split_document_and_review(_strip_fences(answer))
+        document = _strip_boilerplate(_strip_fences(document))
+        review   = _strip_fences(review)
+
+        base     = f"WRITING_{track.upper()}_{stem}_{timestamp}"
+        doc_md   = paths["output"] / f"{base}.md"
+        doc_docx = paths["output"] / f"{base}.docx"
+        rev_md   = paths["output"] / f"{base}_REVIEW.md"
+
+        _write_text(doc_md, document)
+        _write_docx(doc_docx, document, title=f"{track.upper()} -- {stem}")
+        _write_text(rev_md, f"# Review ({track.upper()}) -- {stem}\n\n{review}\n")
+
+        if verbose:
+            print(f"\n  Done: {stem}")
+            print(f"    Document: output/writing/{doc_docx.name}")
+            print(f"    Review:   output/writing/{rev_md.name}")
 
 
 # ---------------------------------------------------------------------------
@@ -722,3 +979,196 @@ def run_qa(
 
 
 
+# ---------------------------------------------------------------------------
+# Synopsis track: ONE document summarising ALL files in input/writing/
+# ---------------------------------------------------------------------------
+TRACK_SYNOPSIS = "synopsis"
+
+# Register the Synopsis track in the shared tables defined near the top.
+DEFAULT_WORDS[TRACK_SYNOPSIS] = 1500
+_TRACK_LABELS[TRACK_SYNOPSIS] = "synopsis of multiple source documents"
+
+_WRITER_PERSONA[TRACK_SYNOPSIS] = (
+    "You are a medical writer who synthesises several source documents "
+    "(for example research papers, or one patient's clinical records) into "
+    "one clear, accurate synopsis. You cover every source, group related "
+    "findings, note where sources agree or conflict, keep figures, dates and "
+    "medication details exactly as written, and never add facts that are not "
+    "in the sources."
+)
+_EDITOR_PERSONA[TRACK_SYNOPSIS] = (
+    "You are a medical editor checking a multi-source synopsis. You make sure "
+    "every source is represented, facts, numbers and dates match the sources, "
+    "nothing is invented, duplicated points are merged, the structure is "
+    "logical, the language is plain and clear, and the word limit is met."
+)
+_QA_PERSONA[TRACK_SYNOPSIS] = (
+    "You are a quality assurance reviewer for multi-document synopses. You "
+    "check coverage of every source, factual fidelity (numbers, dates, "
+    "medications, findings), absence of fabricated content, handling of "
+    "conflicting information, clarity, structure, word count, and "
+    "confidentiality (no unnecessary patient identifiers). You produce a "
+    "structured QA report with PASS items, FAIL items with specific "
+    "references, and a final RECOMMENDATION: APPROVE / REVISE MINOR / "
+    "REVISE MAJOR."
+)
+
+# Ollama's context (num_ctx, default 32768 tokens) holds prompt + answer.
+# With up to 8192 tokens kept for the answer, ~24,500 tokens (~90,000
+# characters) are left; 80,000 characters of source text leaves room for
+# the guidelines and instructions. Above this, a local run stops.
+SYNOPSIS_LOCAL_MAX_CHARS = 80_000
+
+_UNREADABLE_SIGNS = ("could not read", "no extractable text", "requires pymupdf")
+
+
+def _unreadable_reason(content: str) -> str | None:
+    """Return why a loaded file is unusable, or None if it has real text.
+
+    _load_input_files puts a one-line placeholder such as
+    "[PDF x.pdf contained no extractable text]" in place of unreadable
+    files; those must not be sent to the AI as if they were content.
+    """
+    stripped = (content or "").strip()
+    if not stripped:
+        return "empty file"
+    if (stripped.startswith("[") and stripped.endswith("]")
+            and any(s in stripped.lower() for s in _UNREADABLE_SIGNS)):
+        return stripped[1:-1]
+    return None
+
+
+def _synopsis_user_prompt(
+    direct_instructions: list,
+    sources: list,
+    word_limit: int,
+) -> str:
+    """User prompt for the Synopsis track. sources = [(name, text), ...]."""
+    parts = []
+    if direct_instructions:
+        parts.append("## Direct Task Instructions (highest priority)")
+        parts.extend(f"> {str(i).lstrip('> ').strip()}" for i in direct_instructions)
+        parts.append("")
+    parts.append("## Task")
+    parts.append(
+        f"Write ONE {_TRACK_LABELS[TRACK_SYNOPSIS]} that summarises ALL "
+        f"{len(sources)} source document(s) below together. Cover every "
+        "source, group related points, note where sources agree or "
+        "conflict, and name the source file for key points. Use only "
+        "information from the sources."
+    )
+    parts.append(f"Target word count: {word_limit} words (the synopsis only).")
+    parts.append("")
+    for i, (name, text) in enumerate(sources, 1):
+        parts.append(f"## Source {i}: {name}")
+        parts.append(text.strip())
+        parts.append("")
+    parts.append("## Output Format")
+    parts.append("1. The final polished synopsis in Markdown (no draft, no stage headings).")
+    parts.append("2. Then this line on its own:")
+    parts.append(REVIEW_MARKER)
+    parts.append(
+        "3. Then the review: PASS items, FAIL items with specific references, "
+        "and a final line RECOMMENDATION: APPROVE / REVISE MINOR / REVISE MAJOR."
+    )
+    return "\n".join(parts)
+
+
+def run_synopsis(
+    direct_instructions: list,
+    call_llm_fn: Callable,
+    word_limit: int | None = None,
+    verbose: bool = True,
+    local: bool = True,
+) -> None:
+    """Read ALL files in input/writing/ and write ONE synopsis + review
+    in a single AI call.
+
+    Unreadable files are skipped with a [SKIP] line. With no files, or no
+    readable files, nothing is sent and nothing is written. local=True
+    (Ollama) stops if the files are too large for the context window.
+    Files are never moved or deleted. Stop/skip messages always print.
+    """
+    root      = _project_root()
+    paths     = _paths(root)
+    timestamp = _ts()
+
+    for p in [paths["input"], paths["output"]]:
+        p.mkdir(parents=True, exist_ok=True)
+
+    if word_limit is None:
+        word_limit = DEFAULT_WORDS[TRACK_SYNOPSIS]
+
+    input_files = _load_input_files(paths["input"])
+    if not input_files:
+        print("  [SYNOPSIS] Synopsis needs files in input/writing/ -- nothing was written.")
+        return
+
+    sources = []
+    for stem, content, suffix in input_files:
+        reason = _unreadable_reason(content)
+        if reason:
+            print(f"  [SKIP] {stem}{suffix}: {reason}")
+            continue
+        sources.append((f"{stem}{suffix}", content))
+
+    if not sources:
+        print("  [SYNOPSIS] No readable files in input/writing/ -- nothing was written.")
+        return
+
+    total = sum(len(text) for _, text in sources)
+    if total > SYNOPSIS_LOCAL_MAX_CHARS:
+        if local:
+            print(f"  [SYNOPSIS] Files too large for local AI: {total:,} characters "
+                  f"(limit {SYNOPSIS_LOCAL_MAX_CHARS:,}). Nothing was written.")
+            print("  Remove some files from input/writing/ or change to a cloud provider.")
+            return
+        print(f"  [SYNOPSIS] Note: {total:,} characters of source text; "
+              "large inputs may be slow or costly on cloud providers.")
+
+    guidelines = _load_guidelines(paths["doc_root"], paths["doc_root"])
+
+    if verbose:
+        print(f"\n{'='*60}")
+        print(f"  [WRITING | SYNOPSIS] {len(sources)} file(s)")
+        for name, _ in sources:
+            print(f"    - {name}")
+        print(f"  Word limit: {word_limit}")
+        print(f"{'='*60}")
+        print("\n  Writing, editing and reviewing the synopsis (one AI call)...")
+
+    answer = _call_llm(
+        _one_pass_system_prompt(guidelines, TRACK_SYNOPSIS),
+        _synopsis_user_prompt(direct_instructions, sources, word_limit),
+        call_llm_fn, "Synopsis (one pass)",
+    )
+    document, review = _split_document_and_review(_strip_fences(answer))
+    document = _strip_boilerplate(_strip_fences(document))
+    review   = _strip_fences(review)
+
+    base     = f"WRITING_SYNOPSIS_{timestamp}"
+    doc_md   = paths["output"] / f"{base}.md"
+    doc_docx = paths["output"] / f"{base}.docx"
+    rev_md   = paths["output"] / f"{base}_REVIEW.md"
+
+    _write_text(doc_md, document)
+    _write_docx(doc_docx, document, title=f"SYNOPSIS -- {len(sources)} file(s)")
+    _write_text(rev_md, f"# Review (SYNOPSIS) -- {len(sources)} file(s)\n\n{review}\n")
+
+    if verbose:
+        print("\n  Done: synopsis")
+        print(f"    Document: output/writing/{doc_docx.name}")
+        print(f"    Review:   output/writing/{rev_md.name}")
+
+def input_file_sizes(input_dir: Path) -> list:
+    """(name, characters) for each file Writing mode would read, in the
+    same order as list_input_names. characters is None if the file is
+    unreadable (it will be skipped). Counts exactly the text that
+    run_synopsis checks against SYNOPSIS_LOCAL_MAX_CHARS. Reads the files,
+    so it is slower than list_input_names; used by the Synopsis menu.
+    """
+    sizes = []
+    for stem, content, suffix in _load_input_files(input_dir):
+        chars = None if _unreadable_reason(content) else len(content)
+        sizes.append((f"{stem}{suffix}", chars))
+    return sizes
