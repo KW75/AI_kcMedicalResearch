@@ -1903,19 +1903,22 @@ def handle_writing_mode(
     model: str | None = None,
     dry_run: bool = False,
 ) -> None:
-    """Terminal entry point for Writing mode (two-track: topic / article)."""
+    """Terminal entry point for Writing mode (two-track: topic / article/ report / synopsis)."""
     try:
         from pipelines.writing.writing import (
-            run_one_pass, list_input_names,
+            run_one_pass, list_input_names, run_synopsis,
             parse_direct_instructions as _pdi,
-            TRACK_TOPIC, TRACK_ARTICLE, TRACK_REPORT, DEFAULT_WORDS,
+            TRACK_TOPIC, TRACK_ARTICLE, TRACK_REPORT, TRACK_SYNOPSIS,
+            DEFAULT_WORDS,
         )
     except ModuleNotFoundError:
         from pipelines.writing.writing import (
-            run_one_pass, list_input_names,
+            run_one_pass, list_input_names, run_synopsis,
             parse_direct_instructions as _pdi,
-            TRACK_TOPIC, TRACK_ARTICLE, TRACK_REPORT, DEFAULT_WORDS,
+            TRACK_TOPIC, TRACK_ARTICLE, TRACK_REPORT, TRACK_SYNOPSIS,
+            DEFAULT_WORDS,
         )
+
 
     def _call_llm_fn(system_prompt: str, user_prompt: str) -> str:
         if dry_run:
@@ -1933,21 +1936,24 @@ def handle_writing_mode(
     print("  1. Topic Track     - editorial / opinion")
     print("  2. Article Track   - medical research articles")
     print("  3. Report Track    - abstract / report")
+    print("  4. Synopsis Track  - one synopsis of all files in input/writing/")
     print("  0. Back to menu")
     print("=" * 60)
     try:
-        track_choice = input("Select track [0-3]: ").strip()
+        track_choice = input("Select track [0-4]: ").strip()
     except (EOFError, KeyboardInterrupt):
         print()
         return
     if track_choice == "0" or not track_choice:
         print("Returning to menu.")
         return
-    track_map = {"1": TRACK_TOPIC, "2": TRACK_ARTICLE, "3": TRACK_REPORT}
+    track_map = {"1": TRACK_TOPIC, "2": TRACK_ARTICLE, "3": TRACK_REPORT,
+                 "4": TRACK_SYNOPSIS}
     if track_choice not in track_map:
         print("Invalid choice  - returning to menu.")
         return
     track = track_map[track_choice]
+    is_synopsis = track == TRACK_SYNOPSIS
 
     print(f"\n  Track: {track.upper()}")
 
@@ -1955,7 +1961,23 @@ def handle_writing_mode(
     # Files are never moved or deleted; "n" only ignores them for this run.
     found = list_input_names(INPUT_WRITING)
     use_files = True
-    if found:
+    if is_synopsis:
+        # Synopsis needs files: never written from scratch.
+        if not found:
+            print("\n  Synopsis needs files in input/writing/ - nothing was written.")
+            return
+        print("\n  Files found in input/writing/:")
+        for i, name in enumerate(found, 1):
+            print(f"    {i}. {name}")
+        try:
+            ans = input("  Use these files for one synopsis? [Y/n]: ").strip().lower()
+        except (EOFError, KeyboardInterrupt):
+            ans = ""
+        if ans in ("n", "no"):
+            print("  Synopsis cancelled - nothing was written.")
+            return
+        print(f"  Using {len(found)} file(s): one synopsis + review for all of them.")
+    elif found:
         print("\n  Files found in input/writing/:")
         for i, name in enumerate(found, 1):
             print(f"    {i}. {name}")
@@ -1970,7 +1992,6 @@ def handle_writing_mode(
             print(f"  Using {len(found)} file(s): one document + review per file.")
     else:
         print("\n  No files in input/writing/ - a new document will be written.")
-
 
     # Word limit (always asked: every run writes a document)
     default_wl = DEFAULT_WORDS[track]
@@ -1988,7 +2009,6 @@ def handle_writing_mode(
     # Instructions
     print(f"  [WRITING | {track.upper()}] Enter instructions below.")
     print("  Lines starting with > are DIRECT TASK INSTRUCTIONS (highest priority).")
-    print("  Files in input/writing/ are revised; with no files, a new document is written.")
     print("  Press ENTER on a blank line when done.\n")
 
     lines: list[str] = []
@@ -2006,6 +2026,18 @@ def handle_writing_mode(
 
     direct_instructions = _pdi("\n".join(lines))
     print()
+
+    if is_synopsis:
+        run_synopsis(
+            direct_instructions=direct_instructions,
+            call_llm_fn=_call_llm_fn,
+            word_limit=word_limit,
+            verbose=True,
+            local=(provider == "ollama"),
+        )
+        print("\n  [WRITING | SYNOPSIS] Finished. See the messages above and "
+              "output/writing/.\n")
+        return
 
     run_one_pass(
         direct_instructions=direct_instructions,
