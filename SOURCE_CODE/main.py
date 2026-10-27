@@ -1906,13 +1906,13 @@ def handle_writing_mode(
     """Terminal entry point for Writing mode (two-track: topic / article)."""
     try:
         from pipelines.writing.writing import (
-            run_writer, run_editor, run_qa,
+            run_one_pass,
             parse_direct_instructions as _pdi,
             TRACK_TOPIC, TRACK_ARTICLE, DEFAULT_WORDS,
         )
     except ModuleNotFoundError:
         from pipelines.writing.writing import (
-            run_writer, run_editor, run_qa,
+            run_one_pass,
             parse_direct_instructions as _pdi,
             TRACK_TOPIC, TRACK_ARTICLE, DEFAULT_WORDS,
         )
@@ -1952,44 +1952,24 @@ def handle_writing_mode(
 
     # Sub-mode selection
     print(f"\n  Track: {track.upper()}")
-    print("  " + "-" * 40)
-    print("  1. Writer   - full pipeline: Writer -> Editor -> QA")
-    print("  2. Editor   - standalone: edit documents in input/writing/")
-    print("  3. QA       - standalone: review documents in input/writing/")
-    print("  0. Back")
-    try:
-        sub_choice = input("Select sub-mode [0-3]: ").strip()
-    except (EOFError, KeyboardInterrupt):
-        print()
-        return
-    if sub_choice == "0" or not sub_choice:
-        print("Returning to menu.")
-        return
-    sub_mode_map = {"1": "Writer", "2": "Editor", "3": "QA"}
-    if sub_choice not in sub_mode_map:
-        print("Invalid choice  - returning to menu.")
-        return
-    sub_mode = sub_mode_map[sub_choice]
 
-    # Word limit
-    if sub_mode in ("Writer", "Editor"):
-        default_wl = DEFAULT_WORDS[track]
-        print(f"\n  Default word limit for {track} track: {default_wl}")
-        try:
-            wl_input = input(
-                f"  Press Enter to keep {default_wl}, or type a number: "
-            ).strip()
-        except (EOFError, KeyboardInterrupt):
-            wl_input = ""
-        word_limit = int(wl_input) if wl_input.isdigit() and int(wl_input) > 0 \
-            else default_wl
-        print(f"  Word limit set to: {word_limit}\n")
-    else:
-        word_limit = DEFAULT_WORDS[track]
+    # Word limit (always asked: every run writes a document)
+    default_wl = DEFAULT_WORDS[track]
+    print(f"\n  Default word limit for {track} track: {default_wl}")
+    try:
+        wl_input = input(
+            f"  Press Enter to keep {default_wl}, or type a number: "
+        ).strip()
+    except (EOFError, KeyboardInterrupt):
+        wl_input = ""
+    word_limit = int(wl_input) if wl_input.isdigit() and int(wl_input) > 0 \
+        else default_wl
+    print(f"  Word limit set to: {word_limit}\n")
 
     # Instructions
-    print(f"  [{sub_mode.upper()} | {track.upper()}] Enter instructions below.")
+    print(f"  [WRITING | {track.upper()}] Enter instructions below.")
     print("  Lines starting with > are DIRECT TASK INSTRUCTIONS (highest priority).")
+    print("  Files in input/writing/ are revised; with no files, a new document is written.")
     print("  Press ENTER on a blank line when done.\n")
 
     lines: list[str] = []
@@ -2008,32 +1988,16 @@ def handle_writing_mode(
     direct_instructions = _pdi("\n".join(lines))
     print()
 
-    if sub_mode == "Writer":
-        run_writer(
-            direct_instructions=direct_instructions,
-            call_llm_fn=_call_llm_fn,
-            track=track,
-            word_limit=word_limit,
-            verbose=True,
-        )
-    elif sub_mode == "Editor":
-        run_editor(
-            direct_instructions=direct_instructions,
-            call_llm_fn=_call_llm_fn,
-            track=track,
-            word_limit=word_limit,
-            verbose=True,
-        )
-    elif sub_mode == "QA":
-        run_qa(
-            direct_instructions=direct_instructions,
-            call_llm_fn=_call_llm_fn,
-            track=track,
-            verbose=True,
-        )
+    run_one_pass(
+        direct_instructions=direct_instructions,
+        call_llm_fn=_call_llm_fn,
+        track=track,
+        word_limit=word_limit,
+        verbose=True,
+    )
 
-    print(f"\n  [{sub_mode.upper()} | {track.upper()}] Done. "
-          "Check output/writing/ and reports/writing/ for results.\n")
+    print(f"\n  [WRITING | {track.upper()}] Done. "
+          "Check output/writing/ for the document and its review.\n")
 
 
 # ---------------------------------------------------------------------------
