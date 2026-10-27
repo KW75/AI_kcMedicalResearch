@@ -243,3 +243,33 @@ class TestRunOnePass:
         docx, _, reviews = _outputs(paths["output"])
         assert docx[0].name.startswith("WRITING_ARTICLE_")
         assert reviews[0].name.startswith("WRITING_ARTICLE_")
+
+
+class TestRunOnePassFencedAnswer:
+    """Models sometimes wrap their reply in code fences; the split must survive."""
+
+    def test_whole_answer_in_markdown_fence(self, tmp_path):
+        answer = "```markdown\n" + FAKE_ANSWER + "```"
+        paths, _ = TestRunOnePass()._run(tmp_path, answer=answer)
+        _, docs_md, reviews = _outputs(paths["output"])
+        doc_text = docs_md[0].read_text(encoding="utf-8")
+        review_text = reviews[0].read_text(encoding="utf-8")
+        assert "Document body text." in doc_text
+        assert "```" not in doc_text
+        assert "RECOMMENDATION: APPROVE" in review_text
+        assert "```" not in review_text
+
+    def test_document_and_review_fenced_separately(self, tmp_path):
+        answer = (
+            "```markdown\n# Title\n\nBody.\n```\n"
+            "=== REVIEW ===\n"
+            "```\nPASS: ok.\nRECOMMENDATION: APPROVE\n```"
+        )
+        paths, _ = TestRunOnePass()._run(tmp_path, answer=answer)
+        _, docs_md, reviews = _outputs(paths["output"])
+        doc_text = docs_md[0].read_text(encoding="utf-8")
+        review_text = reviews[0].read_text(encoding="utf-8")
+        assert "Body." in doc_text
+        assert "```" not in doc_text
+        assert "RECOMMENDATION: APPROVE" in review_text
+        assert "```" not in review_text
