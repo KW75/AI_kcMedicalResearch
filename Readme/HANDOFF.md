@@ -814,3 +814,66 @@ Details, commits and follow-ups: see "Session 32" at the end of this file.
     commands once (a double paste gave `-WrapGet-ChildItem`).
   - For multi-part edits, compare `git diff --stat` with the expected size
     before committing: 1f8df30 (+13/-43) was missing this whole log.
+
+## Session 33 handoff: "UI startup" (written end of Session 32)
+
+- State at end of Session 32: main = origin/main = fa4edb9 (PR #3 merged:
+  Writing mode one-pass, four tracks). v2.6-ocr-editor = fa4edb9 + HANDOFF
+  commits (not yet on main; they go with the next PR). Tests: 816 passed,
+  3 skipped, 11 deselected (local and CI on PR #3). Version stays 2.5.0;
+  bump to 2.6.0 after OCR is merged.
+- Not yet confirmed: Render "Deploy live" hash (expected fa4edb9; the user saw
+  the live app's API working); CI run on main for fa4edb9 (expected 816).
+- JOB (user's words): Rename this pipeline to "UI startup". It provides users
+  who have difficulty to locate where to put their input files and find the
+  output files, set up API's. The work button will bring users to the
+  corresponding CLI pipelines. This applies to all the pipelines in the UI
+  with minimal coding.
+- Meaning: the Streamlit UI is a front door, not a place where pipelines run.
+  It handles (1) input: upload or locate files in input/<mode>/, (2) output:
+  the output browser for output/<mode>/, (3) API keys: sidebar, kept in
+  st.session_state, passed to the CLI via env= (never written to disk).
+  Run opens the matching CLI pipeline in a terminal, where all menus are
+  answered. No per-mode UI controls and no new CLI flags: the Session 32 idea
+  of --track / --word-limit / --instructions / --no-files is DROPPED.
+- DECISION 1 (ask the user first): Render has no terminal. _run_cli_cloud
+  uses stdin=subprocess.DEVNULL (ui/app.py line 638), so menu modes stop at
+  their first input() (Writing: "Select track [0-4]" main.py line 1943;
+  also Appraisal and Search). Options: (a) on Render, UI startup shows
+  guidance + output browser only and Run explains the pipelines run locally;
+  (b) allow hosted Run only for modes that ask no questions; (c) flags later.
+- DECISION 2 (DECIDED by the user, end of Session 32): launcher menu becomes
+  7 Data Analysis (new), 8 OCR (new), 9 Dry Run (was 7), 10 Startup UI
+  (was 8 "Pipeline UI", renamed). Dry Run and the UI are KEPT, not replaced;
+  this supersedes the older plan (#4 Data Analysis replaces Dry Run, #5 OCR
+  replaces option 8). Name: user said "UI startup" first, then "Startup UI";
+  use "Startup UI" unless the user says otherwise (confirm once).
+- Menu work order: (1) renumber 9 Dry Run and 10 Startup UI, and add
+  placeholders for 7 and 8 that print "coming soon" and return to the menu.
+  Test-first: pin the new numbers and labels in launcher tests, and update
+  any existing tests that expect 7 = Dry Run or 8 = Pipeline UI. (2) Startup
+  UI job (above). (3) OCR as option 8 (Task A). (4) Data Analysis as
+  option 7 (#4: data file -> Python/R/Excel statistics -> Ollama model
+  explains/checks/reports; needs its own design questions first).
+- Places a new menu number touches: scripts/launcher.py MODES / menu
+  numbers / _MODE_INPUT_MAP / show_help(); README launcher table;
+  Readme/flashcard-help.html; the four launchers (.bat etc.) if they print
+  the menu. First read-only check:
+  `Select-String -Path scripts\launcher.py -Pattern 'Dry Run|Pipeline UI|"7"|"8"|def show_help|def main_menu|MODES' -Encoding utf8 | Select-Object LineNumber, Line`
+- Known facts (Session 32, ui/app.py): "in the terminal" help text at lines
+  89, 113, 130, 147, 149; launch messages at 1207-1208 ("session launched in
+  a new terminal window"); _build_cli_cmd 484 (passes --sub at 496);
+  RENDER* detection 475-477 and _RENDER_VARS 534; _launch_terminal 598;
+  _run_cli_cloud 607; _launch_terminal_local 666; file_uploader on home
+  page 936, SR page 1071, mode page 1122; hosted-upload note 1172.
+- First read-only commands:
+  `Select-String -Path SOURCE_CODE\ui\app.py, scripts\launcher.py, README.md, Readme\flashcard-help.html -Pattern 'Pipeline UI|Streamlit|page_title|--ui|option 8' -Encoding utf8 | Select-Object Filename, LineNumber, Line`
+  Rename places expected: app.py page title/header (_render_header ~387),
+  launcher menu label + show_help(), README, flashcard-help.html, HANDOFF.
+- Working rules unchanged: read-only first, failing test (fails for the
+  right reason), code, full suite, check_no_bom.py, docs, commit/push.
+  CI runs only on PRs to main (ci.yml lines 4-7). Merging to main deploys
+  to Render. Check syntax after editing main.py/app.py with ast.parse.
+- After UI startup: Task A OCR (search HANDOFF for "Task A").
+- Rule for every new mode: decide its UI startup entry (input folder,
+  output folder, Run -> CLI) and its Render behaviour.
