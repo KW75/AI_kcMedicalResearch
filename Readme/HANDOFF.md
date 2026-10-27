@@ -41,16 +41,19 @@ so those catches happen at session open, not mid-work.
 
 ---
 
-## Current State (Session 31, v2.5.0, 2026-10-26)
+## Current State (Session 32, v2.5.0 on main, 2026-10-27)
 
 
 | Component      | Status |
 |----------------|--------|
-| Tests          | 743 passed, 3 skipped, 11 deselected (`python -m pytest -m "not live" --tb=short -q`) |
-| CI             | green (455b2d8; 28e616e; 3a9081b and 6813b12 also confirmed green) |
-| Render deploy | 2a37319 live; DEFAULT_PROVIDER=qwen only, no API key on Render; users enter their own key in the sidebar (tested OK) |
+| Tests          | 816 passed, 3 skipped, 11 deselected on v2.6-ocr-editor (`python -m pytest -m "not live" --tb=short -q`); main 737 |
+| Branch         | v2.6-ocr-editor, 17 commits ahead of main (2a37319) incl. this HANDOFF update; not merged |
+| CI             | green (455b2d8; 28e616e; 3a9081b and 6813b12 also confirmed green); v2.6-ocr-editor not checked |
+| Render deploy  | 2a37319 live; DEFAULT_PROVIDER=qwen only, no API key on Render; users enter their own key in the sidebar (tested OK) |
+| Writing mode   | one-pass (write + edit + review in one call); tracks Topic 800 / Article 3,500 / Report 500 / Synopsis 1,500; tested on gemma4:e4b (branch only) |
 | SR pipeline    | working via CLI with Qwen; Ang 2010 verified against PDF (NFR week 6, unanimous N=3); text-fallback drops now surface in Stage 4 `[SKIP]` block |
 | Providers      | Ollama (default, local) / DeepSeek / Qwen (SR) / OpenAI / Anthropic / Groq / Ollama (local, never falls back) |
+
 
 Issue numbers below match `README.md` > Known Issues.
 
@@ -499,7 +502,7 @@ with an explicit warning + consent. Local model choice exists so users can match
    `providers._ollama_detect_best_model`. Thinking mode DONE (Session 30): every Ollama request sends `think: false`. Measured on Ollama 0.40.8: qwen3:8b used 229 tokens without it and 3 with it, same answer; qwen2.5 accepts it without error.
    Review OLLAMA_CONTEXT=32768 for small hardware.
    Pulled locally: gemma4:e4b 6.6 GB, qwen3:8b 5.2 GB, qwen2.5:14b-instruct 9.0 GB, llama3.2:latest 2.0 GB, nomic-embed-text 274 MB.
-2. **#3 Writing mode**: Topic and Article tracks offer only the stand-alone editor mode.
+2. **#3 Writing mode**: RESOLVED in Session 32 (branch v2.6-ocr-editor): one-pass flow, four tracks, files question. See the Session 32 log.
 3. **#2 Time limit per action/iteration**: default 15 min; options 30 min, 1 hr, until finished; needs clean cancel.
    (UI cloud path currently uses `UIConfig.TIMEOUT`.)
 4. **#5 OCR** replaces launcher option 8 "Pipeline UI" (pytesseract already used in `relevance_screener.py`).
@@ -659,45 +662,11 @@ Places a new mode must be added (found in Session 30):
 - `main.data_destinations` / `SEARCH_SERVICES` (cloud gate);
 - README modes table; help guide (`Readme/flashcard-help.html`).
 
-### Task B: Editor mode (merge writing + editing + review)
-Goal (user's words): simplify the writing mode, both the Topic track and the Article
-track, into one "editor mode" that merges writing, editing and review.
+### Task B: Editor mode -> DONE in Session 32 (kept the name "Writing mode")
+B1 name kept (`--mode writing`); B2 one AI pass; B3 tracks: Topic, Article,
+plus new Report and Synopsis; B4 document and review as two files.
+Details, commits and follow-ups: see "Session 32" at the end of this file.
 
-Known facts:
-- `SOURCE_CODE/pipelines/writing/writing.py`: `_call_llm` (~line 105) with the
-  time-limit watchdog. Role calls: writer_out (~573), editor_out (~596), qa_out (~618),
-  editor_out (~670), qa_out (~713). That looks like two flows (draft, and edit
-  existing), but this is NOT verified.
-- main.py imports from `pipelines.writing.writing` (~1908, ~1914); `--report` calls
-  `generate_writing_report(provider, model)` (~2406).
-- NOT yet seen: how the "Topic track" and "Article track" are chosen today.
-  Note `--sub` 1=Topic Search / 2=Article Search belongs to SEARCH mode. Confirm with
-  the user which "Topic/Article" is meant, and inspect before designing.
-
-Decisions needed:
-- B1. Name: rename `writing` to `editor` and keep `--mode writing` as an alias so
-  existing scripts and docs work? Or keep the flag and just change the behaviour?
-- B2. One combined LLM pass (write+edit+review in one prompt; fewer calls, faster
-  on local models), or keep the internal roles but show the user one mode and one
-  output? Trade-off: one pass is faster; separate review catches more.
-- B3. Tracks become submodes of editor: Topic = draft from a topic/outline,
-  Article = revise an existing manuscript. Same output shape for both?
-- B4. Output: revised text + a short change log + review comments, in one file
-  or separate files?
-
-First read-only commands:
-    Select-String -Path SOURCE_CODE\pipelines\writing\writing.py -Pattern "^def |topic|article|track|_call_llm\(" | Select-Object LineNumber, Line | Format-Table -Wrap
-    Select-String -Path SOURCE_CODE\main.py -Pattern "writing|topic|article" | Select-Object LineNumber, Line | Format-Table -Wrap
-    Select-String -Path SOURCE_CODE\ui\app.py -Pattern "writing|topic|article|submode" | Select-Object LineNumber, Line | Format-Table -Wrap
-    Get-ChildItem -Path tests -Filter *.py | Select-String -Pattern "writing" | Group-Object Path | Select-Object Count, Name
-
-Tests that will be affected:
-- `tests/test_time_limit_wiring.py` imports `pipelines.writing.writing._call_llm`;
-- `tests/test_ui_model_picker.py::test_every_mode_page_renders_with_ollama_down`
-  (loops over MODES);
-- `tests/test_ui_time_limit.py` (uses "writing" mode and key `time_limit_writing`);
-- launcher tests; cloud gate tests (`data_destinations` per mode);
-- whatever the last command above lists.
 
 ### Known limitations carried forward
 - A timed-out call keeps running on its daemon thread. Ollama keeps generating and
@@ -784,3 +753,4 @@ Tests that will be affected:
 - Lesson: Render env vars go on the web service's own Environment tab (service → left menu → Environment → Edit), not a project environment, an env group, or the "+ New" service form. Changes need Save, rebuild, and deploy. Never paste keys into chat; one was exposed and rotated this session.
 - input/ guard: tests/test_gitignore_input.py pins that user data in input/ is ignored and only input/sr/pico_sample.json and input/sr/study_overrides.yaml stay committable (rules were already in .gitignore). Verified by commenting out input/* (coding and writing paths then failed). Note: `git check-ignore input` tests the folder name and prints nothing for `input/*`; test a file path instead. Suite: 743 passed.
 - Open: "Apply PICO" (ui/app.py ~line 1101) overwrites tracked SOURCE_CODE/pipelines/sr/config/prisma_criteria.yaml; should write to a user file instead. Until fixed, `git restore` it if it shows as modified.
+
