@@ -46,11 +46,11 @@ so those catches happen at session open, not mid-work.
 
 | Component      | Status |
 |----------------|--------|
-| Tests          | 816 passed, 3 skipped, 11 deselected on v2.6-ocr-editor (`python -m pytest -m "not live" --tb=short -q`); main 737 |
-| Branch         | v2.6-ocr-editor, 17 commits ahead of main (2a37319) incl. this HANDOFF update; not merged |
-| CI             | green (455b2d8; 28e616e; 3a9081b and 6813b12 also confirmed green); v2.6-ocr-editor not checked |
-| Render deploy  | 2a37319 live; DEFAULT_PROVIDER=qwen only, no API key on Render; users enter their own key in the sidebar (tested OK) |
-| Writing mode   | one-pass (write + edit + review in one call); tracks Topic 800 / Article 3,500 / Report 500 / Synopsis 1,500; tested on gemma4:e4b (branch only) |
+| Tests          | 816 passed, 3 skipped, 11 deselected on main and v2.6-ocr-editor (`python -m pytest -m "not live" --tb=short -q`) |
+| Branch         | PR #3 merged as fa4edb9; v2.6-ocr-editor = main + HANDOFF commits, kept for Startup UI, OCR and Data Analysis. Version stays 2.5.0; bump to 2.6.0 after OCR is merged |
+| CI             | green on PR #3 (816 passed); runs only on push to main and PRs to main (ci.yml lines 4-7), not on branch pushes |
+| Render deploy  | fa4edb9 merged (auto-deploy); API works on live app with user's sidebar key; menu modes stop on Render (no terminal) - see Session 33 handoff |
+| Writing mode   | one-pass (write + edit + review in one call); tracks Topic 800 / Article 3,500 / Report 500 / Synopsis 1,500; on main since fa4edb9; tested on gemma4:e4b; terminal menus only |
 | SR pipeline    | working via CLI with Qwen; Ang 2010 verified against PDF (NFR week 6, unanimous N=3); text-fallback drops now surface in Stage 4 `[SKIP]` block |
 | Providers      | Ollama (default, local) / DeepSeek / Qwen (SR) / OpenAI / Anthropic / Groq / Ollama (local, never falls back) |
 
