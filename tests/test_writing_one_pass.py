@@ -550,3 +550,20 @@ class TestRunSynopsis:
         monkeypatch.setattr(w, "SYNOPSIS_LOCAL_MAX_CHARS", 10)
         calls, _ = _syn_run(tmp_path, [("big", "x" * 50, ".txt")], local=False)
         assert len(calls) == 1
+
+# ---------------------------------------------------------------------------
+# input_file_sizes: characters per file, for the Synopsis file list
+# ---------------------------------------------------------------------------
+class TestInputFileSizes:
+
+    def test_sizes_match_text_length(self, tmp_path):
+        (tmp_path / "a.txt").write_text("12345", encoding="utf-8")
+        (tmp_path / "b.md").write_text("abc", encoding="utf-8")
+        assert w.input_file_sizes(tmp_path) == [("a.txt", 5), ("b.md", 3)]
+
+    def test_unreadable_is_none(self, tmp_path):
+        (tmp_path / "empty.txt").write_text("", encoding="utf-8")
+        assert w.input_file_sizes(tmp_path) == [("empty.txt", None)]
+
+    def test_missing_folder(self, tmp_path):
+        assert w.input_file_sizes(tmp_path / "nope") == []

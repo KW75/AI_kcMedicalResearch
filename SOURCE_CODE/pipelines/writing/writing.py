@@ -1153,3 +1153,16 @@ def run_synopsis(
         print("\n  Done: synopsis")
         print(f"    Document: output/writing/{doc_docx.name}")
         print(f"    Review:   output/writing/{rev_md.name}")
+
+def input_file_sizes(input_dir: Path) -> list:
+    """(name, characters) for each file Writing mode would read, in the
+    same order as list_input_names. characters is None if the file is
+    unreadable (it will be skipped). Counts exactly the text that
+    run_synopsis checks against SYNOPSIS_LOCAL_MAX_CHARS. Reads the files,
+    so it is slower than list_input_names; used by the Synopsis menu.
+    """
+    sizes = []
+    for stem, content, suffix in _load_input_files(input_dir):
+        chars = None if _unreadable_reason(content) else len(content)
+        sizes.append((f"{stem}{suffix}", chars))
+    return sizes

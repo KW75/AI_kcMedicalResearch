@@ -1906,17 +1906,17 @@ def handle_writing_mode(
     """Terminal entry point for Writing mode (two-track: topic / article/ report / synopsis)."""
     try:
         from pipelines.writing.writing import (
-            run_one_pass, list_input_names, run_synopsis,
+            run_one_pass, list_input_names, run_synopsis, input_file_sizes,
             parse_direct_instructions as _pdi,
             TRACK_TOPIC, TRACK_ARTICLE, TRACK_REPORT, TRACK_SYNOPSIS,
-            DEFAULT_WORDS,
+            DEFAULT_WORDS, SYNOPSIS_LOCAL_MAX_CHARS,
         )
     except ModuleNotFoundError:
         from pipelines.writing.writing import (
-            run_one_pass, list_input_names, run_synopsis,
+            run_one_pass, list_input_names, run_synopsis, input_file_sizes,
             parse_direct_instructions as _pdi,
             TRACK_TOPIC, TRACK_ARTICLE, TRACK_REPORT, TRACK_SYNOPSIS,
-            DEFAULT_WORDS,
+            DEFAULT_WORDS, SYNOPSIS_LOCAL_MAX_CHARS,
         )
 
 
@@ -1966,9 +1966,19 @@ def handle_writing_mode(
         if not found:
             print("\n  Synopsis needs files in input/writing/ - nothing was written.")
             return
-        print("\n  Files found in input/writing/:")
-        for i, name in enumerate(found, 1):
-            print(f"    {i}. {name}")
+        print("\n  Reading files to count their text...")
+        sizes = input_file_sizes(INPUT_WRITING)
+        print("\n  Files found in input/writing/ (characters of text):")
+        total = 0
+        for i, (name, chars) in enumerate(sizes, 1):
+            if chars is None:
+                print(f"    {i}. {name} (unreadable - will be skipped)")
+            else:
+                total += chars
+                print(f"    {i}. {name} ({chars:,} chars)")
+        print(f"  Total: {total:,} characters "
+              f"(local AI limit {SYNOPSIS_LOCAL_MAX_CHARS:,})")
+
         try:
             ans = input("  Use these files for one synopsis? [Y/n]: ").strip().lower()
         except (EOFError, KeyboardInterrupt):

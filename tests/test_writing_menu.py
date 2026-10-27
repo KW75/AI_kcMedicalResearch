@@ -22,12 +22,16 @@ from SOURCE_CODE import main
 from pipelines.writing.writing import TRACK_TOPIC, TRACK_ARTICLE, TRACK_REPORT
 
 
-def _run_menu(answers, files=None, provider="ollama"):
+def _run_menu(answers, files=None, provider="ollama", sizes=None):
     """Run handle_writing_mode with typed answers and a fake file list.
+    sizes = fake [(name, chars or None)] for the Synopsis list; by default
+    every file has 1,000 characters.
     Return (run_one_pass mock, run_writer mock, list of input() prompts,
     run_synopsis mock)."""
     it = iter(answers)
     prompts = []
+    if sizes is None:
+        sizes = [(name, 1000) for name in (files or [])]
 
     def fake_input(prompt=""):
         prompts.append(prompt)
@@ -36,6 +40,8 @@ def _run_menu(answers, files=None, provider="ollama"):
     with patch("builtins.input", side_effect=fake_input), \
          patch("pipelines.writing.writing.list_input_names",
                return_value=list(files or [])), \
+         patch("pipelines.writing.writing.input_file_sizes",
+               return_value=list(sizes)), \
          patch("pipelines.writing.writing.run_one_pass") as one_pass, \
          patch("pipelines.writing.writing.run_synopsis") as synopsis, \
          patch("pipelines.writing.writing.run_writer") as writer:
@@ -152,3 +158,26 @@ class TestSynopsisMenu:
         assert "Synopsis cancelled" in capsys.readouterr().out
         synopsis.assert_not_called()
         one_pass.assert_not_called()
+
+class TestSynopsisSizes:
+    """Synopsis file list shows characters per file, total and limit."""
+
+    def test_sizes_total_and_limit_shown(self, capsys):
+        _run_menu(
+            ["4", "", "", "Summarise", ""],
+            files=["a.pdf", "b.pdf"],
+            sizes=[("a.pdf", 21400), ("b.pdf", 3000)],
+        )
+        out = capsys.readouterr().out
+        assert "21,400" in out and "3,000" in out
+        assert "24,400" in out          # total
+        assert "80,000" in out          # local limit
+
+    def test_unreadable_file_marked_skipped(self, capsys):
+        _run_menu(
+            ["4", "", "", "Summarise", ""],
+            files=["a.pdf", "scan.pdf"],
+            sizes=[("a.pdf", 500), ("scan.pdf", None)],
+        )
+        out = capsys.readouterr().out
+        assert "scan.pdf" in out and "skipped" in out
