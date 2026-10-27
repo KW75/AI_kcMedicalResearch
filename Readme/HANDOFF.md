@@ -754,3 +754,63 @@ Details, commits and follow-ups: see "Session 32" at the end of this file.
 - input/ guard: tests/test_gitignore_input.py pins that user data in input/ is ignored and only input/sr/pico_sample.json and input/sr/study_overrides.yaml stay committable (rules were already in .gitignore). Verified by commenting out input/* (coding and writing paths then failed). Note: `git check-ignore input` tests the folder name and prints nothing for `input/*`; test a file path instead. Suite: 743 passed.
 - Open: "Apply PICO" (ui/app.py ~line 1101) overwrites tracked SOURCE_CODE/pipelines/sr/config/prisma_criteria.yaml; should write to a user file instead. Until fixed, `git restore` it if it shows as modified.
 
+## Session 32 - 2026-10-27 - branch v2.6-ocr-editor
+
+- Task B (Editor mode) DONE. Name kept as "Writing mode" (`--mode writing`);
+  the user does not need to see an "editor" label. main and Render unchanged
+  (main = origin/main = 2a37319); all work is on branch v2.6-ocr-editor.
+- Decisions:
+  - One AI pass per job: writer, editor and reviewer in one prompt
+    (`run_one_pass`, `run_synopsis` in pipelines/writing/writing.py).
+  - Two output files: document (`.docx` + `.md`) and a separate `_REVIEW.md`,
+    all in output/writing/. Nothing is written to reports/writing/.
+  - Four tracks: 1 Topic (editorial / opinion, 800 words), 2 Article (medical
+    research article, 3,500), 3 Report (abstract / report, 500), 4 Synopsis
+    (one document summarising ALL files in input/writing/, 1,500). Word limit
+    is always asked; Enter keeps the default.
+  - Files question: files in input/writing/ are listed, then
+    "Use these files? [Y/n]". "n" ignores them for this run only; files are
+    never moved or deleted. Empty folder: a new document is written
+    (Synopsis stops: "Synopsis needs files in input/writing/").
+  - Cloud warning applies to the whole Writing mode (confirm_data_destinations
+    runs before any AI call), because users may type confidential text.
+  - Synopsis on Ollama stops before the AI call above 80,000 characters
+    (`SYNOPSIS_LOCAL_MAX_CHARS`; num_ctx 32768 minus ~8192 for the answer):
+    "Remove some files from input/writing/ or change to a cloud provider."
+    The file list shows characters per file, the total and the limit;
+    unreadable files are marked "(unreadable - will be skipped)".
+- writing.py details:
+  - The answer is split at a line `=== REVIEW ===` (`_split_document_and_review`).
+    Fallback: split at a "Stage 3" / "QA Report" heading; if neither is found
+    the document keeps all text and the review says "Review missing: ...".
+  - The prompt no longer contains `## Stage N` headings. gemma4:e4b copied
+    them and wrote the report twice (1,335 words); after the fix the Report
+    track gave 478 words against a 500 target.
+  - `_unreadable_reason` skips placeholder/empty files with `[SKIP] <file>`.
+- Real runs on Ollama gemma4:e4b, all OK: Topic (655/800 words), Article,
+  Report from a 37,395-character PDF, Synopsis from 3 PDFs.
+- Commits: 6d7e666, 49cff65, 6dde284, cef5a8a, fa6f7b2, 8bb2be8, 9750db0,
+  ffc0708, 9e8c9e7, 06f0031, bfefcc7, 6c73d08, 166f038, c303726, 99be9e2
+  (docs), 1f8df30 (HANDOFF tables), plus this log.
+- Tests: 743 -> 816 passed, 3 skipped, 11 deselected. New files:
+  tests/test_writing_one_pass.py, tests/test_writing_menu.py.
+- Follow-ups:
+  - Reviewer is lenient ("FAIL items: None"); consider a stricter QA prompt.
+  - LaTeX such as `$\rightarrow$` appears in output and in Word.
+  - project-brief.md is loaded twice by `_load_guidelines` (harmless).
+  - `_strip_boilerplate` cuts at fixed headings; review whether still needed.
+  - Remove legacy run_writer / run_editor / run_qa and their tests in
+    tests/test_writing.py (still exported by pipelines/writing/__init__.py).
+  - `--mode writing --report` not checked against the new flow.
+  - Render cannot answer terminal menus; hosted Writing mode needs a UI path.
+  - Deferred: pick Synopsis files by number; size check for tracks 1-3.
+- Lessons:
+  - Check syntax after editing main.py:
+    `python -c "import ast; ast.parse(open('SOURCE_CODE/main.py', encoding='utf-8').read()); print('syntax OK')"`
+  - When replacing an import block, delete the old `try:` too (one stray
+    `try:` broke collection of 5 test files).
+  - PowerShell: put `Get-Content ... -Raw` in brackets before `-split`; use
+    single quotes for regex patterns containing double quotes; paste long
+    commands once (a double paste gave `-WrapGet-ChildItem`).
+  - For multi-part edits, compare `git diff --stat` with the expected size
+    before committing: 1f8df30 (+13/-43) was missing this whole log.
