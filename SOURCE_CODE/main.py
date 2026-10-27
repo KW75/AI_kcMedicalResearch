@@ -1908,13 +1908,13 @@ def handle_writing_mode(
         from pipelines.writing.writing import (
             run_one_pass,
             parse_direct_instructions as _pdi,
-            TRACK_TOPIC, TRACK_ARTICLE, DEFAULT_WORDS,
+            TRACK_TOPIC, TRACK_ARTICLE, TRACK_REPORT, DEFAULT_WORDS,
         )
     except ModuleNotFoundError:
         from pipelines.writing.writing import (
             run_one_pass,
             parse_direct_instructions as _pdi,
-            TRACK_TOPIC, TRACK_ARTICLE, DEFAULT_WORDS,
+            TRACK_TOPIC, TRACK_ARTICLE, TRACK_REPORT, DEFAULT_WORDS,
         )
 
     def _call_llm_fn(system_prompt: str, user_prompt: str) -> str:
@@ -1930,28 +1930,27 @@ def handle_writing_mode(
     print("\n" + "=" * 60)
     print("  WRITING MODE")
     print("=" * 60)
-    print("  1. Topic Track     - editorial / opinion (newspaper style)")
-    print("  2. Article Track   - medical journal article")
+    print("  1. Topic Track     - editorial / opinion")
+    print("  2. Article Track   - medical research articles")
+    print("  3. Report Track    - abstract / report")
     print("  0. Back to menu")
     print("=" * 60)
     try:
-        track_choice = input("Select track [0-2]: ").strip()
+        track_choice = input("Select track [0-3]: ").strip()
     except (EOFError, KeyboardInterrupt):
         print()
         return
     if track_choice == "0" or not track_choice:
         print("Returning to menu.")
         return
-    if track_choice == "1":
-        track = TRACK_TOPIC
-    elif track_choice == "2":
-        track = TRACK_ARTICLE
-    else:
+    track_map = {"1": TRACK_TOPIC, "2": TRACK_ARTICLE, "3": TRACK_REPORT}
+    if track_choice not in track_map:
         print("Invalid choice  - returning to menu.")
         return
+    track = track_map[track_choice]
 
-    # Sub-mode selection
     print(f"\n  Track: {track.upper()}")
+
 
     # Word limit (always asked: every run writes a document)
     default_wl = DEFAULT_WORDS[track]

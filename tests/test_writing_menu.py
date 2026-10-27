@@ -2,6 +2,8 @@
 
 New flow: track -> word limit -> instructions -> one call to run_one_pass.
 There is no Writer/Editor/QA sub-mode question any more.
+Tracks: 1 Topic (editorial / opinion), 2 Article (medical research articles),
+3 Report (abstract / report).
 """
 
 import sys
@@ -13,7 +15,7 @@ SOURCE_CODE_DIR = PROJECT_ROOT / "SOURCE_CODE"
 sys.path.insert(0, str(SOURCE_CODE_DIR))
 
 from SOURCE_CODE import main
-from pipelines.writing.writing import TRACK_TOPIC, TRACK_ARTICLE
+from pipelines.writing.writing import TRACK_TOPIC, TRACK_ARTICLE, TRACK_REPORT
 
 
 def _run_menu(answers):
@@ -54,3 +56,18 @@ class TestWritingMenu:
     def test_no_sub_mode_question(self):
         _, _, prompts = _run_menu(["1", "", "Focus on dengue", ""])
         assert not any("sub-mode" in p.lower() for p in prompts)
+
+    def test_report_track_default_word_limit(self):
+        one_pass, _, _ = _run_menu(["3", "", "Summarise dengue cases 2025", ""])
+        one_pass.assert_called_once()
+        kwargs = one_pass.call_args.kwargs
+        assert kwargs["track"] == TRACK_REPORT
+        assert kwargs["word_limit"] == 500
+
+    def test_menu_wording_shows_three_tracks(self, capsys):
+        _, _, prompts = _run_menu(["0"])
+        out = capsys.readouterr().out
+        assert "Topic Track" in out and "editorial / opinion" in out
+        assert "Article Track" in out and "medical research articles" in out
+        assert "Report Track" in out and "abstract / report" in out
+        assert any("[0-3]" in p for p in prompts)
