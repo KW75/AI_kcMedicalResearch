@@ -273,3 +273,39 @@ class TestRunOnePassFencedAnswer:
         assert "```" not in doc_text
         assert "RECOMMENDATION: APPROVE" in review_text
         assert "```" not in review_text
+
+
+class TestReportTrack:
+    """Third track: Report (abstract / report), default 500 words."""
+
+    def test_track_constant(self):
+        assert w.TRACK_REPORT == "report"
+
+    def test_default_words(self):
+        assert w.DEFAULT_WORDS[w.TRACK_REPORT] == 500
+
+    def test_has_writer_editor_and_reviewer_texts(self):
+        for table in (w._WRITER_PERSONA, w._EDITOR_PERSONA, w._QA_PERSONA):
+            assert table[w.TRACK_REPORT].strip()
+
+    def test_role_texts_differ_from_other_tracks(self):
+        for table in (w._WRITER_PERSONA, w._EDITOR_PERSONA, w._QA_PERSONA):
+            assert table[w.TRACK_REPORT] != table[w.TRACK_TOPIC]
+            assert table[w.TRACK_REPORT] != table[w.TRACK_ARTICLE]
+
+    def test_system_prompt_uses_report_texts(self):
+        sp = w._one_pass_system_prompt("", w.TRACK_REPORT)
+        assert w._WRITER_PERSONA[w.TRACK_REPORT] in sp
+        assert w._EDITOR_PERSONA[w.TRACK_REPORT] in sp
+        assert w._QA_PERSONA[w.TRACK_REPORT] in sp
+
+    def test_user_prompt_says_abstract_report_not_journal_article(self):
+        p = w._one_pass_user_prompt([], "", True, w.TRACK_REPORT, 500)
+        assert "abstract / report" in p
+        assert "journal article" not in p
+
+    def test_run_one_pass_report_file_names(self, tmp_path):
+        paths, _ = TestRunOnePass()._run(tmp_path, track=w.TRACK_REPORT)
+        docx, _, reviews = _outputs(paths["output"])
+        assert docx[0].name.startswith("WRITING_REPORT_")
+        assert reviews[0].name.startswith("WRITING_REPORT_")

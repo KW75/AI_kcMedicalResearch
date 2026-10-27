@@ -1,10 +1,11 @@
 """
-writing.py  - Writing Mode engine (v1.2 two-track system)
+writing.py  - Writing Mode engine (v2.6 one-pass, three tracks)
 Tracks:
-  topic    - newspaper/editorial style, default 800 words
-  article  - medical journal style, default 3500 words
-Pipeline: Writer  - Editor  - QA (linear)
-Standalone: Editor, QA (require input/writing/ files)
+  topic    - newspaper editorial / opinion, default 800 words
+  article  - medical research (journal) article, default 3500 words
+  report   - structured abstract / report, default 500 words
+Main flow: run_one_pass - one AI call per input -> document + review.
+Legacy (kept until cleanup): run_writer (Writer - Editor - QA), run_editor, run_qa.
 """
 
 import sys
@@ -35,10 +36,20 @@ except ImportError:
 # ---------------------------------------------------------------------------
 TRACK_TOPIC   = "topic"
 TRACK_ARTICLE = "article"
+TRACK_REPORT  = "report"
 
 DEFAULT_WORDS = {
     TRACK_TOPIC:   800,
     TRACK_ARTICLE: 3500,
+    TRACK_REPORT:  500,
+}
+
+# What each track is called inside the prompt. A missing track raises an
+# error instead of silently being treated as a journal article.
+_TRACK_LABELS = {
+    TRACK_TOPIC:   "newspaper editorial / opinion piece",
+    TRACK_ARTICLE: "medical journal article",
+    TRACK_REPORT:  "structured abstract / report",
 }
 
 DISCLOSURE = (
@@ -296,6 +307,13 @@ _WRITER_PERSONA = {
         "evidence precisely, report effect sizes and confidence intervals, name study "
         "designs correctly, and write in formal academic prose suitable for peer review."
     ),
+    TRACK_REPORT: (
+        "You are a medical report writer who produces clear, factual, structured "
+        "abstracts and reports. You state the purpose, sources or methods, key "
+        "findings and conclusions in a neutral tone, use headings where helpful, and "
+        "never add opinion, persuasion, or claims not supported by the input or the "
+        "instructions."
+    ),
 }
 
 _EDITOR_PERSONA = {
@@ -311,6 +329,13 @@ _EDITOR_PERSONA = {
         "claims are supported by cited evidence, ensure statistical reporting is complete "
         "(effect sizes, CIs, p-values), flag unsupported assertions, and improve academic "
         "prose without altering the scientific content."
+    ),
+    TRACK_REPORT: (
+        "You are a medical report editor. You check that the abstract or report is "
+        "accurate, concise and logically structured (for example Background, Methods, "
+        "Results, Conclusions), remove opinion and unsupported statements, tighten "
+        "wording, keep terminology consistent, and keep within the word count without "
+        "changing the factual content."
     ),
 }
 
@@ -329,6 +354,13 @@ _QA_PERSONA = {
         "ethical compliance, and formatting. Produce a structured QA report with "
         "PASS items, FAIL items with specific section references, and a "
         "RECOMMENDATION: APPROVE / REVISE MINOR / REVISE MAJOR."
+    ),
+    TRACK_REPORT: (
+        "You are a quality assurance reviewer for medical abstracts and reports. You "
+        "review the document for structure, factual accuracy against the source, "
+        "neutral tone, completeness of key findings, clarity, and word count. "
+        "Produce a structured QA report with PASS items, FAIL items with specific "
+        "references, and a RECOMMENDATION: APPROVE / REVISE MINOR / REVISE MAJOR."
     ),
 }
 
@@ -394,8 +426,7 @@ def _one_pass_user_prompt(
     word_limit: int,
 ) -> str:
     """User prompt for one-pass Writing mode: document, marker line, review."""
-    track_label = "newspaper editorial / opinion piece" if track == TRACK_TOPIC \
-        else "medical journal article"
+    track_label = _TRACK_LABELS[track]
     parts = []
     if direct_instructions:
         parts.append("## DIRECT TASK INSTRUCTIONS (highest priority)")
@@ -669,7 +700,7 @@ def run_writer(
 
         sp = {"stem": stem, "status": "started"}
 
-        # ?? WRITER ??????????????????????????????????????????????
+        # -- WRITER --
         if verbose:
             print(f"\n  [WRITER] Generating draft...")
         writer_out = _call_llm(
@@ -692,7 +723,7 @@ def run_writer(
         _write_docx(w_docx, writer_out, title=f"Writer Draft ({track.upper()}) -- {stem}")
         sp["writer_docx"] = w_docx.name
 
-        # ?? EDITOR ??????????????????????????????????????????????
+        # -- EDITOR --
         if verbose:
             print(f"\n  [EDITOR] Editing draft...")
         editor_out = _call_llm(
@@ -714,7 +745,7 @@ def run_writer(
                     title=f"Edited Document ({track.upper()}) -- {stem}")
         sp["editor_docx"] = e_docx.name
 
-        # ?? QA ??????????????????????????????????????????????????
+        # -- QA --
         if verbose:
             print(f"\n  [QA] Running quality check...")
         qa_out = _call_llm(
@@ -885,6 +916,3 @@ def run_qa(
         )
         qa_out = _strip_fences(qa_out)
         _write_report(paths["reports"], "QA", track, stem, timestamp, qa_out)
-
-
-
