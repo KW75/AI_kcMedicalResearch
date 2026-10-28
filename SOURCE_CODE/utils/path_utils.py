@@ -19,7 +19,6 @@ class PathManager:
         # Source code subdirectories
         self.utils_dir = self.src_dir / "utils"
         self.pipelines_dir = self.src_dir / "pipelines"
-        self.ui_dir = self.src_dir / "ui"
         self.sr_dir = self.pipelines_dir / "sr"
         self.doc_dir = self.src_dir / "docs"  # AI reference docs
         
@@ -31,9 +30,6 @@ class PathManager:
         
         # Reader documentation ([Readme] folder)
         self.readme_dir = self.project_root / "Readme"
-        
-        # Assets
-        self.assets_dir = self.project_root / "assets"
         
         # Scripts
         self.scripts_dir = self.project_root / "scripts"
@@ -57,9 +53,9 @@ class PathManager:
         # Main directories
         main_dirs = [
             self.src_dir, self.utils_dir, self.pipelines_dir,
-            self.ui_dir, self.sr_dir, self.doc_dir,
+            self.sr_dir, self.doc_dir,
             self.prompts_dir, self.docs_dir, self.readme_dir,
-            self.assets_dir, self.scripts_dir,
+            self.scripts_dir,
             self.scripts_windows_dir, self.scripts_macos_dir,
             self.input_dir, self.output_dir,
             self.reports_dir, self.chroma_db_dir,
@@ -114,9 +110,6 @@ class PathManager:
     def get_project_root(self) -> Path:
         return self.project_root
     
-    def get_assets_path(self, asset_name: str) -> Path:
-        return self.assets_dir / asset_name
-    
     def get_readme_path(self, doc_name: str) -> Path:
         return self.readme_dir / doc_name
 
@@ -153,9 +146,6 @@ def get_docs_mode(mode: str) -> Path:
 
 def get_mode_reference(mode: str) -> Path:
     return PATH_MANAGER.get_mode_reference_path(mode)
-
-def get_assets(asset_name: str) -> Path:
-    return PATH_MANAGER.get_assets_path(asset_name)
 
 def get_readme(doc_name: str) -> Path:
     return PATH_MANAGER.get_readme_path(doc_name)

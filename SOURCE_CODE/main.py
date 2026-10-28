@@ -1357,7 +1357,7 @@ def fetch_pubmed_articles(
 # ---------------------------------------------------------------------------
 
 def run_sr_launcher(provider: str = "", model: str = "") -> None:
-    """Run the SR automation pipeline (CLI mode  - no Streamlit)."""
+    """Run the SR automation pipeline (CLI mode)."""
     import shutil
     import subprocess as _sp
     import json as _json
@@ -1827,20 +1827,10 @@ def handle_search_mode(provider: str, model: str, sub_mode: str = None) -> None:
     print("  1. Topic Search  (web synopsis with reference links)")
     print("  2. Article Search (PubMed by article type + comparison)")
     
-    # Determine sub-mode
-    is_cloud = any([
-        os.environ.get('RENDER'),
-        os.environ.get('STREAMLIT_SERVER_PORT'),
-        os.environ.get('STREAMLIT_SHARING'),
-    ])
-    
+    # Determine sub-mode   
     if sub_mode:
         sub = sub_mode
         print(f"   - Using sub-mode: {sub}")
-    elif is_cloud:
-        # Cloud environment - use default
-        print("  [i]  Cloud environment detected. Defaulting to Topic Search (1).")
-        sub = "1"
     else:
         # Local - interactive
         try:
@@ -2324,8 +2314,6 @@ def parse_args(args: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--list-roles",     action="store_true", default=False)
     parser.add_argument("--help-guide",     action="store_true", default=False,
                         help="Open the interactive HTML help guide in your browser")
-    parser.add_argument("--ui",             action="store_true", default=False,
-                        help="Launch the main Streamlit UI")
     parser.add_argument('--sub', '--submode', type=str, default=None,
                     help='Sub-mode selection: 1=Topic Search, 2=Article Search')
     ns = parser.parse_args(args)
@@ -2364,22 +2352,6 @@ def run_cli(args: argparse.Namespace) -> None:
             "    Manual verification against source PDFs remains required "
             "either way.\n"
         )
-
-    if args.ui:
-        import subprocess as _sp
-        proc = _sp.Popen(
-            [sys.executable, "-m", "streamlit", "run",
-             str(SOURCE_CODE_DIR / "ui" / "app.py"),
-             "--server.runOnSave", "false"],
-            cwd=str(Path(__file__).resolve().parent.parent),
-        )
-        print("UI launched -- open http://localhost:8501 in your browser.")
-        print("Press Ctrl+C to stop the UI server.")
-        try:
-            proc.wait()
-        except KeyboardInterrupt:
-            proc.terminate()
-        raise SystemExit(0)
 
     non_ai_flags = (
         args.list_sessions

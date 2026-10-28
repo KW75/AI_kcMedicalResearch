@@ -4,21 +4,17 @@ A multi-mode AI assistant for medical research, critical appraisal, systematic r
 
 
     Version: 2.5.0
-    Tests: 874 passed, 3 skipped, 11 deselected
+    Tests: 799 passed, 3 skipped, 10 deselected
            (reproduce with `python -m pytest -m "not live" --tb=short -q`)
     CI: GitHub Actions - Green
     GitHub: https://github.com/KW75/AI_kcMedicalResearch
-    Live App: https://ai-kcmedicalresearch.onrender.com
-    Health Check: https://ai-kcmedicalresearch.onrender.com/_stcore/health
-    Uptime: UptimeRobot (5-min monitoring, prevents cold starts)
 
-**CONFIDENTIALITY:** the hosted app and every cloud provider transmit your
-input to an external API. For patient-identifiable or confidential data, run
+
+**CONFIDENTIALITY:** every cloud provider transmits your input to an external
+API. For patient-identifiable or confidential data, run
 locally with `--provider ollama` (see Providers).
 
 ## Quick Start
-
-Hosted app, nothing to install: https://ai-kcmedicalresearch.onrender.com
 
 Local install (python.org Python 3.11 + venv, Windows and macOS): see
 Local Setup below. Full instructions, including the pinned local install
@@ -89,7 +85,7 @@ Option A - Free / local (Ollama), no API key:
    coding and reasoning ranks from the 2026-10 local model comparison
    (1 = best). Press Enter for the default (gemma4:e4b) or type a number to
    match the model to your hardware. Ranked models you have not pulled are
-   shown as `ollama pull ...` commands. The web UI (--ui) shows the same list as a dropdown when the provider is Ollama. If Ollama isn't running or no model is pulled, Run is disabled with a warning.
+   shown as `ollama pull ...` commands.
 
 
 Note: v2.5 changed the default from qwen2.5:14b-instruct to gemma4:e4b. In
@@ -108,8 +104,7 @@ Large local models on slower machines may need longer. Choose with
 `--time-limit 15|30|60|none` (minutes; `none` = wait until the model
 finishes, stop with Ctrl+C). Example:
 `python SOURCE_CODE/main.py --mode writing --time-limit 60`
-The launcher asks for it after the model (Enter = 15 minutes), and the web UI has a "Time limit per AI call" dropdown.
-
+The launcher asks for it after the model (Enter = 15 minutes).
 
 
 ## Modes
@@ -136,8 +131,6 @@ The launcher asks for it after the model (Enter = 15 minutes), and the web UI ha
 
 
 **Confidentiality gate.** Ollama runs entirely on your machine and starts without any prompt. If you choose a cloud provider, the app first lists every external service your input could be sent to (the chosen provider plus any `FALLBACK_PROVIDERS` backups) and asks `Continue? [y/N]`. Pressing Enter cancels. For scripted or non-interactive runs, add `--confirm-cloud` to accept explicitly; without it, a run with no keyboard attached is refused. Search modes always contact PubMed / Europe PMC (and DuckDuckGo for Search) with your search terms, even when the AI model is local.
-
-The Streamlit UI shows the same list and keeps the Run button disabled until you tick a consent box; on the hosted (Render) version, uploaded files are already on Render's servers, so use a local install with Ollama for confidential work.
 
 On transient errors (timeout, 429, 502, 503) the system tries the next
 provider. Default chain: DeepSeek -> Qwen -> Groq (`FALLBACK_PROVIDERS`).
@@ -183,9 +176,10 @@ Copy `.env.example` to `.env`. `.env` is gitignored.
     EMBEDDING_MODEL=nomic-embed-text
     CLI_THEME=dark
 
-If you used the Streamlit UI before v2.4.7, rotate your API keys and delete
-any `%TEMP%\ai_km_run_*.bat` files - that version wrote keys to disk in
-plaintext. Clearing `.env` does not revoke a key.
+If you used the old Streamlit web interface before v2.4.7 (the interface was
+removed in v2.6), rotate your API keys and delete any `%TEMP%\ai_km_run_*.bat`
+files - that version wrote keys to disk in plaintext. Clearing `.env` does not
+revoke a key.
 
 ## Running Tests
 
@@ -312,12 +306,6 @@ reviewer-entered values. See `docs/sr/REVIEWER_GUIDE.md` §5-6.
 The end of Stage 3 prints a DATA PROVENANCE SUMMARY listing every study with
 overridden values or auto-derived metadata. Both must be described in the
 review's data-collection methods.
-
-## Deployment (Render)
-
-- Auto-deploy on push to `main`
-- Build: `pip install --upgrade pip && pip install --no-cache-dir --only-binary=:all: -r requirements-render.txt && pip install --no-cache-dir --no-deps docx2txt==0.8`
-- UptimeRobot pings every 5 min
 
 ## Known Issues
 

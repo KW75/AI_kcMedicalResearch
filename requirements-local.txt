@@ -2,7 +2,7 @@
 #
 # WHY THIS FILE EXISTS:
 # The open-ended pins in requirements.txt / requirements-base.txt let pip pull
-# bleeding-edge pyarrow (via chromadb and streamlit). On macOS those newest
+# bleeding-edge pyarrow (via chromadb). On macOS those newest
 # versions have no prebuilt wheel, so pip builds from source and fails with
 # "can't find Rust compiler" (Known Issue #19).
 #
@@ -37,9 +37,6 @@ pillow==10.4.0
 #     for both Intel (macosx_10_14_x86_64) and Apple Silicon (macosx_11_0_arm64)
 #     on cp311. Newer pyarrow drops the older-macOS wheels -> Rust build. ---
 pyarrow==12.0.1
-
-# --- UI ---
-streamlit==1.38.0
 
 # --- Providers ---
 anthropic==0.34.2

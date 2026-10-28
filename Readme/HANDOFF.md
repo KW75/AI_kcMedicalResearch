@@ -46,10 +46,10 @@ so those catches happen at session open, not mid-work.
 
 | Component      | Status |
 |----------------|--------|
-| Tests          | 874 passed, 3 skipped, 11 deselected on v2.6-ocr-editor; 816 on main (`python -m pytest -m "not live" --tb=short -q`) |
+| Tests          | 799 passed, 3 skipped, 10 deselected on v2.6-ocr-editor; 816 on main (`python -m pytest -m "not live" --tb=short -q`) |
 | Branch         | PR #3 merged as fa4edb9; v2.6-ocr-editor = main + HANDOFF commits, kept for Startup UI, OCR and Data Analysis. Version stays 2.5.0; bump to 2.6.0 after OCR is merged |
 | CI             | green on PR #3 (816 passed); runs only on push to main and PRs to main (ci.yml lines 4-7), not on branch pushes |
-| Render deploy  | Service DELETED 2026-10-27 (suspended, then deleted; health URL returns 404). Repo files (render.yaml, requirements-render.txt, README links) are removed in Session 33 commit 5 |
+| Render deploy  | Service DELETED 2026-10-27 (suspended, then deleted; health URL returns 404). Repo files removed in Session 33 commit 3. UptimeRobot monitor to be paused/deleted by user |
 | Writing mode   | one-pass (write + edit + review in one call); tracks Topic 800 / Article 3,500 / Report 500 / Synopsis 1,500; on main since fa4edb9; tested on gemma4:e4b; terminal menus only |
 | SR pipeline    | working via CLI with Qwen; Ang 2010 verified against PDF (NFR week 6, unanimous N=3); text-fallback drops now surface in Stage 4 `[SKIP]` block |
 | Providers      | Ollama (default, local) / DeepSeek / Qwen (SR) / OpenAI / Anthropic / Groq / Ollama (local, never falls back) |
@@ -965,3 +965,13 @@ Notes:
 - Checked 2026-10-28: no *_API_KEY / DEFAULT_PROVIDER / OLLAMA_MODEL system environment variables on this machine; user's .env is CRLF and lacks GROQ/OPENAI/ANTHROPIC key lines (appended on first save).
 - Tests: tests/test_env_file.py (26), tests/test_launcher_api_keys.py (10, temp .env only - real .env never touched); test_setup_items_1_and_2_are_placeholders narrowed to item 2.
 - Commit 3 note: .env.example is stale - v2.4.6 header (line 3), "ranked best" text (67-69), "let the app pick ... largest model" (76-77, contradicts no-silent-switch), Docker note (85-86).
+
+### Commit 3 - remove Streamlit UI and Render deploy
+- Commit order changed: 3 = Streamlit/Render removal (was 5), 4 = ollama_models tidy + default-model rule + .env.example (was 3), 5 = Setup -> Local AI (was 4), 6 = flashcard-help.html + forest-plot path. Reason: ui/app.py and test_ui_model_picker.py used RANKS_SOURCE/choose_default, so removing them first avoids editing code that is about to be deleted.
+- git rm (22 files): SOURCE_CODE/ui/, .streamlit/, assets/, render.yaml, requirements-render.txt, scripts/windows/AI_kcMedicalResearch_UI.bat, scripts/macos/Mac_kcMedicalResearch_UI.sh, SOURCE_CODE/pipelines/sr/run_sr_ui.bat (dead: launched sr/src/ui/app.py, removed in Session 4), tests/test_ui.py, test_ui_cloud_gate.py, test_ui_model_picker.py, test_ui_time_limit.py, test_render_without_chromadb.py (84 tests).
+- main.py: --ui flag and Streamlit launch block removed; Search-mode cloud detection (RENDER / STREAMLIT_* -> default Topic Search) removed, so Search always asks or uses --sub.
+- path_utils.py: ui_dir, assets_dir, get_assets_path, get_assets removed; import no longer creates assets/.
+- streamlit removed from requirements-base.txt, requirements-local.txt, SOURCE_CODE/pipelines/sr/requirements.txt; Render notes removed from requirements*.txt and rag.py comment; .gitignore .streamlit line removed. pyarrow==12.0.1 pin KEPT (chromadb). streaming.py kept.
+- README: Render links, hosted-app line, web-UI sentences and Deployment (Render) section removed; pre-v2.4.7 key-rotation note kept and reworded.
+- Guard: tests/test_no_streamlit.py (9 tests: files gone, no --ui/streamlit/is_cloud in main.py, no ui/assets in PathManager, no streamlit in requirements, pyarrow pin kept, .gitignore, README).
+- Left for commit 4: README lines on model ranks and "ollama pull" hints, ollama_models.py docstring mentioning ui/app.py.

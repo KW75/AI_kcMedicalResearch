@@ -48,7 +48,7 @@ def _get_client() -> chromadb.Client:
         # Updated path: go up 3 levels from SOURCE_CODE/utils/ to project root
         db_path = Path(__file__).resolve().parent.parent.parent / "chroma_db"
         db_path.mkdir(parents=True, exist_ok=True)
-        import chromadb  # lazy: requirements-render.txt omits chromadb (Session 31)
+        import chromadb  # lazy: only loaded when RAG is actually used (Session 31)
         _chroma_client = chromadb.PersistentClient(path=str(db_path))
     return _chroma_client
 
