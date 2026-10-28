@@ -46,7 +46,7 @@ so those catches happen at session open, not mid-work.
 
 | Component      | Status |
 |----------------|--------|
-| Tests          | 819 passed, 3 skipped, 11 deselected on v2.6-ocr-editor; 816 on main (`python -m pytest -m "not live" --tb=short -q`) |
+| Tests          | 839 passed, 3 skipped, 11 deselected on v2.6-ocr-editor; 816 on main (`python -m pytest -m "not live" --tb=short -q`) |
 | Branch         | PR #3 merged as fa4edb9; v2.6-ocr-editor = main + HANDOFF commits, kept for Startup UI, OCR and Data Analysis. Version stays 2.5.0; bump to 2.6.0 after OCR is merged |
 | CI             | green on PR #3 (816 passed); runs only on push to main and PRs to main (ci.yml lines 4-7), not on branch pushes |
 | Render deploy  | Service DELETED 2026-10-27 (suspended, then deleted; health URL returns 404). Repo files (render.yaml, requirements-render.txt, README links) are removed in Session 33 commit 5 |
@@ -948,3 +948,12 @@ Notes:
   add test pinning the 404->pull-message mapping]" not confirmed; Session 28
   priority "vote outcome_selected/timepoint_selected" never closed; the
   2026-09-02 notes still say llama3.2. Fix in a docs commit.
+
+### Commit 1 - launcher menu
+- Menu: 1-6 pipelines, 7 Data Analysis (coming soon), 8 OCR (coming soon), 9 Dry Run, 10 Setup; C Custom flags (was 9), H Help, X Exit.
+- Setup sub-menu: 1 API keys (coming soon - commit 2), 2 Local AI (coming soon - commit 4), 3 Open Help, 0 Back.
+- run_ui() and the --ui launch removed from the launcher; show_help() replaced by open_help() using HELP_FILE = Readme/flashcard-help.html.
+- Banner: Render "Deploy" line replaced by "Runs  local first / cloud API"; Modes line 2 is now `rct_search  sr  data_analysis  ocr` (ui and dry-run dropped).
+- tests/test_launcher_menu.py (20 tests) incl. a banner width guard, proven to fail when the padding is off by 2.
+- Desktop shortcut checked: targets scripts/windows/AI_kcMedicalResearch_CLI.bat, icon C:\icon_AI_kcMedicalResearch.ico (outside repo) - unaffected by commit 5.
+- Added to the commit 5 list: scripts/windows/AI_kcMedicalResearch_UI.bat, scripts/macos/Mac_kcMedicalResearch_UI.sh, assets/ (via git rm -r, plus assets_dir/get_assets* in path_utils.py), README lines 92/140 (web UI text), README line 186 (keep, reword).

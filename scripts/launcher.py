@@ -167,15 +167,20 @@ RESET = _R
 #  Pipeline / provider tables
 # -----------------------------------------------------------------------------
 MODES = [
-    ('1', 'Coding',       '--mode coding'),
-    ('2', 'Writing',      '--mode writing'),
-    ('3', 'Appraisal',    '--mode appraisal'),
-    ('4', 'Search',       '--mode search'),
-    ('5', 'RCT Search',   '--mode rct_search'),
-    ('6', 'SR Pipeline',  '--mode sr'),
-    ('7', 'Dry Run',      '--dry-run'),
-    ('8', 'Pipeline UI',  '--ui'),
+    ('1',  'Coding',        '--mode coding'),
+    ('2',  'Writing',       '--mode writing'),
+    ('3',  'Appraisal',     '--mode appraisal'),
+    ('4',  'Search',        '--mode search'),
+    ('5',  'RCT Search',    '--mode rct_search'),
+    ('6',  'SR Pipeline',   '--mode sr'),
+    ('7',  'Data Analysis', None),        # coming soon
+    ('8',  'OCR',           None),        # coming soon
+    ('9',  'Dry Run',       '--dry-run'),
+    ('10', 'Setup',         'setup'),     # launcher sub-menu, not a main.py flag
 ]
+
+HELP_FILE = BASE / "Readme" / "flashcard-help.html"
+
 
 PROVIDERS = [
     ('1', 'Ollama',    'local - free - default',  '--provider ollama'),
@@ -257,8 +262,9 @@ def banner() -> None:
     _py = _py[:23]
     print(f'  {FRAME}║{RESET}   {LOGO}██╔═██╗ ██║{RESET}{W(9)}'
           f'{ACCENT}Python   {RESET}{GOOD}{_py}{RESET}{W(23 - len(_py))}{FRAME}║{RESET}')
+    _run = 'local first / cloud API'
     print(f'  {FRAME}║{RESET}   {LOGO}██║  ██╗╚██████╗{RESET}{W(4)}'
-          f'{ACCENT}Deploy   {RESET}{INFO}render.com / local{RESET}{W(5)}{FRAME}║{RESET}')
+          f'{ACCENT}Runs     {RESET}{INFO}{_run}{RESET}{W(23 - len(_run))}{FRAME}║{RESET}')
     print(f'  {FRAME}║{RESET}   {LOGO}╚═╝  ╚═╝ ╚═════╝{RESET}{W(36)}{FRAME}║{RESET}')
 
     print(f'  {FRAME}║{RESET}                                                       {FRAME}║{RESET}')
@@ -272,8 +278,9 @@ def banner() -> None:
 
     print(f'  {FRAME}║{RESET}  {INFO}Modes  :{RESET}  '
           f'{TEXT}coding  writing  appraisal  search{RESET}{W(8)}{FRAME} ║{RESET}')
+    _modes2 = 'rct_search  sr  data_analysis  ocr'
     print(f'  {FRAME}║{RESET}  {INFO}         {RESET}  '
-          f'{TEXT}rct_search  sr  dry-run  ui{RESET}{W(12)}{FRAME}   ║{RESET}')
+          f'{TEXT}{_modes2}{RESET}{W(42 - len(_modes2))}{FRAME}║{RESET}')
     print(f'  {FRAME}║{RESET}  {INFO}Providers:{RESET} '
           f'{ACCENT}ollama  qwen  groq  openai  anthropic{RESET}{W(3)}{FRAME}  ║{RESET}')
     print(f'  {FRAME}║{RESET}  {INFO}Help   :{RESET}  '
@@ -305,7 +312,7 @@ def pick_mode():
         left_col  = col_items[:mid]
         right_col = col_items[mid:]
 
-        # column inner width = 2 + 1 + 2 + 18 + 2 = 25
+        # column inner width = 1 + 2 (key, right-aligned) + 2 + 18 + 2 = 25
         CW = 25
 
         # -- top border --------------------------------------------------------
@@ -314,10 +321,10 @@ def pick_mode():
         # -- data rows ---------------------------------------------------------
         for i in range(mid):
             l_key, l_lbl, _ = left_col[i]
-            left_cell  = f'  {ACCENT}{l_key}{RESET}  {TEXT}{l_lbl:<18}{RESET}  '
+            left_cell  = f' {ACCENT}{l_key:>2}{RESET}  {TEXT}{l_lbl:<18}{RESET}  '
             if i < len(right_col):
                 r_key, r_lbl, _ = right_col[i]
-                right_cell = f'  {ACCENT}{r_key}{RESET}  {TEXT}{r_lbl:<18}{RESET}  '
+                right_cell = f' {ACCENT}{r_key:>2}{RESET}  {TEXT}{r_lbl:<18}{RESET}  '
             else:
                 right_cell = ' ' * CW
             print(f'  {FRAME}│{RESET}{left_cell}{FRAME}│{RESET}{right_cell}{FRAME}│{RESET}')
@@ -325,12 +332,12 @@ def pick_mode():
         # -- divider before footer ---------------------------------------------
         print(f'  {FRAME}├{"-" * CW}┼{"-" * CW}┤{RESET}')
 
-        # -- footer row 1: 9 / H -----------------------------------------------
-        print(f'  {FRAME}│{RESET}  {ACCENT}9{RESET}  {TEXT}{"Custom flags":<18}{RESET}  '
-              f'{FRAME}│{RESET}  {ACCENT}H{RESET}  {TEXT}{"Help guide":<18}{RESET}  {FRAME}│{RESET}')
+        # -- footer row 1: C / H -----------------------------------------------
+        print(f'  {FRAME}│{RESET} {ACCENT} C{RESET}  {TEXT}{"Custom flags":<18}{RESET}  '
+              f'{FRAME}│{RESET} {ACCENT} H{RESET}  {TEXT}{"Help guide":<18}{RESET}  {FRAME}│{RESET}')
 
         # -- footer row 2: X / blank -------------------------------------------
-        print(f'  {FRAME}│{RESET}  {ACCENT}X{RESET}  {TEXT}{"Exit":<18}{RESET}  '
+        print(f'  {FRAME}│{RESET} {ACCENT} X{RESET}  {TEXT}{"Exit":<18}{RESET}  '
               f'{FRAME}│{RESET}{" " * CW}{FRAME}│{RESET}')
 
         # -- bottom border -----------------------------------------------------
@@ -341,7 +348,7 @@ def pick_mode():
         print()
 
         choice = safe_input(
-            f'  {ACCENT}>> Enter choice [1-9 / H / X]: {RESET}',
+            f'  {ACCENT}>> Enter choice [1-10 / C / H / X]: {RESET}',
             default='X'
         ).upper()
 
@@ -349,13 +356,13 @@ def pick_mode():
             return None, None, False, False
         if choice == 'H':
             return None, None, False, True
-        if choice == '9':
+        if choice == 'C':
             return None, None, True, False
         for key, label, flag in MODES:
             if choice == key:
                 return label, flag, False, False
 
-        print(f'\n  {ERR}Invalid choice - please enter 1-9, H, or X.{RESET}')
+        print(f'\n  {ERR}Invalid choice - please enter 1-10, C, H, or X.{RESET}')
         safe_input(f'  {INFO}Press Enter to try again...{RESET}')
 
 
@@ -615,55 +622,62 @@ def run_custom() -> None:
     _run_cmd(cmd, label='custom')
 
 
-def run_ui() -> None:
-    cmd = [PYTHON, str(BASE / "SOURCE_CODE" / 'main.py'), '--ui']
+def coming_soon(label: str) -> None:
     print()
-    print(f'  {FRAME}╔══ Streamlit UI ══════════════════════════════════════════╗{RESET}')
-    print(f'  {FRAME}║{RESET}  {GOOD}Opening :{RESET}  {ACCENT}http://localhost:8501{RESET}{"  " * 12}{FRAME}║{RESET}')
-    print(f'  {FRAME}║{RESET}  {INFO}Stop    :{RESET}  {INFO}Close browser tab then press Ctrl+C{RESET}  {FRAME}        ║{RESET}')
-    print(f'  {FRAME}╚══════════════════════════════════════════════════════════╝{RESET}')
-    print()
+    print(f'  {WARN}{label}: coming soon.{RESET}')
+    safe_input(f'  {INFO}Press Enter to return to menu...{RESET}')
+
+
+def open_help() -> bool:
+    """Open Readme/flashcard-help.html in the browser. True if opened."""
+    if not HELP_FILE.is_file():
+        print()
+        print(f'  {ERR}Help page not found:{RESET}  {TEXT}{HELP_FILE}{RESET}')
+        safe_input(f'  {INFO}Press Enter to return to menu...{RESET}')
+        return False
+    import webbrowser
     try:
-        proc = subprocess.Popen(cmd, cwd=str(BASE))
-        proc.wait()
-    except (KeyboardInterrupt, EOFError):
-        proc.terminate()
-        print(f'\n  {WARN}UI stopped.  Returning to menu...{RESET}\n')
-
-
-def show_help() -> None:
-    help_file = BASE / "Readme" / "flashcard-help.html"
-    opened = False
-    if help_file.exists():
-        try:
-            import webbrowser
-            webbrowser.open(str(help_file))
-            opened = True
-        except Exception:
-            pass
-
+        opened = webbrowser.open(HELP_FILE.resolve().as_uri())
+    except Exception:
+        opened = False
     if not opened:
+        print()
+        print(f'  {WARN}Could not open a browser. Open this file yourself:{RESET}')
+        print(f'  {TEXT}{HELP_FILE}{RESET}')
+        safe_input(f'  {INFO}Press Enter to return to menu...{RESET}')
+        return False
+    return True
+
+
+SETUP_ITEMS = [
+    ('1', 'API keys',          'saved to .env, typed hidden'),
+    ('2', 'Local AI (Ollama)', 'check install, default model, pull models'),
+    ('3', 'Open Help',         'help page in your browser'),
+]
+
+
+def setup_menu() -> None:
+    while True:
         clear()
         banner()
-        section_header('QUICK  HELP')
+        section_header('SETUP')
         print()
-        entries = [
-            ('coding',     'AI-assisted manuscript coding'),
-            ('writing',    'AI writing pipeline'),
-            ('appraisal',  'Critical appraisal of studies'),
-            ('search',     'Literature search'),
-            ('rct_search', 'PubMed + Europe PMC RCT search'),
-            ('sr',         '6-stage systematic review (vision)'),
-            ('dry-run',    'Test without calling APIs'),
-            ('--ui',       'Launch Streamlit web interface'),
-        ]
-        for mode, desc in entries:
-            print(f'  {ACCENT}{mode:<14}{RESET}  {TEXT}{desc}{RESET}')
+        for key, label, desc in SETUP_ITEMS:
+            print(f'  {ACCENT}{key}{RESET}  {TEXT}{label:<20}{RESET}  {INFO}{desc}{RESET}')
+        print(f'  {ACCENT}0{RESET}  {TEXT}Back to main menu{RESET}')
         print()
-        print(f'  {INFO}Full guide:{RESET}  {ACCENT}python SOURCE_CODE/main.py --help-guide{RESET}')
-        print()
-
-    safe_input(f'  {INFO}Press Enter to return to menu...{RESET}')
+        choice = safe_input(f'  {ACCENT}>> Enter choice [0-3]: {RESET}', default='0')
+        if choice in ('0', ''):
+            return
+        if choice == '1':
+            coming_soon('API keys')
+        elif choice == '2':
+            coming_soon('Local AI (Ollama)')
+        elif choice == '3':
+            open_help()
+        else:
+            print(f'\n  {ERR}Invalid choice - please enter 0-3.{RESET}')
+            safe_input(f'  {INFO}Press Enter to try again...{RESET}')
 
 
 # -----------------------------------------------------------------------------
@@ -685,7 +699,7 @@ def main() -> None:
                 break
 
             if is_help:
-                show_help()
+                open_help()
                 continue
 
             if is_custom:
@@ -693,9 +707,12 @@ def main() -> None:
                 safe_input(f'  {INFO}Press Enter to return to menu...{RESET}')
                 continue
 
-            if mode_flag == '--ui':
-                run_ui()
-                safe_input(f'  {INFO}Press Enter to return to menu...{RESET}')
+            if mode_flag is None:          # 7 Data Analysis, 8 OCR
+                coming_soon(label)
+                continue
+
+            if mode_flag == 'setup':       # 10 Setup
+                setup_menu()
                 continue
 
             input_mode = _MODE_INPUT_MAP.get(mode_flag)
