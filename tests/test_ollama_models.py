@@ -114,3 +114,16 @@ class TestNoRankings:
         for name in ("MODEL_RANKS", "RANKS_SOURCE", "rank_label",
                      "missing_ranked", "choose_default", "_SKIP_PATTERNS"):
             assert not hasattr(ollama_models, name), name
+
+
+class TestVersion:
+    def test_reads_version_from_api_version(self):
+        import ollama_models
+        with patch("urllib.request.urlopen", return_value=_resp({"version": "0.40.11"})) as fake:
+            assert ollama_models.ollama_version("http://localhost:11434") == "0.40.11"
+        assert fake.call_args[0][0].full_url.endswith("/api/version")
+
+    def test_unreachable_returns_empty(self):
+        import ollama_models
+        with patch("urllib.request.urlopen", side_effect=OSError("refused")):
+            assert ollama_models.ollama_version("http://localhost:11434") == ""

@@ -46,7 +46,7 @@ so those catches happen at session open, not mid-work.
 
 | Component      | Status |
 |----------------|--------|
-| Tests          | 802 passed, 3 skipped, 10 deselected on v2.6-ocr-editor; 816 on main (`python -m pytest -m "not live" --tb=short -q`) |
+| Tests          | 818 passed, 3 skipped, 10 deselected on v2.6-ocr-editor; 816 on main (`python -m pytest -m "not live" --tb=short -q`) |
 | Branch         | PR #3 merged as fa4edb9; v2.6-ocr-editor = main + HANDOFF commits, kept for Startup UI, OCR and Data Analysis. Version stays 2.5.0; bump to 2.6.0 after OCR is merged |
 | CI             | green on PR #3 (816 passed); runs only on push to main and PRs to main (ci.yml lines 4-7), not on branch pushes |
 | Render deploy  | Service DELETED 2026-10-27 (suspended, then deleted; health URL returns 404). Repo files removed in Session 33 commit 3. UptimeRobot monitor to be paused/deleted by user |
@@ -987,3 +987,23 @@ Notes:
 - Tests: test_providers TestOllamaModelRule; test_streaming 3 tests; test_sr_cli_model_resolution (placeholder test replaced by 2); test_launcher_model_picker rewritten (10 picker tests, autouse temp .env); test_ollama_models (9 rank/choose_default tests deleted, TestNoRankings added); new tests/test_sr_default_model.py (4). Suite 799 -> 802.
 - Note: tests/test_main.py::TestMainProviderCalls::test_call_ai_fallback_to_ollama is a live test (real DeepSeek call, got 400 on 2026-10-28). Always run test_main.py with -m "not live".
 - Deferred to commit 5 (Setup -> Local AI): pull offer [y/N], 404 message to mention Setup, plain-language 404 in streaming.py (currently raw "Ollama streaming error 404").
+
+### Commit 5 - Setup -> Local AI (Ollama)
+
+- Setup item 2 now opens `local_ai_menu()` in scripts/launcher.py (was "coming soon").
+- Status line: Ollama version (new `ollama_version()` in ollama_models.py, GET /api/version)
+  and the default model (`OLLAMA_MODEL` in .env, else gemma4:e4b), marked pulled / NOT pulled yet.
+- Not installed (`_ollama_exe()`: PATH, then %LOCALAPPDATA%\Programs\Ollama\ollama.exe):
+  shows https://ollama.com/download and no menu. Installed but not running: says so, no menu.
+- 1 Change default model: lists pulled models whose /api/show capabilities include
+  `completion` (embedding models hidden), saves `OLLAMA_MODEL` via env_file.set_value.
+  Enter cancels. Warns if a Windows/system `OLLAMA_MODEL` variable would override .env.
+- 2 Pull a new model: name checked against `^[A-Za-z0-9][A-Za-z0-9._:/-]{0,199}$`
+  (no spaces, cannot start with `-`), size warning, `Download <name>? [y/N]` (Enter = no),
+  runs `[ollama, "pull", name]` as a list (no shell). Ctrl+C stops; non-zero exit = "failed".
+  Only after a successful pull: `Make <name> the default model? [y/N]`.
+- Tests: tests/test_launcher_local_ai.py (15, nothing touches real Ollama or .env),
+  TestVersion in tests/test_ollama_models.py (2); deleted the item-2 placeholder test
+  in tests/test_launcher_menu.py. Full suite 818 passed, 3 skipped, 10 deselected (2026-10-28).
+- Still open: streaming.py `_stream_ollama` shows a raw HTTP 404 when the model is not
+  pulled; providers.py already says "ollama pull <model>". Next commit.

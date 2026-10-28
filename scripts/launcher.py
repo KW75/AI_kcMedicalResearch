@@ -32,7 +32,7 @@ if _SOURCE_DIR not in sys.path:
     sys.path.append(_SOURCE_DIR)
 
 from ollama_models import (  # noqa: E402
-    OLLAMA_DEFAULT_MODEL, describe, list_ollama_models, model_capabilities,
+    OLLAMA_DEFAULT_MODEL, describe, list_ollama_models, model_capabilities, ollama_version,
 )
 from time_limits import CHOICES as TIME_CHOICES, DEFAULT as TIME_DEFAULT, LABELS as TIME_LABELS  # noqa: E402
 import env_file  # noqa: E402
@@ -734,6 +734,154 @@ def api_keys_menu() -> None:
         safe_input(f'  {INFO}Press Enter to continue...{RESET}')
 
 
+# -----------------------------------------------------------------------------
+#  Setup -> Local AI (Ollama)
+# -----------------------------------------------------------------------------
+# Names Ollama accepts, e.g. qwen3:4b or hf.co/user/model:Q4_K_M. Must start
+# with a letter or digit so it can never look like a command option.
+_MODEL_NAME_RE = re.compile(r'^[A-Za-z0-9][A-Za-z0-9._:/-]{0,199}$')
+
+
+def _ollama_exe() -> str:
+    """Full path of the ollama program, or '' if it is not installed."""
+    found = shutil.which('ollama')
+    if found:
+        return found
+    if os.name == 'nt':
+        local = os.environ.get('LOCALAPPDATA', '')
+        if local:
+            guess = Path(local) / 'Programs' / 'Ollama' / 'ollama.exe'
+            if guess.is_file():
+                return str(guess)
+    return ''
+
+
+def _local_default_model() -> str:
+    """OLLAMA_MODEL from .env, else the code default (gemma4:e4b)."""
+    values = env_file.read_values(ENV_FILE) if ENV_FILE.exists() else {}
+    return values.get('OLLAMA_MODEL', '').strip() or OLLAMA_DEFAULT_MODEL
+
+
+def _warn_if_system_ollama_model() -> None:
+    value = os.environ.get('OLLAMA_MODEL', '')
+    if value:
+        print(f'  {WARN}Note: OLLAMA_MODEL={value} is also set in your system environment variables{RESET}')
+        print(f'  {WARN}(Windows: System Properties -> Environment Variables). That copy wins,{RESET}')
+        print(f'  {WARN}so the .env value is ignored until you remove it.{RESET}')
+
+
+def _save_default_model(name: str) -> None:
+    try:
+        env_file.set_value(ENV_FILE, 'OLLAMA_MODEL', name, template=ENV_TEMPLATE)
+    except ValueError as e:
+        print(f'  {ERR}{e} Nothing was saved.{RESET}')
+        return
+    except OSError as e:
+        print(f'  {ERR}Could not save .env ({e.strerror or type(e).__name__}). Nothing was changed.{RESET}')
+        return
+    print(f'  {ACCENT}Saved OLLAMA_MODEL={name} to .env - used whenever you pick Ollama.{RESET}')
+    _warn_if_system_ollama_model()
+
+
+def _change_default_model(models: list) -> None:
+    """Pick from pulled chat models only (Ollama says 'completion')."""
+    caps = {m['name']: model_capabilities(None, m['name']) for m in models}
+    chat = [m for m in models if 'completion' in caps[m['name']]]
+    print()
+    if not chat:
+        print(f'  {WARN}No chat models pulled yet - use 2 to pull one first.{RESET}')
+        return
+    current = _local_default_model()
+    for i, m in enumerate(chat, 1):
+        mark = f'  {ACCENT}(current default){RESET}' if m['name'] == current else ''
+        print(f'  {ACCENT}{i}{RESET}  {TEXT}{describe(m, caps[m["name"]])}{RESET}{mark}')
+    print()
+    choice = safe_input(f'  {ACCENT}>> New default [1-{len(chat)}] or Enter to cancel: {RESET}')
+    if not choice:
+        print(f'  {INFO}Cancelled - default not changed.{RESET}')
+        return
+    if not (choice.isdigit() and 1 <= int(choice) <= len(chat)):
+        print(f'  {ERR}Invalid choice - default not changed.{RESET}')
+        return
+    _save_default_model(chat[int(choice) - 1]['name'])
+
+
+def _pull_model(exe: str) -> None:
+    print()
+    print(f'  {INFO}Find model names at https://ollama.com/search (e.g. qwen3:4b).{RESET}')
+    name = safe_input(f'  {ACCENT}>> Model to pull (Enter to cancel): {RESET}')
+    if not name:
+        print(f'  {INFO}Cancelled.{RESET}')
+        return
+    if not _MODEL_NAME_RE.match(name):
+        print(f'  {ERR}Invalid model name - use letters, digits and . _ : / - only (e.g. qwen3:4b).{RESET}')
+        return
+    print(f'  {WARN}Models are big downloads (often 2-10 GB) and use that much disk space.{RESET}')
+    answer = safe_input(f'  {ACCENT}>> Download {name}? [y/N]: {RESET}')
+    if answer.lower() not in ('y', 'yes'):
+        print(f'  {INFO}Cancelled - nothing downloaded.{RESET}')
+        return
+    print(f'  {INFO}Running: ollama pull {name}   (Ctrl+C to stop){RESET}')
+    try:
+        rc = subprocess.run([exe, 'pull', name]).returncode
+    except KeyboardInterrupt:
+        print(f'\n  {WARN}Download stopped. Pull it again later to resume.{RESET}')
+        return
+    except OSError as e:
+        print(f'  {ERR}Download failed - could not start ollama ({e.strerror or type(e).__name__}).{RESET}')
+        return
+    if rc != 0:
+        print(f'  {ERR}Download failed (ollama exit code {rc}). Check the name at https://ollama.com/search.{RESET}')
+        return
+    print(f'  {ACCENT}{name} is ready.{RESET}')
+    answer = safe_input(f'  {ACCENT}>> Make {name} the default model? [y/N]: {RESET}')
+    if answer.lower() in ('y', 'yes'):
+        _save_default_model(name)
+
+
+def local_ai_menu() -> None:
+    clear()
+    section_header('SETUP - LOCAL AI (OLLAMA)')
+    exe = _ollama_exe()
+    if not exe:
+        print()
+        print(f'  {WARN}Ollama is not installed.{RESET}')
+        print(f'  {TEXT}Download it from https://ollama.com/download, install it,{RESET}')
+        print(f'  {TEXT}then come back here to pull a model.{RESET}')
+        safe_input(f'  {INFO}Press Enter to return to menu...{RESET}')
+        return
+    version = ollama_version()
+    if not version:
+        print()
+        print(f'  {WARN}Ollama is installed but not running.{RESET}')
+        print(f'  {TEXT}Start the Ollama app (Windows: Start menu -> Ollama), then try again.{RESET}')
+        safe_input(f'  {INFO}Press Enter to return to menu...{RESET}')
+        return
+    while True:
+        models = list_ollama_models()
+        default = _local_default_model()
+        want = default if ':' in default else default + ':latest'
+        state = 'pulled' if any(m['name'] == want for m in models) else 'NOT pulled yet - use 2'
+        print()
+        print(f'  {TEXT}Ollama {version} - running{RESET}')
+        print(f'  {TEXT}Default model: {default} ({state}){RESET}')
+        _warn_if_system_ollama_model()
+        print()
+        print(f'  {ACCENT}1{RESET}  {TEXT}Change default model{RESET}')
+        print(f'  {ACCENT}2{RESET}  {TEXT}Pull a new model{RESET}')
+        print(f'  {ACCENT}0{RESET}  {TEXT}Back{RESET}')
+        print()
+        choice = safe_input(f'  {ACCENT}>> Enter choice [0-2]: {RESET}', default='0')
+        if choice in ('0', ''):
+            return
+        if choice == '1':
+            _change_default_model(models)
+        elif choice == '2':
+            _pull_model(exe)
+        else:
+            print(f'\n  {ERR}Invalid choice - please enter 0-2.{RESET}')
+
+
 SETUP_ITEMS = [
     ('1', 'API keys',          'saved to .env, typed hidden'),
     ('2', 'Local AI (Ollama)', 'check install, default model, pull models'),
@@ -757,7 +905,7 @@ def setup_menu() -> None:
         if choice == '1':
             api_keys_menu()
         elif choice == '2':
-            coming_soon('Local AI (Ollama)')
+            local_ai_menu()
         elif choice == '3':
             open_help()
         else:

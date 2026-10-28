@@ -7,6 +7,7 @@ Standard library only: the launcher imports this file directly.
 
 Everything about a model is read live from Ollama, never hard-coded:
 - Disk size and parameter count: /api/tags.
+- Version (Setup -> Local AI status line): /api/version.
 - Capabilities (completion, vision, embedding, ...): /api/show.
   The launcher lists only models with 'completion', which hides
   embedding models without matching their names.
@@ -23,6 +24,18 @@ OLLAMA_HOST_DEFAULT = os.environ.get("OLLAMA_HOST", "http://localhost:11434")
 # no auto-detection). gemma4:e4b reads images, which OCR mode will need.
 # README and .env.example must name the same model (test_providers.py).
 OLLAMA_DEFAULT_MODEL = "gemma4:e4b"
+
+
+def ollama_version(host: str | None = None) -> str:
+    """Ollama's version from /api/version, e.g. '0.40.11'. '' if not reachable."""
+    host = host or OLLAMA_HOST_DEFAULT
+    try:
+        req = urllib.request.Request(f"{host}/api/version", method="GET")
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            data = json.loads(resp.read())
+    except Exception:
+        return ""
+    return str(data.get("version") or "")
 
 
 def _parse_params(text: str) -> float:
