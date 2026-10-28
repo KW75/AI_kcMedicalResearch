@@ -33,8 +33,9 @@ def resolve_model(provider: str, model):
     The --model help text has always promised the provider default, but the
     CLI passed args.model (None) straight through to every stage, so Qwen
     rejected the very first call with "you must provide a model parameter"
-    (Session 24, #65). The Streamlit UI resolves via get_default_model; the
-    CLI now does the same so both entry points agree.
+    (Session 24, #65). It resolves via providers.get_default_model, the same
+    value the providers themselves use.
+
     """
     if model:
         return model

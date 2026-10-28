@@ -25,15 +25,14 @@ except ImportError:
 BASE   = Path(__file__).resolve().parent.parent
 PYTHON = sys.executable
 
-# Ollama model list, default and descriptions, shared with the app so the
-# launcher and the UI show the same thing. ollama_models.py is stdlib only.
+# Default model, model list and descriptions come from SOURCE_CODE/ollama_models.py
+# (stdlib only, so the launcher can import it).
 _SOURCE_DIR = str(BASE / 'SOURCE_CODE')
 if _SOURCE_DIR not in sys.path:
     sys.path.append(_SOURCE_DIR)
 
 from ollama_models import (  # noqa: E402
-    RANKS_SOURCE, choose_default, describe, list_ollama_models,
-    missing_ranked, model_capabilities,
+    OLLAMA_DEFAULT_MODEL, describe, list_ollama_models, model_capabilities,
 )
 from time_limits import CHOICES as TIME_CHOICES, DEFAULT as TIME_DEFAULT, LABELS as TIME_LABELS  # noqa: E402
 import env_file  # noqa: E402
@@ -373,49 +372,70 @@ def pick_mode():
 # -----------------------------------------------------------------------------
 #  Provider selection menu
 # -----------------------------------------------------------------------------
-def pick_ollama_model() -> str:
-    """Ask which pulled Ollama model to use.
+def _with_tag(name: str) -> str:
+    """'llama3.2' and 'llama3.2:latest' are the same model to Ollama."""
+    name = name.strip()
+    return name if ':' in name else f'{name}:latest'
 
-    Returns the model name, or '' if Ollama cannot be reached (the app then
-    chooses a model itself). Enter picks the default.
+
+def pick_ollama_model() -> str:
+    """Ask which pulled Ollama model to use for this job.
+
+    Default = OLLAMA_MODEL in .env (set in Setup), else OLLAMA_DEFAULT_MODEL.
+    Only models that can chat ('completion' capability) are listed, so
+    embedding models are hidden. If the default is not pulled it is still
+    the Enter choice: no silent switch - the job stops with a pull message.
+    Returns '' if no chat model can be listed (the app then uses the default).
     """
+    default = (env_file.read_values(ENV_FILE).get('OLLAMA_MODEL', '').strip()
+               or OLLAMA_DEFAULT_MODEL)
+
     models = list_ollama_models()
     if not models:
         print()
         print(f'  {WARN}!  Could not list Ollama models. Is the Ollama app running?{RESET}')
-        print(f'  {INFO}   Continuing without a model choice; the app will pick one.{RESET}')
+        print(f'  {INFO}   Continuing with the default model: {default}{RESET}')
         return ''
 
-    default = choose_default(models)
     caps = {m['name']: model_capabilities(None, m['name']) for m in models}
-    missing = missing_ranked(models)
+    # An empty set means /api/show did not answer: show the model rather
+    # than hide it. Only models Ollama reports as non-chat are hidden.
+    chat = [m for m in models
+            if 'completion' in caps[m['name']] or not caps[m['name']]]
+    if not chat:
+        print()
+        print(f'  {WARN}!  No chat model is pulled (only embedding models).{RESET}')
+        print(f'  {INFO}   Run:  ollama pull {default}{RESET}')
+        return ''
+
+    default_pulled = _with_tag(default) in {_with_tag(m['name']) for m in chat}
 
     while True:
         print()
         section_header('SELECT  LOCAL  MODEL')
         print()
-        for i, m in enumerate(models, start=1):
-            mark = f'  {GOOD}(default){RESET}' if m['name'] == default else ''
+        for i, m in enumerate(chat, start=1):
+            is_default = _with_tag(m['name']) == _with_tag(default)
+            mark = f'  {GOOD}(default){RESET}' if is_default else ''
             print(f'  {ACCENT}{i}{RESET}  {TEXT}{describe(m, caps[m["name"]])}{RESET}{mark}')
         print()
-        print(f'  {INFO}Ranks: {RANKS_SOURCE}. Image/OCR = the model can read images;{RESET}')
-        print(f'  {INFO}the app does not send images to Ollama yet (OCR mode is planned).{RESET}')
-        if missing:
+        print(f'  {INFO}Image/OCR = the model can read images; the app does not{RESET}')
+        print(f'  {INFO}send images to Ollama yet (OCR mode is planned).{RESET}')
+        if not default_pulled:
             print()
-            print(f'  {INFO}Also in the comparison, not installed yet:{RESET}')
-            for name in missing:
-                print(f'     {INFO}ollama pull {name}{RESET}')
+            print(f'  {WARN}!  Default model {default} is not pulled.{RESET}')
+            print(f'  {INFO}   Run:  ollama pull {default}   or pick a number below.{RESET}')
         print()
 
         choice = safe_input(
-            f'  {ACCENT}>> Enter choice [1-{len(models)}] or Enter for {default}: {RESET}',
+            f'  {ACCENT}>> Enter choice [1-{len(chat)}] or Enter for {default}: {RESET}',
             default='',
         ).strip()
         if choice == '':
             return default
-        if choice.isdigit() and 1 <= int(choice) <= len(models):
-            return models[int(choice) - 1]['name']
-        print(f'\n  {ERR}Invalid choice. Please enter 1-{len(models)} or press Enter.{RESET}')
+        if choice.isdigit() and 1 <= int(choice) <= len(chat):
+            return chat[int(choice) - 1]['name']
+        print(f'\n  {ERR}Invalid choice. Please enter 1-{len(chat)} or press Enter.{RESET}')
 
 
 def pick_time_limit() -> str:

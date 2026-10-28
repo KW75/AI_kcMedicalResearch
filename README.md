@@ -4,7 +4,7 @@ A multi-mode AI assistant for medical research, critical appraisal, systematic r
 
 
     Version: 2.5.0
-    Tests: 799 passed, 3 skipped, 10 deselected
+    Tests: 802 passed, 3 skipped, 10 deselected
            (reproduce with `python -m pytest -m "not live" --tb=short -q`)
     CI: GitHub Actions - Green
     GitHub: https://github.com/KW75/AI_kcMedicalResearch
@@ -75,24 +75,22 @@ Option A - Free / local (Ollama), no API key:
 3. Copy `.env.example` to `.env` and confirm this line matches the model you
    pulled (already set by default):
        OLLAMA_MODEL=gemma4:e4b
-   (If you pulled a different chat model, put its exact name here, or comment
-    the line out to let the app pick: gemma4:e4b if pulled, otherwise the
-    largest model you have. The embedding model must stay nomic-embed-text
+   (If you pulled a different chat model, put its exact name here. If the
+    line is commented out, the app uses gemma4:e4b. It never switches model
+    on its own: if the model is not pulled, the job stops and tells you to
+    run `ollama pull <model>`. The embedding model must stay nomic-embed-text
     unless you change EMBEDDING_MODEL.)
 4. Ollama runs in the background after install; the app connects automatically.
-5. When you choose Ollama in the CLI launcher, it lists the models you have
-   pulled with their size, whether they read images (Image/OCR), and their
-   coding and reasoning ranks from the 2026-10 local model comparison
-   (1 = best). Press Enter for the default (gemma4:e4b) or type a number to
-   match the model to your hardware. Ranked models you have not pulled are
-   shown as `ollama pull ...` commands.
+5. When you choose Ollama in the CLI launcher, it lists the chat models you
+   have pulled with their size and whether they read images (Image/OCR).
+   Embedding models are hidden. Press Enter for your default (OLLAMA_MODEL in
+   .env, else gemma4:e4b) or type a number to use another model for this job.
 
 
-Note: v2.5 changed the default from qwen2.5:14b-instruct to gemma4:e4b. In
-the 2026-10 local model comparison gemma4:e4b ranked best for coding and
-second for reasoning, is smaller (6.6 GB vs 9.0 GB), and is the only one of
-the five that reads images (for the planned OCR mode). qwen2.5:14b-instruct
-still works if you already have it.
+Note: v2.5 changed the default from qwen2.5:14b-instruct to gemma4:e4b. It is
+smaller (6.6 GB vs 9.0 GB) and reads images (for the planned OCR mode).
+qwen2.5:14b-instruct still works if you already have it: set OLLAMA_MODEL to
+its name.
 
 Option B - Cloud provider (DeepSeek, Qwen, OpenAI, Anthropic, Groq):
 1. Copy `.env.example` to `.env`.
@@ -363,7 +361,6 @@ On branch:
 
 Noted, not fixed:
 - rob2_tool.py reads `OLLAMA_URL`; the rest of the app reads `OLLAMA_HOST`.
-- main.py SR route uses raw `OLLAMA_MODEL`, not `_resolve_ollama_model()`.
 - An Ollama SR run screens locally, then fails at extraction (no vision).
   It should stop at the start, like the DeepSeek warning.
 - main.call_ai swallows streaming errors (`except Exception: pass`), so an

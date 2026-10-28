@@ -1,6 +1,6 @@
 """
 Provider registry for AI kcMedicalResearch.
-Handles all LLM provider connections, auto-detection, fallback chains,
+Handles all LLM provider connections, fallback chains,
 and provider capability assessment.
 """
 
@@ -57,8 +57,8 @@ FALLBACK_PROVIDERS = [
 LOCAL_ONLY_PROVIDERS = {"ollama"}
 
 # Default local model and model listing live in ollama_models.py, so the
-# launcher, the UI and this module share one value.
-from ollama_models import OLLAMA_DEFAULT_MODEL, choose_default, list_ollama_models  # noqa: E402
+# launcher and this module share one value.
+from ollama_models import OLLAMA_DEFAULT_MODEL  # noqa: E402
 import time_limits
 
 # Ollama performance thresholds
@@ -89,24 +89,6 @@ def supports_vision(provider: str) -> bool:
 
 
 # ---------------------------------------------------------------------------
-# Ollama auto-detect best model
-# ---------------------------------------------------------------------------
-def _ollama_detect_best_model(host: str = "http://localhost:11434") -> str:
-    """Pick the Ollama model to use when OLLAMA_MODEL is unset.
-
-    OLLAMA_DEFAULT_MODEL if it is pulled, otherwise the largest pulled chat
-    model. OLLAMA_DEFAULT_MODEL if nothing is pulled or Ollama is down.
-    """
-    models = list_ollama_models(host)
-    if not models:
-        return OLLAMA_DEFAULT_MODEL
-    best = choose_default(models)
-    size = next((m["params_b"] for m in models if m["name"] == best), 0.0)
-    print(f"[ollama] Auto-detected best model: {best} ({size:.1f}B params)")
-    return best
-
-
-# ---------------------------------------------------------------------------
 # Ollama startup probe (performance measurement)
 # ---------------------------------------------------------------------------
 def ollama_probe_performance(host: str = None, model: str = None) -> dict:
@@ -115,7 +97,7 @@ def ollama_probe_performance(host: str = None, model: str = None) -> dict:
     Returns dict with: reachable, tokens_per_second, model, model_size_b
     """
     host = host or OLLAMA_HOST
-    model = model or OLLAMA_MODEL or _ollama_detect_best_model(host)
+    model = model or _resolve_ollama_model()
 
     probe_prompt = "Count from 1 to 20, one number per line."
     url = f"{host}/api/generate"
@@ -183,27 +165,13 @@ def _get_model_size(host: str, model_name: str) -> float:
     return 0.0
 
 
-# Ollama model resolution is lazy (see _resolve_ollama_model below), not
-# eager at import time. Previously this block ran unconditionally for every
-# process regardless of which provider was actually selected: a network
-# probe to the local Ollama server (bounded by a 5s timeout, but still a
-# latent hang on every single run - Known Issue #17) and a cosmetic
-# "[ollama] Auto-detected..." print that fired even on a Qwen SR run that
-# never touches Ollama (Known Issue #6).
-_OLLAMA_MODEL_RESOLVED: str | None = None
-
-
+# Ollama model rule (Session 33): OLLAMA_MODEL from .env, otherwise
+# OLLAMA_DEFAULT_MODEL. No auto-detection and no silent switching: if that
+# model is not pulled, the call fails with a 404 and the error message below
+# tells the user what to run. Read at call time so tests can monkeypatch it.
 def _resolve_ollama_model() -> str:
-    """Return the Ollama model to use, auto-detecting on first real use only."""
-    global _OLLAMA_MODEL_RESOLVED
-    if OLLAMA_MODEL:
-        return OLLAMA_MODEL
-    if _OLLAMA_MODEL_RESOLVED is None:
-        try:
-            _OLLAMA_MODEL_RESOLVED = _ollama_detect_best_model(OLLAMA_HOST)
-        except Exception:
-            _OLLAMA_MODEL_RESOLVED = OLLAMA_DEFAULT_MODEL
-    return _OLLAMA_MODEL_RESOLVED
+    """Return the Ollama model to use: OLLAMA_MODEL, else OLLAMA_DEFAULT_MODEL."""
+    return OLLAMA_MODEL.strip() or OLLAMA_DEFAULT_MODEL
 
 
 # ---------------------------------------------------------------------------
@@ -617,11 +585,11 @@ def validate_provider(provider: str) -> tuple[bool, str]:
 def get_default_model(provider: str) -> str:
     """Return the default model for a given provider.
 
-    For Ollama, this reflects only an explicitly configured OLLAMA_MODEL and
-    deliberately does NOT trigger the network auto-detect probe - callers
-    that just want to list/display provider status shouldn't pay for or
-    wait on a live Ollama query. The real model is resolved lazily on first
-    actual generation call; see _resolve_ollama_model.
+    For Ollama: OLLAMA_MODEL from .env, otherwise OLLAMA_DEFAULT_MODEL
+    (gemma4:e4b). No network call and no auto-detection; if that model is
+    not pulled, the generation call fails with a plain-language message.
+    See _resolve_ollama_model.
+
     """
     defaults = {
         "deepseek": DEEPSEEK_MODEL,
@@ -629,7 +597,7 @@ def get_default_model(provider: str) -> str:
         "anthropic": ANTHROPIC_MODEL,
         "groq": GROQ_MODEL,
         "qwen": QWEN_MODEL,
-        "ollama": OLLAMA_MODEL or "(auto-detected on first use)",
+        "ollama": _resolve_ollama_model(),
     }
     return defaults.get(provider, "")
 

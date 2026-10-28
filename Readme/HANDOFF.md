@@ -46,7 +46,7 @@ so those catches happen at session open, not mid-work.
 
 | Component      | Status |
 |----------------|--------|
-| Tests          | 799 passed, 3 skipped, 10 deselected on v2.6-ocr-editor; 816 on main (`python -m pytest -m "not live" --tb=short -q`) |
+| Tests          | 802 passed, 3 skipped, 10 deselected on v2.6-ocr-editor; 816 on main (`python -m pytest -m "not live" --tb=short -q`) |
 | Branch         | PR #3 merged as fa4edb9; v2.6-ocr-editor = main + HANDOFF commits, kept for Startup UI, OCR and Data Analysis. Version stays 2.5.0; bump to 2.6.0 after OCR is merged |
 | CI             | green on PR #3 (816 passed); runs only on push to main and PRs to main (ci.yml lines 4-7), not on branch pushes |
 | Render deploy  | Service DELETED 2026-10-27 (suspended, then deleted; health URL returns 404). Repo files removed in Session 33 commit 3. UptimeRobot monitor to be paused/deleted by user |
@@ -975,3 +975,15 @@ Notes:
 - README: Render links, hosted-app line, web-UI sentences and Deployment (Render) section removed; pre-v2.4.7 key-rotation note kept and reworded.
 - Guard: tests/test_no_streamlit.py (9 tests: files gone, no --ui/streamlit/is_cloud in main.py, no ui/assets in PathManager, no streamlit in requirements, pyarrow pin kept, .gitignore, README).
 - Left for commit 4: README lines on model ranks and "ollama pull" hints, ollama_models.py docstring mentioning ui/app.py.
+
+### Commit 4 - Ollama default-model rule, no rankings
+- Rule: model = OLLAMA_MODEL in .env, else OLLAMA_DEFAULT_MODEL (gemma4:e4b). No auto-detection and no silent switching. A model that is not pulled fails with the plain-language 404 message ("ollama pull <model>").
+- providers.py: _resolve_ollama_model() = OLLAMA_MODEL or default (no network call, no cache). Deleted _ollama_detect_best_model and _OLLAMA_MODEL_RESOLVED. get_default_model("ollama") returns the real model; the startup probe uses the same rule.
+- ollama_models.py: deleted MODEL_RANKS, RANKS_SOURCE, rank_label, missing_ranked, choose_default, _norm, _SKIP_PATTERNS. list_ollama_models lists every model; describe() has no rank text.
+- launcher.py pick_ollama_model: default read from .env each time the picker opens; lists only models with the 'completion' capability (embedding models hidden); Ollama unreachable or no chat model -> returns ''. Default not pulled -> warning, still the Enter choice. No ranks, no pull hints.
+- main.py: new _sr_default_model(provider). The SR route (--mode sr --provider ollama) used raw OLLAMA_MODEL and sent an empty model name when unset; fixed. README "Noted, not fixed" line removed.
+- sr/main.py: docstring only (resolve_model now never stops for Ollama).
+- .env.example: removed v2.4.6 header, ranking text and Docker note; OLLAMA_MODEL comment explains the rule. README Step 3/5 and the v2.5 note rewritten.
+- Tests: test_providers TestOllamaModelRule; test_streaming 3 tests; test_sr_cli_model_resolution (placeholder test replaced by 2); test_launcher_model_picker rewritten (10 picker tests, autouse temp .env); test_ollama_models (9 rank/choose_default tests deleted, TestNoRankings added); new tests/test_sr_default_model.py (4). Suite 799 -> 802.
+- Note: tests/test_main.py::TestMainProviderCalls::test_call_ai_fallback_to_ollama is a live test (real DeepSeek call, got 400 on 2026-10-28). Always run test_main.py with -m "not live".
+- Deferred to commit 5 (Setup -> Local AI): pull offer [y/N], 404 message to mention Setup, plain-language 404 in streaming.py (currently raw "Ollama streaming error 404").
