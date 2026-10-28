@@ -46,7 +46,7 @@ so those catches happen at session open, not mid-work.
 
 | Component      | Status |
 |----------------|--------|
-| Tests          | 818 passed, 3 skipped, 10 deselected on v2.6-ocr-editor; 816 on main (`python -m pytest -m "not live" --tb=short -q`) |
+| Tests          | 821 passed, 3 skipped, 10 deselected on v2.6-ocr-editor; 816 on main (`python -m pytest -m "not live" --tb=short -q`) |
 | Branch         | PR #3 merged as fa4edb9; v2.6-ocr-editor = main + HANDOFF commits, kept for Startup UI, OCR and Data Analysis. Version stays 2.5.0; bump to 2.6.0 after OCR is merged |
 | CI             | green on PR #3 (816 passed); runs only on push to main and PRs to main (ci.yml lines 4-7), not on branch pushes |
 | Render deploy  | Service DELETED 2026-10-27 (suspended, then deleted; health URL returns 404). Repo files removed in Session 33 commit 3. UptimeRobot monitor to be paused/deleted by user |
@@ -1007,3 +1007,14 @@ Notes:
   in tests/test_launcher_menu.py. Full suite 818 passed, 3 skipped, 10 deselected (2026-10-28).
 - Still open: streaming.py `_stream_ollama` shows a raw HTTP 404 when the model is not
   pulled; providers.py already says "ollama pull <model>". Next commit.
+
+### Commit 6 - same "model not pulled" message when streaming
+
+- New `ollama_model_missing_message(model)` in providers.py: "The local AI model '<model>'
+  is not installed yet", the `ollama pull <model>` command, and the launcher route
+  (10 Setup -> 2 Local AI -> 2 Pull a new model).
+- Used by the Ollama call in providers.py and by streaming._stream_ollama on HTTP 404.
+  Before this, streaming showed the raw "Ollama streaming error 404". Other HTTP codes unchanged.
+- Tests: tests/test_ollama_missing_model.py (3, urlopen patched). Full suite 821 passed,
+  3 skipped, 10 deselected (2026-10-28).
+- Closes the "Still open" item in Commit 5.

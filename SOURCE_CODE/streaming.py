@@ -31,7 +31,7 @@ load_dotenv()
 
 # Import config from providers module
 from providers import (
-    OLLAMA_HOST, OLLAMA_MODEL, _resolve_ollama_model,
+    OLLAMA_HOST, OLLAMA_MODEL, _resolve_ollama_model, ollama_model_missing_message,
     OPENAI_API_KEY, OPENAI_MODEL,
     ANTHROPIC_API_KEY, ANTHROPIC_MODEL,
     DEEPSEEK_API_KEY, DEEPSEEK_MODEL,
@@ -189,6 +189,9 @@ def _stream_ollama(prompt: str, model: str = None) -> Generator[str, None, None]
                 continue
         resp.close()
     except urllib.error.HTTPError as exc:
+        # 404 = model not pulled yet; same plain-language message as providers.py.
+        if exc.code == 404:
+            raise RuntimeError(ollama_model_missing_message(model)) from exc
         raise RuntimeError(f"Ollama streaming error {exc.code}: {exc.reason}") from exc
     except urllib.error.URLError as exc:
         raise RuntimeError(f"Ollama connection error: {exc.reason}") from exc

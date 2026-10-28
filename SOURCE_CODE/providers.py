@@ -250,6 +250,20 @@ def call_anthropic_provider(
         raise RuntimeError(f"Anthropic connection error: {exc.reason}") from exc
 
 
+def ollama_model_missing_message(model: str) -> str:
+    """Plain-language fix when Ollama answers 404 (model not pulled yet).
+
+    Shared by the Ollama call here and streaming._stream_ollama, so the
+    wording cannot drift apart.
+    """
+    return (
+        f"The local AI model '{model}' is not installed yet.\n"
+        f"Open a terminal and run:  ollama pull {model}\n"
+        f"(or launcher menu 10 Setup -> 2 Local AI -> 2 Pull a new model)\n"
+        f"Then start the app again."
+    )
+
+
 def call_ollama_provider(
     prompt: str,
     model: str | None = None,
@@ -288,11 +302,7 @@ def call_ollama_provider(
         # instead of "HTTP error 404: Not Found", which means nothing to a
         # non-technical user on their first run.
         if exc.code == 404:
-            raise RuntimeError(
-                f"The local AI model '{model}' is not installed yet.\n"
-                f"Open a terminal and run:  ollama pull {model}\n"
-                f"Then start the app again."
-            ) from exc
+            raise RuntimeError(ollama_model_missing_message(model)) from exc
         raise RuntimeError(f"Ollama HTTP error {exc.code}: {exc.reason}") from exc
     except urllib.error.URLError as exc:
         # Connection refused = Ollama app isn't running.
