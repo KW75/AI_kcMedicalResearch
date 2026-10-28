@@ -1018,3 +1018,92 @@ Notes:
 - Tests: tests/test_ollama_missing_model.py (3, urlopen patched). Full suite 821 passed,
   3 skipped, 10 deselected (2026-10-28).
 - Closes the "Still open" item in Commit 5.
+
+## Session 33 handoff - for the next chat (2026-10-28)
+
+Repo D:\AI_kcMedicalResearch, branch `v2.6-ocr-editor`, Windows PowerShell, `.venv`.
+`main` is still at fa4edb9 (PR #3, 816 tests). The branch has 8 commits (7 code + this
+handoff), all pushed, **not merged yet** (no PR opened).
+
+### Session 33 commits
+
+| Commit | What |
+|---|---|
+| e4d57cd | path_utils stops creating `data/` and `docker/` |
+| c297396 | Launcher menu: 7 Data Analysis, 8 OCR, 9 Dry Run, 10 Setup |
+| 982c46b | Setup -> API keys saved to `.env` (new `SOURCE_CODE/env_file.py`) |
+| 1264d0c | Removed Streamlit UI and Render deploy (local-first CLI only) |
+| 7fff199 | Ollama: `OLLAMA_MODEL` else gemma4:e4b, no rankings or auto-detect |
+| 189491a | Setup -> Local AI: Ollama status, change default model, pull models |
+| b67873e | Same "model not pulled" message when streaming |
+
+Tests: **821 passed, 3 skipped, 10 deselected** (`python -m pytest -m "not live" --tb=short -q`).
+
+### Where things stand
+
+- **CLI only.** The Streamlit UI, `--ui`, `SOURCE_CODE/ui/`, `assets/`, `.streamlit/`, `render.yaml`,
+  `requirements-render.txt`, `*_UI.bat`/`*_UI.sh` and `run_sr_ui.bat` are gone. The Render service
+  was deleted (the health URL returns 404). README line ~179 still mentions the old Streamlit
+  interface on purpose (it's the API-key rotation note).
+- **Launcher menu** (`scripts/launcher.py`): 1 Coding, 2 Writing, 3 Appraisal, 4 Search,
+  5 RCT Search, 6 SR Pipeline, 7 Data Analysis (coming soon), 8 OCR (coming soon), 9 Dry Run,
+  10 Setup, C Custom flags, H Help (`Readme/flashcard-help.html`), X Exit.
+- **Setup (10):**
+  - 1 API keys: 5 keys typed hidden (getpass), saved by `env_file.set_value`, shown masked.
+    Warns if a system environment variable would override `.env`.
+  - 2 Local AI: `local_ai_menu()` shows the Ollama version and the default model.
+    1 Change default (chat models only), 2 Pull a model (name checked, `[y/N]`, no shell).
+    If Ollama is not installed it shows https://ollama.com/download; if not running it says so.
+  - 3 Open Help.
+- **Ollama model rule:** `OLLAMA_MODEL` from `.env`, else `OLLAMA_DEFAULT_MODEL = "gemma4:e4b"`
+  (`ollama_models.py`). No auto-detection and no silent switching. A model that isn't pulled
+  gives `ollama_model_missing_message()` (providers.py), used by both the normal and the streaming call.
+- **`ollama_models.py`** (stdlib only): `list_ollama_models` (/api/tags),
+  `model_capabilities` (/api/show), `ollama_version` (/api/version), `describe`.
+  "Chat model" = capabilities include `completion`.
+- **Safety rules kept:** Ollama never falls back to a cloud provider (`LOCAL_ONLY_PROVIDERS`).
+  The SR pipeline blocks ollama and deepseek (no image input).
+- **`env_file.py`** keeps `.env` CRLF/LF line endings, never writes a BOM, and saves through a temp
+  file + `os.replace` (`.env.*.tmp` is gitignored).
+
+### Working rules (same as before)
+
+- Test-first, one step at a time: write a failing test, run it, then edit the code, then run the full suite.
+- Edit bottom-up so line numbers stay valid. Save as UTF-8 without BOM; run
+  `python scripts/check_no_bom.py` after every edit.
+- Always use `-m "not live"`. `test_main.py::test_call_ai_fallback_to_ollama` makes a real
+  DeepSeek call (it returned 400 on 2026-10-28).
+- Use `git --no-pager ...`. In `git grep`, put patterns that start with `-` after `-e`.
+- Commit with `git commit -F D:\commit_msg.txt`, and **check its first line first**
+  (`Get-Content D:\commit_msg.txt -TotalCount 1`). f1dbc36 went out with a stale message and
+  had to be amended and force-pushed (now c297396).
+- On split imports inside `( ... )`, check that each line ends in a comma, not a full stop.
+- The launcher tests load `scripts/launcher.py` by path with colorama mocked. The Local AI tests count
+  `safe_input` calls, so don't add "Press Enter" prompts after actions there.
+- CRLF->LF warnings on `git add` for new test files are harmless.
+- Line viewer helper (define it once per PowerShell window):
+  `function Show($f, $a, $b) { "--- $f ($a-$b)"; $i = 0; Get-Content $f -Encoding utf8 | ForEach-Object { $i++; if ($i -ge $a -and $i -le $b) { "${i}: $_" } } }`
+
+### Next options (user to choose)
+
+1. **Open a PR `v2.6-ocr-editor` -> `main`.** After the merge, update the Tests row
+   ("816 on main") to 821.
+2. **8 OCR.** gemma4:e4b can read images, but the app doesn't send images to Ollama yet:
+   `call_ollama` and `_stream_ollama` are text-only. `.env` has TESSERACT_PATH and POPPLER_PATH;
+   `utils/document_reader.py` already accepts image extensions. Start with read-only checks.
+3. **7 Data Analysis** (placeholder).
+
+Outside the repo (user): pause or delete the UptimeRobot monitor for the deleted Render URL.
+The desktop shortcut icon now lives at `C:\icon_AI_kcMedicalResearch.ico`, so it wasn't affected
+when `assets/` was removed.
+
+### First commands for the next session (read-only)
+
+```powershell
+git status -sb
+git --no-pager log --oneline -9
+python scripts/check_no_bom.py
+python -m pytest -m "not live" --tb=line -q
+```
+Expected: a clean tree in sync with origin, the top commit is this handoff, and 821 passed,
+3 skipped, 10 deselected.
