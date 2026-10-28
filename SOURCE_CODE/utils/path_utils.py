@@ -40,16 +40,12 @@ class PathManager:
         self.scripts_windows_dir = self.scripts_dir / "windows"
         self.scripts_macos_dir = self.scripts_dir / "macos"
         
-        # Docker
-        self.docker_dir = self.project_root / "docker"
-        
         # Data directories
         self.input_dir = self.project_root / "input"
         self.output_dir = self.project_root / "output"
         self.reports_dir = self.project_root / "reports"
-        self.data_dir = self.project_root / "data"
         self.chroma_db_dir = self.project_root / "chroma_db"
-        
+ 
         # Tests
         self.tests_dir = self.project_root / "tests"
         
@@ -65,8 +61,8 @@ class PathManager:
             self.prompts_dir, self.docs_dir, self.readme_dir,
             self.assets_dir, self.scripts_dir,
             self.scripts_windows_dir, self.scripts_macos_dir,
-            self.docker_dir, self.input_dir, self.output_dir,
-            self.reports_dir, self.data_dir, self.chroma_db_dir,
+            self.input_dir, self.output_dir,
+            self.reports_dir, self.chroma_db_dir,
             self.tests_dir
         ]
         
@@ -123,9 +119,6 @@ class PathManager:
     
     def get_readme_path(self, doc_name: str) -> Path:
         return self.readme_dir / doc_name
-    
-    def get_docker_path(self, file_name: str) -> Path:
-        return self.docker_dir / file_name
 
 # Create a global instance
 PATH_MANAGER = PathManager()
@@ -166,6 +159,3 @@ def get_assets(asset_name: str) -> Path:
 
 def get_readme(doc_name: str) -> Path:
     return PATH_MANAGER.get_readme_path(doc_name)
-
-def get_docker_file(file_name: str) -> Path:
-    return PATH_MANAGER.get_docker_path(file_name)

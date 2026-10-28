@@ -46,10 +46,10 @@ so those catches happen at session open, not mid-work.
 
 | Component      | Status |
 |----------------|--------|
-| Tests          | 816 passed, 3 skipped, 11 deselected on main and v2.6-ocr-editor (`python -m pytest -m "not live" --tb=short -q`) |
+| Tests          | 819 passed, 3 skipped, 11 deselected on v2.6-ocr-editor; 816 on main (`python -m pytest -m "not live" --tb=short -q`) |
 | Branch         | PR #3 merged as fa4edb9; v2.6-ocr-editor = main + HANDOFF commits, kept for Startup UI, OCR and Data Analysis. Version stays 2.5.0; bump to 2.6.0 after OCR is merged |
 | CI             | green on PR #3 (816 passed); runs only on push to main and PRs to main (ci.yml lines 4-7), not on branch pushes |
-| Render deploy  | fa4edb9 merged (auto-deploy); API works on live app with user's sidebar key; menu modes stop on Render (no terminal) - see Session 33 handoff |
+| Render deploy  | Service DELETED 2026-10-27 (suspended, then deleted; health URL returns 404). Repo files (render.yaml, requirements-render.txt, README links) are removed in Session 33 commit 5 |
 | Writing mode   | one-pass (write + edit + review in one call); tracks Topic 800 / Article 3,500 / Report 500 / Synopsis 1,500; on main since fa4edb9; tested on gemma4:e4b; terminal menus only |
 | SR pipeline    | working via CLI with Qwen; Ang 2010 verified against PDF (NFR week 6, unanimous N=3); text-fallback drops now surface in Stage 4 `[SKIP]` block |
 | Providers      | Ollama (default, local) / DeepSeek / Qwen (SR) / OpenAI / Anthropic / Groq / Ollama (local, never falls back) |
@@ -877,3 +877,74 @@ Details, commits and follow-ups: see "Session 32" at the end of this file.
 - After UI startup: Task A OCR (search HANDOFF for "Task A").
 - Rule for every new mode: decide its UI startup entry (input folder,
   output folder, Run -> CLI) and its Render behaviour.
+
+## Session 33 - 2026-10-27 - branch v2.6-ocr-editor
+
+Decisions (these replace the "Session 33 handoff" plan above: DECISION 1 and
+the Startup UI job are dropped):
+- Streamlit UI removed completely (replaces the Session 29 decision to keep it).
+  Without Run, uploads or keys it added nothing the launcher and Help don't.
+- Render service deleted. It held no API keys, only `DEFAUL_PROVIDER`
+  (misspelt, so never read) and `PYTHON_VERSION`. Steps: auto-deploy off,
+  suspend (health 503), check no local Streamlit (port 8501 free), delete
+  (health 404).
+- Launcher menu: 7 Data Analysis (coming soon), 8 OCR (coming soon),
+  9 Dry Run, 10 Setup.
+- Setup sub-menu: 1 API keys (getpass, written to .env, only that line
+  changed, .env.example copied if no .env, UTF-8 no BOM); 2 Local AI
+  (check Ollama installed/running, choose default model, pull a new model);
+  3 Open Help (Readme/flashcard-help.html, path relative to the launcher).
+  All .env reading/writing goes in a new stdlib-only SOURCE_CODE/env_file.py.
+- Model list: live facts only. MODEL_RANKS and "Not pulled yet" hints are
+  dropped. A model is selectable only if /api/show lists `completion`
+  (embedding models are excluded by capability, not by name).
+- Default model: OLLAMA_MODEL from Setup, else gemma4:e4b
+  (OLLAMA_DEFAULT_MODEL, the only model name left in code). `--model` or a
+  job-time pick applies to that job only. The .env.example OLLAMA_MODEL line
+  gets commented out so an unset value means "built-in default".
+- If the default model isn't pulled: the launcher offers "pull it now" or
+  "choose a pulled model for this job only". With no TTY, the job stops:
+  "Run `ollama pull <model>` or choose another in Setup". No silent switch
+  to the largest model (replaces choose_default's fallback).
+- Pulling: Setup runs `ollama pull <name>` (name checked against a pattern,
+  no shell, [y/N] size warning, Ctrl+C cancels, then "make it default?").
+  It also offers to pull the embedding model (EMBEDDING_MODEL or
+  nomic-embed-text). Setup points users to ollama.com/download and never
+  installs Ollama itself.
+
+Commit 0 (this commit): path_utils.py no longer creates data/ or docker/,
+and docker_dir, data_dir, get_docker_path() and get_docker_file() are
+removed. Nothing else used them. PATH_MANAGER = PathManager() runs
+_ensure_directories() on import, which is why deleting the empty folders
+by hand never stuck. Verified: after importing utils.path_utils,
+Test-Path data, docker -> False, False. tests/test_path_utils_dirs.py (3;
+2 failed with AssertionError before the fix). Suite: 816 -> 819 passed.
+
+Order of work: 1 menu renumber + Setup/Open Help; 2 env_file.py + API keys;
+3 ollama_models.py cleanup (ranks out, capability filter, default rule);
+4 Setup -> Local AI; 5 remove Streamlit and Render; 6 update flashcard-help.html.
+
+Commit 5 list (remove together): ui/app.py, tests/test_ui.py and the other
+UI tests (test_ui_cloud_gate, test_ui_model_picker, test_ui_time_limit,
+AppTest renders), --ui in main.py and the launcher, streamlit in the
+requirements files, .streamlit/ (config.toml, secrets.toml.example) and
+.gitignore line `.streamlit/secrets.toml`, render.yaml,
+requirements-render.txt, tests/test_render_without_chromadb.py, the whole
+assets/ folder, and in path_utils.py the ui_dir and assets_dir mkdir entries
+plus get_assets_path()/get_assets(). Keep: streaming.py (not Streamlit),
+the pyarrow==12.0.1 pin (chromadb needs it), `.gitattributes` `*.ico binary`.
+Expect a large test-count drop; record before/after.
+
+Notes:
+- assets/icon_AI_kcMedicalResearch.ico was used only by the user's desktop
+  shortcut; copied outside the repo before commit 5. No script uses it.
+- The two untracked PNGs (icon_Data_Analysis, logo_OCR) were deleted;
+  made for the dropped UI.
+- Forest plot path disagrees: flashcard-help.html line 273 says
+  output/figures/, README line 226 says output/sr/figures/. Check
+  mirror_figures (main.py ~1569) in commit 6.
+- Still stale (from the session-open read): #19 is RESOLVED but still in the
+  Open Issues table; Providers row lists Ollama twice; Session 28 "[APPLY +
+  add test pinning the 404->pull-message mapping]" not confirmed; Session 28
+  priority "vote outcome_selected/timepoint_selected" never closed; the
+  2026-09-02 notes still say llama3.2. Fix in a docs commit.
