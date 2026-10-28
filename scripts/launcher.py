@@ -3,6 +3,7 @@
 #  (version shown in the banner is parsed live from SOURCE_CODE/main.py)
 # =============================================================================
 
+import getpass
 import re
 import subprocess
 import sys
@@ -35,6 +36,7 @@ from ollama_models import (  # noqa: E402
     missing_ranked, model_capabilities,
 )
 from time_limits import CHOICES as TIME_CHOICES, DEFAULT as TIME_DEFAULT, LABELS as TIME_LABELS  # noqa: E402
+import env_file  # noqa: E402
 
 
 def _project_meta() -> tuple[str, str]:
@@ -180,6 +182,8 @@ MODES = [
 ]
 
 HELP_FILE = BASE / "Readme" / "flashcard-help.html"
+ENV_FILE     = BASE / ".env"
+ENV_TEMPLATE = BASE / ".env.example"
 
 
 PROVIDERS = [
@@ -649,6 +653,67 @@ def open_help() -> bool:
     return True
 
 
+API_KEY_ITEMS = [
+    ('1', 'Qwen',      'DASHSCOPE_API_KEY'),
+    ('2', 'Groq',      'GROQ_API_KEY'),
+    ('3', 'DeepSeek',  'DEEPSEEK_API_KEY'),
+    ('4', 'OpenAI',    'OPENAI_API_KEY'),
+    ('5', 'Anthropic', 'ANTHROPIC_API_KEY'),
+]
+
+
+def _save_api_key(label: str, var: str) -> None:
+    """Ask for one key (hidden) and save it to .env. Never prints the value."""
+    print()
+    try:
+        # Plain prompt: getpass writes it straight to the console, where
+        # colour codes may show up as raw characters on Windows.
+        secret = getpass.getpass(f'  Paste the {label} key (hidden; Enter = keep current): ')
+    except (KeyboardInterrupt, EOFError):
+        print(f'\n  {INFO}Cancelled - nothing changed.{RESET}')
+        return
+    if not secret.strip():
+        print(f'  {INFO}No change - kept the current {var}.{RESET}')
+        return
+    try:
+        env_file.set_value(ENV_FILE, var, secret, template=ENV_TEMPLATE)
+    except ValueError as e:
+        print(f'  {ERR}{e} Nothing was saved.{RESET}')
+        return
+    except OSError as e:
+        print(f'  {ERR}Could not save .env ({e.strerror or type(e).__name__}). Nothing was changed.{RESET}')
+        return
+    shown = env_file.mask(env_file.read_values(ENV_FILE).get(var, ''))
+    print(f'  {ACCENT}Saved {var} ({shown}) to .env{RESET}')
+    if os.environ.get(var):
+        print(f'  {WARN}Note: {var} is also set in your system environment variables.{RESET}')
+        print(f'  {WARN}That copy wins, so the .env value is ignored until you remove it.{RESET}')
+
+
+def api_keys_menu() -> None:
+    while True:
+        clear()
+        section_header('SETUP - API KEYS')
+        values = env_file.read_values(ENV_FILE)
+        print()
+        for key, label, var in API_KEY_ITEMS:
+            print(f'  {ACCENT}{key}{RESET}  {TEXT}{label:<10}{RESET} '
+                  f'{INFO}{var:<18}{RESET}  {TEXT}{env_file.mask(values.get(var, ""))}{RESET}')
+        print(f'  {ACCENT}0{RESET}  {TEXT}Back{RESET}')
+        print()
+        print(f'  {INFO}Keys are saved to .env in the project folder (never committed).{RESET}')
+        print()
+        choice = safe_input(f'  {ACCENT}>> Enter choice [0-5]: {RESET}', default='0')
+        if choice in ('0', ''):
+            return
+        item = next((i for i in API_KEY_ITEMS if i[0] == choice), None)
+        if item is None:
+            print(f'\n  {ERR}Invalid choice - please enter 0-5.{RESET}')
+        else:
+            _save_api_key(item[1], item[2])
+        safe_input(f'  {INFO}Press Enter to continue...{RESET}')
+
+
 SETUP_ITEMS = [
     ('1', 'API keys',          'saved to .env, typed hidden'),
     ('2', 'Local AI (Ollama)', 'check install, default model, pull models'),
@@ -670,7 +735,7 @@ def setup_menu() -> None:
         if choice in ('0', ''):
             return
         if choice == '1':
-            coming_soon('API keys')
+            api_keys_menu()
         elif choice == '2':
             coming_soon('Local AI (Ollama)')
         elif choice == '3':

@@ -109,8 +109,8 @@ def test_setup_open_help_opens_the_help_page(launcher):
     run_cmd.assert_not_called()
 
 
-@pytest.mark.parametrize("item", ["1", "2"])
-def test_setup_items_1_and_2_are_placeholders(launcher, capsys, item):
+@pytest.mark.parametrize("item", ["2"])
+def test_setup_item_2_is_still_a_placeholder(launcher, capsys, item):
     run_cmd, _, wb_open = _run_main(launcher, ["10", item, "", "0", "X"])
     assert "coming soon" in capsys.readouterr().out.lower()
     run_cmd.assert_not_called()

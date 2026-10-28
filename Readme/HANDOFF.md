@@ -46,7 +46,7 @@ so those catches happen at session open, not mid-work.
 
 | Component      | Status |
 |----------------|--------|
-| Tests          | 839 passed, 3 skipped, 11 deselected on v2.6-ocr-editor; 816 on main (`python -m pytest -m "not live" --tb=short -q`) |
+| Tests          | 874 passed, 3 skipped, 11 deselected on v2.6-ocr-editor; 816 on main (`python -m pytest -m "not live" --tb=short -q`) |
 | Branch         | PR #3 merged as fa4edb9; v2.6-ocr-editor = main + HANDOFF commits, kept for Startup UI, OCR and Data Analysis. Version stays 2.5.0; bump to 2.6.0 after OCR is merged |
 | CI             | green on PR #3 (816 passed); runs only on push to main and PRs to main (ci.yml lines 4-7), not on branch pushes |
 | Render deploy  | Service DELETED 2026-10-27 (suspended, then deleted; health URL returns 404). Repo files (render.yaml, requirements-render.txt, README links) are removed in Session 33 commit 5 |
@@ -957,3 +957,11 @@ Notes:
 - tests/test_launcher_menu.py (20 tests) incl. a banner width guard, proven to fail when the padding is off by 2.
 - Desktop shortcut checked: targets scripts/windows/AI_kcMedicalResearch_CLI.bat, icon C:\icon_AI_kcMedicalResearch.ico (outside repo) - unaffected by commit 5.
 - Added to the commit 5 list: scripts/windows/AI_kcMedicalResearch_UI.bat, scripts/macos/Mac_kcMedicalResearch_UI.sh, assets/ (via git rm -r, plus assets_dir/get_assets* in path_utils.py), README lines 92/140 (web UI text), README line 186 (keep, reword).
+
+### Commit 2 - Setup -> API keys
+- New SOURCE_CODE/env_file.py (stdlib only): read_values, set_value, mask. set_value changes only the target key's active lines (all duplicates), appends a missing key, leaves comments/blank lines/order alone, keeps CRLF or LF, writes UTF-8 without BOM, copies .env.example if .env is missing, saves via temp file + os.replace (temp name .env.<random>.tmp is covered by .gitignore '.env.*'). Rejects bad key names and values with spaces, quotes or line breaks; error messages never include the value.
+- Launcher Setup item 1 is live: api_keys_menu() lists Qwen (DASHSCOPE_API_KEY), Groq, DeepSeek, OpenAI, Anthropic with masked values (****abcd / (not set)); key typed hidden via getpass; Enter keeps the current key; Ctrl+C cancels; "Saved" message reads the value back from .env and shows only the mask; warns if the same name is also a system environment variable (load_dotenv does not override those).
+- No "clear key" option yet (edit .env by hand). Ollama has no key; its model setting is Setup item 2 (commit 4).
+- Checked 2026-10-28: no *_API_KEY / DEFAULT_PROVIDER / OLLAMA_MODEL system environment variables on this machine; user's .env is CRLF and lacks GROQ/OPENAI/ANTHROPIC key lines (appended on first save).
+- Tests: tests/test_env_file.py (26), tests/test_launcher_api_keys.py (10, temp .env only - real .env never touched); test_setup_items_1_and_2_are_placeholders narrowed to item 2.
+- Commit 3 note: .env.example is stale - v2.4.6 header (line 3), "ranked best" text (67-69), "let the app pick ... largest model" (76-77, contradicts no-silent-switch), Docker note (85-86).
