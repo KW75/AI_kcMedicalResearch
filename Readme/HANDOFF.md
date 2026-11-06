@@ -46,7 +46,7 @@ so those catches happen at session open, not mid-work.
 
 | Component      | Status |
 |----------------|--------|
-| Tests          | 837 passed, 3 skipped, 10 deselected on v2.6-ocr-editor; 816 on main (`python -m pytest -m "not live" --tb=short -q`) |
+| Tests          | 837 passed, 10 deselected on v2.6-ocr-editor; 816 on main (`python -m pytest -m "not live" --tb=short -q`) |
 | Branch         | PR #3 merged as fa4edb9; v2.6-ocr-editor = main + HANDOFF commits, kept for Startup UI, OCR and Data Analysis. Version stays 2.5.0; bump to 2.6.0 after OCR is merged |
 | CI             | green on PR #3 (816 passed); runs only on push to main and PRs to main (ci.yml lines 4-7), not on branch pushes |
 | Render deploy  | Service DELETED 2026-10-27 (suspended, then deleted; health URL returns 404). Repo files removed in Session 33 commit 3. UptimeRobot monitor to be paused/deleted by user |
@@ -1221,3 +1221,21 @@ Expected: a clean tree in sync with origin, the top commit is this handoff, and 
 - When OCR or data_analysis code is written: move the name into
   mode_subdirs, add it to the main.py --mode choices and _MODE_EXTENSIONS,
   and add it to the mode list in test_e2e.py line 269.
+
+## Session 34 (cont.) - 2026-11-06 - test cleanup, Gemini checked
+- Checked tests for leftovers from the removed Streamlit UI: none are
+  redundant. The UI matches in test_launcher_menu.py, test_ollama_models.py
+  and test_no_streamlit.py are guards that stop the UI coming back; keep
+  them. Other matches ("render") are about report output, not UI.
+- Deleted 3 placeholder tests from test_main.py (TestMainProviderCalls):
+  two Ollama, one OpenAI. Each was @pytest.mark.skip with body `pass`;
+  real calls are covered by test_live_providers.py.
+  Suite: 837 passed, 3 skipped -> 837 passed, 0 skipped, 10 deselected.
+- Found, not fixed: test_call_openai_provider_missing_key is marked
+  @pytest.mark.live but makes no network call, so it never runs. Its patch
+  target SOURCE_CODE.main.OPENAI_API_KEY may also be wrong (the Anthropic
+  test below patches the provider module). Remove the mark and fix the
+  patch target, test-first.
+- Gemini API is not available in our region (checked 2026-11-06), so the
+  planned Anthropic -> Gemini move was stopped. Anthropic kept (needs VPN).
+  No-VPN options: DeepSeek (text only), Qwen (has a vision model), Ollama.
