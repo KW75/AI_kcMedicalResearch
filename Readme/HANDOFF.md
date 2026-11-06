@@ -41,18 +41,18 @@ so those catches happen at session open, not mid-work.
 
 ---
 
-## Current State (Session 32, v2.5.0 on main, 2026-10-27)
+## Current State (Session 34, v2.5.0 on main, 2026-11-06)
 
 
 | Component      | Status |
 |----------------|--------|
 | Tests          | 837 passed, 10 deselected on v2.6-ocr-editor; 816 on main (`python -m pytest -m "not live" --tb=short -q`) |
-| Branch         | PR #3 merged as fa4edb9; v2.6-ocr-editor = main + HANDOFF commits, kept for Startup UI, OCR and Data Analysis. Version stays 2.5.0; bump to 2.6.0 after OCR is merged |
-| CI             | green on PR #3 (816 passed); runs only on push to main and PRs to main (ci.yml lines 4-7), not on branch pushes |
-| Render deploy  | Service DELETED 2026-10-27 (suspended, then deleted; health URL returns 404). Repo files removed in Session 33 commit 3. UptimeRobot monitor to be paused/deleted by user |
+| Branch         | main = fa4edb9 (PR #3). v2.6-ocr-editor is 15 commits ahead (Sessions 33-34: Setup menu, Streamlit/Render removal, Ollama model rule, httpx pin, moved-folder launcher check); no PR opened yet. Version stays 2.5.0; bump to 2.6.0 after OCR is merged |
+| CI             | last green: PR #3 (816 passed). Runs only on push to main and PRs to main (ci.yml lines 4-7). The 15 branch commits have not been through CI. CI never installs requirements-local.txt (the file colleagues use) |
+| Deploy         | None: CLI only, local first. Render service deleted 2026-10-27; Streamlit UI and Render files removed in Session 33. UptimeRobot monitor: confirm paused/deleted |
 | Writing mode   | one-pass (write + edit + review in one call); tracks Topic 800 / Article 3,500 / Report 500 / Synopsis 1,500; on main since fa4edb9; tested on gemma4:e4b; terminal menus only |
 | SR pipeline    | working via CLI with Qwen; Ang 2010 verified against PDF (NFR week 6, unanimous N=3); text-fallback drops now surface in Stage 4 `[SKIP]` block |
-| Providers      | Ollama (default, local) / DeepSeek / Qwen (SR) / OpenAI / Anthropic / Groq / Ollama (local, never falls back) |
+| Providers      | Ollama (default, local, never falls back to cloud; model = OLLAMA_MODEL in .env, else gemma4:e4b) / DeepSeek / Qwen (SR) / OpenAI / Anthropic / Groq. Anthropic and Gemini are geo-restricted on the dev machine; the planned Anthropic -> Gemini switch is on hold |
 
 
 Issue numbers below match `README.md` > Known Issues.
@@ -63,9 +63,8 @@ Issue numbers below match `README.md` > Known Issues.
 
 | #  | Issue | Priority | What to do |
 |----|-------|----------|------------|
-| 19 | macOS install | RESOLVED | Fixed 2026-09-02. python.org 3.11.9 + requirements-local.txt (pyarrow 12.0.1, chromadb 0.5.23) verified end-to-end on Intel macOS 11. Launchers reject conda and guide to python.org. NOT yet run on Apple Silicon (reasoned from wheel tags). |
 | 2  | WeasyPrint not installed; PDF report falls back to HTML | Medium | |
-| 3  | Anthropic geo-restricted from dev machine | Low | VPN or skip. |
+| 3  | Anthropic and Gemini geo-restricted from dev machine | Low | VPN or skip. Blocks the planned Anthropic -> Gemini switch. |
 
 
 ---
@@ -1239,3 +1238,40 @@ Expected: a clean tree in sync with origin, the top commit is this handoff, and 
 - Gemini API is not available in our region (checked 2026-11-06), so the
   planned Anthropic -> Gemini move was stopped. Anthropic kept (needs VPN).
   No-VPN options: DeepSeek (text only), Qwen (has a vision model), Ollama.
+
+## Session 35 - 2026-11-06 - branch v2.6-ocr-editor
+
+- Session-opening checklist, all four items run:
+  1. Test count: 837/847 collected (10 deselected) = README line 7.
+  2. Closed-issue citations: 55 RESOLVED_ISSUES rows, no `(#N)` in README.md
+     or HANDOFF.md. Note: the pattern `#(\d+)` only finds numbers cited in
+     passing (5 of them), not the table rows. Use `^\|\s*(\d+)\s*\|` and
+     print the count, so "clean" cannot mean "never ran".
+  3. Open Issues tables matched (#19, #2, #3). #19 was RESOLVED but still
+     listed: moved to RESOLVED_ISSUES.md and removed from both tables.
+  4. Spot check found the #61 warning (below).
+- Gaps in issue numbers (53-60, 63-65) are not lost rows. The archive
+  renumbering table maps old 53/54/60 to new 43/44/49; #63/#64 were working
+  numbers for #51/#52.
+- Current State table updated to Session 34 (no Render; 15 branch commits not
+  through CI; providers). Anthropic AND Gemini are geo-restricted on the dev
+  machine (#3); the Anthropic -> Gemini switch is on hold.
+- Session 28 "[APPLY + add test pinning the 404->pull message]" CLOSED:
+  tests/test_providers.py::test_ollama_404_tells_user_to_pull_model
+  (non-streaming) and tests/test_ollama_missing_model.py (streaming + helper).
+- Session 28 priorities still open: 1 vote outcome_selected /
+  timepoint_selected; 2 Ang outcome change S26 -> S27; 3 decoder `!` (low).
+- Corrections to the 2026-09-02 notes (left as history): the Ollama model is
+  OLLAMA_MODEL in .env, else gemma4:e4b (no llama3.2, no auto-detect);
+  requirements-local.txt is NOT fully pinned (unnamed packages float; httpx
+  pinned in Session 34).
+- Forest plot: primary copy reports/sr/<RUN_ID>/output/figures/, mirror shown
+  to the user output/sr/figures/ (project_layout.py; main.py mirror_figures).
+  README is right; flashcard-help.html "output/figures/" is wrong. Fix in the
+  flashcard commit.
+- Found, fixed next commit: main.py SR Anthropic warning (~line 2351) says the
+  Anthropic path runs without the source-quote, SD/SE and group-timepoint
+  tripwires, and cites resolved #61. In the code, _extract_anthropic calls
+  _flag_suspect_source_quotes and (per #50) group/timepoint runs; only the
+  text-line SD/SE check cannot run (REVIEWER_GUIDE §6). This is the same
+  claim the S23 lesson called false, still printed to users.

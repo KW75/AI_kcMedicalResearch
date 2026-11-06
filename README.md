@@ -312,9 +312,8 @@ them; gaps are closed issues. Closed issues: `Readme/RESOLVED_ISSUES.md`.
 
 | #  | Issue | Priority | What to do |
 |----|-------|----------|------------|
-| 19 | macOS install | RESOLVED | Fixed 2026-09-02. python.org 3.11.9 + requirements-local.txt (pyarrow 12.0.1, chromadb 0.5.23) verified end-to-end on Intel macOS 11. Launchers reject conda and guide to python.org. NOT yet run on Apple Silicon (reasoned from wheel tags). |
 | 2  | WeasyPrint not installed; PDF report falls back to HTML | Medium | |
-| 3  | Anthropic geo-restricted from dev machine | Low | VPN or skip. |
+| 3  | Anthropic and Gemini geo-restricted from dev machine | Low | VPN or skip. Blocks the planned Anthropic -> Gemini switch. |
 
 
 #9 (SD/SE confusion) and #10 (within- vs between-group) are mitigated by the
