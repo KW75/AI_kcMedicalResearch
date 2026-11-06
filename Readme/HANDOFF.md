@@ -46,7 +46,7 @@ so those catches happen at session open, not mid-work.
 
 | Component      | Status |
 |----------------|--------|
-| Tests          | 833 passed, 3 skipped, 10 deselected on v2.6-ocr-editor; 816 on main (`python -m pytest -m "not live" --tb=short -q`) |
+| Tests          | 835 passed, 3 skipped, 10 deselected on v2.6-ocr-editor; 816 on main (`python -m pytest -m "not live" --tb=short -q`) |
 | Branch         | PR #3 merged as fa4edb9; v2.6-ocr-editor = main + HANDOFF commits, kept for Startup UI, OCR and Data Analysis. Version stays 2.5.0; bump to 2.6.0 after OCR is merged |
 | CI             | green on PR #3 (816 passed); runs only on push to main and PRs to main (ci.yml lines 4-7), not on branch pushes |
 | Render deploy  | Service DELETED 2026-10-27 (suspended, then deleted; health URL returns 404). Repo files removed in Session 33 commit 3. UptimeRobot monitor to be paused/deleted by user |
@@ -1163,3 +1163,23 @@ Expected: a clean tree in sync with origin, the top commit is this handoff, and 
 - Lesson: a pip reinstall regenerates the stubs but not pyvenv.cfg. Any check
   that reads pyvenv.cfg sees the original creation path until it is edited
   or the venv is rebuilt.
+
+### Session 34 commit 2 - httpx pin for colleagues' installs
+- Launcher commit 2c7c57f pushed (821 -> 833).
+- requirements-local.txt: added httpx==0.27.2 (fixes the FOUND item above).
+  Checked in D:\kc_move_test: 89 `proxies` errors -> 0; 828 passed, 5 failed
+  (the 4 .git + 1 .env failures, as expected); pyarrow/chromadb unchanged.
+  Tests: tests/test_requirements_local_pins.py (2; both failed before).
+  Suite: 833 -> 835 passed, 3 skipped, 10 deselected.
+- Why CI missed it: CI installs requirements-ci.txt -> requirements-base.txt
+  (newest SDKs); dev uses requirements.txt -> base too. Nothing installs
+  requirements-local.txt, the file colleagues get. Follow-up: a CI job that
+  installs requirements-local.txt and runs the suite.
+- Follow-up: SR requirements.txt wants anthropic>=0.40.0; requirements-local
+  pins 0.34.2. Raising it needs its own test in the copy.
+- Push 403 (fixed): git uses `store --file=C:/Users/user/.git-credentials-github`
+  for github.com (one token for every repo). On 31 Oct a fine-grained token
+  for another KW75 repo replaced it. Fix: added AI_kcMedicalResearch to that
+  token (Contents: Read and write). Lesson: a token made for one repo
+  must list every repo pushed from this machine.
+- Still to delete: D:\kc_move_test, D:\frozen.txt, D:\commit_msg.txt.
