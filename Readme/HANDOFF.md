@@ -46,7 +46,7 @@ so those catches happen at session open, not mid-work.
 
 | Component      | Status |
 |----------------|--------|
-| Tests          | 821 passed, 3 skipped, 10 deselected on v2.6-ocr-editor; 816 on main (`python -m pytest -m "not live" --tb=short -q`) |
+| Tests          | 833 passed, 3 skipped, 10 deselected on v2.6-ocr-editor; 816 on main (`python -m pytest -m "not live" --tb=short -q`) |
 | Branch         | PR #3 merged as fa4edb9; v2.6-ocr-editor = main + HANDOFF commits, kept for Startup UI, OCR and Data Analysis. Version stays 2.5.0; bump to 2.6.0 after OCR is merged |
 | CI             | green on PR #3 (816 passed); runs only on push to main and PRs to main (ci.yml lines 4-7), not on branch pushes |
 | Render deploy  | Service DELETED 2026-10-27 (suspended, then deleted; health URL returns 404). Repo files removed in Session 33 commit 3. UptimeRobot monitor to be paused/deleted by user |
@@ -1107,3 +1107,59 @@ python -m pytest -m "not live" --tb=line -q
 ```
 Expected: a clean tree in sync with origin, the top commit is this handoff, and 821 passed,
 3 skipped, 10 deselected.
+
+## Session 34 - 2026-11-06 - branch v2.6-ocr-editor
+
+- Dev machine: every console script in .venv\Scripts failed with "Fatal error
+  in launcher". The venv was created at D:\ai-automation-tool and the folder
+  was later renamed; pip's .exe stubs store the absolute interpreter path.
+  `python` and `python -m ...` kept working (pyvenv.cfg `home` is what Python
+  uses), which is why nothing in the handoff commands noticed.
+  Fixed in place: `pip freeze --exclude-editable` to D:\frozen.txt, then
+  `python -m pip install --force-reinstall --no-deps -r D:\frozen.txt`
+  (129 packages, same versions, from cache). Scan for the old path: 31 stale
+  stubs before, 0 after. Suite unchanged (821).
+- pyvenv.cfg `command` line still named D:\ai-automation-tool after the
+  reinstall (pip never rewrites it). Edited by hand to
+  D:\AI_kcMedicalResearch\.venv; Python does not read that line.
+- Launchers (Windows .bat and macOS .sh):
+  A. pip is called as `python -m pip`, never through the pip stub.
+  B. New moved-folder check: reads the `command` line in .venv\pyvenv.cfg; if
+     it does not name this folder's .venv, prints "This app folder was moved
+     since setup" and asks "Rebuild the app environment now? [Y/n]". Yes
+     renames .venv to .venv.old, rebuilds from requirements-local.txt, and
+     deletes .venv.old only after a successful install; any failure restores
+     .venv.old. An existing .venv.old stops the launcher with an explanation.
+  Tests: tests/test_launcher_venv_move.py (12; 10 failed before the change).
+  Suite: 821 -> 833 passed, 3 skipped, 10 deselected.
+  Checked by hand on Windows: real folder -> no box, straight to the menu;
+  copy at D:\kc_move_test -> box shown, rebuild ran, new `command` names the
+  copy, .venv.old removed, no stub points at the old folder,
+  pyarrow 12.0.1 / chromadb 0.5.23 installed, no streamlit.
+  macOS script: `bash -n` syntax check only; not run on a Mac.
+- FOUND, NOT FIXED (next commit): a fresh install from requirements-local.txt
+  breaks every OpenAI-compatible and Anthropic call. It pins openai==1.43.0
+    and anthropic==0.34.2 but not httpx; pip installs httpx 0.28.1, which
+  removed `proxies`, and the old SDKs crash with
+  "Client.__init__() got an unexpected keyword argument 'proxies'".
+  89 errors/failures in the copy's test run. Ollama unaffected (urllib).
+  Fix to test: pin httpx<0.28 in requirements-local.txt, then rerun in the copy.
+- requirements-local.txt is NOT fully pinned (the 2026-09-02 note says it is):
+  packages it does not name float to the newest version (the copy got
+  packaging 26.3, pygments 2.21.0).
+- Dev venv drift: this machine's venv has pyarrow 24.0.0, chromadb 1.5.9,
+  openai 2.41.1, anthropic 0.120.0 and still has streamlit 1.60.0. Colleagues
+  get the pinned versions above, so local test runs do not represent them.
+  Consider rebuilding the dev venv from requirements-local.txt plus pytest.
+- Other failures in the copy, not colleague-facing: test_gitignore_input.py
+  (4) needs a .git folder; test_main.py::TestMainValidation::
+  test_validate_api_keys_qwen_with_key failed without .env (check whether it
+  depends on the developer's real .env).
+- Follow-up C (not done): the launcher only runs setup when .venv\Scripts\
+  python.exe is missing, so a setup interrupted halfway is never retried.
+  Needs a success marker and a rule for existing venvs without one.
+- To delete when done: D:\kc_move_test (copy, about 1 GB plus rebuilt venv),
+  D:\frozen.txt.
+- Lesson: a pip reinstall regenerates the stubs but not pyvenv.cfg. Any check
+  that reads pyvenv.cfg sees the original creation path until it is edited
+  or the venv is rebuilt.
