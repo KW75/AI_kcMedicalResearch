@@ -46,7 +46,7 @@ so those catches happen at session open, not mid-work.
 
 | Component      | Status |
 |----------------|--------|
-| Tests          | 835 passed, 3 skipped, 10 deselected on v2.6-ocr-editor; 816 on main (`python -m pytest -m "not live" --tb=short -q`) |
+| Tests          | 837 passed, 3 skipped, 10 deselected on v2.6-ocr-editor; 816 on main (`python -m pytest -m "not live" --tb=short -q`) |
 | Branch         | PR #3 merged as fa4edb9; v2.6-ocr-editor = main + HANDOFF commits, kept for Startup UI, OCR and Data Analysis. Version stays 2.5.0; bump to 2.6.0 after OCR is merged |
 | CI             | green on PR #3 (816 passed); runs only on push to main and PRs to main (ci.yml lines 4-7), not on branch pushes |
 | Render deploy  | Service DELETED 2026-10-27 (suspended, then deleted; health URL returns 404). Repo files removed in Session 33 commit 3. UptimeRobot monitor to be paused/deleted by user |
@@ -1206,3 +1206,18 @@ Expected: a clean tree in sync with origin, the top commit is this handoff, and 
   6. Launcher follow-up C: retry a setup that failed halfway.
   7. Dev venv drift: newer pyarrow/chromadb/SDKs and still streamlit.
   8. test_validate_api_keys_qwen_with_key may depend on the developer's .env.
+
+## Session 34 (cont.) - 2026-11-06 - folders for planned OCR / data_analysis
+- The app now creates input\, output\ and reports\ ocr and data_analysis
+  folders itself. path_utils.py has future_mode_subdirs = ['ocr',
+  'data_analysis'] (input/output/reports only, no docs/). Git ignores
+  input/*, output/ and reports/, so a fresh clone gets them on first run.
+- Tests: test_path_utils_dirs.py +2 (folders created; no docs/ folder yet).
+  Suite: 835 -> 837 passed, 3 skipped, 10 deselected.
+- Found: the 10 .gitkeep files in output\ and reports\ exist only on this
+  machine. .gitignore lines 13-14 ignore them, so they do nothing.
+- main.py lines 187-202 is a second, partial folder list (sr missing from
+  reports). Left unchanged because path_utils runs at every start.
+- When OCR or data_analysis code is written: move the name into
+  mode_subdirs, add it to the main.py --mode choices and _MODE_EXTENSIONS,
+  and add it to the mode list in test_e2e.py line 269.

@@ -31,3 +31,22 @@ def test_data_and_docker_attributes_and_helpers_are_gone(tmp_path):
     assert not hasattr(pm, "docker_dir")
     assert not hasattr(PathManager, "get_docker_path")
     assert not hasattr(path_utils, "get_docker_file")
+
+
+# OCR and data_analysis are planned but not runnable modes yet. Git ignores
+# input/*, output/ and reports/, so the app itself must create these folders
+# for colleagues. They get no docs/ folder until the mode code exists.
+FUTURE_MODES = ("ocr", "data_analysis")
+
+
+def test_creates_input_output_reports_for_future_modes(tmp_path):
+    PathManager(tmp_path)
+    for mode in FUTURE_MODES:
+        for top in ("input", "output", "reports"):
+            assert (tmp_path / top / mode).is_dir(), f"{top}/{mode} not created"
+
+
+def test_future_modes_get_no_docs_folder(tmp_path):
+    PathManager(tmp_path)
+    for mode in FUTURE_MODES:
+        assert not (tmp_path / "docs" / mode).exists(), f"docs/{mode} should not exist yet"

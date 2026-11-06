@@ -79,6 +79,16 @@ class PathManager:
             
             # reports/ subdirectories
             (self.reports_dir / mode).mkdir(parents=True, exist_ok=True)
+
+        # Planned modes (OCR, data_analysis): no pipeline code yet, so no
+        # docs/ folder. Git ignores input/*, output/ and reports/, so the app
+        # must create these itself. Move a name into mode_subdirs above once
+        # its mode code exists.
+        future_mode_subdirs = ['ocr', 'data_analysis']
+        for mode in future_mode_subdirs:
+            for parent in (self.input_dir, self.output_dir, self.reports_dir):
+                (parent / mode).mkdir(parents=True, exist_ok=True)
+
     
     # Input/Output path getters
     def get_input_path(self, mode: str) -> Path:
