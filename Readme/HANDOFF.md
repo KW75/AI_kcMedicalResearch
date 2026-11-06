@@ -1183,3 +1183,26 @@ Expected: a clean tree in sync with origin, the top commit is this handoff, and 
   token (Contents: Read and write). Lesson: a token made for one repo
   must list every repo pushed from this machine.
 - Still to delete: D:\kc_move_test, D:\frozen.txt, D:\commit_msg.txt.
+
+
+### Session 34 close
+- Cleanup done: D:\kc_move_test, D:\frozen.txt, D:\commit_msg.txt deleted.
+- Dev venv: activate.bat and activate (bash) also had the old path; fixed by
+  hand (local only, .venv is untracked). PowerShell Activate.ps1 was fine.
+  pip.exe runs from this folder. Housekeeping item "confirm .venv\Scripts\
+  Python is the one resolving" is confirmed: cmd and PowerShell both
+  resolve .venv\Scripts\python.exe first.
+- This machine also has Python 3.14; rebuild the dev venv with py -3.11.
+- Follow-ups (not urgent, suggested order):
+  1. CI job that installs requirements-local.txt (+ pytest) and runs the
+     suite; today nothing tests the file colleagues install.
+  2. macOS launcher moved-folder check verified by `bash -n` only; run it
+     on a Mac.
+  3. SR requirements.txt wants anthropic>=0.40.0; requirements-local pins
+     0.34.2. Raise it only after a fresh-copy test.
+  4. requirements-local.txt is not fully pinned (unnamed packages float).
+  5. Some tests write real files to output/writing/ and reports/rct_search/
+     instead of tmp_path; check .gitignore covers output/ and reports/.
+  6. Launcher follow-up C: retry a setup that failed halfway.
+  7. Dev venv drift: newer pyarrow/chromadb/SDKs and still streamlit.
+  8. test_validate_api_keys_qwen_with_key may depend on the developer's .env.
