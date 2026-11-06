@@ -2335,6 +2335,30 @@ def parse_args(args: list[str] | None = None) -> argparse.Namespace:
 # ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
+def sr_provider_warning(mode: str, provider: str):
+    """Return the SR warning for a provider that skips checks, else None.
+
+    Anthropic extraction (_extract_anthropic) gets structured JSON, not the
+    PDF text, so it calls _flag_suspect_source_quotes(source_text=None).
+    Two checks cannot run there: the verbatim quote-in-source check and the
+    text-line SD/SE check (_flag_possible_se_as_sd). Group/timepoint and the
+    other source-quote checks still run. See REVIEWER_GUIDE.md section 6.
+    """
+    if mode != "sr" or provider != "anthropic":
+        return None
+    return (
+        "\n[!] Note: with --provider anthropic, two SR checks cannot run, "
+        "because this route has no extracted text from the PDF:\n"
+        "    - source quotes are not checked word for word against the "
+        "paper's text\n"
+        "    - the text-line SD/SE check does not run\n"
+        "    The other checks still run. See docs/sr/REVIEWER_GUIDE.md "
+        "section 6, which explains when to prefer --provider qwen.\n"
+        "    Manual verification against source PDFs remains required "
+        "either way.\n"
+    )
+
+
 def run_cli(args: argparse.Namespace) -> None:
     """Dispatch parsed CLI arguments to the correct handler.
 
@@ -2348,19 +2372,10 @@ def run_cli(args: argparse.Namespace) -> None:
     entry-point guard below owns the clean-exit message.
     """
 
-    # Anthropic-path tripwire gap (#61): _extract_anthropic and
-    # assess_by_file_id bypass the source-quote, SD/SE, and
-    # group/timepoint checks that the qwen path runs. Warn at point
-    # of use until the checks are ported to the Anthropic path.
-    if args.mode == "sr" and args.provider == "anthropic":
-        print(
-            "\n[!] Warning: --provider anthropic runs SR extraction without "
-            "the source-quote, SD/SE, or group-timepoint tripwires.\n"
-            "    See Known Issue #61. For full tripwire coverage use "
-            "--provider qwen (default vision model).\n"
-            "    Manual verification against source PDFs remains required "
-            "either way.\n"
-        )
+    sr_warning = sr_provider_warning(args.mode, args.provider)
+    if sr_warning:
+        print(sr_warning)
+
 
     non_ai_flags = (
         args.list_sessions

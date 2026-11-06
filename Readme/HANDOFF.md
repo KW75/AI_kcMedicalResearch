@@ -46,7 +46,7 @@ so those catches happen at session open, not mid-work.
 
 | Component      | Status |
 |----------------|--------|
-| Tests          | 837 passed, 10 deselected on v2.6-ocr-editor; 816 on main (`python -m pytest -m "not live" --tb=short -q`) |
+| Tests          | 842 passed, 10 deselected on v2.6-ocr-editor; 816 on main (`python -m pytest -m "not live" --tb=short -q`) |
 | Branch         | main = fa4edb9 (PR #3). v2.6-ocr-editor is 15 commits ahead (Sessions 33-34: Setup menu, Streamlit/Render removal, Ollama model rule, httpx pin, moved-folder launcher check); no PR opened yet. Version stays 2.5.0; bump to 2.6.0 after OCR is merged |
 | CI             | last green: PR #3 (816 passed). Runs only on push to main and PRs to main (ci.yml lines 4-7). The 15 branch commits have not been through CI. CI never installs requirements-local.txt (the file colleagues use) |
 | Deploy         | None: CLI only, local first. Render service deleted 2026-10-27; Streamlit UI and Render files removed in Session 33. UptimeRobot monitor: confirm paused/deleted |
@@ -1275,3 +1275,13 @@ Expected: a clean tree in sync with origin, the top commit is this handoff, and 
   _flag_suspect_source_quotes and (per #50) group/timepoint runs; only the
   text-line SD/SE check cannot run (REVIEWER_GUIDE §6). This is the same
   claim the S23 lesson called false, still printed to users.
+- SR Anthropic warning corrected. New main.sr_provider_warning(mode, provider);
+  run_cli prints it. It now says only two checks cannot run on
+  --provider anthropic (verbatim quote-in-source, text-line SD/SE) and that the
+  rest still run, and points to docs/sr/REVIEWER_GUIDE.md section 6 instead of
+  closed #61. tests/test_sr_anthropic_warning.py (5); seen failing first
+  (4 AttributeError + 1 on "Known Issue #61"). Suite: 837 -> 842.
+- Noted, not fixed: REVIEWER_GUIDE section 6 "Quote-check number matching" row
+  says unicode-vs-ASCII minus signs can still miss; #68 (Session 27) fixed that
+  in _number_in_text. Thousands-separator claim not yet checked. Separate docs
+  commit after grepping _number_in_text.
