@@ -149,17 +149,27 @@ def test_ocr_lists_only_the_chosen_provider():
     assert main.data_destinations("ocr", "openai") == ["openai"]
 
 
-def test_ocr_provider_error_only_for_ocr_with_cloud():
-    msg = main.ocr_provider_error("ocr", "openai")
-    assert msg and "ollama" in msg.lower()
-    assert main.ocr_provider_error("ocr", "ollama") is None
-    assert main.ocr_provider_error("coding", "openai") is None
+def test_ocr_provider_error_only_for_providers_that_cannot_read_images():
+    for p in ("ollama", "qwen", "openai"):
+        assert main.ocr_provider_error("ocr", p) is None
+    msg = main.ocr_provider_error("ocr", "deepseek")
+    assert msg and "ollama" in msg and "qwen" in msg and "openai" in msg
+    assert main.ocr_provider_error("ocr", "groq")
+    assert main.ocr_provider_error("coding", "deepseek") is None
 
 
-def test_run_cli_stops_cloud_ocr_with_the_message(capsys):
+def test_run_cli_stops_ocr_with_a_provider_that_cannot_read_images(capsys):
     with pytest.raises(SystemExit):
-        main.run_cli(main.parse_args(["--mode", "ocr", "--provider", "openai"]))
-    assert main.ocr_provider_error("ocr", "openai") in capsys.readouterr().out
+        main.run_cli(main.parse_args(["--mode", "ocr", "--provider", "deepseek"]))
+    assert main.ocr_provider_error("ocr", "deepseek") in capsys.readouterr().out
+
+
+def test_ocr_cloud_banner_says_page_images_leave_the_machine(capsys):
+    ok = main.confirm_data_destinations("ocr", "qwen", stdin_is_tty=False)
+    out = capsys.readouterr().out.lower()
+    assert ok is False
+    assert "page images" in out
+    assert "deepseek" not in out
 
 
 @pytest.mark.parametrize("files", [("only.pdf",), ("a.pdf", "b.png")])

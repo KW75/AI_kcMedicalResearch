@@ -488,8 +488,9 @@ def confirm_data_destinations(
         print(f"        or, if it is busy or times out: {', '.join(names[1:])}")
     if services:
         print(f"        Search terms are also sent to: {', '.join(services)}.")
+    if mode == "ocr":
+        print("        For OCR this means page images of your documents.")
     print("        Do not use for patient-identifiable or confidential data.")
-
     if confirm_cloud:
         print("        Confirmed in advance with --confirm-cloud.")
         print()
@@ -2359,12 +2360,18 @@ def sr_provider_warning(mode: str, provider: str):
     )
 
 
+OCR_PROVIDERS = ("ollama", "qwen", "openai")
+
+
 def ocr_provider_error(mode: str, provider: str) -> str | None:
-    """OCR sends images only to local Ollama for now; refuse cloud providers."""
-    if mode == "ocr" and provider != "ollama":
-        return ("OCR: cloud providers are not supported yet; only local Ollama "
-                "models can read the images. Run again with --provider ollama.")
+    """OCR needs a provider that can read page images: local Ollama (vision
+    models), Qwen or OpenAI. Others are refused: DeepSeek has no image input;
+    Groq/Anthropic are not wired for OCR yet."""
+    if mode == "ocr" and provider not in OCR_PROVIDERS:
+        return (f"OCR: {provider} cannot be used to read page images. "
+                "Use --provider ollama (local), qwen or openai.")
     return None
+
 
 def run_cli(args: argparse.Namespace) -> None:
     """Dispatch parsed CLI arguments to the correct handler.
