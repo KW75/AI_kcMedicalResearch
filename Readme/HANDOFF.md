@@ -46,7 +46,7 @@ so those catches happen at session open, not mid-work.
 
 | Component      | Status |
 |----------------|--------|
-| Tests          | 934 passed, 10 deselected on v2.6-ocr-editor; 816 on main (`python -m pytest -m "not live" --tb=short -q`) |
+| Tests          | 937 passed, 10 deselected on v2.6-ocr-editor; 816 on main (`python -m pytest -m "not live" --tb=short -q`) |
 | Branch         | main = fa4edb9 (PR #3). v2.6-ocr-editor = Sessions 33-35 work, open as draft PR #4 (Setup menu, Streamlit/Render removal, Ollama model rule, httpx pin, moved-folder launcher check, SR Anthropic warning, test-local-pins CI job). Do not merge until OCR is done. Version stays 2.5.0; bump to 2.6.0 after OCR is merged |
 | CI             | green on draft PR #4, both jobs: test (requirements-ci.txt, 845 passed, 44 warnings) and test-local-pins (requirements-local.txt like the launchers, 845 passed, 57 warnings). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
 | Deploy         | None: CLI only, local first. Render service deleted 2026-10-27; Streamlit UI and Render files removed in Session 33. UptimeRobot monitor: confirm paused/deleted |
@@ -1464,10 +1464,21 @@ Expected: a clean tree in sync with origin, the top commit is this handoff, and 
 - TODO OCR banner: in cloud mode the summary/synopsis is also written by the
   cloud model, so text (.txt, .docx, PDF text layers) leaves the machine too,
   not only page images. Fix the "For OCR this means page images..." line.
-- TODO Writing: check whether the writing pipeline can read .doc files.
-  utils/document_reader.py sends .doc to textract (not in requirements);
-  a bare except then falls back to _extract_with_alternative, which may give
-  garbled text silently. OCR refuses .doc ("save it as .docx").
+- DONE Writing .doc check: Writing never reads .doc. writing._load_input_files
+  (all Writing roles) and the --report path in main.py filter by extension,
+  and .doc is not listed, so it was skipped silently. _load_input_files now
+  prints "[SKIP] <name>: old Word .doc files cannot be read - open it in Word
+  and save it as .docx". tests/test_writing_doc_skip.py: 3 tests (2 failed
+  first). Suite: 934 -> 937.
+  DocumentReader's .doc -> textract -> Latin-1 binary fallback is unreachable:
+  no pipeline under SOURCE_CODE calls DocumentReader.extract_text or
+  batch_extract (grep 2026-11-07; scripts/ and tests/ not checked).
+- TODO Writing: --report path (main.py ~985-998) still skips .doc silently;
+  the Writing menu's list_input_names leaves .doc out with no message.
+- TODO Writing: _load_input_files reads .docx paragraphs only, so tables
+  (e.g. lab values) never reach the AI. On a read error it sends
+  "[Could not read <name>]" to the AI as if it were the document text
+  (main._read_docx does the same). The OCR reader already handles tables.
 - DONE OCR banner TODO: [CLOUD] banner (main.py) and the no-local-model
   cloud offer (cli.py) now say page images AND the text of your documents
   leave the machine (the cloud AI also writes the summary).
