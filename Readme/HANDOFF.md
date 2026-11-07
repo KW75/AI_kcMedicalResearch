@@ -1294,4 +1294,7 @@ Expected: a clean tree in sync with origin, the top commit is this handoff, and 
   first) pins that a CI job installs the launchers' file. Suite: 842 -> 845.
 - CI on d7f11f1 (PR #4): both jobs green, 845 passed. test-local-pins shows
   57 warnings vs 44 (older pinned versions; not failing, look when convenient).
-
+- REVIEWER_GUIDE section 6 "Quote-check number matching" row corrected:
+  unicode minus/dash signs now match (#68, _number_in_text lines 1144-1145);
+  thousands separators still miss (1234 vs 1,234 or 1 234), since [.,] is only
+  allowed when the value has a decimal point (line 1156). Docs only.
