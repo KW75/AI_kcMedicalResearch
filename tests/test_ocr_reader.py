@@ -25,7 +25,7 @@ def _make_pdf(path, texts):
 
 
 def test_list_inputs_keeps_supported_files_in_name_order(tmp_path):
-    for name in ["c.txt", "b.PNG", "a.pdf", "d.webp", "notes.docx"]:
+    for name in ["c.xyz", "b.PNG", "a.pdf", "d.webp", "notes.xlsx"]:
         (tmp_path / name).write_bytes(b"x")
     names = [p.name for p in reader.list_inputs(tmp_path)]
     assert names == ["a.pdf", "b.PNG", "d.webp"]
@@ -73,7 +73,7 @@ def test_multipage_tiff_gives_one_page_per_frame(tmp_path):
 
 
 def test_unsupported_file_is_refused(tmp_path):
-    path = tmp_path / "notes.txt"
+    path = tmp_path / "notes.xlsx"
     path.write_text("hello", encoding="utf-8")
     with pytest.raises(ValueError):
         reader.read_input(path)
