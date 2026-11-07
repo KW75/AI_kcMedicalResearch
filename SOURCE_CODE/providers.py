@@ -177,11 +177,30 @@ def _resolve_ollama_model() -> str:
 # ---------------------------------------------------------------------------
 # Provider functions
 # ---------------------------------------------------------------------------
+def _user_content(prompt: str, images: list[bytes] | None = None):
+    """Plain prompt, or OpenAI-style parts: one image_url per page, then the prompt.
+
+    Used by OpenAI and Qwen (DashScope is OpenAI-compatible); same format as
+    SR's _call_vision_api. No images -> the plain string, so text calls are
+    unchanged.
+    """
+    if not images:
+        return prompt
+    import base64
+    parts = [{"type": "image_url",
+              "image_url": {"url": "data:image/png;base64,"
+                            + base64.b64encode(img).decode("ascii")}}
+             for img in images]
+    parts.append({"type": "text", "text": prompt})
+    return parts
+
 def call_openai_provider(
     prompt: str,
     model: str | None = None,
     max_tokens: int = 8192,
+    images: list[bytes] | None = None,
 ) -> str:
+
     """Send a prompt to the OpenAI chat completions endpoint."""
     if not OPENAI_API_KEY:
         raise RuntimeError("OPENAI_API_KEY is not set. Add it to your .env file.")
@@ -189,7 +208,7 @@ def call_openai_provider(
     url = "https://api.openai.com/v1/chat/completions"
     payload = json.dumps({
         "model": model,
-        "messages": [{"role": "user", "content": prompt}],
+        "messages": [{"role": "user", "content": _user_content(prompt, images)}],
         "max_tokens": max_tokens,
     }).encode()
     req = urllib.request.Request(
@@ -405,15 +424,16 @@ def call_qwen_provider(
     prompt: str,
     model: str | None = None,
     max_tokens: int = 8192,
+    images: list[bytes] | None = None,
 ) -> str:
     """Send a prompt to Alibaba Cloud Model Studio (Qwen) via OpenAI-compatible API."""
     if not DASHSCOPE_API_KEY:
         raise RuntimeError("DASHSCOPE_API_KEY is not set. Add it to your .env file.")
-    model = model or QWEN_MODEL
+    model = model or (QWEN_VISION_MODEL if images else QWEN_MODEL)
     url = f"{DASHSCOPE_BASE_URL.rstrip('/')}/chat/completions"
     payload = json.dumps({
         "model": model,
-        "messages": [{"role": "user", "content": prompt}],
+        "messages": [{"role": "user", "content": _user_content(prompt, images)}],
         "max_tokens": max_tokens,
         "stream": False,
         "enable_thinking": False,

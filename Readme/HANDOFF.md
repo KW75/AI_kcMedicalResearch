@@ -46,7 +46,7 @@ so those catches happen at session open, not mid-work.
 
 | Component      | Status |
 |----------------|--------|
-| Tests          | 909 passed, 10 deselected on v2.6-ocr-editor; 816 on main (`python -m pytest -m "not live" --tb=short -q`) |
+| Tests          | 916 passed, 10 deselected on v2.6-ocr-editor; 816 on main (`python -m pytest -m "not live" --tb=short -q`) |
 | Branch         | main = fa4edb9 (PR #3). v2.6-ocr-editor = Sessions 33-35 work, open as draft PR #4 (Setup menu, Streamlit/Render removal, Ollama model rule, httpx pin, moved-folder launcher check, SR Anthropic warning, test-local-pins CI job). Do not merge until OCR is done. Version stays 2.5.0; bump to 2.6.0 after OCR is merged |
 | CI             | green on draft PR #4, both jobs: test (requirements-ci.txt, 845 passed, 44 warnings) and test-local-pins (requirements-local.txt like the launchers, 845 passed, 57 warnings). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
 | Deploy         | None: CLI only, local first. Render service deleted 2026-10-27; Streamlit UI and Render files removed in Session 33. UptimeRobot monitor: confirm paused/deleted |
@@ -1418,3 +1418,18 @@ Expected: a clean tree in sync with origin, the top commit is this handoff, and 
   (reader messages no longer include the name) and "Done: 0 record(s) in
   <folder>" named a folder that was never created (now "No records
   written."). +2 tests. Suite: 907 -> 909. Next: launcher menu 8 (5b).
+- Cloud OCR step 1: call_openai_provider and call_qwen_provider accept
+  images (shared _user_content: one image_url part per page as
+  data:image/png;base64, then the prompt; same format as SR's
+  _call_vision_api). No images -> request unchanged. Qwen with images and
+  no --model uses QWEN_VISION_MODEL (qwen-vl-max). tests/test_cloud_images.py
+  (7; 4 failed first on 'images'). Suite: 909 -> 916.
+  Agreed design (user): no local vision model / Ollama not running ->
+  offer pull or cloud (Qwen default, OpenAI); [CLOUD] confidentiality
+  banner + typed "y" / --confirm-cloud; chosen provider only, no fallback;
+  DeepSeek blocked. Groq/Anthropic later (Groq default model likely
+  text-only; Anthropic uses a different image format, geo-restricted).
+  Notes for later: PROVIDER_CAPABILITIES marks ollama vision False
+  (outdated, per-model); SR uses qwen-vl-plus vs providers default
+  qwen-vl-max.
+  Next: OCR offers cloud when no local vision model, then menu 8 (5b).
