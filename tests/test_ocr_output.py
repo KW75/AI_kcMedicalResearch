@@ -87,3 +87,12 @@ def test_summary_and_synopsis_file_names(tmp_path):
 def test_summary_kind_must_be_known(tmp_path):
     with pytest.raises(ValueError):
         output.write_summary(tmp_path, "H", "REPORT", "x", "m")
+
+def test_control_characters_do_not_break_the_docx(tmp_path):
+    import docx
+    pages = [{"page": 1, "text": "BP 140/90\x00 mm\x0bHg\x1f ok", "method": "text"}]
+    output.write_record(tmp_path, "H", "a.pdf", "sum\x07mary", pages, "m")
+    docx_path = next((tmp_path / "records").glob("*.docx"))
+    text = "\n".join(p.text for p in docx.Document(str(docx_path)).paragraphs)
+    assert "BP 140/90 mmHg ok" in text
+    assert "summary" in text

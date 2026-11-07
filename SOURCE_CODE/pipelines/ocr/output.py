@@ -18,6 +18,14 @@ SUMMARY_KINDS = {"SUMMARY", "SYNOPSIS"}
 METHOD_LABELS = {"text": "text layer", "vision": "AI read"}
 _UNSAFE = re.compile(r"[^\w-]")
 _UNSAFE_STEM = re.compile(r'[<>:"/\\|?*\s]')
+# Characters an XML/Word file cannot hold (tab, newline, CR are kept).
+# Broken PDF font encodings (e.g. Ang 2010) can put these in the text layer.
+_XML_BAD = re.compile("[\x00-\x08\x0b\x0c\x0e-\x1f\ud800-\udfff\ufffe\uffff]")
+
+
+def _clean(text):
+    """Remove characters Word cannot store; None stays None."""
+    return _XML_BAD.sub("", text) if text else text
 
 
 def make_header(name: str, now: datetime | None = None) -> str:
@@ -51,6 +59,9 @@ def write_record(out_dir, header: str, source_name: str, summary: str,
     """Write <rec_dir or out_dir/records>/<header>_<stem>_<ext>.docx and .md."""
     rec_dir = Path(rec_dir) if rec_dir else Path(out_dir) / "records"
     rec_dir.mkdir(parents=True, exist_ok=True)
+    summary = _clean(summary) or ""
+    pages = [{**p, "text": _clean(p.get("text"))} for p in pages]
+
     stem = _record_stem(header, source_name)
     docx_path, md_path = rec_dir / f"{stem}.docx", rec_dir / f"{stem}.md"
 
@@ -86,6 +97,7 @@ def write_summary(out_dir, header: str, kind: str, text: str,
         raise ValueError(f"Unknown summary kind: {kind!r}")
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
+    text = _clean(text) or ""
     docx_path = out_dir / f"{header}_{kind}.docx"
     md_path = out_dir / f"{header}_{kind}.md"
     title = f"{header} {kind.title()}"
