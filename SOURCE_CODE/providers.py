@@ -38,7 +38,7 @@ DASHSCOPE_BASE_URL = os.environ.get(
     "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
 )
 QWEN_MODEL = os.getenv("QWEN_MODEL", "qwen-plus-latest")
-QWEN_VISION_MODEL = os.getenv("QWEN_VISION_MODEL", "qwen-vl-max")
+QWEN_VISION_MODEL = os.getenv("QWEN_VISION_MODEL", "qwen3-vl-plus")
 # Used when .env does not set DEFAULT_PROVIDER (or sets it blank).
 # Local-first: input stays on this machine unless the user deliberately
 # chooses a cloud provider.

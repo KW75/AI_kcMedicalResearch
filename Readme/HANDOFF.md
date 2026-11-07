@@ -1447,3 +1447,24 @@ Expected: a clean tree in sync with origin, the top commit is this handoff, and 
   model) wraps call_qwen_provider/call_openai_provider. The AI note names
   e.g. "qwen-vl-max (qwen, cloud)". tests/test_ocr_cli_cloud.py (7; all
   failed first). Suite: 917 -> 924. Not yet: real cloud OCR run; menu 8 (5b).
+- Cloud OCR real test works: --provider qwen, one photo (.jpeg) -> record
+  (Page 1 AI read) + SUMMARY, AI note "qwen3-vl-plus (qwen, cloud)".
+- Qwen vision model fix: qwen-vl-max and qwen-vl-plus return 404 "Model not
+  exist" on our key (dashscope-intl); qwen2.5-vl-* and *-latest return 403.
+  Only qwen3-vl-plus and qwen-vl-ocr work (probe 2026-11-07, /models list).
+  providers.py line 41 default QWEN_VISION_MODEL -> qwen3-vl-plus. An env
+  QWEN_VISION_MODEL still overrides it (a leftover session variable caused
+  one false 404 during testing).
+- TODO SR: main._sr_default_model("qwen") uses QWEN_VISION_MODEL, so SR now
+  runs on qwen3-vl-plus. Earlier verified results (e.g. Ang 2010 unanimous
+  N=3) came from an older model: re-check the next real SR run against PDFs.
+  Hard-coded "qwen-vl-plus" defaults remain in data_extractor.py line 199,
+  table_extractor.py lines 14 and 279, scripts/nondet_probe.py line 145;
+  they fail if ever used without a model passed.
+- TODO OCR banner: in cloud mode the summary/synopsis is also written by the
+  cloud model, so text (.txt, .docx, PDF text layers) leaves the machine too,
+  not only page images. Fix the "For OCR this means page images..." line.
+- TODO Writing: check whether the writing pipeline can read .doc files.
+  utils/document_reader.py sends .doc to textract (not in requirements);
+  a bare except then falls back to _extract_with_alternative, which may give
+  garbled text silently. OCR refuses .doc ("save it as .docx").
