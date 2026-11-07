@@ -47,9 +47,9 @@ def _page_heading(page: dict) -> str:
 
 
 def write_record(out_dir, header: str, source_name: str, summary: str,
-                 pages: list[dict], model: str) -> tuple[Path, Path]:
-    """Write records/<header>_<stem>_<ext>.docx and .md; return both paths."""
-    rec_dir = Path(out_dir) / "records"
+                 pages: list[dict], model: str, rec_dir=None) -> tuple[Path, Path]:
+    """Write <rec_dir or out_dir/records>/<header>_<stem>_<ext>.docx and .md."""
+    rec_dir = Path(rec_dir) if rec_dir else Path(out_dir) / "records"
     rec_dir.mkdir(parents=True, exist_ok=True)
     stem = _record_stem(header, source_name)
     docx_path, md_path = rec_dir / f"{stem}.docx", rec_dir / f"{stem}.md"

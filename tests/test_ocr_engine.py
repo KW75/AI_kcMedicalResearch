@@ -131,3 +131,39 @@ def test_empty_folder_raises(tmp_path):
 
 def test_transcribe_prompt_forbids_summarising():
     assert "do not summarise" in engine.TRANSCRIBE_PROMPT.lower()
+
+
+def test_records_go_to_their_own_header_folder(tmp_path):
+    src = _png(tmp_path / "scan.png")
+    out, rep = tmp_path / "out", tmp_path / "reports" / "ocr"
+    engine.run_single(src, out, "Test scan", "fake-model", call=FakeModel(),
+                      now=NOW, records_root=rep)
+    assert len(list((rep / "Test_scan_2026-11-07").glob("*.md"))) == 1
+    assert not (out / "records").exists()
+    assert list(out.glob("Test_scan_2026-11-07_SUMMARY.md"))
+
+
+def test_second_scan_same_name_same_day_does_not_overwrite(tmp_path):
+    src = _png(tmp_path / "scan.png")
+    out, rep = tmp_path / "out", tmp_path / "reports" / "ocr"
+    r1 = engine.run_single(src, out, "Test scan", "fake-model", call=FakeModel(),
+                           now=NOW, records_root=rep)
+    r2 = engine.run_single(src, out, "Test scan", "fake-model", call=FakeModel(),
+                           now=NOW, records_root=rep)
+    assert r1["header"] == "Test_scan_2026-11-07"
+    assert r2["header"] == "Test_scan_2026-11-07_2"
+    assert (rep / "Test_scan_2026-11-07_2").is_dir()
+    assert len(list(out.glob("*_SUMMARY.md"))) == 2
+
+def test_repeat_scan_with_empty_name_gets_a_number(tmp_path):
+    src = _png(tmp_path / "scan.png")
+    out, rep = tmp_path / "out", tmp_path / "reports" / "ocr"
+    r1 = engine.run_single(src, out, "", "fake-model", call=FakeModel(),
+                           now=NOW, records_root=rep)
+    r2 = engine.run_single(src, out, "", "fake-model", call=FakeModel(),
+                           now=NOW, records_root=rep)
+    assert r1["header"] == "OCR_2026-11-07_1430"
+    assert r2["header"] == "OCR_2026-11-07_1430_2"
+    assert (rep / "OCR_2026-11-07_1430").is_dir()
+    assert (rep / "OCR_2026-11-07_1430_2").is_dir()
+
