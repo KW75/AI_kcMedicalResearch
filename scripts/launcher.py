@@ -175,7 +175,7 @@ MODES = [
     ('5',  'RCT Search',    '--mode rct_search'),
     ('6',  'SR Pipeline',   '--mode sr'),
     ('7',  'Data Analysis', None),        # coming soon
-    ('8',  'OCR',           None),        # coming soon
+    ('8',  'OCR',           '--mode ocr'),
     ('9',  'Dry Run',       '--dry-run'),
     ('10', 'Setup',         'setup'),     # launcher sub-menu, not a main.py flag
 ]
@@ -196,6 +196,9 @@ PROVIDERS = [
 
 VISION_PROVIDERS  = {'qwen', 'openai', 'anthropic', 'groq'}
 BLOCKED_FOR_SR    = {'ollama', 'deepseek'}
+OCR_PROVIDERS     = {'ollama', 'qwen', 'openai'}
+BLOCKED_FOR_OCR   = {'groq', 'deepseek', 'anthropic'}
+
 
 _MODE_INPUT_MAP = {
     '--mode coding':     'coding',
@@ -419,8 +422,8 @@ def pick_ollama_model() -> str:
             mark = f'  {GOOD}(default){RESET}' if is_default else ''
             print(f'  {ACCENT}{i}{RESET}  {TEXT}{describe(m, caps[m["name"]])}{RESET}{mark}')
         print()
-        print(f'  {INFO}Image/OCR = the model can read images; the app does not{RESET}')
-        print(f'  {INFO}send images to Ollama yet (OCR mode is planned).{RESET}')
+        print(f'  {INFO}Image/OCR = the model can read images; OCR (menu 8){RESET}')
+        print(f'  {INFO}uses it to read scans and photos.{RESET}')
         if not default_pulled:
             print()
             print(f'  {WARN}!  Default model {default} is not pulled.{RESET}')
@@ -469,6 +472,7 @@ def time_limit_flag(mode_flag: str) -> str:
 
 def pick_provider(mode_flag: str = '') -> str:
     is_sr = (mode_flag == '--mode sr')
+    is_ocr = (mode_flag == '--mode ocr')
 
     while True:
         print()
@@ -484,12 +488,12 @@ def pick_provider(mode_flag: str = '') -> str:
         for key, name, desc, flag in PROVIDERS:
             prov_id = flag.split()[-1] if flag else 'ollama'
 
-            if is_sr and prov_id in BLOCKED_FOR_SR:
+            if (is_sr and prov_id in BLOCKED_FOR_SR) or (is_ocr and prov_id in BLOCKED_FOR_OCR):
                 badge = f'{ERR}{"x no vision":<{BADGE_W}}{RESET}'
                 prow  = (f'  {FRAME}│{RESET}  {INFO}{key}{RESET}  '
                          f'{INFO}{name:<12}{RESET}  {INFO}{desc:<26}{RESET}'
                          f'{badge}{FRAME}│{RESET}')
-            elif is_sr and prov_id in VISION_PROVIDERS:
+            elif (is_sr and prov_id in VISION_PROVIDERS) or (is_ocr and prov_id in OCR_PROVIDERS):
                 badge = f'{GOOD}{"+ vision":<{BADGE_W}}{RESET}'
                 prow  = (f'  {FRAME}│{RESET}  {ACCENT}{key}{RESET}  '
                          f'{TEXT}{name:<12}{RESET}  {INFO}{desc:<26}{RESET}'
@@ -506,6 +510,12 @@ def pick_provider(mode_flag: str = '') -> str:
             print(f'  {WARN}⚠  SR Pipeline requires a vision-capable provider.{RESET}')
             print(f'  {INFO}   Supported: {GOOD}qwen, openai, anthropic, groq{RESET}')
             print(f'  {INFO}   Blocked:   {ERR}ollama, deepseek{RESET}')
+            print()
+
+        if is_ocr:
+            print(f'  {WARN}!  OCR needs a provider that can read page images.{RESET}')
+            print(f'  {INFO}   Supported: {GOOD}ollama (vision model), qwen, openai{RESET}')
+            print(f'  {INFO}   Blocked:   {ERR}groq, deepseek, anthropic{RESET}')
             print()
 
         choice = safe_input(
@@ -542,7 +552,15 @@ def pick_provider(mode_flag: str = '') -> str:
             safe_input(f'  {INFO}Press Enter to choose again...{RESET}')
             continue
 
-        if prov_id == 'ollama':
+        if is_ocr and prov_id in BLOCKED_FOR_OCR:
+            print()
+            print(f'  {ERR}x  {prov_id} cannot read page images for OCR.{RESET}')
+            print(f'  {GOOD}  Use: ollama (local), qwen or openai.{RESET}')
+            print()
+            safe_input(f'  {INFO}Press Enter to choose again...{RESET}')
+            continue
+
+        if prov_id == 'ollama' and not is_ocr:
             model = pick_ollama_model()
             if model:
                 return f'{prov_flag} --model {model}'
@@ -940,7 +958,7 @@ def main() -> None:
                 safe_input(f'  {INFO}Press Enter to return to menu...{RESET}')
                 continue
 
-            if mode_flag is None:          # 7 Data Analysis, 8 OCR
+            if mode_flag is None:          # 7 Data Analysis
                 coming_soon(label)
                 continue
 

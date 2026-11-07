@@ -186,3 +186,32 @@ class TestTimeLimitFlag:
     def test_ai_modes_ask(self, launcher):
         with patch.object(launcher, "pick_time_limit", return_value="--time-limit 60"):
             assert launcher.time_limit_flag("--mode writing") == "--time-limit 60"
+
+
+class TestPickProviderOcr:
+    """Menu 8 OCR: ollama/qwen/openai allowed; groq/deepseek/anthropic refused.
+    Ollama skips the launcher's model list: cli.py shows only vision models."""
+
+    def test_ocr_ollama_skips_launcher_model_list(self, launcher):
+        with patch.object(launcher, "pick_ollama_model") as fake_pick, \
+             patch.object(launcher, "safe_input", side_effect=[""]):
+            assert launcher.pick_provider("--mode ocr") == "--provider ollama"
+        fake_pick.assert_not_called()
+
+    @pytest.mark.parametrize("choice, flag", [("2", "--provider qwen"),
+                                              ("5", "--provider openai")])
+    def test_ocr_cloud_vision_providers_allowed(self, launcher, choice, flag):
+        with patch.object(launcher, "safe_input", side_effect=[choice]):
+            assert launcher.pick_provider("--mode ocr") == flag
+
+    @pytest.mark.parametrize("blocked", ["3", "4", "6"])
+    def test_ocr_refuses_groq_deepseek_anthropic(self, launcher, blocked):
+        # blocked choice, "" = "Press Enter to choose again", "2" = Qwen
+        with patch.object(launcher, "pick_ollama_model") as fake_pick, \
+             patch.object(launcher, "safe_input", side_effect=[blocked, "", "2"]):
+            assert launcher.pick_provider("--mode ocr") == "--provider qwen"
+        fake_pick.assert_not_called()
+
+    def test_model_list_no_longer_says_ocr_is_planned(self, launcher):
+        text = (ROOT / "scripts" / "launcher.py").read_text(encoding="utf-8")
+        assert "OCR mode is planned" not in text

@@ -53,7 +53,7 @@ def test_menu_numbers_labels_and_flags(launcher):
     table = {k: (label, flag) for k, label, flag in launcher.MODES}
     assert [k for k, _, _ in launcher.MODES] == [str(n) for n in range(1, 11)]
     assert table["7"] == ("Data Analysis", None)
-    assert table["8"] == ("OCR", None)
+    assert table["8"] == ("OCR", "--mode ocr")
     assert table["9"] == ("Dry Run", "--dry-run")
     assert table["10"] == ("Setup", "setup")
 
@@ -92,7 +92,7 @@ def test_prompt_lists_the_new_keys(launcher):
 
 # --- main loop --------------------------------------------------------------
 
-@pytest.mark.parametrize("key, label", [("7", "Data Analysis"), ("8", "OCR")])
+@pytest.mark.parametrize("key, label", [("7", "Data Analysis")])
 def test_placeholders_say_coming_soon_and_run_nothing(launcher, capsys, key, label):
     run_cmd, pick_provider, _ = _run_main(launcher, [key, "", "X"])
     out = capsys.readouterr().out
