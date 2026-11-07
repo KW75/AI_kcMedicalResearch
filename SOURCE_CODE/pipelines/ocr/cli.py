@@ -1,10 +1,12 @@
 """OCR terminal prompts for --mode ocr (launcher menu 8).
 
-Order: function (1 = one file, 2 = whole folder) -> file (function 1 only)
--> name for the output files -> vision model. Checks that need no typing
-(input files present, a vision model pulled, --model can read images) run
-first, so a job that cannot run never asks a question.
-Ollama only for now; main.py stops cloud providers before this runs.
+input/ocr/ decides what runs:
+  one file      -> function 1: record + <header>_SUMMARY
+  several files -> function 2: every file -> one record each + <header>_SYNOPSIS
+Then two questions: scan title/name (header of the output files) and the
+vision model. Checks that need no typing (input files present, a vision
+model pulled, --model can read images) run first, so a job that cannot run
+never asks a question. Ollama only for now; main.py stops cloud providers.
 """
 from __future__ import annotations
 
@@ -80,25 +82,15 @@ def run(base_dir, model=None, *, input_fn=input, list_fn=None, caps_fn=None,
                 f"https://ollama.com/search?c=vision). Job not run.")
             return None
 
-    log("OCR  1 = one file -> record + SUMMARY")
-    log("     2 = every file in input/ocr -> records + SYNOPSIS")
-    func = input_fn("Choose 1 or 2: ").strip()
-    if func not in ("1", "2"):
-        log("Not a valid choice. Job not run.")
-        return None
+    if len(files) == 1:
+        log(f"1 file: {files[0].name} -> record + SUMMARY")
+    else:
+        log(f"{len(files)} files in {in_dir} -> one record each + SYNOPSIS:")
+        for f in files:
+            log(f"  {f.name}")
 
-    path = None
-    if func == "1":
-        for i, f in enumerate(files, start=1):
-            log(f"  {i}. {f.name}")
-        path = _pick(files, input_fn("File number: "))
-        if path is None:
-            log("Not a valid file number. Job not run.")
-            return None
-
-    log("Name for the output files (e.g. PT0123 or Cardio_lectures). "
-        "Enter = OCR_<date>_<time>.")
-    name = input_fn("Name: ").strip()
+    name = input_fn("Scan title/name (header of the output files; "
+                    "Enter = OCR_<date>_<time>): ").strip()
 
     if models is not None:
         names = [m["name"] for m in models]
@@ -117,8 +109,8 @@ def run(base_dir, model=None, *, input_fn=input, list_fn=None, caps_fn=None,
             model = picked["name"]
 
     log(f"Model: {model}. Output: {out_dir}")
-    if func == "1":
-        result = run_single(path, out_dir, name, model, log=log)
+    if len(files) == 1:
+        result = run_single(files[0], out_dir, name, model, log=log)
     else:
         result = run_set(in_dir, out_dir, name, model, log=log)
     _report(result, out_dir, log)

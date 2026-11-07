@@ -1,7 +1,8 @@
 """OCR step 5a: --mode ocr in main.py and the terminal prompts (pipelines/ocr/cli.py).
 
 No Ollama needed: model listing, capabilities and the engine are faked.
-Prompt order: function (1/2) -> file (function 1 only) -> name -> model.
+input/ocr/ decides the function: one file -> run_single, several -> run_set.
+Questions: scan title/name -> model.
 """
 import pytest
 
@@ -38,9 +39,14 @@ class FakeEngine:
         return {"header": "H", "records": [], "failed": [], "summary": None}
 
 
-def _answers(*items):
+def _answers(*items, asked=None):
     it = iter(items)
-    return lambda prompt="": next(it)
+
+    def _input(prompt=""):
+        if asked is not None:
+            asked.append(prompt)
+        return next(it)
+    return _input
 
 
 def _base(tmp_path, files=("a.pdf", "b.png")):
@@ -51,9 +57,10 @@ def _base(tmp_path, files=("a.pdf", "b.png")):
     return tmp_path
 
 
-def _run(tmp_path, answers, model=None, files=("a.pdf", "b.png")):
+def _run(tmp_path, answers, model=None, files=("a.pdf", "b.png"), asked=None):
     eng = FakeEngine()
-    result = cli.run(_base(tmp_path, files), model=model, input_fn=_answers(*answers),
+    result = cli.run(_base(tmp_path, files), model=model,
+                     input_fn=_answers(*answers, asked=asked),
                      list_fn=fake_list, caps_fn=fake_caps,
                      run_single=eng.single, run_set=eng.set, log=lambda *a: None)
     return eng, result
@@ -64,37 +71,44 @@ def test_vision_models_keeps_only_vision_capable():
     assert names == ["gemma4:e4b", "qwen2.5vl:7b"]
 
 
-def test_function_1_runs_the_chosen_file(tmp_path, monkeypatch):
+def test_one_file_runs_single_without_asking_which(tmp_path, monkeypatch):
     monkeypatch.delenv("OLLAMA_MODEL", raising=False)
-    eng, _ = _run(tmp_path, ["1", "2", "PT0123", ""])
+    eng, _ = _run(tmp_path, ["Test scan", ""], files=("only.pdf",))
     kind, path, out_dir, name, model = eng.calls[0]
-    assert kind == "single" and path.name == "b.png"
+    assert kind == "single" and path.name == "only.pdf"
     assert out_dir == tmp_path / "output" / "ocr"
-    assert (name, model) == ("PT0123", "gemma4:e4b")
+    assert (name, model) == ("Test scan", "gemma4:e4b")
 
 
-def test_function_2_runs_the_whole_folder(tmp_path, monkeypatch):
+def test_several_files_run_as_a_set(tmp_path, monkeypatch):
     monkeypatch.delenv("OLLAMA_MODEL", raising=False)
-    eng, _ = _run(tmp_path, ["2", "Cardio lectures", "2"])
+    eng, _ = _run(tmp_path, ["Cardio lectures", "2"])
     kind, folder, _, name, model = eng.calls[0]
     assert kind == "set" and folder == tmp_path / "input" / "ocr"
     assert (name, model) == ("Cardio lectures", "qwen2.5vl:7b")
 
 
+def test_name_question_says_scan_title(tmp_path, monkeypatch):
+    monkeypatch.delenv("OLLAMA_MODEL", raising=False)
+    asked = []
+    _run(tmp_path, ["", ""], asked=asked)
+    assert "scan title/name" in asked[0].lower()
+
+
 def test_default_model_follows_OLLAMA_MODEL_when_it_has_vision(tmp_path, monkeypatch):
     monkeypatch.setenv("OLLAMA_MODEL", "qwen2.5vl:7b")
-    eng, _ = _run(tmp_path, ["2", "", ""])
+    eng, _ = _run(tmp_path, ["", ""])
     assert eng.calls[0][4] == "qwen2.5vl:7b"
 
 
 def test_text_only_OLLAMA_MODEL_falls_back_to_gemma4(tmp_path, monkeypatch):
     monkeypatch.setenv("OLLAMA_MODEL", "qwen3:8b")
-    eng, _ = _run(tmp_path, ["2", "", ""])
+    eng, _ = _run(tmp_path, ["", ""])
     assert eng.calls[0][4] == "gemma4:e4b"
 
 
 def test_model_flag_skips_the_model_question(tmp_path):
-    eng, _ = _run(tmp_path, ["2", ""], model="gemma4:e4b")
+    eng, _ = _run(tmp_path, [""], model="gemma4:e4b")
     assert eng.calls[0][4] == "gemma4:e4b"
 
 
@@ -117,8 +131,8 @@ def test_empty_input_folder_asks_nothing(tmp_path):
     assert result is None and eng.calls == []
 
 
-@pytest.mark.parametrize("answers", [["x"], ["1", "9"], ["2", "", "7"]])
-def test_invalid_choice_does_not_run(tmp_path, monkeypatch, answers):
+@pytest.mark.parametrize("answers", [["", "7"], ["", "x"]])
+def test_invalid_model_number_does_not_run(tmp_path, monkeypatch, answers):
     monkeypatch.delenv("OLLAMA_MODEL", raising=False)
     eng, result = _run(tmp_path, answers)
     assert result is None and eng.calls == []

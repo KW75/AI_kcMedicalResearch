@@ -1378,3 +1378,8 @@ Expected: a clean tree in sync with origin, the top commit is this handoff, and 
   only the chosen provider, like sr. Cloud OCR refused for now
   (ocr_provider_error). tests/test_ocr_cli.py (16). Suite: 878 -> 894.
   Not yet: launcher menu 8 (5b), cloud OCR with consent, real-scan test.
+- OCR prompts simplified (user request): input/ocr/ decides the function -
+  one file -> record + SUMMARY, several -> records + SYNOPSIS. The "Choose
+  1 or 2" and "File number" questions were removed. Questions left: "Scan
+  title/name" (header; spaces -> _, capitals kept) and model.
+  tests/test_ocr_cli.py rewritten (still 16). Next: .txt/.docx in a set.
