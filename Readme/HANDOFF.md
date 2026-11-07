@@ -46,7 +46,7 @@ so those catches happen at session open, not mid-work.
 
 | Component      | Status |
 |----------------|--------|
-| Tests          | 878 passed, 10 deselected on v2.6-ocr-editor; 816 on main (`python -m pytest -m "not live" --tb=short -q`) |
+| Tests          | 894 passed, 10 deselected on v2.6-ocr-editor; 816 on main (`python -m pytest -m "not live" --tb=short -q`) |
 | Branch         | main = fa4edb9 (PR #3). v2.6-ocr-editor = Sessions 33-35 work, open as draft PR #4 (Setup menu, Streamlit/Render removal, Ollama model rule, httpx pin, moved-folder launcher check, SR Anthropic warning, test-local-pins CI job). Do not merge until OCR is done. Version stays 2.5.0; bump to 2.6.0 after OCR is merged |
 | CI             | green on draft PR #4, both jobs: test (requirements-ci.txt, 845 passed, 44 warnings) and test-local-pins (requirements-local.txt like the launchers, 845 passed, 57 warnings). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
 | Deploy         | None: CLI only, local first. Render service deleted 2026-10-27; Streamlit UI and Render files removed in Session 33. UptimeRobot monitor: confirm paused/deleted |
@@ -1370,3 +1370,11 @@ Expected: a clean tree in sync with origin, the top commit is this handoff, and 
   with "cannot import name 'engine'"). Suite: 870 -> 878.
   Not yet: real Ollama run, --mode ocr / menu 8. A long set may go over
   num_ctx 32768 when summarised.
+- OCR step 5a: --mode ocr in main.py; prompts in pipelines/ocr/cli.py
+  (function 1/2 -> file -> name -> vision model). Only models reporting
+  'vision' are listed; default OLLAMA_MODEL if it has vision, else
+  gemma4:e4b. Checks that need no typing run first (no input files, no
+  vision model -> "ollama pull gemma4:e4b"). data_destinations: ocr lists
+  only the chosen provider, like sr. Cloud OCR refused for now
+  (ocr_provider_error). tests/test_ocr_cli.py (16). Suite: 878 -> 894.
+  Not yet: launcher menu 8 (5b), cloud OCR with consent, real-scan test.

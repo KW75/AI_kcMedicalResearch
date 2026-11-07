@@ -438,7 +438,7 @@ def data_destinations(mode: str, provider: str) -> list[str]:
     SR calls its provider directly (no fallback chain), so it lists only the
     chosen provider. Other modes go through call_ai -> call_ai_with_fallback.
     """
-    if mode == "sr":
+    if mode in ("sr", "ocr"):
         return [provider]
     return provider_attempt_order(provider, _fallback_chain_from_env())
 
@@ -2289,7 +2289,7 @@ def parse_args(args: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--model",          type=str, default=None)
     parser.add_argument("--mode",           type=str, default="coding",
                         choices=["coding", "writing", "rct_search",
-                                 "appraisal", "search", "sr"])
+                                 "appraisal", "search", "sr", "ocr"])
     parser.add_argument("--report",         action="store_true", default=False,
                         help="Generate a writing report from input/writing/ files")
     parser.add_argument("--revise",         action="store_true", default=False,
@@ -2359,6 +2359,13 @@ def sr_provider_warning(mode: str, provider: str):
     )
 
 
+def ocr_provider_error(mode: str, provider: str) -> str | None:
+    """OCR sends images only to local Ollama for now; refuse cloud providers."""
+    if mode == "ocr" and provider != "ollama":
+        return ("OCR: cloud providers are not supported yet; only local Ollama "
+                "models can read the images. Run again with --provider ollama.")
+    return None
+
 def run_cli(args: argparse.Namespace) -> None:
     """Dispatch parsed CLI arguments to the correct handler.
 
@@ -2375,6 +2382,11 @@ def run_cli(args: argparse.Namespace) -> None:
     sr_warning = sr_provider_warning(args.mode, args.provider)
     if sr_warning:
         print(sr_warning)
+    ocr_error = ocr_provider_error(args.mode, args.provider)
+    if ocr_error:
+        print(ocr_error)
+        sys.exit(1)
+
 
 
     non_ai_flags = (
@@ -2466,6 +2478,9 @@ def run_cli(args: argparse.Namespace) -> None:
             model=args.model,
             dry_run=args.dry_run,
         )
+    elif args.mode == "ocr":
+        from pipelines.ocr import cli as ocr_cli
+        ocr_cli.run(BASE_DIR, model=args.model)
     elif args.mode == "appraisal":
         handle_appraisal_mode(
             provider=args.provider,
