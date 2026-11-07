@@ -167,3 +167,62 @@ def test_repeat_scan_with_empty_name_gets_a_number(tmp_path):
     assert (rep / "OCR_2026-11-07_1430").is_dir()
     assert (rep / "OCR_2026-11-07_1430_2").is_dir()
 
+# --- Long text: summarised in parts, nothing cut silently -------------------
+
+def _ctx_call(answer="note"):
+    prompts = []
+
+    def call(prompt, images=None):
+        prompts.append(prompt)
+        return answer
+    call.prompts = prompts
+    return call
+
+
+def _ctx_txt(folder, name, text):
+    folder.mkdir(parents=True, exist_ok=True)
+    path = folder / name
+    path.write_text(text, encoding="utf-8")
+    return path
+
+
+def test_short_document_is_still_one_call(tmp_path, monkeypatch):
+    monkeypatch.setattr(engine, "_budget_chars", lambda: 2000)
+    path = _ctx_txt(tmp_path / "in", "short.txt", "Hb 13.2 g/dL. " * 20)
+    call = _ctx_call()
+    engine.run_single(path, tmp_path / "out", "t", "fake", call=call,
+                      log=lambda m: None)
+    assert len(call.prompts) == 1
+    assert engine.PART_PROMPT not in call.prompts[0]
+
+
+def test_long_document_is_summarised_in_parts_and_nothing_is_lost(tmp_path, monkeypatch):
+    monkeypatch.setattr(engine, "_budget_chars", lambda: 2000)
+    words = [f"W{i:04d}" for i in range(1200)]          # about 7,200 characters
+    path = _ctx_txt(tmp_path / "in", "long.txt", " ".join(words))
+    call = _ctx_call()
+    logs = []
+    engine.run_single(path, tmp_path / "out", "t", "fake", call=call,
+                      log=logs.append)
+    parts = [p for p in call.prompts if engine.PART_PROMPT in p]
+    assert len(parts) >= 3
+    sent = "".join(parts)
+    assert all(w in sent for w in words)                # every word reached the model
+    assert all(len(p) <= 2000 + len(engine.PART_PROMPT) + 200 for p in parts)
+    assert any(engine.COMBINE_PROMPT in p for p in call.prompts)
+    assert any("summarised in" in m for m in logs)
+
+
+def test_long_synopsis_is_combined_in_parts(tmp_path, monkeypatch):
+    monkeypatch.setattr(engine, "_budget_chars", lambda: 2000)
+    folder = tmp_path / "in"
+    for name in ["a.txt", "b.txt", "c.txt", "d.txt"]:
+        _ctx_txt(folder, name, f"Text of {name}, BP 140/90 mmHg.")
+    call = _ctx_call(answer="x" * 900)                  # long per-file summaries
+    result = engine.run_set(folder, tmp_path / "out", "t", "fake", call=call,
+                            log=lambda m: None)
+    assert len(result["records"]) == 4
+    parts = "".join(p for p in call.prompts if engine.PART_PROMPT in p)
+    assert all(f"### {n}" in parts for n in ["a.txt", "b.txt", "c.txt", "d.txt"])
+    assert any(engine.COMBINE_PROMPT in p and engine.SYNOPSIS_PROMPT in p
+               for p in call.prompts)

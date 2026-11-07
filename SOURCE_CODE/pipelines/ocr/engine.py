@@ -37,6 +37,73 @@ SYNOPSIS_PROMPT = (
 )
 
 
+# --- Long text: summarise in parts so nothing is cut silently ----------------
+# Ollama silently drops prompt text past num_ctx (OLLAMA_CONTEXT, default
+# 32768). The window also holds the answer (num_predict 8192), so the text
+# budget is (context - answer - prompt room) at a cautious 3 chars/token.
+PART_PROMPT = (
+    "This is one part of a longer text. Write concise notes on this part "
+    "only. Keep every number, unit, name and date exactly as written. Do not "
+    "add anything that is not in the text."
+)
+COMBINE_PROMPT = (
+    "The notes below were made from consecutive parts of one longer text, "
+    "in order. Use them as the source for this task."
+)
+CHARS_PER_TOKEN = 3
+ANSWER_TOKENS = 8192
+PROMPT_TOKENS = 1000
+MAX_ROUNDS = 3
+
+
+def _budget_chars() -> int:
+    """How many characters of document text fit in one prompt."""
+    import os
+    ctx = int(os.getenv("OLLAMA_CONTEXT", "32768"))
+    return max(2000, (ctx - ANSWER_TOKENS - PROMPT_TOKENS) * CHARS_PER_TOKEN)
+
+
+def _split(text: str, limit: int) -> list[str]:
+    """Split at paragraph breaks (then spaces) into parts <= limit chars."""
+    pieces = []
+    for para in text.split("\n\n"):
+        while len(para) > limit:
+            cut = para.rfind(" ", 0, limit)
+            if cut <= 0:
+                cut = limit
+            pieces.append(para[:cut])
+            para = para[cut:].lstrip(" ")
+        pieces.append(para)
+    parts, cur = [], ""
+    for piece in pieces:
+        if cur and len(cur) + 2 + len(piece) > limit:
+            parts.append(cur)
+            cur = piece
+        else:
+            cur = f"{cur}\n\n{piece}" if cur else piece
+    if cur:
+        parts.append(cur)
+    return parts
+
+
+def _summarise(task_prompt: str, text: str, call, log, head: str = "") -> str:
+    """One call if the text fits; otherwise notes per part, then combine."""
+    budget = _budget_chars()
+    rounds = 0
+    while len(text) > budget:
+        rounds += 1
+        if rounds > MAX_ROUNDS:
+            raise ValueError(f"text still too long after {MAX_ROUNDS} rounds "
+                             "of notes; raise OLLAMA_CONTEXT or split the file")
+        parts = _split(text, budget)
+        log(f"    long text: summarised in {len(parts)} parts")
+        notes = [call(f"{PART_PROMPT}\n\n{p}").strip() for p in parts]
+        text = "\n\n".join(f"[Part {i}]\n{n}" for i, n in enumerate(notes, 1))
+    if rounds:
+        return call(f"{task_prompt}\n\n{head}{COMBINE_PROMPT}\n\n{text}").strip()
+    return call(f"{task_prompt}\n\n{head}{text}").strip()
+
+
 def ollama_call(model: str):
     """Default AI: the chosen local Ollama model (images sent base64)."""
     def _call(prompt, images=None):
@@ -89,7 +156,8 @@ def _process_file(path: Path, out_dir, header: str, model: str, call, log,
             done.append({"page": page["page"], "text": text, "method": "vision"})
     full = "\n\n".join(f"[Page {p['page']}]\n{p['text']}" for p in done)
     log("    summarising...")
-    summary = call(f"{SUMMARY_PROMPT}\n\nFile: {path.name}\n\n{full}").strip()
+    summary = _summarise(SUMMARY_PROMPT, full, call, log,
+                         head=f"File: {path.name}\n\n")
     output.write_record(out_dir, header, path.name, summary, done, model,
                         rec_dir=rec_dir)
     return summary
@@ -145,7 +213,7 @@ def run_set(folder, out_dir, name: str, model: str, call=None, now=None,
         return result
     log("Writing synopsis...")
     body = "\n\n".join(f"### {n}\n{s}" for n, s in summaries)
-    synopsis = call(f"{SYNOPSIS_PROMPT}\n\n{body}").strip()
+    synopsis = _summarise(SYNOPSIS_PROMPT, body, call, log)
     if result["failed"]:
         synopsis += ("\n\nNot included (could not be read): "
                      + ", ".join(n for n, _ in result["failed"]))

@@ -46,7 +46,7 @@ so those catches happen at session open, not mid-work.
 
 | Component      | Status |
 |----------------|--------|
-| Tests          | 931 passed, 10 deselected on v2.6-ocr-editor; 816 on main (`python -m pytest -m "not live" --tb=short -q`) |
+| Tests          | 934 passed, 10 deselected on v2.6-ocr-editor; 816 on main (`python -m pytest -m "not live" --tb=short -q`) |
 | Branch         | main = fa4edb9 (PR #3). v2.6-ocr-editor = Sessions 33-35 work, open as draft PR #4 (Setup menu, Streamlit/Render removal, Ollama model rule, httpx pin, moved-folder launcher check, SR Anthropic warning, test-local-pins CI job). Do not merge until OCR is done. Version stays 2.5.0; bump to 2.6.0 after OCR is merged |
 | CI             | green on draft PR #4, both jobs: test (requirements-ci.txt, 845 passed, 44 warnings) and test-local-pins (requirements-local.txt like the launchers, 845 passed, 57 warnings). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
 | Deploy         | None: CLI only, local first. Render service deleted 2026-10-27; Streamlit UI and Render files removed in Session 33. UptimeRobot monitor: confirm paused/deleted |
@@ -1488,6 +1488,16 @@ Expected: a clean tree in sync with origin, the top commit is this handoff, and 
   text layer ("All strings must be XML compatible" from lxml). Menu 8 re-run
   on Ang PDF with gemma4:e4b: record + SUMMARY written, text reads normally.
   tests/test_ocr_output.py: 1 test added (failed first). Suite: 930 -> 931.
-- TODO OCR context: SUMMARY/SYNOPSIS send the whole document/set in one
-  prompt. Ollama silently truncates past num_ctx. Check whether
-  call_ollama_provider sets num_ctx; set it for OCR and warn/chunk long sets.
+- DONE OCR context: SUMMARY/SYNOPSIS no longer risk silent truncation.
+  call_ollama_provider already sends num_ctx = OLLAMA_CONTEXT (default 32768;
+  not Ollama's small default). engine._summarise: text budget =
+  (OLLAMA_CONTEXT - 8192 answer - 1000 prompt) x 3 chars/token (~70,000 chars
+  at 32k). Fits -> one call, prompt unchanged. Too long -> split at paragraph
+  breaks, notes per part (PART_PROMPT keeps numbers/units exactly), then
+  combined (COMBINE_PROMPT); log "long text: summarised in N parts". Max 3
+  rounds, then the file fails with a clear error. SYNOPSIS uses the same guard
+  (built from per-file summaries, so only very large sets split). Cloud uses
+  the same cautious budget. tests/test_ocr_engine.py: 3 tests added (failed
+  first). Suite: 931 -> 934. OLLAMA_CONTEXT default left at 32768 (shared by
+  all pipelines; bigger window = more GPU memory).
+
