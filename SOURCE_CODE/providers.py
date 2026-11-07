@@ -268,11 +268,17 @@ def call_ollama_provider(
     prompt: str,
     model: str | None = None,
     max_tokens: int = 8192,
+    images: list[bytes] | None = None,
 ) -> str:
-    """Send a prompt to the local Ollama generate endpoint."""
+    """Send a prompt to the local Ollama generate endpoint.
+
+    images: optional list of PNG bytes (OCR). They are sent base64-encoded in
+    the "images" field. Text-only calls send no "images" key at all, so their
+    request is unchanged. See tests/test_ollama_images.py.
+    """
     model = model or _resolve_ollama_model()
     url = f"{OLLAMA_HOST}/api/generate"
-    payload = json.dumps({
+    body = {
         "model": model,
         "prompt": prompt,
         "stream": False,
@@ -284,7 +290,11 @@ def call_ollama_provider(
             "top_p": 0.9,
             "repeat_penalty": 1.1,
         },
-    }).encode()
+    }
+    if images:
+        import base64
+        body["images"] = [base64.b64encode(img).decode("ascii") for img in images]
+    payload = json.dumps(body).encode()
     req = urllib.request.Request(
         url, data=payload,
         headers={"Content-Type": "application/json"},
