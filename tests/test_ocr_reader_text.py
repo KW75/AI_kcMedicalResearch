@@ -69,3 +69,11 @@ def test_list_inputs_includes_text_files(tmp_path):
     for n in ("a.txt", "b.DOCX", "c.doc", "d.xyz"):
         (tmp_path / n).write_bytes(b"x")
     assert [p.name for p in reader.list_inputs(tmp_path)] == ["a.txt", "b.DOCX", "c.doc"]
+
+
+def test_reader_error_does_not_repeat_the_file_name(tmp_path):
+    p = tmp_path / "old.doc"
+    p.write_bytes(b"x")
+    with pytest.raises(ValueError) as exc:
+        reader.read_input(p)
+    assert "old.doc" not in str(exc.value)

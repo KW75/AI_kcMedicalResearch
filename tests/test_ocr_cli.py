@@ -167,3 +167,12 @@ def test_records_go_to_reports_ocr(tmp_path, monkeypatch, files):
     monkeypatch.delenv("OLLAMA_MODEL", raising=False)
     eng, _ = _run(tmp_path, ["Test scan", ""], files=files)
     assert eng.roots == [tmp_path / "reports" / "ocr"]
+
+
+def test_report_with_no_records_names_no_folder(tmp_path):
+    logs = []
+    cli._report({"header": "H", "records": [], "summary": None,
+                 "failed": [("old.doc", "save it as .docx")]},
+                tmp_path, logs.append)
+    assert not any(line.startswith("Done:") for line in logs)
+    assert any("No records written" in line for line in logs)

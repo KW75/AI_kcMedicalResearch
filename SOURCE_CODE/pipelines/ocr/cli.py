@@ -42,7 +42,10 @@ def _pick(options: list, answer: str):
 
 
 def _report(result: dict, rep_dir: Path, log) -> None:
-    log(f"Done: {len(result['records'])} record(s) in {rep_dir / result['header']}")
+    if result["records"]:
+        log(f"Done: {len(result['records'])} record(s) in {rep_dir / result['header']}")
+    else:
+        log("No records written.")
     for name, err in result["failed"]:
         log(f"  Could not read {name}: {err}")
     if result["summary"]:

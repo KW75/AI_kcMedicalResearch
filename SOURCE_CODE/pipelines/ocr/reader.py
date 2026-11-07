@@ -57,8 +57,8 @@ def read_input(path) -> list[dict]:
     if ext in DOCX_EXTS:
         return _read_docx(path)
     if ext in DOC_EXTS:
-        raise ValueError(f"{path.name}: old Word .doc files cannot be read yet - "
-                         f"open it in Word and save it as .docx")
+        raise ValueError("old Word .doc files cannot be read yet - "
+                         "open it in Word and save it as .docx")
     raise ValueError(f"Unsupported file type for OCR: {path.name}")
 
 
@@ -66,7 +66,7 @@ def _text_page(path: Path, text: str) -> list[dict]:
     """One text page; ValueError if the file holds no text."""
     text = text.replace("\r\n", "\n").replace("\r", "\n").strip()
     if not text:
-        raise ValueError(f"{path.name}: no text found in the file")
+        raise ValueError("no text found in the file")
     return [_page(1, text=text)]
 
 

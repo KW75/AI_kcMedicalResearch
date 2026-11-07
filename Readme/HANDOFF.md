@@ -46,7 +46,7 @@ so those catches happen at session open, not mid-work.
 
 | Component      | Status |
 |----------------|--------|
-| Tests          | 907 passed, 10 deselected on v2.6-ocr-editor; 816 on main (`python -m pytest -m "not live" --tb=short -q`) |
+| Tests          | 909 passed, 10 deselected on v2.6-ocr-editor; 816 on main (`python -m pytest -m "not live" --tb=short -q`) |
 | Branch         | main = fa4edb9 (PR #3). v2.6-ocr-editor = Sessions 33-35 work, open as draft PR #4 (Setup menu, Streamlit/Render removal, Ollama model rule, httpx pin, moved-folder launcher check, SR Anthropic warning, test-local-pins CI job). Do not merge until OCR is done. Version stays 2.5.0; bump to 2.6.0 after OCR is merged |
 | CI             | green on draft PR #4, both jobs: test (requirements-ci.txt, 845 passed, 44 warnings) and test-local-pins (requirements-local.txt like the launchers, 845 passed, 57 warnings). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
 | Deploy         | None: CLI only, local first. Render service deleted 2026-10-27; Streamlit UI and Render files removed in Session 33. UptimeRobot monitor: confirm paused/deleted |
@@ -1410,3 +1410,11 @@ Expected: a clean tree in sync with origin, the top commit is this handoff, and 
   tests/test_ocr_reader_text.py (8); test_ocr_reader.py examples changed
   from .txt/.docx to .xyz/.xlsx. Suite: 899 -> 907.
   Next: launcher menu 8 (5b). Later: .doc support.
+- OCR real-file test, text inputs (Session 35): a set of PDF + .txt +
+  .docx (with table) works; text files go straight to summarising (no AI
+  reading), records and SYNOPSIS written as expected.
+- OCR .doc real test: refused with "save it as .docx", nothing crashed.
+  Fixed two output issues it showed: the file name was printed twice
+  (reader messages no longer include the name) and "Done: 0 record(s) in
+  <folder>" named a folder that was never created (now "No records
+  written."). +2 tests. Suite: 907 -> 909. Next: launcher menu 8 (5b).
