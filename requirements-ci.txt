@@ -1,7 +1,6 @@
 # requirements-ci.txt - GitHub Actions CI (Ubuntu, Python 3.11)
 #
 # Shared deps live in requirements-base.txt.
-# Do NOT use this file for Render; Render uses requirements-render.txt.
 
 -r requirements-base.txt
 

@@ -173,40 +173,31 @@ def _run_stream_ollama_capturing_body(**kwargs):
     return sent["body"]
 
 
-def test_ollama_streaming_resolves_model_when_none_configured(monkeypatch):
-    """With no --model and no OLLAMA_MODEL in .env, streaming must use the
-    same resolver as the batch route, not send an empty model name."""
+def test_ollama_streaming_uses_default_when_none_configured(monkeypatch):
+    """No --model and no OLLAMA_MODEL in .env: streaming sends gemma4:e4b
+    (same rule as the batch route), never an empty model name."""
     import providers
     import streaming
-    detect_calls = []
-
-    def fake_detect(*args, **kwargs):
-        detect_calls.append(args)
-        return "sentinel-model:1b"
-
     monkeypatch.setattr(providers, "OLLAMA_MODEL", "")
     monkeypatch.setattr(streaming, "OLLAMA_MODEL", "")
-    monkeypatch.setattr(providers, "_OLLAMA_MODEL_RESOLVED", None)
-    monkeypatch.setattr(providers, "_ollama_detect_best_model", fake_detect)
-
     body = _run_stream_ollama_capturing_body()
-    assert body["model"] == "sentinel-model:1b"
-    assert len(detect_calls) == 1
+    assert body["model"] == providers.OLLAMA_DEFAULT_MODEL
+
+
+def test_ollama_streaming_env_model_wins(monkeypatch):
+    import providers
+    import streaming
+    monkeypatch.setattr(providers, "OLLAMA_MODEL", "qwen3:8b")
+    monkeypatch.setattr(streaming, "OLLAMA_MODEL", "qwen3:8b")
+    body = _run_stream_ollama_capturing_body()
+    assert body["model"] == "qwen3:8b"
 
 
 def test_ollama_streaming_explicit_model_wins(monkeypatch):
-    """An explicit model (from --model or the pickers) is sent as-is and
-    the detector is never called."""
+    """An explicit model (from --model or the launcher picker) is sent as-is."""
     import providers
     import streaming
-
-    def fail_detect(*args, **kwargs):
-        raise AssertionError("detector must not run when a model is given")
-
-    monkeypatch.setattr(providers, "OLLAMA_MODEL", "")
-    monkeypatch.setattr(streaming, "OLLAMA_MODEL", "")
-    monkeypatch.setattr(providers, "_OLLAMA_MODEL_RESOLVED", None)
-    monkeypatch.setattr(providers, "_ollama_detect_best_model", fail_detect)
-
+    monkeypatch.setattr(providers, "OLLAMA_MODEL", "qwen3:8b")
+    monkeypatch.setattr(streaming, "OLLAMA_MODEL", "qwen3:8b")
     body = _run_stream_ollama_capturing_body(model="gemma4:e4b")
     assert body["model"] == "gemma4:e4b"

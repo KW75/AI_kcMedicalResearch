@@ -1,6 +1,6 @@
 """
 Provider registry for AI kcMedicalResearch.
-Handles all LLM provider connections, auto-detection, fallback chains,
+Handles all LLM provider connections, fallback chains,
 and provider capability assessment.
 """
 
@@ -57,8 +57,8 @@ FALLBACK_PROVIDERS = [
 LOCAL_ONLY_PROVIDERS = {"ollama"}
 
 # Default local model and model listing live in ollama_models.py, so the
-# launcher, the UI and this module share one value.
-from ollama_models import OLLAMA_DEFAULT_MODEL, choose_default, list_ollama_models  # noqa: E402
+# launcher and this module share one value.
+from ollama_models import OLLAMA_DEFAULT_MODEL  # noqa: E402
 import time_limits
 
 # Ollama performance thresholds
@@ -89,24 +89,6 @@ def supports_vision(provider: str) -> bool:
 
 
 # ---------------------------------------------------------------------------
-# Ollama auto-detect best model
-# ---------------------------------------------------------------------------
-def _ollama_detect_best_model(host: str = "http://localhost:11434") -> str:
-    """Pick the Ollama model to use when OLLAMA_MODEL is unset.
-
-    OLLAMA_DEFAULT_MODEL if it is pulled, otherwise the largest pulled chat
-    model. OLLAMA_DEFAULT_MODEL if nothing is pulled or Ollama is down.
-    """
-    models = list_ollama_models(host)
-    if not models:
-        return OLLAMA_DEFAULT_MODEL
-    best = choose_default(models)
-    size = next((m["params_b"] for m in models if m["name"] == best), 0.0)
-    print(f"[ollama] Auto-detected best model: {best} ({size:.1f}B params)")
-    return best
-
-
-# ---------------------------------------------------------------------------
 # Ollama startup probe (performance measurement)
 # ---------------------------------------------------------------------------
 def ollama_probe_performance(host: str = None, model: str = None) -> dict:
@@ -115,7 +97,7 @@ def ollama_probe_performance(host: str = None, model: str = None) -> dict:
     Returns dict with: reachable, tokens_per_second, model, model_size_b
     """
     host = host or OLLAMA_HOST
-    model = model or OLLAMA_MODEL or _ollama_detect_best_model(host)
+    model = model or _resolve_ollama_model()
 
     probe_prompt = "Count from 1 to 20, one number per line."
     url = f"{host}/api/generate"
@@ -183,37 +165,42 @@ def _get_model_size(host: str, model_name: str) -> float:
     return 0.0
 
 
-# Ollama model resolution is lazy (see _resolve_ollama_model below), not
-# eager at import time. Previously this block ran unconditionally for every
-# process regardless of which provider was actually selected: a network
-# probe to the local Ollama server (bounded by a 5s timeout, but still a
-# latent hang on every single run - Known Issue #17) and a cosmetic
-# "[ollama] Auto-detected..." print that fired even on a Qwen SR run that
-# never touches Ollama (Known Issue #6).
-_OLLAMA_MODEL_RESOLVED: str | None = None
-
-
+# Ollama model rule (Session 33): OLLAMA_MODEL from .env, otherwise
+# OLLAMA_DEFAULT_MODEL. No auto-detection and no silent switching: if that
+# model is not pulled, the call fails with a 404 and the error message below
+# tells the user what to run. Read at call time so tests can monkeypatch it.
 def _resolve_ollama_model() -> str:
-    """Return the Ollama model to use, auto-detecting on first real use only."""
-    global _OLLAMA_MODEL_RESOLVED
-    if OLLAMA_MODEL:
-        return OLLAMA_MODEL
-    if _OLLAMA_MODEL_RESOLVED is None:
-        try:
-            _OLLAMA_MODEL_RESOLVED = _ollama_detect_best_model(OLLAMA_HOST)
-        except Exception:
-            _OLLAMA_MODEL_RESOLVED = OLLAMA_DEFAULT_MODEL
-    return _OLLAMA_MODEL_RESOLVED
+    """Return the Ollama model to use: OLLAMA_MODEL, else OLLAMA_DEFAULT_MODEL."""
+    return OLLAMA_MODEL.strip() or OLLAMA_DEFAULT_MODEL
 
 
 # ---------------------------------------------------------------------------
 # Provider functions
 # ---------------------------------------------------------------------------
+def _user_content(prompt: str, images: list[bytes] | None = None):
+    """Plain prompt, or OpenAI-style parts: one image_url per page, then the prompt.
+
+    Used by OpenAI and Qwen (DashScope is OpenAI-compatible); same format as
+    SR's _call_vision_api. No images -> the plain string, so text calls are
+    unchanged.
+    """
+    if not images:
+        return prompt
+    import base64
+    parts = [{"type": "image_url",
+              "image_url": {"url": "data:image/png;base64,"
+                            + base64.b64encode(img).decode("ascii")}}
+             for img in images]
+    parts.append({"type": "text", "text": prompt})
+    return parts
+
 def call_openai_provider(
     prompt: str,
     model: str | None = None,
     max_tokens: int = 8192,
+    images: list[bytes] | None = None,
 ) -> str:
+
     """Send a prompt to the OpenAI chat completions endpoint."""
     if not OPENAI_API_KEY:
         raise RuntimeError("OPENAI_API_KEY is not set. Add it to your .env file.")
@@ -221,7 +208,7 @@ def call_openai_provider(
     url = "https://api.openai.com/v1/chat/completions"
     payload = json.dumps({
         "model": model,
-        "messages": [{"role": "user", "content": prompt}],
+        "messages": [{"role": "user", "content": _user_content(prompt, images)}],
         "max_tokens": max_tokens,
     }).encode()
     req = urllib.request.Request(
@@ -282,15 +269,35 @@ def call_anthropic_provider(
         raise RuntimeError(f"Anthropic connection error: {exc.reason}") from exc
 
 
+def ollama_model_missing_message(model: str) -> str:
+    """Plain-language fix when Ollama answers 404 (model not pulled yet).
+
+    Shared by the Ollama call here and streaming._stream_ollama, so the
+    wording cannot drift apart.
+    """
+    return (
+        f"The local AI model '{model}' is not installed yet.\n"
+        f"Open a terminal and run:  ollama pull {model}\n"
+        f"(or launcher menu 10 Setup -> 2 Local AI -> 2 Pull a new model)\n"
+        f"Then start the app again."
+    )
+
+
 def call_ollama_provider(
     prompt: str,
     model: str | None = None,
     max_tokens: int = 8192,
+    images: list[bytes] | None = None,
 ) -> str:
-    """Send a prompt to the local Ollama generate endpoint."""
+    """Send a prompt to the local Ollama generate endpoint.
+
+    images: optional list of PNG bytes (OCR). They are sent base64-encoded in
+    the "images" field. Text-only calls send no "images" key at all, so their
+    request is unchanged. See tests/test_ollama_images.py.
+    """
     model = model or _resolve_ollama_model()
     url = f"{OLLAMA_HOST}/api/generate"
-    payload = json.dumps({
+    body = {
         "model": model,
         "prompt": prompt,
         "stream": False,
@@ -302,7 +309,11 @@ def call_ollama_provider(
             "top_p": 0.9,
             "repeat_penalty": 1.1,
         },
-    }).encode()
+    }
+    if images:
+        import base64
+        body["images"] = [base64.b64encode(img).decode("ascii") for img in images]
+    payload = json.dumps(body).encode()
     req = urllib.request.Request(
         url, data=payload,
         headers={"Content-Type": "application/json"},
@@ -320,11 +331,7 @@ def call_ollama_provider(
         # instead of "HTTP error 404: Not Found", which means nothing to a
         # non-technical user on their first run.
         if exc.code == 404:
-            raise RuntimeError(
-                f"The local AI model '{model}' is not installed yet.\n"
-                f"Open a terminal and run:  ollama pull {model}\n"
-                f"Then start the app again."
-            ) from exc
+            raise RuntimeError(ollama_model_missing_message(model)) from exc
         raise RuntimeError(f"Ollama HTTP error {exc.code}: {exc.reason}") from exc
     except urllib.error.URLError as exc:
         # Connection refused = Ollama app isn't running.
@@ -417,15 +424,16 @@ def call_qwen_provider(
     prompt: str,
     model: str | None = None,
     max_tokens: int = 8192,
+    images: list[bytes] | None = None,
 ) -> str:
     """Send a prompt to Alibaba Cloud Model Studio (Qwen) via OpenAI-compatible API."""
     if not DASHSCOPE_API_KEY:
         raise RuntimeError("DASHSCOPE_API_KEY is not set. Add it to your .env file.")
-    model = model or QWEN_MODEL
+    model = model or (QWEN_VISION_MODEL if images else QWEN_MODEL)
     url = f"{DASHSCOPE_BASE_URL.rstrip('/')}/chat/completions"
     payload = json.dumps({
         "model": model,
-        "messages": [{"role": "user", "content": prompt}],
+        "messages": [{"role": "user", "content": _user_content(prompt, images)}],
         "max_tokens": max_tokens,
         "stream": False,
         "enable_thinking": False,
@@ -617,11 +625,11 @@ def validate_provider(provider: str) -> tuple[bool, str]:
 def get_default_model(provider: str) -> str:
     """Return the default model for a given provider.
 
-    For Ollama, this reflects only an explicitly configured OLLAMA_MODEL and
-    deliberately does NOT trigger the network auto-detect probe - callers
-    that just want to list/display provider status shouldn't pay for or
-    wait on a live Ollama query. The real model is resolved lazily on first
-    actual generation call; see _resolve_ollama_model.
+    For Ollama: OLLAMA_MODEL from .env, otherwise OLLAMA_DEFAULT_MODEL
+    (gemma4:e4b). No network call and no auto-detection; if that model is
+    not pulled, the generation call fails with a plain-language message.
+    See _resolve_ollama_model.
+
     """
     defaults = {
         "deepseek": DEEPSEEK_MODEL,
@@ -629,7 +637,7 @@ def get_default_model(provider: str) -> str:
         "anthropic": ANTHROPIC_MODEL,
         "groq": GROQ_MODEL,
         "qwen": QWEN_MODEL,
-        "ollama": OLLAMA_MODEL or "(auto-detected on first use)",
+        "ollama": _resolve_ollama_model(),
     }
     return defaults.get(provider, "")
 

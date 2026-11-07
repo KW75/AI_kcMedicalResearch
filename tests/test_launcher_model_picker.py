@@ -13,12 +13,15 @@ import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
 
-MODELS = [  # what list_ollama_models returns: smallest first
+MODELS = [  # what list_ollama_models returns: smallest first, embeddings included
+    {"name": "nomic-embed-text:latest", "size_gb": 0.3, "params_b": 0.1},
     {"name": "llama3.2:latest", "size_gb": 2.0, "params_b": 3.2},
     {"name": "gemma4:e4b", "size_gb": 6.6, "params_b": 7.5},
     {"name": "qwen3:8b", "size_gb": 5.2, "params_b": 8.2},
     {"name": "qwen2.5:14b-instruct", "size_gb": 9.0, "params_b": 14.8},
 ]
+CHAT = [m for m in MODELS if "embed" not in m["name"]]
+NO_DEFAULT = [m for m in MODELS if m["name"] != "gemma4:e4b"]
 
 
 @pytest.fixture(scope="module")
@@ -32,7 +35,18 @@ def launcher():
     return mod
 
 
+@pytest.fixture(autouse=True)
+def env_path(launcher, tmp_path, monkeypatch):
+    """Every test reads a temp .env (absent unless written), never the real one."""
+    path = tmp_path / ".env"
+    monkeypatch.setattr(launcher, "ENV_FILE", path)
+    return path
+
+
 def _caps(host, name):
+    """Capabilities as Ollama's /api/show reports them."""
+    if "embed" in name:
+        return {"embedding"}
     return {"completion", "vision"} if name == "gemma4:e4b" else {"completion"}
 
 
@@ -44,34 +58,70 @@ def _pick(launcher, inputs, models=MODELS):
 
 
 class TestPickOllamaModel:
-    def test_enter_picks_default(self, launcher):
+    """Session 33 rule: default = OLLAMA_MODEL in .env, else gemma4:e4b.
+    Only models that can chat (capability 'completion') are offered.
+    No ranks, no pull hints, no silent switch to another model."""
+
+    def test_enter_picks_code_default_when_env_unset(self, launcher):
         chosen, _ = _pick(launcher, [""])
         assert chosen == "gemma4:e4b"
 
+    def test_enter_picks_the_env_default(self, launcher, env_path):
+        env_path.write_text("OLLAMA_MODEL=qwen3:8b\n", encoding="utf-8")
+        chosen, _ = _pick(launcher, [""])
+        assert chosen == "qwen3:8b"
+
+    def test_env_default_is_the_one_marked(self, launcher, env_path, capsys):
+        env_path.write_text("OLLAMA_MODEL=qwen3:8b\n", encoding="utf-8")
+        _pick(launcher, [""])
+        marked = [l for l in capsys.readouterr().out.splitlines() if "(default)" in l]
+        assert len(marked) == 1 and "qwen3:8b" in marked[0]
+
+    def test_embedding_models_are_hidden(self, launcher, capsys):
+        _pick(launcher, [""])
+        assert "nomic-embed-text" not in capsys.readouterr().out
+
     def test_number_picks_that_model(self, launcher):
-        chosen, _ = _pick(launcher, ["3"])
+        chosen, _ = _pick(launcher, ["3"])  # 1 llama3.2, 2 gemma4, 3 qwen3:8b
         assert chosen == "qwen3:8b"
 
     def test_invalid_choice_asks_again(self, launcher):
-        chosen, fake_input = _pick(launcher, ["9", "abc", "2"])
+        chosen, fake_input = _pick(launcher, ["5", "abc", "2"])  # only 4 chat models
         assert chosen == "gemma4:e4b"
         assert fake_input.call_count == 3
+
+    def test_default_not_pulled_is_not_switched(self, launcher, capsys):
+        chosen, _ = _pick(launcher, [""], models=NO_DEFAULT)
+        assert chosen == "gemma4:e4b"
+        out = capsys.readouterr().out
+        assert "not pulled" in out
+        assert "ollama pull gemma4:e4b" in out
 
     def test_ollama_unreachable_returns_empty_without_asking(self, launcher, capsys):
         chosen, fake_input = _pick(launcher, [], models=[])
         assert chosen == ""
         assert fake_input.call_count == 0
-        assert "ollama" in capsys.readouterr().out.lower()
+        out = capsys.readouterr().out
+        assert "Ollama" in out
+        assert "will pick one" not in out  # no auto-detection any more
+        assert "gemma4:e4b" in out
 
-    def test_menu_shows_descriptions_default_and_pull_hints(self, launcher, capsys):
+    def test_only_embedding_models_returns_empty_without_asking(self, launcher, capsys):
+        chosen, fake_input = _pick(launcher, [], models=MODELS[:1])
+        assert chosen == ""
+        assert fake_input.call_count == 0
+        assert "no chat model" in capsys.readouterr().out.lower()
+
+    def test_menu_shows_descriptions_and_no_ranks_or_pull_hints(self, launcher, capsys):
         from ollama_models import describe
         _pick(launcher, [""])
         out = capsys.readouterr().out
-        for m in MODELS:
+        for m in CHAT:
             assert describe(m, _caps(None, m["name"])) in out
         assert "(default)" in out
-        assert "ollama pull qwen3:4b" in out
-        assert "ollama pull granite3.3:latest" in out
+        assert "Ranks:" not in out
+        assert "comparison" not in out
+        assert "ollama pull" not in out
 
 
 class TestPickProviderWiring:

@@ -194,24 +194,12 @@ class TestMainSessionManagement:
 class TestMainProviderCalls:
     """Test provider call functions - skip real API calls."""
 
-    @pytest.mark.skip(reason="Requires Ollama to be running and may make real API calls")
-    def test_call_ollama_provider(self):
-        pass
-
-    @pytest.mark.skip(reason="Requires Ollama to be running")
-    def test_call_ollama_provider_handles_error(self):
-        pass
-
     @pytest.mark.live
     def test_call_openai_provider_missing_key(self):
         with patch("SOURCE_CODE.main.OPENAI_API_KEY", ""):
             with pytest.raises(RuntimeError) as exc:
                 main.call_openai_provider("Test prompt")
             assert "OPENAI_API_KEY" in str(exc.value)
-
-    @pytest.mark.skip(reason="Requires OpenAI API key and makes real API calls")
-    def test_call_openai_provider_success(self):
-        pass
 
     def test_call_anthropic_provider_missing_key(self):
         # Patch the module where the function actually looks up the variable

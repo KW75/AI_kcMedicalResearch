@@ -26,7 +26,16 @@ def test_fails_loudly_when_no_default(monkeypatch):
         resolve_model("qwen", None)
 
 
-def test_ollama_placeholder_is_not_a_model(monkeypatch):
+def test_ollama_unset_uses_the_default_model(monkeypatch):
+    """Session 33 rule: OLLAMA_MODEL unset -> OLLAMA_DEFAULT_MODEL (gemma4:e4b).
+
+    The old '(auto-detected on first use)' placeholder is gone, so Ollama
+    always has a real model name and resolve_model never stops for it.
+    """
     monkeypatch.setattr(providers, "OLLAMA_MODEL", "")
-    with pytest.raises(SystemExit, match="OLLAMA_MODEL"):
-        resolve_model("ollama", None)
+    assert resolve_model("ollama", None) == providers.OLLAMA_DEFAULT_MODEL
+
+
+def test_ollama_env_model_wins_over_default(monkeypatch):
+    monkeypatch.setattr(providers, "OLLAMA_MODEL", "qwen3:8b")
+    assert resolve_model("ollama", None) == "qwen3:8b"

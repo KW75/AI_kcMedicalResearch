@@ -66,66 +66,49 @@ class TestProviderCapabilities:
         assert "max_context" in caps
 
 
-class TestOllamaAutoDetect:
-    """Test Ollama model auto-detection."""
+class TestOllamaModelRule:
+    """Session 33: OLLAMA_MODEL from .env if set, otherwise gemma4:e4b.
+    No auto-detect, no network probe, no silent switch to another model."""
 
-    def test_selects_largest_non_embedding(self):
-        from providers import _ollama_detect_best_model
-        mock_response = json.dumps({
-            "models": [
-                {"name": "qwen3.6:latest", "details": {"parameter_size": "36.0B"}},
-                {"name": "llama3.2:latest", "details": {"parameter_size": "3.2B"}},
-                {"name": "nomic-embed-text:latest", "details": {"parameter_size": "137M"}},
-            ]
-        }).encode()
+    def test_env_model_wins(self, monkeypatch):
+        import providers
+        monkeypatch.setattr(providers, "OLLAMA_MODEL", "qwen3:8b")
+        assert providers._resolve_ollama_model() == "qwen3:8b"
 
-        mock_resp = MagicMock()
-        mock_resp.read.return_value = mock_response
-        mock_resp.__enter__ = lambda s: s
-        mock_resp.__exit__ = MagicMock(return_value=False)
+    def test_unset_uses_default(self, monkeypatch):
+        import providers
+        monkeypatch.setattr(providers, "OLLAMA_MODEL", "")
+        assert providers._resolve_ollama_model() == "gemma4:e4b"
 
-        with patch("urllib.request.urlopen", return_value=mock_resp):
-            result = _ollama_detect_best_model("http://localhost:11434")
-        assert result == "qwen3.6:latest"
+    def test_resolving_never_contacts_ollama(self, monkeypatch):
+        import providers
+        calls = []
 
-    def test_skips_embedding_models(self):
-        from providers import _ollama_detect_best_model
-        mock_response = json.dumps({
-            "models": [
-                {"name": "nomic-embed-text:latest", "details": {"parameter_size": "137M"}},
-                {"name": "all-minilm:latest", "details": {"parameter_size": "33M"}},
-                {"name": "llama3.2:latest", "details": {"parameter_size": "3.2B"}},
-            ]
-        }).encode()
+        def fake_urlopen(*args, **kwargs):
+            calls.append(args)
+            raise OSError("refused")
 
-        mock_resp = MagicMock()
-        mock_resp.read.return_value = mock_response
-        mock_resp.__enter__ = lambda s: s
-        mock_resp.__exit__ = MagicMock(return_value=False)
+        monkeypatch.setattr(providers, "OLLAMA_MODEL", "")
+        monkeypatch.setattr(providers, "_OLLAMA_MODEL_RESOLVED", None, raising=False)
+        with patch("urllib.request.urlopen", side_effect=fake_urlopen):
+            assert providers._resolve_ollama_model() == providers.OLLAMA_DEFAULT_MODEL
+        assert calls == []
 
-        with patch("urllib.request.urlopen", return_value=mock_resp):
-            result = _ollama_detect_best_model("http://localhost:11434")
-        assert result == "llama3.2:latest"
+    def test_auto_detect_is_gone(self):
+        import providers
+        assert not hasattr(providers, "_ollama_detect_best_model")
+        assert not hasattr(providers, "_OLLAMA_MODEL_RESOLVED")
+        src = (Path(__file__).resolve().parent.parent
+               / "SOURCE_CODE" / "providers.py").read_text(encoding="utf-8")
+        assert "_ollama_detect_best_model" not in src
+        assert "Auto-detected" not in src
 
-   
-    def test_empty_models_returns_default(self):
-        from providers import _ollama_detect_best_model, OLLAMA_DEFAULT_MODEL
-        mock_response = json.dumps({"models": []}).encode()
-
-        mock_resp = MagicMock()
-        mock_resp.read.return_value = mock_response
-        mock_resp.__enter__ = lambda s: s
-        mock_resp.__exit__ = MagicMock(return_value=False)
-
-        with patch("urllib.request.urlopen", return_value=mock_resp):
-            result = _ollama_detect_best_model("http://localhost:11434")
-        assert result == OLLAMA_DEFAULT_MODEL
-
-    def test_connection_failure_returns_default(self):
-        from providers import _ollama_detect_best_model, OLLAMA_DEFAULT_MODEL
-        with patch("urllib.request.urlopen", side_effect=Exception("timeout")):
-            result = _ollama_detect_best_model("http://localhost:11434")
-        assert result == OLLAMA_DEFAULT_MODEL
+    def test_get_default_model_shows_the_real_model(self, monkeypatch):
+        import providers
+        monkeypatch.setattr(providers, "OLLAMA_MODEL", "")
+        assert providers.get_default_model("ollama") == "gemma4:e4b"
+        monkeypatch.setattr(providers, "OLLAMA_MODEL", "qwen3:8b")
+        assert providers.get_default_model("ollama") == "qwen3:8b"
 
     def test_docs_name_the_same_default_model_as_code(self):
         """README and .env.example must recommend the model the code falls back to.

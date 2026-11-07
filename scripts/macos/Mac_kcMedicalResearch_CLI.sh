@@ -12,7 +12,6 @@ PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$PROJECT_DIR"
 
 PY="$PROJECT_DIR/.venv/bin/python"
-PIP="$PROJECT_DIR/.venv/bin/pip"
 LAUNCHER="$PROJECT_DIR/scripts/launcher.py"
 
 echo ""
@@ -39,6 +38,58 @@ show_install_message() {
     read -r -p "  Press Enter to close..."
 }
 
+# --- MOVED FOLDER? -----------------------------------------------------------
+# pip and the other console scripts in .venv store the absolute path of the
+# folder the venv was built in. After the app folder is moved or renamed they
+# fail. pyvenv.cfg's "command" line records where the venv was built; if it
+# is not this folder, offer a rebuild. The old tree is kept as .venv.old
+# until the new one installs.
+REBUILT=""
+
+restore_old_venv() {
+    if [ -n "$REBUILT" ]; then
+        rm -rf "$PROJECT_DIR/.venv"
+        mv "$PROJECT_DIR/.venv.old" "$PROJECT_DIR/.venv" \
+            && echo "  Your previous app environment was restored."
+    fi
+}
+
+CFG="$PROJECT_DIR/.venv/pyvenv.cfg"
+if [ -f "$CFG" ]; then
+    VENV_CMD="$(grep -i '^command *=' "$CFG" | head -n 1)"
+    if [ -n "$VENV_CMD" ]; then
+        case "$VENV_CMD" in
+            *"$PROJECT_DIR/.venv"*) ;;
+            *)
+                echo "  ------------------------------------------------------------"
+                echo "   This app folder was moved since setup."
+                echo "   The app environment was built in: ${VENV_CMD##*-m venv }"
+                echo "   Tools such as pip and pytest will not start until it is rebuilt."
+                echo "  ------------------------------------------------------------"
+                if [ -e "$PROJECT_DIR/.venv.old" ]; then
+                    echo "  A previous rebuild left the folder .venv.old behind."
+                    echo "  Delete .venv.old, or rename it back to .venv, then start again."
+                    read -r -p "  Press Enter to close..."
+                    exit 1
+                fi
+                ANS=""
+                read -r -p "  Rebuild the app environment now? [Y/n] " ANS
+                case "$ANS" in
+                    [nN]|[nN][oO]) ;;
+                    *)
+                        mv "$PROJECT_DIR/.venv" "$PROJECT_DIR/.venv.old" || {
+                            echo "  [ERROR] Could not rename .venv. Close other windows using it, then try again."
+                            read -r -p "  Press Enter to close..."
+                            exit 1
+                        }
+                        REBUILT=1
+                        ;;
+                esac
+                ;;
+        esac
+    fi
+fi
+
 # --- CHECK / CREATE .venv ----------------------------------------------------
 if [ ! -x "$PY" ]; then
     # Find a genuine python.org / non-conda Python 3.11.
@@ -57,23 +108,34 @@ if [ ! -x "$PY" ]; then
     done
 
     if [ -z "$PYBIN" ]; then
+        restore_old_venv
         show_install_message
         exit 1
     fi
 
     echo "  Using Python: $PYBIN"
     echo ""
-    "$PYBIN" -m venv .venv || { echo "  [ERROR] Could not create the app environment."; read -r -p "  Press Enter to close..."; exit 1; }
+    if ! "$PYBIN" -m venv .venv; then
+        echo "  [ERROR] Could not create the app environment."
+        restore_old_venv
+        read -r -p "  Press Enter to close..."
+        exit 1
+    fi
 
     echo "  Setting up, please wait - this can take a few minutes."
     echo "  The screen may look frozen. That is normal - do NOT close this window."
     echo ""
-    "$PIP" install --upgrade pip
-    if ! "$PIP" install -r requirements-local.txt; then
+    "$PY" -m pip install --upgrade pip
+    if ! "$PY" -m pip install -r requirements-local.txt; then
         echo ""
         echo "  [ERROR] Could not install the app's components."
+        restore_old_venv
         show_install_message
         exit 1
+    fi
+    if [ -n "$REBUILT" ]; then
+        rm -rf "$PROJECT_DIR/.venv.old"
+        echo "  Old app environment removed."
     fi
     echo ""
     echo "  Setup complete."
