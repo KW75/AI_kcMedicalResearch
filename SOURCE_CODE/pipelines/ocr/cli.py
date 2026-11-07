@@ -41,8 +41,8 @@ def _pick(options: list, answer: str):
     return None
 
 
-def _report(result: dict, out_dir: Path, log) -> None:
-    log(f"Done: {len(result['records'])} record(s) in {out_dir / 'records'}")
+def _report(result: dict, rep_dir: Path, log) -> None:
+    log(f"Done: {len(result['records'])} record(s) in {rep_dir / result['header']}")
     for name, err in result["failed"]:
         log(f"  Could not read {name}: {err}")
     if result["summary"]:
@@ -60,6 +60,8 @@ def run(base_dir, model=None, *, input_fn=input, list_fn=None, caps_fn=None,
     run_set = run_set or engine.run_set
     in_dir = Path(base_dir) / "input" / "ocr"
     out_dir = Path(base_dir) / "output" / "ocr"
+    rep_dir = Path(base_dir) / "reports" / "ocr"
+
 
     files = reader.list_inputs(in_dir)
     if not files:
@@ -110,8 +112,10 @@ def run(base_dir, model=None, *, input_fn=input, list_fn=None, caps_fn=None,
 
     log(f"Model: {model}. Output: {out_dir}")
     if len(files) == 1:
-        result = run_single(files[0], out_dir, name, model, log=log)
+        result = run_single(files[0], out_dir, name, model, log=log,
+                            records_root=rep_dir)
     else:
-        result = run_set(in_dir, out_dir, name, model, log=log)
-    _report(result, out_dir, log)
+        result = run_set(in_dir, out_dir, name, model, log=log,
+                         records_root=rep_dir)
+    _report(result, rep_dir, log)
     return result

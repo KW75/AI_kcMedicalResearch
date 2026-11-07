@@ -29,13 +29,16 @@ def fake_caps(host, name):
 class FakeEngine:
     def __init__(self):
         self.calls = []
+        self.roots = []
 
-    def single(self, path, out_dir, name, model, log=print):
+    def single(self, path, out_dir, name, model, log=print, records_root=None):
         self.calls.append(("single", path, out_dir, name, model))
+        self.roots.append(records_root)
         return {"header": "H", "records": [path.name], "failed": [], "summary": None}
 
-    def set(self, folder, out_dir, name, model, log=print):
+    def set(self, folder, out_dir, name, model, log=print, records_root=None):
         self.calls.append(("set", folder, out_dir, name, model))
+        self.roots.append(records_root)
         return {"header": "H", "records": [], "failed": [], "summary": None}
 
 
@@ -157,3 +160,10 @@ def test_run_cli_stops_cloud_ocr_with_the_message(capsys):
     with pytest.raises(SystemExit):
         main.run_cli(main.parse_args(["--mode", "ocr", "--provider", "openai"]))
     assert main.ocr_provider_error("ocr", "openai") in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("files", [("only.pdf",), ("a.pdf", "b.png")])
+def test_records_go_to_reports_ocr(tmp_path, monkeypatch, files):
+    monkeypatch.delenv("OLLAMA_MODEL", raising=False)
+    eng, _ = _run(tmp_path, ["Test scan", ""], files=files)
+    assert eng.roots == [tmp_path / "reports" / "ocr"]
