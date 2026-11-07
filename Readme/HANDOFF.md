@@ -1468,3 +1468,7 @@ Expected: a clean tree in sync with origin, the top commit is this handoff, and 
   utils/document_reader.py sends .doc to textract (not in requirements);
   a bare except then falls back to _extract_with_alternative, which may give
   garbled text silently. OCR refuses .doc ("save it as .docx").
+- DONE OCR banner TODO: [CLOUD] banner (main.py) and the no-local-model
+  cloud offer (cli.py) now say page images AND the text of your documents
+  leave the machine (the cloud AI also writes the summary).
+  tests/test_ocr_cli.py: one assert added (failed first). Suite still 924.

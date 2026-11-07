@@ -169,6 +169,7 @@ def test_ocr_cloud_banner_says_page_images_leave_the_machine(capsys):
     out = capsys.readouterr().out.lower()
     assert ok is False
     assert "page images" in out
+    assert "and the text of your documents" in out
     assert "deepseek" not in out
 
 

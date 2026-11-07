@@ -489,7 +489,8 @@ def confirm_data_destinations(
     if services:
         print(f"        Search terms are also sent to: {', '.join(services)}.")
     if mode == "ocr":
-        print("        For OCR this means page images of your documents.")
+        print("        For OCR this means page images and the text of your documents")
+        print("        (the cloud AI also writes the summary).")
     print("        Do not use for patient-identifiable or confidential data.")
     if confirm_cloud:
         print("        Confirmed in advance with --confirm-cloud.")

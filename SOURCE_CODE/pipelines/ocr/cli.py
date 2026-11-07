@@ -79,8 +79,9 @@ def _cloud_model(provider: str, model):
 
 def _offer_cloud(choices, confirm, input_fn, log):
     """No local vision model: offer a cloud provider. None = not run."""
-    log("A cloud AI can read the pages instead, but page images of your "
-        "documents will leave this machine.")
+    log("A cloud AI can read the pages instead, but page images and the "
+        "text of your documents will leave this machine (the cloud AI also "
+        "writes the summary).")
     for i, p in enumerate(choices, start=1):
         log(f"  {i}. {p}")
     answer = input_fn("Cloud provider number (Enter = cancel): ").strip()
