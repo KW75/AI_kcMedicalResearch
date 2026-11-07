@@ -1298,3 +1298,42 @@ Expected: a clean tree in sync with origin, the top commit is this handoff, and 
   unicode minus/dash signs now match (#68, _number_in_text lines 1144-1145);
   thousands separators still miss (1234 vs 1,234 or 1 234), since [.,] is only
   allowed when the value has a decimal point (line 1156). Docs only.
+  
+### OCR design (agreed Session 35, not built yet)
+- `--mode ocr`, launcher menu 8. Both functions use the same flow:
+  OCR -> record (summary of the file at the top + full OCR text below) in
+  output/ocr/records/ -> summary output in output/ocr/.
+  1 Single file: choose one file from input/ocr/. Record saved to
+    output/ocr/records/; that file's summary saved to output/ocr/.
+  2 Document set: every file in input/ocr/ (any stack of documents, e.g.
+    patient records or lecture notes). One record per file in
+    output/ocr/records/; then one synopsis built from the per-file summaries
+    (not the full texts, so more files fit locally) saved to output/ocr/.
+    Each synopsis point names its source file. Records are kept if the
+    synopsis fails.
+- Records: one heading per page ("Page 3") in the full-text part.
+  All outputs are .docx + .md.
+- Names: the user types a short name (e.g. PT0123, Cardio_lectures); the app
+  adds the date: records <name>_<YYYY-MM-DD>_<original>.docx; output
+  <name>_<date>_SUMMARY.docx (function 1) or <name>_<date>_SYNOPSIS.docx
+  (function 2). Enter = OCR_<date>_<time>. Advise against real patient names
+  in file names.
+- Input from input/ocr/: .pdf, .jpg, .jpeg, .png, .tif, .tiff, .bmp, .gif,
+  .webp (.docx also read as text in a set). Images are converted to PNG before
+  sending to the model. PDF pages with a text layer are read directly (no AI);
+  only pages without text go to the model. pymupdf renders pages, pillow reads
+  images (both in requirements-local.txt). Input files are never moved.
+  Later option: .heic (needs pillow-heif, a new package).
+- Providers: same routine as other pipelines. Ollama default; cloud only per
+  job behind the consent warning. Like SR: only the chosen provider (no
+  FALLBACK_PROVIDERS chain), DeepSeek blocked (no image input).
+- Models: any pulled Ollama model whose /api/show capabilities include
+  `vision` (gemma4:e4b confirmed: completion, vision, audio, tools, thinking).
+  No fixed model list, so larger vision models on newer hardware work with no
+  code change. The list shows sizes. No vision model -> stop before the job,
+  point to Setup -> Local AI -> Pull a new model. qwen3:8b and
+  qwen2.5:14b-instruct are text-only.
+- Synopsis size limit on Ollama: decide when building (app sends
+  num_ctx 32768; gemma4:e4b supports 131072).
+- Later: amend the SR pipeline to use the same vision-capability check for
+  Ollama instead of blocking all Ollama models.
