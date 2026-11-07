@@ -48,7 +48,7 @@ so those catches happen at session open, not mid-work.
 |----------------|--------|
 | Tests          | 845 passed, 10 deselected on v2.6-ocr-editor; 816 on main (`python -m pytest -m "not live" --tb=short -q`) |
 | Branch         | main = fa4edb9 (PR #3). v2.6-ocr-editor is 15 commits ahead (Sessions 33-34: Setup menu, Streamlit/Render removal, Ollama model rule, httpx pin, moved-folder launcher check); no PR opened yet. Version stays 2.5.0; bump to 2.6.0 after OCR is merged |
-| CI             | green on draft PR #4 (842 passed, 10 deselected, 44 warnings). Runs only on push to main and PRs to main (ci.yml lines 4-7). CI installs requirements-ci.txt, not requirements-local.txt (the file both launchers install) |
+| CI             | green on draft PR #4, both jobs: test (requirements-ci.txt, 845 passed, 44 warnings) and test-local-pins (requirements-local.txt like the launchers, 845 passed, 57 warnings). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
 | Deploy         | None: CLI only, local first. Render service deleted 2026-10-27; Streamlit UI and Render files removed in Session 33. UptimeRobot monitor: confirm paused/deleted |
 | Writing mode   | one-pass (write + edit + review in one call); tracks Topic 800 / Article 3,500 / Report 500 / Synopsis 1,500; on main since fa4edb9; tested on gemma4:e4b; terminal menus only |
 | SR pipeline    | working via CLI with Qwen; Ang 2010 verified against PDF (NFR week 6, unanimous N=3); text-fallback drops now surface in Stage 4 `[SKIP]` block |
@@ -1292,3 +1292,6 @@ Expected: a clean tree in sync with origin, the top commit is this handoff, and 
   runs pip check, logs pip freeze, then the not-live suite. No pysqlite3-binary
   (colleagues never get it). tests/test_ci_matches_launchers.py (3; 2 failed
   first) pins that a CI job installs the launchers' file. Suite: 842 -> 845.
+- CI on d7f11f1 (PR #4): both jobs green, 845 passed. test-local-pins shows
+  57 warnings vs 44 (older pinned versions; not failing, look when convenient).
+
