@@ -2487,7 +2487,11 @@ def run_cli(args: argparse.Namespace) -> None:
         )
     elif args.mode == "ocr":
         from pipelines.ocr import cli as ocr_cli
-        ocr_cli.run(BASE_DIR, model=args.model)
+        ocr_cli.run(
+            BASE_DIR, model=args.model, provider=args.provider,
+            confirm=lambda p: confirm_data_destinations(
+                "ocr", p, confirm_cloud=args.confirm_cloud),
+        )
     elif args.mode == "appraisal":
         handle_appraisal_mode(
             provider=args.provider,

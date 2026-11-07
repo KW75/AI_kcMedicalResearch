@@ -4,9 +4,18 @@ input/ocr/ decides what runs:
   one file      -> function 1: record + <header>_SUMMARY
   several files -> function 2: every file -> one record each + <header>_SYNOPSIS
 Then two questions: scan title/name (header of the output files) and the
-vision model. Checks that need no typing (input files present, a vision
-model pulled, --model can read images) run first, so a job that cannot run
-never asks a question. Ollama only for now; main.py stops cloud providers.
+vision model. Checks that need no typing run first, so a job that cannot run
+never asks a question.
+
+Which AI reads the page images:
+- --provider ollama (default): a pulled local model with 'vision'.
+- --provider qwen / openai: cloud. run_cli in main.py has already shown the
+  [CLOUD] banner and got consent, so Ollama is not asked.
+- ollama with no local vision model: offers qwen/openai (only those with an
+  API key set). Runs only if confirm(provider) says yes ([CLOUD] banner +
+  typed "y"). Enter cancels.
+The AI note in every output file names the model, plus "(provider, cloud)"
+when the pages left this machine.
 """
 from __future__ import annotations
 
@@ -16,6 +25,7 @@ from pathlib import Path
 from . import engine, reader
 
 DEFAULT_VISION_MODEL = "gemma4:e4b"
+CLOUD_KEYS = {"qwen": "DASHSCOPE_API_KEY", "openai": "OPENAI_API_KEY"}
 
 
 def vision_models(list_fn, caps_fn, host=None) -> list[dict]:
@@ -52,19 +62,50 @@ def _report(result: dict, rep_dir: Path, log) -> None:
         log(f"Summary file: {result['summary'][0]}")
 
 
-def run(base_dir, model=None, *, input_fn=input, list_fn=None, caps_fn=None,
+def _cloud_choices() -> list[str]:
+    """Cloud providers that can read images and have an API key set."""
+    return [p for p, key in CLOUD_KEYS.items() if os.getenv(key, "").strip()]
+
+
+def _cloud_model(provider: str, model):
+    """The cloud model that will read the pages (named in the AI note)."""
+    if model:
+        return model
+    import providers  # lazy
+    if provider == "qwen":
+        return providers.QWEN_VISION_MODEL
+    return providers.get_default_model(provider) or None
+
+
+def _offer_cloud(choices, confirm, input_fn, log):
+    """No local vision model: offer a cloud provider. None = not run."""
+    log("A cloud AI can read the pages instead, but page images of your "
+        "documents will leave this machine.")
+    for i, p in enumerate(choices, start=1):
+        log(f"  {i}. {p}")
+    answer = input_fn("Cloud provider number (Enter = cancel): ").strip()
+    if not answer:
+        log("Cancelled. Job not run.")
+        return None
+    provider = _pick(choices, answer)
+    if provider is None:
+        log("Not a valid number. Job not run.")
+        return None
+    if not confirm(provider):
+        log("Cloud not confirmed. Job not run.")
+        return None
+    return provider
+
+
+def run(base_dir, model=None, *, provider="ollama", confirm=None,
+        input_fn=input, list_fn=None, caps_fn=None,
         run_single=None, run_set=None, log=print):
     """Ask the questions, run the engine, return its result (None = not run)."""
-    if list_fn is None or caps_fn is None:
-        import ollama_models  # lazy: tests pass fakes
-        list_fn = list_fn or ollama_models.list_ollama_models
-        caps_fn = caps_fn or ollama_models.model_capabilities
     run_single = run_single or engine.run_single
     run_set = run_set or engine.run_set
     in_dir = Path(base_dir) / "input" / "ocr"
     out_dir = Path(base_dir) / "output" / "ocr"
     rep_dir = Path(base_dir) / "reports" / "ocr"
-
 
     files = reader.list_inputs(in_dir)
     if not files:
@@ -72,20 +113,35 @@ def run(base_dir, model=None, *, input_fn=input, list_fn=None, caps_fn=None,
             f"{', '.join(sorted(reader.SUPPORTED_EXTS))}. Job not run.")
         return None
 
+    cloud = provider in CLOUD_KEYS
     models = None
-    if model:
-        if "vision" not in caps_fn(None, model):
-            log(f"Model {model} cannot read images (no 'vision' capability) "
-                f"or is not pulled. Use a vision model, e.g. "
-                f"{DEFAULT_VISION_MODEL}. Job not run.")
-            return None
-    else:
-        models = vision_models(list_fn, caps_fn)
-        if not models:
-            log(f"No pulled Ollama model can read images. Run: ollama pull "
-                f"{DEFAULT_VISION_MODEL}  (other vision models: "
-                f"https://ollama.com/search?c=vision). Job not run.")
-            return None
+    if not cloud:
+        if list_fn is None or caps_fn is None:
+            import ollama_models  # lazy: tests pass fakes
+            list_fn = list_fn or ollama_models.list_ollama_models
+            caps_fn = caps_fn or ollama_models.model_capabilities
+        if model:
+            if "vision" not in caps_fn(None, model):
+                log(f"Model {model} cannot read images (no 'vision' capability) "
+                    f"or is not pulled. Use a vision model, e.g. "
+                    f"{DEFAULT_VISION_MODEL}. Job not run.")
+                return None
+        else:
+            models = vision_models(list_fn, caps_fn)
+            if not models:
+                pull = (f"No pulled Ollama model can read images. Run: ollama "
+                        f"pull {DEFAULT_VISION_MODEL}  (other vision models: "
+                        f"https://ollama.com/search?c=vision).")
+                choices = _cloud_choices() if confirm else []
+                if not choices:
+                    log(pull + " Job not run.")
+                    return None
+                log(pull)
+                provider = _offer_cloud(choices, confirm, input_fn, log)
+                if provider is None:
+                    return None
+                cloud = True
+                models = None
 
     if len(files) == 1:
         log(f"1 file: {files[0].name} -> record + SUMMARY")
@@ -97,7 +153,7 @@ def run(base_dir, model=None, *, input_fn=input, list_fn=None, caps_fn=None,
     name = input_fn("Scan title/name (header of the output files; "
                     "Enter = OCR_<date>_<time>): ").strip()
 
-    if models is not None:
+    if models:
         names = [m["name"] for m in models]
         default = _default_model(names)
         for i, m in enumerate(models, start=1):
@@ -113,12 +169,19 @@ def run(base_dir, model=None, *, input_fn=input, list_fn=None, caps_fn=None,
                 return None
             model = picked["name"]
 
-    log(f"Model: {model}. Output: {out_dir}")
+    extra = {}
+    label = model
+    if cloud:
+        real = _cloud_model(provider, model)
+        label = f"{real or 'default model'} ({provider}, cloud)"
+        extra["call"] = engine.cloud_call(provider, real)
+
+    log(f"Model: {label}. Output: {out_dir}")
     if len(files) == 1:
-        result = run_single(files[0], out_dir, name, model, log=log,
-                            records_root=rep_dir)
+        result = run_single(files[0], out_dir, name, label, log=log,
+                            records_root=rep_dir, **extra)
     else:
-        result = run_set(in_dir, out_dir, name, model, log=log,
-                         records_root=rep_dir)
+        result = run_set(in_dir, out_dir, name, label, log=log,
+                         records_root=rep_dir, **extra)
     _report(result, rep_dir, log)
     return result

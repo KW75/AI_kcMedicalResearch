@@ -45,6 +45,17 @@ def ollama_call(model: str):
     return _call
 
 
+def cloud_call(provider: str, model):
+    """Cloud AI (qwen/openai) for OCR, used only after the user agreed.
+    Page images go as image_url parts (providers._user_content)."""
+    def _call(prompt, images=None):
+        import providers  # lazy
+        fn = {"qwen": providers.call_qwen_provider,
+              "openai": providers.call_openai_provider}[provider]
+        return fn(prompt, model=model, images=images)
+    return _call
+
+
 def _header_taken(header: str, out_dir, records_root) -> bool:
     if records_root is not None and (Path(records_root) / header).exists():
         return True
