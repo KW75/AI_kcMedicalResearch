@@ -46,7 +46,7 @@ so those catches happen at session open, not mid-work.
 
 | Component      | Status |
 |----------------|--------|
-| Tests          | 861 passed, 10 deselected on v2.6-ocr-editor; 816 on main (`python -m pytest -m "not live" --tb=short -q`) |
+| Tests          | 870 passed, 10 deselected on v2.6-ocr-editor; 816 on main (`python -m pytest -m "not live" --tb=short -q`) |
 | Branch         | main = fa4edb9 (PR #3). v2.6-ocr-editor = Sessions 33-35 work, open as draft PR #4 (Setup menu, Streamlit/Render removal, Ollama model rule, httpx pin, moved-folder launcher check, SR Anthropic warning, test-local-pins CI job). Do not merge until OCR is done. Version stays 2.5.0; bump to 2.6.0 after OCR is merged |
 | CI             | green on draft PR #4, both jobs: test (requirements-ci.txt, 845 passed, 44 warnings) and test-local-pins (requirements-local.txt like the launchers, 845 passed, 57 warnings). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
 | Deploy         | None: CLI only, local first. Render service deleted 2026-10-27; Streamlit UI and Render files removed in Session 33. UptimeRobot monitor: confirm paused/deleted |
@@ -1351,3 +1351,13 @@ Expected: a clean tree in sync with origin, the top commit is this handoff, and 
   to PNG; multi-page TIFF gives one page per frame. Unsupported -> ValueError.
   tests/test_ocr_reader.py (13; failed first with "No module named
   'pipelines.ocr'"). Suite: 848 -> 861. Not yet: .docx in a set.
+- OCR step 3: pipelines/ocr/output.py writes records and the SUMMARY /
+  SYNOPSIS as .docx + .md. Header = typed name + date (blank ->
+  OCR_<date>_<time>). Record names keep the extension
+  (<header>_<file>_<ext>) so scan01.pdf and scan01.png never clash. OCR text
+  is written verbatim (no markdown-to-Word conversion); every file ends with
+  an AI note naming the model. tests/test_ocr_output.py (9; failed first with
+  "cannot import name 'output'"). Suite: 861 -> 870.
+- OCR design update: inputs also include .txt, .doc and .docx. They are read
+  as text (no AI reading), then summarised like any other file. .doc reading
+  uses pywin32 (Windows only), so check the Mac behaviour. Not built yet.
