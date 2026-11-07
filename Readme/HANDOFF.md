@@ -1394,3 +1394,8 @@ Expected: a clean tree in sync with origin, the top commit is this handoff, and 
   records to reports/ocr/<header>/ and the SUMMARY/SYNOPSIS to output/ocr/.
   "Done" line shows the records folder. tests/test_ocr_cli.py +2 (failed
   first, records_root was None). Suite: 897 -> 899.
+- OCR real-file test (Session 35): --mode ocr --provider ollama with
+  gemma4:e4b works for one file (record + SUMMARY) and several files
+  (records + SYNOPSIS). Records in reports/ocr/<header>/, repeat header
+  gets _2. Still to check: a photo/scan page (AI read path) on real input.
+  Next: .txt/.docx/.doc in a set, then launcher menu 8 (5b).
