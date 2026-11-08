@@ -214,31 +214,86 @@ def fill_symbols(marked: str, answer: str):
     return "".join(out)
 
 
+# --- Per-line fill: only lines with [?] go to the model ----------------------
+# A small model cannot copy back a whole page unchanged, so each line with
+# [?] is sent on its own (numbered, LINES_PER_CALL per call, with the image)
+# and checked on its own by fill_symbols(); a refused line keeps its [?].
+LINES_PROMPT = (
+    "The numbered lines below were copied from the text layer of this page "
+    "image. Their font lost some symbols; each lost symbol is shown as [?]. "
+    "Find each line in the image and write it again with each [?] replaced "
+    "by the symbol printed there (for example ±, =, −, <, >, ≤, ≥, ×, °). "
+    "Keep the line number and change nothing else. Use plain characters, "
+    "not LaTeX. Reply with the numbered lines only, one per line, as: "
+    "number| text"
+)
+LINES_PER_CALL = 15
+
+
+def fill_lines(hint: str, ask):
+    """(text, [?] left, refused): fill [?] line by line; ask(prompt) -> answer.
+
+    refused lists (line, answer line or None) for lines that kept their [?].
+    """
+    import re
+    lines = hint.split("\n")
+    todo = [i for i, line in enumerate(lines) if MARK in line]
+    refused = []
+    for start in range(0, len(todo), LINES_PER_CALL):
+        batch = todo[start:start + LINES_PER_CALL]
+        body = "\n".join(f"{k}| {lines[i]}" for k, i in enumerate(batch, 1))
+        answer = ask(f"{LINES_PROMPT}\n\n{body}") or ""
+        got = {}
+        for row in answer.splitlines():
+            m = re.match(r"^\s*(\d+)\s*[|:.)]\s?(.*)$", row)
+            if m:
+                got.setdefault(int(m.group(1)), m.group(2))
+        if not got and len(batch) == 1:
+            got = {1: answer.strip()}
+        for k, i in enumerate(batch, 1):
+            filled = fill_symbols(lines[i], got.get(k, ""))
+            if filled is None:
+                refused.append((lines[i], got.get(k)))
+            else:
+                lines[i] = filled
+    text = "\n".join(lines)
+    return text, text.count(MARK), refused
+
+
 def _process_file(path: Path, out_dir, header: str, model: str, call, log,
                   rec_dir=None) -> str:
     """Read one file, transcribe image pages, summarise, write the record."""
     done = []
+    debug = []  # (page, line, AI answer) for lines that kept their [?]
     for page in reader.read_input(path):
         if page["text"] is not None:
             done.append({"page": page["page"], "text": page["text"], "method": "text"})
         elif page.get("hint"):
             n = page["page"]
-            log(f"    page {n}: lost symbols, AI filling [?]...")
-            answer = call(f"{FILL_PROMPT}\n\n{page['hint']}", images=[page["png"]])
-            filled = fill_symbols(page["hint"], answer)
-            if filled is None:
-                left = page["hint"].count(MARK)
-                log(f"    WARNING: page {n}: AI answer changed other text; "
-                    f"{left} [?] left in the record - check against the PDF")
-                done.append({"page": n, "text": page["hint"],
-                             "method": "hybrid_unresolved"})
-            else:
-                done.append({"page": n, "text": filled, "method": "hybrid"})
+            total = page["hint"].count(MARK)
+            log(f"    page {n}: lost symbols, AI filling {total} [?] line by line...")
+            text, left, refused = fill_lines(
+                page["hint"], lambda p, png=page["png"]: call(p, images=[png]))
+            debug += [(n, line, ans) for line, ans in refused]
+            if left:
+                log(f"    WARNING: page {n}: {left} of {total} [?] left (AI changed "
+                    "other text on those lines) - check against the PDF")
+            method = ("hybrid" if not left else
+                      "hybrid_unresolved" if left == total else "hybrid_partial")
+            done.append({"page": n, "text": text, "method": method})
         else:
             log(f"    page {page['page']}: AI reading...")
             text = call(TRANSCRIBE_PROMPT, images=[page["png"]]).strip()
             done.append({"page": page["page"], "text": text, "method": "vision"})
     full = "\n\n".join(f"[Page {p['page']}]\n{p['text']}" for p in done)
+    if debug:
+        dbg = Path(out_dir) / f"{header}_FILL_DEBUG.txt"
+        dbg.parent.mkdir(parents=True, exist_ok=True)
+        dbg.write_text("".join(
+            f"[Page {n}]\nTEXT: {line}\nAI:   "
+            f"{ans if ans is not None else '(no line returned)'}\n\n"
+            for n, line, ans in debug), encoding="utf-8")
+        log(f"    AI answers for refused lines: {dbg}")
     log("    summarising...")
     try:
         summary = _summarise(SUMMARY_PROMPT, full, call, log,

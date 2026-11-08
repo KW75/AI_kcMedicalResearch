@@ -52,6 +52,7 @@ def _record_stem(header: str, source_name: str) -> str:
 METHOD_LABELS.update({
     "hybrid": "text layer + AI symbols",
     "hybrid_unresolved": "text layer, [?] not resolved",
+    "hybrid_partial": "text layer + AI symbols, some [?] left",
 })
 
 
