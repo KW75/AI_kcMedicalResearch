@@ -54,6 +54,11 @@ CHARS_PER_TOKEN = 3
 ANSWER_TOKENS = 8192
 PROMPT_TOKENS = 1000
 MAX_ROUNDS = 3
+MIN_SHRINK = 0.8   # a round of notes must cut the text to <= 80%
+
+
+class TooLongError(ValueError):
+    """The text could not be brought within the context budget."""
 
 
 def _budget_chars() -> int:
@@ -93,12 +98,20 @@ def _summarise(task_prompt: str, text: str, call, log, head: str = "") -> str:
     while len(text) > budget:
         rounds += 1
         if rounds > MAX_ROUNDS:
-            raise ValueError(f"text still too long after {MAX_ROUNDS} rounds "
-                             "of notes; raise OLLAMA_CONTEXT or split the file")
+            raise TooLongError(f"text still too long after {MAX_ROUNDS} "
+                               "rounds of notes")
         parts = _split(text, budget)
         log(f"    long text: summarised in {len(parts)} parts")
-        notes = [call(f"{PART_PROMPT}\n\n{p}").strip() for p in parts]
-        text = "\n\n".join(f"[Part {i}]\n{n}" for i, n in enumerate(notes, 1))
+        notes = []
+        for p in parts:
+            words = max(150, len(p) // 24)
+            notes.append(call(f"{PART_PROMPT} Use at most {words} words."
+                              f"\n\n{p}").strip())
+        new = "\n\n".join(f"[Part {i}]\n{n}" for i, n in enumerate(notes, 1))
+        if len(new) > len(text) * MIN_SHRINK:
+            raise TooLongError("the notes were not shorter than the text "
+                               f"({len(text):,} -> {len(new):,} characters)")
+        text = new
     if rounds:
         return call(f"{task_prompt}\n\n{head}{COMBINE_PROMPT}\n\n{text}").strip()
     return call(f"{task_prompt}\n\n{head}{text}").strip()
@@ -156,8 +169,14 @@ def _process_file(path: Path, out_dir, header: str, model: str, call, log,
             done.append({"page": page["page"], "text": text, "method": "vision"})
     full = "\n\n".join(f"[Page {p['page']}]\n{p['text']}" for p in done)
     log("    summarising...")
-    summary = _summarise(SUMMARY_PROMPT, full, call, log,
-                         head=f"File: {path.name}\n\n")
+    try:
+        summary = _summarise(SUMMARY_PROMPT, full, call, log,
+                             head=f"File: {path.name}\n\n")
+    except TooLongError as exc:
+        log(f"    WARNING: summary not written: {exc}")
+        summary = (f"[Summary not written: {exc}. The full text below is "
+                   "complete. Raise OLLAMA_CONTEXT or use a model with a "
+                   "larger context.]")
     output.write_record(out_dir, header, path.name, summary, done, model,
                         rec_dir=rec_dir)
     return summary
@@ -213,7 +232,12 @@ def run_set(folder, out_dir, name: str, model: str, call=None, now=None,
         return result
     log("Writing synopsis...")
     body = "\n\n".join(f"### {n}\n{s}" for n, s in summaries)
-    synopsis = _summarise(SYNOPSIS_PROMPT, body, call, log)
+    try:
+        synopsis = _summarise(SYNOPSIS_PROMPT, body, call, log)
+    except TooLongError as exc:
+        log(f"    WARNING: synopsis not written: {exc}")
+        synopsis = (f"[Synopsis not written: {exc}. The summary of each "
+                    f"file follows.]\n\n{body}")
     if result["failed"]:
         synopsis += ("\n\nNot included (could not be read): "
                      + ", ".join(n for n, _ in result["failed"]))

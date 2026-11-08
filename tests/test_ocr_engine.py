@@ -226,3 +226,57 @@ def test_long_synopsis_is_combined_in_parts(tmp_path, monkeypatch):
     assert all(f"### {n}" in parts for n in ["a.txt", "b.txt", "c.txt", "d.txt"])
     assert any(engine.COMBINE_PROMPT in p and engine.SYNOPSIS_PROMPT in p
                for p in call.prompts)
+
+# --- Notes that do not shrink: stop early, still write the record -----------
+
+def _echo_call():
+    prompts = []
+
+    def call(prompt, images=None):
+        prompts.append(prompt)
+        return prompt                                   # notes never get shorter
+    call.prompts = prompts
+    return call
+
+
+def test_summary_failure_still_writes_the_record(tmp_path, monkeypatch):
+    monkeypatch.setattr(engine, "_budget_chars", lambda: 2000)
+    words = " ".join(f"W{i:04d}" for i in range(1200))
+    path = _ctx_txt(tmp_path / "in", "long.txt", words)
+    logs = []
+    result = engine.run_single(path, tmp_path / "out", "t", "fake",
+                               call=_echo_call(), log=logs.append,
+                               records_root=tmp_path / "rep")
+    assert result["failed"] == []
+    md = list((tmp_path / "rep").rglob("*.md"))
+    assert len(md) == 1
+    text = md[0].read_text(encoding="utf-8")
+    assert "Summary not written" in text
+    assert "W1199" in text                              # full text is kept
+    assert any("WARNING" in m for m in logs)
+
+
+def test_notes_that_do_not_shrink_stop_after_one_round(tmp_path, monkeypatch):
+    monkeypatch.setattr(engine, "_budget_chars", lambda: 2000)
+    words = " ".join(f"W{i:04d}" for i in range(1200))
+    path = _ctx_txt(tmp_path / "in", "long.txt", words)
+    logs = []
+    engine.run_single(path, tmp_path / "out", "t", "fake", call=_echo_call(),
+                      log=logs.append, records_root=tmp_path / "rep")
+    assert sum("summarised in" in m for m in logs) == 1
+
+
+def test_synopsis_failure_keeps_each_file_summary(tmp_path, monkeypatch):
+    monkeypatch.setattr(engine, "_budget_chars", lambda: 2000)
+    folder = tmp_path / "in"
+    for name in ["a.txt", "b.txt", "c.txt", "d.txt"]:
+        _ctx_txt(folder, name, f"{name} " + "BP 140/90 mmHg. " * 50)
+    result = engine.run_set(folder, tmp_path / "out", "t", "fake",
+                            call=_echo_call(), log=lambda m: None,
+                            records_root=tmp_path / "rep")
+    assert len(result["records"]) == 4
+    syn = list((tmp_path / "out").glob("*_SYNOPSIS.md"))
+    assert len(syn) == 1
+    text = syn[0].read_text(encoding="utf-8")
+    assert "Synopsis not written" in text
+    assert "### d.txt" in text
