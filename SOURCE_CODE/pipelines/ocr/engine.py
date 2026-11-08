@@ -191,27 +191,82 @@ def _loose(part: str) -> str:
     return "".join(out)
 
 
-def fill_symbols(marked: str, answer: str):
-    """marked with each [?] filled from answer, or None if anything else changed.
+def symbol_fills(marked: str, answer: str):
+    """Fill for each [?] in marked, or None if anything else changed.
 
     Compared after NFKC (so the ligature fi equals fi) and ignoring spacing and
-    end-of-line hyphens; the original text, line breaks included, is kept.
-    Each fill must be 1-3 symbol characters: no letters, digits, $, \\ or [ ].
+    end-of-line hyphens. Each fill must be 1-3 symbol characters: no letters,
+    digits, dollar sign, backslash or square brackets.
     """
     import re
     import unicodedata
     norm = unicodedata.normalize("NFKC", marked).split(MARK)
-    parts = marked.split(MARK)
-    if len(parts) != len(norm):
+    if len(marked.split(MARK)) != len(norm):
         return None
     pattern = _FILL.join(_loose(p) for p in norm)
     found = re.search(pattern, unicodedata.normalize("NFKC", answer or ""))
-    if not found:
-        return None
+    return None if not found else list(found.groups())
+
+
+def _put(marked: str, fills) -> str:
+    parts = marked.split(MARK)
     out = [parts[0]]
-    for fill, part in zip(found.groups(), parts[1:]):
+    for fill, part in zip(fills, parts[1:]):
         out += [fill, part]
     return "".join(out)
+
+
+def fill_symbols(marked: str, answer: str):
+    """marked with each [?] filled from answer, or None if anything else changed.
+
+    The original text, line breaks included, is kept.
+    """
+    fills = symbol_fills(marked, answer)
+    return None if fills is None else _put(marked, fills)
+
+
+# ASCII stand-ins a model writes for a lost sign; a dash in a [?] is a minus.
+_SAME_SIGN = {"+/-": "\u00b1", "+-": "\u00b1", ">=": "\u2265", "<=": "\u2264",
+              "-": "\u2212", "\u2013": "\u2212"}
+
+
+def normal_fill(fill: str) -> str:
+    import unicodedata
+    f = unicodedata.normalize("NFKC", fill).strip()
+    return _SAME_SIGN.get(f, f)
+
+
+def codes_agree(codes, fills) -> bool:
+    """Same font:code -> same sign; different codes of one font -> different signs.
+
+    Refuses e.g. Ang p1 "versus [?]10.8 [?] 24.1" filled "+-10.8 +- 24.1" (minus and
+    plus-minus are different codes) and "mean = SD 4.4 +- 13.7" (one code, two signs).
+    """
+    if len(codes) != len(fills):
+        return False
+    seen = {}
+    for code, fill in zip(codes, fills):
+        if seen.setdefault(code, fill) != fill:
+            return False
+    items = list(seen.items())
+    for a, (c1, f1) in enumerate(items):
+        for c2, f2 in items[a + 1:]:
+            if f1 == f2 and c1.rsplit(":", 1)[0] == c2.rsplit(":", 1)[0]:
+                return False
+    return True
+
+
+def _accept(line: str, texts, codes):
+    """line filled from the first answer text that passes every check, or None."""
+    for t in texts:
+        fills = symbol_fills(line, t)
+        if fills is None:
+            continue
+        fills = [normal_fill(f) for f in fills]
+        if codes and not codes_agree(codes, fills):
+            continue
+        return _put(line, fills)
+    return None
 
 
 # --- Per-line fill: only lines with [?] go to the model ----------------------
@@ -230,7 +285,7 @@ LINES_PROMPT = (
 LINES_PER_CALL = 5
 
 
-def fill_lines(hint: str, ask):
+def fill_lines(hint: str, ask, codes=None):
     """(text, [?] left, refused): fill [?] line by line; ask(prompt) -> answer.
 
     AI lines are matched by content, not by number: a small model often puts
@@ -246,6 +301,12 @@ def fill_lines(hint: str, ask):
     lines = hint.split("\n")
     todo = [i for i, line in enumerate(lines) if MARK in line]
     numbered = {}  # line index -> answer the model gave under that number
+    line_codes = {}  # line index -> font:code of each [?] on that line
+    if codes is not None and len(codes) == hint.count(MARK):
+        k = 0
+        for i, line in enumerate(lines):
+            line_codes[i] = codes[k:k + line.count(MARK)]
+            k += line.count(MARK)
     for start in range(0, len(todo), LINES_PER_CALL):
         batch = [i for i in todo[start:start + LINES_PER_CALL] if MARK in lines[i]]
         if not batch:
@@ -271,8 +332,7 @@ def fill_lines(hint: str, ask):
             for i in order:
                 if MARK not in lines[i]:
                     continue
-                filled = next((f for f in (fill_symbols(lines[i], t) for t in texts)
-                               if f is not None), None)
+                filled = _accept(lines[i], texts, line_codes.get(i))
                 if filled is not None:
                     lines[i] = filled
                     break
@@ -294,7 +354,8 @@ def _process_file(path: Path, out_dir, header: str, model: str, call, log,
             total = page["hint"].count(MARK)
             log(f"    page {n}: lost symbols, AI filling {total} [?] line by line...")
             text, left, refused = fill_lines(
-                page["hint"], lambda p, png=page["png"]: call(p, images=[png]))
+                page["hint"], lambda p, png=page["png"]: call(p, images=[png]),
+                codes=page.get("codes"))
             debug += [(n, line, ans) for line, ans in refused]
             if left:
                 log(f"    WARNING: page {n}: {left} of {total} [?] left (AI changed "

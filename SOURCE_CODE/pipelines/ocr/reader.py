@@ -129,6 +129,28 @@ def mark_broken(text) -> str:
     return _BROKEN_SYMBOLS.sub("[?]", text or "")
 
 
+def symbol_codes(page, text):
+    """font:code of each broken character in text, in order, or None.
+
+    The same code means different signs in different fonts (Ang 2010: 0x2 in
+    MathematicalPi-Four and in Universal-GreekwithMathP), so checks need the
+    font. Read from get_text("dict"); None if its broken characters are not
+    exactly those of text (then the page gets no per-code check).
+    """
+    found = []
+    data = page.get_text("dict")
+    if not isinstance(data, dict):
+        return None
+    for block in data.get("blocks", []):
+        for line in block.get("lines", []):
+            for span in line.get("spans", []):
+                found += [(span.get("font", ""), ch) for ch in span.get("text", "")
+                          if _BROKEN_SYMBOLS.fullmatch(ch)]
+    if [ch for _, ch in found] != _BROKEN_SYMBOLS.findall(text or ""):
+        return None
+    return [f"{font}:{hex(ord(ch))}" for font, ch in found]
+
+
 def _read_pdf(path: Path) -> list[dict]:
     pages = []
     with fitz.open(str(path)) as doc:
@@ -139,7 +161,10 @@ def _read_pdf(path: Path) -> list[dict]:
             else:
                 pix = page.get_pixmap(dpi=PDF_RENDER_DPI)
                 hint = mark_broken(text) if len(text) >= MIN_TEXT_CHARS else None
-                pages.append(_page(number, png=pix.tobytes("png"), hint=hint))
+                entry = _page(number, png=pix.tobytes("png"), hint=hint)
+                if hint:
+                    entry["codes"] = symbol_codes(page, text)
+                pages.append(entry)
     return pages
 
 
