@@ -23,12 +23,14 @@ TRANSCRIBE_PROMPT = (
     "Transcribe all text in this image exactly as written. Keep the original "
     "line breaks, numbering, units and punctuation. Do not summarise, correct, "
     "translate or add anything. If a word cannot be read, write [illegible]. "
-    "If the image has no text, reply [no text]."
+    "If the image has no text, reply [no text]. Write symbols as plain "
+    "characters (±, ≥, −), not LaTeX."
 )
 SUMMARY_PROMPT = (
     "Summarise the document below. Use only information in the text; do not "
     "add facts. Keep key numbers, dates, names and units exactly as written. "
-    "Use short headings and bullet points."
+    "Use short headings and bullet points. Write symbols as plain "
+    "characters (±, ≥, −), not LaTeX."
 )
 SYNOPSIS_PROMPT = (
     "Write one synopsis of the document set below, using the per-file "
@@ -156,6 +158,62 @@ def _rec_dir(records_root, header: str):
     return Path(records_root) / header if records_root is not None else None
 
 
+# --- Hybrid read: PDF page whose symbol font lost its signs ------------------
+# The reader gives the text layer with each lost symbol as [?] (page["hint"])
+# plus the page image. The model fills only the [?]; fill_symbols() checks
+# that nothing else changed, so letters and digits always come from the text
+# layer. If the check fails the page keeps its visible [?] and a WARNING.
+FILL_PROMPT = (
+    "The text below was copied from the text layer of this page image. Its "
+    "font lost some symbols; each lost symbol is shown as [?]. Look at the "
+    "image and return the whole text with each [?] replaced by the symbol "
+    "printed there (for example ±, =, −, <, >, ≤, ≥, ×, °). Change nothing "
+    "else: keep every word, number, line break and hyphen. Use plain "
+    "characters, not LaTeX. Reply with the text only."
+)
+MARK = "[?]"
+_FILL = r"([^\s\w$\\\[\]]{1,3}?)"
+
+
+def _loose(part: str) -> str:
+    """Regex for one stretch of text between [?] marks; spacing may differ."""
+    import re
+    out = []
+    for piece in re.split(r"(-?\s+)", part):
+        if not piece:
+            continue
+        if not piece.strip():
+            out.append(r"\s*+")
+        elif piece[0] == "-" and not piece[1:].strip():
+            out.append(r"-?\s*+" if "\n" in piece else r"-\s*+")
+        else:
+            out.append(re.escape(piece))
+    return "".join(out)
+
+
+def fill_symbols(marked: str, answer: str):
+    """marked with each [?] filled from answer, or None if anything else changed.
+
+    Compared after NFKC (so the ligature fi equals fi) and ignoring spacing and
+    end-of-line hyphens; the original text, line breaks included, is kept.
+    Each fill must be 1-3 symbol characters: no letters, digits, $, \\ or [ ].
+    """
+    import re
+    import unicodedata
+    norm = unicodedata.normalize("NFKC", marked).split(MARK)
+    parts = marked.split(MARK)
+    if len(parts) != len(norm):
+        return None
+    pattern = _FILL.join(_loose(p) for p in norm)
+    found = re.search(pattern, unicodedata.normalize("NFKC", answer or ""))
+    if not found:
+        return None
+    out = [parts[0]]
+    for fill, part in zip(found.groups(), parts[1:]):
+        out += [fill, part]
+    return "".join(out)
+
+
 def _process_file(path: Path, out_dir, header: str, model: str, call, log,
                   rec_dir=None) -> str:
     """Read one file, transcribe image pages, summarise, write the record."""
@@ -163,6 +221,19 @@ def _process_file(path: Path, out_dir, header: str, model: str, call, log,
     for page in reader.read_input(path):
         if page["text"] is not None:
             done.append({"page": page["page"], "text": page["text"], "method": "text"})
+        elif page.get("hint"):
+            n = page["page"]
+            log(f"    page {n}: lost symbols, AI filling [?]...")
+            answer = call(f"{FILL_PROMPT}\n\n{page['hint']}", images=[page["png"]])
+            filled = fill_symbols(page["hint"], answer)
+            if filled is None:
+                left = page["hint"].count(MARK)
+                log(f"    WARNING: page {n}: AI answer changed other text; "
+                    f"{left} [?] left in the record - check against the PDF")
+                done.append({"page": n, "text": page["hint"],
+                             "method": "hybrid_unresolved"})
+            else:
+                done.append({"page": n, "text": filled, "method": "hybrid"})
         else:
             log(f"    page {page['page']}: AI reading...")
             text = call(TRANSCRIBE_PROMPT, images=[page["png"]]).strip()

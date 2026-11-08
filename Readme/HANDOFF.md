@@ -45,7 +45,7 @@ so those catches happen at session open, not mid-work.
 
 | Component      | Status |
 |----------------|--------|
-| Tests          | 949 passed, 10 deselected on v2.6-ocr-editor; 816 on main (`python -m pytest -m "not live" --tb=short -q`) |
+| Tests          | 959 passed, 10 deselected on v2.6-ocr-editor; 816 on main (`python -m pytest -m "not live" --tb=short -q`) |
 | Branch         | main = fa4edb9 (PR #3). v2.6-ocr-editor = Sessions 33-35 work, open as draft PR #4 (Setup menu, Streamlit/Render removal, Ollama model rule, httpx pin, moved-folder launcher check, SR Anthropic warning, test-local-pins CI job). Do not merge until OCR is done. Version stays 2.5.0; bump to 2.6.0 after OCR is merged |
 | CI             | green on draft PR #4, both jobs: test (requirements-ci.txt, 845 passed, 44 warnings) and test-local-pins (requirements-local.txt like the launchers, 845 passed, 57 warnings). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
 | Deploy         | None: CLI only, local first. Render service deleted 2026-10-27; Streamlit UI and Render files removed in Session 33. UptimeRobot monitor: confirm paused/deleted |
@@ -1520,10 +1520,18 @@ Expected: a clean tree in sync with origin, the top commit is this handoff, and 
   "-65 to -5 msec" became "<= 65 to <= 5", "week 6" became "week 0",
   Table 1 anticonvulsants UC 33 became 40, last sentence words dropped,
   reference names misspelled.
-- TODO OCR next (do first): hybrid read for broken pages - text layer with
-  "[?]" for each broken character + page image; model fills only the [?];
-  code checks the answer equals the text outside the [?], else keep "[?]"
-  and print a WARNING. Prompts: plain Unicode (± ≥ −), no LaTeX.
+- DONE OCR hybrid safety (2026-11-08): broken PDF pages keep the text layer
+  with [?] per lost symbol; the model may only fill [?]; fill_symbols()
+  refuses any other change. Ang 2010 run (hybrid_test): all 5 pages refused
+  (139 [?] left) - but no wrong letters or digits (33, week 6, ">= 2" kept).
+- TODO OCR next (do first): fill per line, not per page. A small model
+  cannot copy back a whole page unchanged. Send only the lines that contain
+  [?] (numbered, with the image), check each line on its own, keep [?] only
+  on lines that fail. Option: keep the code in the marker ([?1] = \x01) so
+  one confirmed meaning can fill every same code from the same font.
+  Save the raw model answer for refused lines (debug file) to see why.
+- TODO OCR summary: still writes LaTeX ($n$, \text{ mA}) and copies [?];
+  still says "Week 6 to Week 12" (Table 2: change from baseline).
 - TODO OCR summary: labelled week-12 change "Week 6 to Week 12"; Table 2
   says change from baseline. Check prompt wording after the hybrid fix.
 - TODO next chat: Writing .docx tables (reuse OCR reader); --report path

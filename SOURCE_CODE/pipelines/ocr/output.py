@@ -49,6 +49,12 @@ def _record_stem(header: str, source_name: str) -> str:
     return f"{header}_{stem}_{ext}" if ext else f"{header}_{stem}"
 
 
+METHOD_LABELS.update({
+    "hybrid": "text layer + AI symbols",
+    "hybrid_unresolved": "text layer, [?] not resolved",
+})
+
+
 def _page_heading(page: dict) -> str:
     label = METHOD_LABELS.get(page.get("method"), "read")
     return f"Page {page['page']} ({label})"

@@ -103,8 +103,12 @@ def _read_docx(path: Path) -> list[dict]:
     return _text_page(path, "\n".join(lines))
 
 
-def _page(number: int, text: str | None = None, png: bytes | None = None) -> dict:
-    return {"page": number, "text": text, "png": png}
+def _page(number: int, text: str | None = None, png: bytes | None = None,
+          hint: str | None = None) -> dict:
+    page = {"page": number, "text": text, "png": png}
+    if hint is not None:
+        page["hint"] = hint  # text layer with [?] for each lost symbol
+    return page
 
 
 # A PDF text layer with control characters (tab, newline, CR excepted) or the
@@ -120,6 +124,11 @@ def has_broken_symbols(text) -> bool:
     return bool(_BROKEN_SYMBOLS.search(text or ""))
 
 
+def mark_broken(text) -> str:
+    """Text layer with each character its font failed to map shown as [?]."""
+    return _BROKEN_SYMBOLS.sub("[?]", text or "")
+
+
 def _read_pdf(path: Path) -> list[dict]:
     pages = []
     with fitz.open(str(path)) as doc:
@@ -129,7 +138,8 @@ def _read_pdf(path: Path) -> list[dict]:
                 pages.append(_page(number, text=text))
             else:
                 pix = page.get_pixmap(dpi=PDF_RENDER_DPI)
-                pages.append(_page(number, png=pix.tobytes("png")))
+                hint = mark_broken(text) if len(text) >= MIN_TEXT_CHARS else None
+                pages.append(_page(number, png=pix.tobytes("png"), hint=hint))
     return pages
 
 
