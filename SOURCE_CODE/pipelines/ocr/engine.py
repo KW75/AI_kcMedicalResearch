@@ -341,11 +341,101 @@ def fill_lines(hint: str, ask, codes=None):
     return text, text.count(MARK), refused
 
 
+# --- Document-wide vote per font code ---------------------------------------
+# One font code always prints the same sign, so fills of one font:code are
+# compared over the whole document. Ang: "P [?] 0.01" was filled "<" and
+# "adjusted P [?] 0.8" ">" while the same code is "=" everywhere else.
+VOTE_MIN = 2
+VOTE_SHARE = 0.8
+
+
+def _font(code: str) -> str:
+    return code.rsplit(":", 1)[0]
+
+
+def code_votes(pages):
+    """(agreed, keep) from (codes, fills) per page; a fill of None is a [?].
+
+    agreed: font:code -> sign with >= VOTE_MIN votes and >= VOTE_SHARE of the
+    votes; every [?] with that code gets it and other fills are changed to it.
+    keep: codes whose fills all agree (a single vote stays, is not copied).
+    Any other code: its fills go back to [?]. Two codes of one font cannot be
+    the same sign, so such codes are trusted by neither list.
+    """
+    from collections import Counter
+    count = {}
+    for codes, fills in pages:
+        for c, f in zip(codes, fills):
+            if f is not None:
+                count.setdefault(c, Counter())[f] += 1
+    agreed, keep = {}, set()
+    for c, cnt in count.items():
+        sign, n = cnt.most_common(1)[0]
+        if n >= VOTE_MIN and n >= VOTE_SHARE * sum(cnt.values()) - 1e-9:
+            agreed[c] = sign
+        if len(cnt) == 1:
+            keep.add(c)
+    same = {}
+    for c, sign in agreed.items():
+        same.setdefault((_font(c), sign), []).append(c)
+    for cs in same.values():
+        if len(cs) > 1:
+            for c in cs:
+                del agreed[c]
+                keep.discard(c)
+    taken = {(_font(c), sign) for c, sign in agreed.items()}
+    for c in list(keep):
+        if c not in agreed and (_font(c), next(iter(count[c]))) in taken:
+            keep.discard(c)
+    return agreed, keep
+
+
+def _fills_from(hint: str, text: str):
+    """Sign put in each [?] of hint to give text (None = still [?]), or None."""
+    import re
+    parts = hint.split(MARK)
+    m = re.fullmatch("(.{1,3}?)".join(re.escape(p) for p in parts), text, re.S)
+    return None if not m else [None if g == MARK else g for g in m.groups()]
+
+
+def _vote_pages(done, hybrid, log):
+    """Apply the document-wide vote to hybrid pages, then warn per page."""
+    found = []
+    for idx, n, hint, codes in hybrid:
+        ok = codes is not None and len(codes) == hint.count(MARK)
+        found.append(_fills_from(hint, done[idx]["text"]) if ok else None)
+    agreed, keep = code_votes(
+        [(h[3], f) for h, f in zip(hybrid, found) if f is not None])
+    for (idx, n, hint, codes), fills in zip(hybrid, found):
+        if fills is not None:
+            new = [agreed[c] if c in agreed else f if c in keep else None
+                   for c, f in zip(codes, fills)]
+            pairs = list(zip(fills, new))
+            changed = sum(1 for f, g in pairs if f is not None and g is not None and f != g)
+            added = sum(1 for f, g in pairs if f is None and g is not None)
+            back = sum(1 for f, g in pairs if f is not None and g is None)
+            if changed or added:
+                log(f"    page {n}: document vote (same font code): {changed} "
+                    f"fill(s) corrected, {added} [?] filled")
+            if back:
+                log(f"    page {n}: {back} fill(s) disagree with the same font "
+                    "code elsewhere - back to [?]")
+            done[idx]["text"] = _put(hint, [g if g is not None else MARK for g in new])
+        total = hint.count(MARK)
+        left = done[idx]["text"].count(MARK)
+        if left:
+            log(f"    WARNING: page {n}: {left} of {total} [?] left (AI changed "
+                "other text on those lines) - check against the PDF")
+        done[idx]["method"] = ("hybrid" if not left else
+                               "hybrid_unresolved" if left == total else "hybrid_partial")
+
+
 def _process_file(path: Path, out_dir, header: str, model: str, call, log,
                   rec_dir=None) -> str:
     """Read one file, transcribe image pages, summarise, write the record."""
     done = []
     debug = []  # (page, line, AI answer) for lines that kept their [?]
+    hybrid = []  # (index in done, page, hint, codes) for the vote
     for page in reader.read_input(path):
         if page["text"] is not None:
             done.append({"page": page["page"], "text": page["text"], "method": "text"})
@@ -357,16 +447,13 @@ def _process_file(path: Path, out_dir, header: str, model: str, call, log,
                 page["hint"], lambda p, png=page["png"]: call(p, images=[png]),
                 codes=page.get("codes"))
             debug += [(n, line, ans) for line, ans in refused]
-            if left:
-                log(f"    WARNING: page {n}: {left} of {total} [?] left (AI changed "
-                    "other text on those lines) - check against the PDF")
-            method = ("hybrid" if not left else
-                      "hybrid_unresolved" if left == total else "hybrid_partial")
-            done.append({"page": n, "text": text, "method": method})
+            hybrid.append((len(done), n, page["hint"], page.get("codes")))
+            done.append({"page": n, "text": text, "method": "hybrid"})
         else:
             log(f"    page {page['page']}: AI reading...")
             text = call(TRANSCRIBE_PROMPT, images=[page["png"]]).strip()
             done.append({"page": page["page"], "text": text, "method": "vision"})
+    _vote_pages(done, hybrid, log)
     full = "\n\n".join(f"[Page {p['page']}]\n{p['text']}" for p in done)
     if debug:
         dbg = Path(out_dir) / f"{header}_FILL_DEBUG.txt"

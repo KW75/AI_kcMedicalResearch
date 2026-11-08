@@ -45,7 +45,7 @@ so those catches happen at session open, not mid-work.
 
 | Component      | Status |
 |----------------|--------|
-| Tests          | 979 passed, 10 deselected on v2.6-ocr-editor; 816 on main (`python -m pytest -m "not live" --tb=short -q`) |
+| Tests          | 988 passed, 10 deselected on v2.6-ocr-editor; 816 on main (`python -m pytest -m "not live" --tb=short -q`) |
 | Branch         | main = fa4edb9 (PR #3). v2.6-ocr-editor = Sessions 33-35 work, open as draft PR #4 (Setup menu, Streamlit/Render removal, Ollama model rule, httpx pin, moved-folder launcher check, SR Anthropic warning, test-local-pins CI job). Do not merge until OCR is done. Version stays 2.5.0; bump to 2.6.0 after OCR is merged |
 | CI             | green on draft PR #4, both jobs: test (requirements-ci.txt, 845 passed, 44 warnings) and test-local-pins (requirements-local.txt like the launchers, 845 passed, 57 warnings). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
 | Deploy         | None: CLI only, local first. Render service deleted 2026-10-27; Streamlit UI and Render files removed in Session 33. UptimeRobot monitor: confirm paused/deleted |
@@ -1553,6 +1553,20 @@ Expected: a clean tree in sync with origin, the top commit is this handoff, and 
   ±10.8" -> "−10.8"; Table 2 all ± and −. Still wrong: p1 "(mean =" (one
   [?] on the line, should be ±). Check vs PDF: p3 "¶ P < 0.01", p4
   "adjusted P > 0.8", "P < 0.3". B2 (document-wide vote) is next.
+- DONE OCR document vote B2 (vote_test_2026-11-09): fills compared per
+  font:code over the whole document (>=2 votes, >=80% agree): majority sign
+  fills every [?] of that code and corrects others; no majority -> back to
+  [?]; two codes of one font with one sign trusted by neither. 19 of 139
+  [?] left (p1 17, p2 0, p3 0, p4 2, p5 0; was 56). Fixed: p3 "P = 0.01",
+  p4 "adjusted P = 0.8", "P = 0.3" (were < > <); p1 "(mean =" back to [?].
+  Checked vs PDF page images: all of these, p3 Table 1 "Education >12"
+  (earlier runs had ≥12, wrong) and p5 "FIQ pain = 0.2, FIQ PI = 0.5,
+  FIQ total = 0.6" (3 vote corrections) are correct.
+- TODO OCR: single-vote codes are kept unchecked (Education >12 was right
+  by luck); p1 abstract font still 17 [?] (model answers wrong lines);
+  summary still LaTeX ($\pm$) and says "Week 6 to Week 12" for the
+  week-12 change from baseline. Copying text from such PDFs loses the
+  sign too - check signs on the page image.
 - TODO OCR option: broken-font pages to a stronger vision model
   (qwen3-vl-plus, cloud, with confidentiality prompt) if many [?] remain.
 - TODO OCR summary: strip LaTeX in code after the model; prompt must copy
