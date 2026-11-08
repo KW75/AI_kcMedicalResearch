@@ -1454,12 +1454,36 @@ Expected: a clean tree in sync with origin, the top commit is this handoff, and 
   providers.py line 41 default QWEN_VISION_MODEL -> qwen3-vl-plus. An env
   QWEN_VISION_MODEL still overrides it (a leftover session variable caused
   one false 404 during testing).
-- TODO SR: main._sr_default_model("qwen") uses QWEN_VISION_MODEL, so SR now
-  runs on qwen3-vl-plus. Earlier verified results (e.g. Ang 2010 unanimous
-  N=3) came from an older model: re-check the next real SR run against PDFs.
-  Hard-coded "qwen-vl-plus" defaults remain in data_extractor.py line 199,
-  table_extractor.py lines 14 and 279, scripts/nondet_probe.py line 145;
-  they fail if ever used without a model passed.
+- TODO SR (next chat, do in this order):
+  1. Qwen defaults: main._sr_default_model("qwen") already uses
+     providers.QWEN_VISION_MODEL (qwen3-vl-plus). Leftover hard-coded
+     qwen-vl-plus (404 model_not_found on this key): data_extractor.py 199,
+     table_extractor.py 14 and 279, scripts/nondet_probe.py 145 -> use the
+     constant. Verified SR results (e.g. Ang 2010, unanimous N=3) came from
+     an older Qwen vision model: re-check the next real SR run vs the PDFs.
+  2. Broken PDF text layers (has_broken_symbols over input/sr): all 5 SR
+     papers flagged. Ang 2010 lost signs (OCR fill + vote handles this);
+     CBT-prefrontal lost degree/(R)/(C); s10608 p4 lost ligatures ti/tt/ft;
+     CBT-women (S1877886015) and zsy234 are gibberish in fitz, pdfplumber
+     and pypdf alike (font encoding, not a library bug; not a clean shift).
+     SR text paths read this silently: relevance_screener.py 127,
+     rob2_tool.py 142, extraction/pdf_parser.extract_text, extractor text
+     fallback. Fix: has_broken_symbols()/gibberish check -> page image path
+     or WARNING. Until then, text-based screening and RoB2 for CBT-women
+     and zsy234 are UNVERIFIED. Extraction uses images (likely fine).
+  3. Local LLM for SR (as in OCR): SR is cloud-only today. Blocks:
+     scripts/launcher.py BLOCKED_FOR_SR = {ollama, deepseek} (198, checked
+     487 and 532); data_extractor.py vision_providers = qwen/openai/
+     anthropic/groq (219-228); providers.py PROVIDER_CAPABILITIES ollama
+     vision=False (77); main.py sr_provider_warning in run_cli. Plan: allow
+     ollama when the picked model has 'vision' (ollama_models.
+     model_capabilities, as OCR does); vision per model, not per provider;
+     data_extractor reaches Ollama via _openai_compat_creds -> OLLAMA_URL/v1
+     (check image_url parts work there, or use call_ollama_provider
+     images=); check OLLAMA_CONTEXT fits 5 page images per call; no local
+     vision model -> offer cloud after typed y (same as OCR); deepseek
+     stays blocked (no vision). Test: gemma4:e4b on Ang, N=3 agreement,
+     compare field by field with qwen3-vl-plus and the PDF.
 - TODO OCR banner: in cloud mode the summary/synopsis is also written by the
   cloud model, so text (.txt, .docx, PDF text layers) leaves the machine too,
   not only page images. Fix the "For OCR this means page images..." line.
