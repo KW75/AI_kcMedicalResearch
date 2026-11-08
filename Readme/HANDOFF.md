@@ -43,10 +43,9 @@ so those catches happen at session open, not mid-work.
 
 ## Current State (Session 34, v2.5.0 on main, 2026-11-06)
 
-
 | Component      | Status |
 |----------------|--------|
-| Tests          | 940 passed, 10 deselected on v2.6-ocr-editor; 816 on main (`python -m pytest -m "not live" --tb=short -q`) |
+| Tests          | 949 passed, 10 deselected on v2.6-ocr-editor; 816 on main (`python -m pytest -m "not live" --tb=short -q`) |
 | Branch         | main = fa4edb9 (PR #3). v2.6-ocr-editor = Sessions 33-35 work, open as draft PR #4 (Setup menu, Streamlit/Render removal, Ollama model rule, httpx pin, moved-folder launcher check, SR Anthropic warning, test-local-pins CI job). Do not merge until OCR is done. Version stays 2.5.0; bump to 2.6.0 after OCR is merged |
 | CI             | green on draft PR #4, both jobs: test (requirements-ci.txt, 845 passed, 44 warnings) and test-local-pins (requirements-local.txt like the launchers, 845 passed, 57 warnings). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
 | Deploy         | None: CLI only, local first. Render service deleted 2026-10-27; Streamlit UI and Render files removed in Session 33. UptimeRobot monitor: confirm paused/deleted |
@@ -1511,4 +1510,22 @@ Expected: a clean tree in sync with origin, the top commit is this handoff, and 
   the same cautious budget. tests/test_ocr_engine.py: 3 tests added (failed
   first). Suite: 931 -> 934. OLLAMA_CONTEXT default left at 32768 (shared by
   all pipelines; bigger window = more GPU memory).
+- DONE OCR parts test (2026-11-08, OLLAMA_CONTEXT=12000, Ang 2010): record
+  written; parts summary dropped NFR pain and FIQ results that the one-call
+  summary kept. Summary failure now keeps the record (commit 4acdb91).
+- INTERIM OCR broken symbols: Ang 2010 text layer gives "\x02" for ± and
+  "\x01" for = (font-specific, cannot be mapped). reader.has_broken_symbols()
+  now sends such PDF pages to the vision model. Signs are back, but
+  gemma4:e4b added silent errors elsewhere: FIQ PI ">= 2" lost the 2,
+  "-65 to -5 msec" became "<= 65 to <= 5", "week 6" became "week 0",
+  Table 1 anticonvulsants UC 33 became 40, last sentence words dropped,
+  reference names misspelled.
+- TODO OCR next (do first): hybrid read for broken pages - text layer with
+  "[?]" for each broken character + page image; model fills only the [?];
+  code checks the answer equals the text outside the [?], else keep "[?]"
+  and print a WARNING. Prompts: plain Unicode (± ≥ −), no LaTeX.
+- TODO OCR summary: labelled week-12 change "Week 6 to Week 12"; Table 2
+  says change from baseline. Check prompt wording after the hybrid fix.
+- TODO next chat: Writing .docx tables (reuse OCR reader); --report path
+  .doc skip message; SR re-check on qwen3-vl-plus against the PDFs.
 

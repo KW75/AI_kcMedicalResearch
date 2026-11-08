@@ -3,7 +3,8 @@
 Turns one file from input/ocr/ into a list of pages for the OCR pipeline.
 Each page is {"page": n, "text": str | None, "png": bytes | None}; exactly
 one of text/png is set:
-- PDF page with a text layer (>= MIN_TEXT_CHARS characters): text, no AI.
+- PDF page with a clean text layer (>= MIN_TEXT_CHARS characters, no broken
+  symbols): text, no AI.
 - PDF page without text (scan, blank, page number only): PNG for the model.
 - Image file (any supported format): converted to PNG. A multi-page TIFF
   gives one page per frame.
@@ -16,6 +17,7 @@ Uses pymupdf (fitz), pillow and python-docx, all in requirements-local.txt.
 from __future__ import annotations
 
 import io
+import re
 from pathlib import Path
 
 import docx
@@ -105,12 +107,25 @@ def _page(number: int, text: str | None = None, png: bytes | None = None) -> dic
     return {"page": number, "text": text, "png": png}
 
 
+# A PDF text layer with control characters (tab, newline, CR excepted) or the
+# replacement character U+FFFD means a symbol font lost its signs. Ang 2010:
+# "4.4 \x02 13.7" (the ± is lost), "(n \x01 32)" (the = is lost). The codes
+# differ per font, so they cannot be mapped back; such pages are read from
+# the image by the vision model instead.
+_BROKEN_SYMBOLS = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\ufffd]")
+
+
+def has_broken_symbols(text) -> bool:
+    """True if a text layer contains characters its font failed to map."""
+    return bool(_BROKEN_SYMBOLS.search(text or ""))
+
+
 def _read_pdf(path: Path) -> list[dict]:
     pages = []
     with fitz.open(str(path)) as doc:
         for number, page in enumerate(doc, start=1):
             text = page.get_text().strip()
-            if len(text) >= MIN_TEXT_CHARS:
+            if len(text) >= MIN_TEXT_CHARS and not has_broken_symbols(text):
                 pages.append(_page(number, text=text))
             else:
                 pix = page.get_pixmap(dpi=PDF_RENDER_DPI)
