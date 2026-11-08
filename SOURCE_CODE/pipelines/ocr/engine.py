@@ -227,35 +227,56 @@ LINES_PROMPT = (
     "not LaTeX. Reply with the numbered lines only, one per line, as: "
     "number| text"
 )
-LINES_PER_CALL = 15
+LINES_PER_CALL = 5
 
 
 def fill_lines(hint: str, ask):
     """(text, [?] left, refused): fill [?] line by line; ask(prompt) -> answer.
 
-    refused lists (line, answer line or None) for lines that kept their [?].
+    AI lines are matched by content, not by number: a small model often puts
+    the right line under the wrong number (Ang p4: up to 10 lines off). Each
+    answer line may fill the line it was numbered for or any other line of
+    the page that still has [?], but only where fill_symbols() accepts it
+    (same text, only symbols in the [?]). A row is tried with and without
+    its number prefix, since text lines can start with "1.6;".
+    refused lists (line, answer under its number or None) for lines that
+    kept their [?].
     """
     import re
     lines = hint.split("\n")
     todo = [i for i, line in enumerate(lines) if MARK in line]
-    refused = []
+    numbered = {}  # line index -> answer the model gave under that number
     for start in range(0, len(todo), LINES_PER_CALL):
-        batch = todo[start:start + LINES_PER_CALL]
+        batch = [i for i in todo[start:start + LINES_PER_CALL] if MARK in lines[i]]
+        if not batch:
+            continue  # already filled by an earlier answer
         body = "\n".join(f"{k}| {lines[i]}" for k, i in enumerate(batch, 1))
         answer = ask(f"{LINES_PROMPT}\n\n{body}") or ""
-        got = {}
         for row in answer.splitlines():
+            if not row.strip():
+                continue
             m = re.match(r"^\s*(\d+)\s*[|:.)]\s?(.*)$", row)
+            own = None
+            texts = [row.strip()]
             if m:
-                got.setdefault(int(m.group(1)), m.group(2))
-        if not got and len(batch) == 1:
-            got = {1: answer.strip()}
-        for k, i in enumerate(batch, 1):
-            filled = fill_symbols(lines[i], got.get(k, ""))
-            if filled is None:
-                refused.append((lines[i], got.get(k)))
-            else:
-                lines[i] = filled
+                texts.insert(0, m.group(2))
+                k = int(m.group(1))
+                if 1 <= k <= len(batch):
+                    own = batch[k - 1]
+                    numbered.setdefault(own, m.group(2))
+            elif len(batch) == 1:
+                own = batch[0]
+                numbered.setdefault(own, row.strip())
+            order = ([own] if own is not None else []) + [i for i in todo if i != own]
+            for i in order:
+                if MARK not in lines[i]:
+                    continue
+                filled = next((f for f in (fill_symbols(lines[i], t) for t in texts)
+                               if f is not None), None)
+                if filled is not None:
+                    lines[i] = filled
+                    break
+    refused = [(lines[i], numbered.get(i)) for i in todo if MARK in lines[i]]
     text = "\n".join(lines)
     return text, text.count(MARK), refused
 

@@ -51,7 +51,8 @@ def test_single_line_answer_without_number_is_accepted():
     assert text == GOOD_2 and left == 0 and refused == []
 
 
-def test_lines_are_sent_in_batches():
+def test_lines_are_sent_in_batches(monkeypatch):
+    monkeypatch.setattr(engine, "LINES_PER_CALL", 15)
     hint = "\n".join(f"line {i} a [?] b" for i in range(20))
     ask, prompts = _asker(["", ""])
     text, left, refused = engine.fill_lines(hint, ask)

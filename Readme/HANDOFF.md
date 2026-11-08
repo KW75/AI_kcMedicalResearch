@@ -45,7 +45,7 @@ so those catches happen at session open, not mid-work.
 
 | Component      | Status |
 |----------------|--------|
-| Tests          | 966 passed, 10 deselected on v2.6-ocr-editor; 816 on main (`python -m pytest -m "not live" --tb=short -q`) |
+| Tests          | 971 passed, 10 deselected on v2.6-ocr-editor; 816 on main (`python -m pytest -m "not live" --tb=short -q`) |
 | Branch         | main = fa4edb9 (PR #3). v2.6-ocr-editor = Sessions 33-35 work, open as draft PR #4 (Setup menu, Streamlit/Render removal, Ollama model rule, httpx pin, moved-folder launcher check, SR Anthropic warning, test-local-pins CI job). Do not merge until OCR is done. Version stays 2.5.0; bump to 2.6.0 after OCR is merged |
 | CI             | green on draft PR #4, both jobs: test (requirements-ci.txt, 845 passed, 44 warnings) and test-local-pins (requirements-local.txt like the launchers, 845 passed, 57 warnings). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
 | Deploy         | None: CLI only, local first. Render service deleted 2026-10-27; Streamlit UI and Render files removed in Session 33. UptimeRobot monitor: confirm paused/deleted |
@@ -1524,16 +1524,34 @@ Expected: a clean tree in sync with origin, the top commit is this handoff, and 
   with [?] per lost symbol; the model may only fill [?]; fill_symbols()
   refuses any other change. Ang 2010 run (hybrid_test): all 5 pages refused
   (139 [?] left) - but no wrong letters or digits (33, week 6, ">= 2" kept).
-- TODO OCR next (do first): fill per line, not per page. A small model
-  cannot copy back a whole page unchanged. Send only the lines that contain
-  [?] (numbered, with the image), check each line on its own, keep [?] only
-  on lines that fail. Option: keep the code in the marker ([?1] = \x01) so
-  one confirmed meaning can fill every same code from the same font.
-  Save the raw model answer for refused lines (debug file) to see why.
-- TODO OCR summary: still writes LaTeX ($n$, \text{ mA}) and copies [?];
-  still says "Week 6 to Week 12" (Table 2: change from baseline).
-- TODO OCR summary: labelled week-12 change "Week 6 to Week 12"; Table 2
-  says change from baseline. Check prompt wording after the hybrid fix.
+- DONE OCR per-line fill (Ang, gemma4:e4b, second_test_2026-11-08): 64 of
+  139 [?] filled, 75 left (p1 21/23, p2 2/6, p3 11/30, p4 41/77, p5 0/3).
+  No letter or digit changed. BUT wrong symbols pass the check: ± filled as
+  "=" (p1 "mean = SD"; p4 Table 2 "mean = SD mA", "32.5 = 15", "37.6 = 10",
+  "56.3 = 30.5"; "0.0 = 4.1"); "ES <= 0.6" likely "=". ASCII "+/-", ">=",
+  "<=" accepted as fills.
+- FOUND in FILL_DEBUG: most refusals are answers on the wrong line number
+  (drift up to 10 lines on p4 with 15 lines per call; some lines missing).
+  Model drops minus signs ("[?]65 to [?]5" -> "65 to 5") and reads
+  "mean ± SD" as "mean = SD" - refusing those was correct.
+- DONE OCR (A) content matching + LINES_PER_CALL 5 (match_test_2026-11-08):
+  84 of 139 [?] filled, 55 left (p1 18/23, p2 3/6, p3 6/30, p4 28/77,
+  p5 0/3). Table 2 header and baselines "+/-" now right. Still wrong: p1
+  "(mean =" for ±; NEW sign error p1 "±10.8" (minus filled as ±); p3
+  footnote "P < 0.01" vs p4 body "P = 0.01" - check PDF. Record mixes
+  "+/-", "+-", "±" and hyphen for minus.
+- TODO OCR next (do first): (B) reader keeps (font, code) of each [?];
+  per-line rule: same code -> same fill, different codes of the same font
+  -> different fills (refuses "±10.8 ± 24.1", "mean = SD 4.4 ± 13.7");
+  then per-code vote over the document (>=2 votes, >=80%); normalise
+  +/- +- >= <= and hyphen-minus first; conflict keeps [?] + WARNING;
+  never guess minus. Font codes in Ang: 8 (font, code) pairs, 139 total.
+- TODO OCR option: broken-font pages to a stronger vision model
+  (qwen3-vl-plus, cloud, with confidentiality prompt) if many [?] remain.
+- TODO OCR summary: strip LaTeX in code after the model; prompt must copy
+  [?] exactly (summary dropped [?] before numbers: -0.3 shown as 0.3);
+  week-12 change still labelled "Week 6 to Week 12".
+- TODO OCR output: lines starting "- " or "* " (Table 2 minus, footnote
+  marks) become Word bullets.
 - TODO next chat: Writing .docx tables (reuse OCR reader); --report path
   .doc skip message; SR re-check on qwen3-vl-plus against the PDFs.
-
