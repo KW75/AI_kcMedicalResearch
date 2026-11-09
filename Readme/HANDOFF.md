@@ -44,13 +44,13 @@ so those catches happen at session open, not mid-work.
 
 ---
 
-## Current State (Session 36, v2.5.0 on main, 2026-11-09)
+## Current State (Session 36, v2.6.0 on main, 2026-11-09)
 
 | Component      | Status |
 |----------------|--------|
 | Tests          | 1027 passed, 10 deselected on v2.6-ocr-editor; 816 on main (`python -m pytest -m "not live" --tb=short -q`) |
 | Branch         | main = fa4edb9 (PR #3). v2.6-ocr-editor = Sessions 33-36 work, open as draft PR #4 (Setup menu, Streamlit/Render removal, Ollama model rule, httpx pin, moved-folder launcher check, SR Anthropic warning, test-local-pins CI job, OCR mode). Do not merge until the "Before the OCR merge" items in Next work are done. Version stays 2.5.0; bump to 2.6.0 after OCR is merged |
-| CI             | green on draft PR #4 (2026-11-09), both jobs: test (requirements-ci.txt, 1025 passed, 44 warnings) and test-local-pins (requirements-local.txt like the launchers, 1025 passed, 57 warnings). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
+| CI             | green on draft PR #4 (2026-11-09), both jobs: test (requirements-ci.txt, 1027 passed, 44 warnings) and test-local-pins (requirements-local.txt like the launchers, 1027 passed, 57 warnings). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
 | Deploy         | None: CLI only, local first. Render service deleted 2026-10-27; Streamlit UI and Render files removed in Session 33. UptimeRobot monitor for the old Render URL: not yet confirmed paused/deleted (user, outside the repo) |
 | Writing mode   | one-pass (write + edit + review in one call); tracks Topic 800 / Article 3,500 / Report 500 / Synopsis 1,500; on main since fa4edb9; tested on gemma4:e4b; terminal menus only |
 | OCR mode       | `--mode ocr`, launcher menu 8 (branch only). Reads PDF / image / .txt / .docx; .doc refused with a message. Records in `reports/ocr/<header>/`, SUMMARY / SYNOPSIS in `output/ocr/`. Ollama by default; Qwen / OpenAI only behind the cloud gate; groq / deepseek / anthropic refused. Broken-font PDFs: text layer with [?], AI fills symbols only, document-wide vote per font code (Ang 2010: 19 of 139 [?] left, checked against the PDF) |
@@ -110,6 +110,12 @@ Before the OCR merge (PR #4):
    `timepoint_selected`; Ang outcome change S26 -> S27 (evidence in
    `Readme/evidence/s26_issue11/`); decoder `!`-for-space gap (low).
 8. Menu 7 Data Analysis: design questions first.
+9. Post-merge OCR (details in the Session 36 log): list "confirmed only
+   once" fills in the record .docx/.md; code-fence the record .md page
+   text; convert LaTeX in fill answers (`$\pm$`) before `_accept`;
+   Tesseract as second reader (trust alone only for minus; lookup
+   TESSERACT_CMD -> PATH -> install folders incl. Mac Homebrew); check
+   how `relevance_screener.py` behaves when tesseract.exe is not on PATH.
 
 
 ---
@@ -1809,3 +1815,10 @@ Expected: a clean tree in sync with origin, the top commit is this handoff, and 
 - Check (SR TODO): `relevance_screener.py` imports pytesseract, but
   tesseract.exe is not on PATH on the dev machine. Find out whether that
   path fails or is silently skipped.
+- Version set to 2.6.0 for the PR #4 merge (user's choice): README.md
+  line 6, main.py VERSION (line 146), pipelines/__init__.py __version__
+  (was stale at 2.3.0), CLI .bat lines 4/160, Mac .sh lines 4/19. No
+  test checks the version; suite still 1027 passed, 10 deselected.
+  Mac launcher exists (scripts/macos/Mac_kcMedicalResearch_CLI.sh), so
+  Mac is supported. Post-merge items collected as Next work item 9.
+  After merge: update the branch row (main = new merge commit).

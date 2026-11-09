@@ -1,7 +1,7 @@
 @echo off
 :: =============================================================================
 ::  AI_kcMedicalResearch_CLI.bat
-::  v2.5.0  |  Menu-driven CLI Launcher (scripts\launcher.py)
+::  v2.6.0  |  Menu-driven CLI Launcher (scripts\launcher.py)
 ::
 ::  Location: scripts\windows\   (resolves project root two levels up)
 :: =============================================================================
@@ -157,7 +157,7 @@ exit /b !RC!
 :print_header
 echo.
 echo   ============================================================
-echo    AI kcMedical Research  ^|  CLI Launcher  ^|  v2.5.0
+echo    AI kcMedical Research  ^|  CLI Launcher  ^|  v2.6.0
 echo   ============================================================
 echo    Project : !PROJECT_DIR!
 echo   ============================================================
