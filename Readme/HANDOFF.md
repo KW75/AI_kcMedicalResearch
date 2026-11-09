@@ -48,12 +48,12 @@ so those catches happen at session open, not mid-work.
 
 | Component      | Status |
 |----------------|--------|
-| Tests          | 1027 passed, 10 deselected on v2.6-ocr-editor; 816 on main (`python -m pytest -m "not live" --tb=short -q`) |
-| Branch         | main = fa4edb9 (PR #3). v2.6-ocr-editor = Sessions 33-36 work, open as draft PR #4 (Setup menu, Streamlit/Render removal, Ollama model rule, httpx pin, moved-folder launcher check, SR Anthropic warning, test-local-pins CI job, OCR mode). Do not merge until the "Before the OCR merge" items in Next work are done. Version stays 2.5.0; bump to 2.6.0 after OCR is merged |
-| CI             | green on draft PR #4 (2026-11-09), both jobs: test (requirements-ci.txt, 1027 passed, 44 warnings) and test-local-pins (requirements-local.txt like the launchers, 1027 passed, 57 warnings). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
+| Tests          | 1027 passed, 10 deselected on main (v2.6.0, bcd42d9) (`python -m pytest -m "not live" --tb=short -q`) |
+| Branch         | main = bcd42d9 (PR #4 merged 2026-11-09 as a merge commit; v2.6.0, OCR mode). It brought in Sessions 33-36: Setup menu, Streamlit/Render removal, Ollama model rule, httpx pin, moved-folder launcher check, SR Anthropic warning, test-local-pins CI job, OCR mode. v2.6-ocr-editor = 106c9ef, fully merged (branch kept for now) |
+| CI             | green on main at bcd42d9 (2026-11-09), both jobs: test (requirements-ci.txt, 1027 passed, 44 warnings) and test-local-pins (requirements-local.txt like the launchers, 1027 passed, 57 warnings). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
 | Deploy         | None: CLI only, local first. Render service deleted 2026-10-27; Streamlit UI and Render files removed in Session 33. UptimeRobot monitor for the old Render URL: not yet confirmed paused/deleted (user, outside the repo) |
 | Writing mode   | one-pass (write + edit + review in one call); tracks Topic 800 / Article 3,500 / Report 500 / Synopsis 1,500; on main since fa4edb9; tested on gemma4:e4b; terminal menus only |
-| OCR mode       | `--mode ocr`, launcher menu 8 (branch only). Reads PDF / image / .txt / .docx; .doc refused with a message. Records in `reports/ocr/<header>/`, SUMMARY / SYNOPSIS in `output/ocr/`. Ollama by default; Qwen / OpenAI only behind the cloud gate; groq / deepseek / anthropic refused. Broken-font PDFs: text layer with [?], AI fills symbols only, document-wide vote per font code (Ang 2010: 19 of 139 [?] left, checked against the PDF) |
+| OCR mode       | `--mode ocr`, launcher menu 8. Reads PDF / image / .txt / .docx; .doc refused with a message. Records in `reports/ocr/<header>/`, SUMMARY / SYNOPSIS in `output/ocr/`. Ollama by default; Qwen / OpenAI only behind the cloud gate; groq / deepseek / anthropic refused. Broken-font PDFs: text layer with [?], AI fills symbols only, document-wide vote per font code (Ang 2010: 19 of 139 [?] left, checked against the PDF) |
 | SR pipeline    | working via CLI with Qwen; Ang 2010 verified against PDF (NFR week 6, unanimous N=3); text-fallback drops surface in Stage 4 `[SKIP]` block. Hard-coded `qwen-vl-plus` (404 on the current key) still in the SR extractors (see Next work) |
 | Providers      | Ollama (default, local, never falls back to cloud; model = OLLAMA_MODEL in .env, else gemma4:e4b) / DeepSeek / Qwen (SR) / OpenAI / Anthropic / Groq. Anthropic and Gemini are geo-restricted on the dev machine; the planned Anthropic -> Gemini switch is on hold |
 
@@ -1822,3 +1822,11 @@ Expected: a clean tree in sync with origin, the top commit is this handoff, and 
   Mac launcher exists (scripts/macos/Mac_kcMedicalResearch_CLI.sh), so
   Mac is supported. Post-merge items collected as Next work item 9.
   After merge: update the branch row (main = new merge commit).
+- PR #4 merged 2026-11-09 as merge commit bcd42d9 (user chose "Create a
+  merge commit" so the branch commit IDs cited in this log stay valid).
+  Local main fast-forwarded fa4edb9..bcd42d9 (63 commits, Sessions 33-36).
+  Suite on main: 1027 passed, 10 deselected. CI on main green, both jobs:
+  test 1027 passed (44 warnings), test-local-pins 1027 passed (57 warnings).
+  Current State rows Tests / Branch / CI updated to bcd42d9; OCR mode row
+  no longer says "branch only". v2.6-ocr-editor (106c9ef) is fully merged
+  and kept for now.
