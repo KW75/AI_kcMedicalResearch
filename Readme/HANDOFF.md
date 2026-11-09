@@ -48,9 +48,9 @@ so those catches happen at session open, not mid-work.
 
 | Component      | Status |
 |----------------|--------|
-| Tests          | 1025 passed, 10 deselected on v2.6-ocr-editor; 816 on main (`python -m pytest -m "not live" --tb=short -q`) |
+| Tests          | 1027 passed, 10 deselected on v2.6-ocr-editor; 816 on main (`python -m pytest -m "not live" --tb=short -q`) |
 | Branch         | main = fa4edb9 (PR #3). v2.6-ocr-editor = Sessions 33-36 work, open as draft PR #4 (Setup menu, Streamlit/Render removal, Ollama model rule, httpx pin, moved-folder launcher check, SR Anthropic warning, test-local-pins CI job, OCR mode). Do not merge until the "Before the OCR merge" items in Next work are done. Version stays 2.5.0; bump to 2.6.0 after OCR is merged |
-| CI             | green on draft PR #4 (2026-11-09), both jobs: test (requirements-ci.txt, 1024 passed, 44 warnings) and test-local-pins (requirements-local.txt like the launchers, 1024 passed, 57 warnings). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
+| CI             | green on draft PR #4 (2026-11-09), both jobs: test (requirements-ci.txt, 1025 passed, 44 warnings) and test-local-pins (requirements-local.txt like the launchers, 1025 passed, 57 warnings). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
 | Deploy         | None: CLI only, local first. Render service deleted 2026-10-27; Streamlit UI and Render files removed in Session 33. UptimeRobot monitor for the old Render URL: not yet confirmed paused/deleted (user, outside the repo) |
 | Writing mode   | one-pass (write + edit + review in one call); tracks Topic 800 / Article 3,500 / Report 500 / Synopsis 1,500; on main since fa4edb9; tested on gemma4:e4b; terminal menus only |
 | OCR mode       | `--mode ocr`, launcher menu 8 (branch only). Reads PDF / image / .txt / .docx; .doc refused with a message. Records in `reports/ocr/<header>/`, SUMMARY / SYNOPSIS in `output/ocr/`. Ollama by default; Qwen / OpenAI only behind the cloud gate; groq / deepseek / anthropic refused. Broken-font PDFs: text layer with [?], AI fills symbols only, document-wide vote per font code (Ang 2010: 19 of 139 [?] left, checked against the PDF) |
@@ -92,11 +92,9 @@ Before the OCR merge (PR #4):
    plain `Normal` paragraphs. The AI summary's Markdown now becomes Word
    formatting via `_add_markdown()` in output.py. Open choice: wrap the
    record .md page text in a code fence (see the Session 36 log).
-4. OCR fill: codes with a single vote are kept unchecked; Ang p1 abstract
-   font still has 17 [?] left. Option: send broken-font pages to a stronger
-   vision model (qwen3-vl-plus, cloud, behind the gate).
-
-After the merge:
+4. DONE in code (Session 36, option 3): single-vote fills stay but are
+   flagged "confirmed only once - check against the PDF" on screen and
+   in FILL_DEBUG. Open choice: also list them in the record .docx/.md.
 5. SR: see "TODO SR (next chat, do in this order)" in the Session 35 log
    for full detail. Replace hard-coded `qwen-vl-plus` with
    `QWEN_VISION_MODEL` (data_extractor.py, table_extractor.py,
@@ -1780,4 +1778,14 @@ Expected: a clean tree in sync with origin, the top commit is this handoff, and 
 - Idea, not done: fill answers also contain LaTeX (`$\pm$` despite
   LINES_PROMPT), and `_FILL` refuses `$` and `\`. Converting LaTeX in the
   answers before `_accept` would be safe (`codes_agree` still applies).
-
+- Next work item 4 DONE in code (option 3, chosen by the user): a fill
+  whose font code has a single vote (in `keep`, not in `agreed`) stays,
+  but `_vote_pages` logs "page N: K fill(s) confirmed only once (−10.8)
+  - check against the PDF". Each fill is shown with up to 8 characters
+  of the text after it, so the user can find it in the PDF. The line goes
+  to screen and FILL_DEBUG (via the vote wrapper). Not yet in the record
+  .docx/.md: decide separately. Options 1 (keep silently) and 2 (send
+  back to [?]) were rejected: 1 hides the risk, 2 loses correct fills
+  such as `−10.8` in s36_vote.
+  Tests: tests/test_ocr_warnings.py (+2); suite 1025 -> 1027 passed,
+  10 deselected. CI green on d224006 (1025 both jobs).

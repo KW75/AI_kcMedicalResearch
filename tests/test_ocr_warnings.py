@@ -29,3 +29,22 @@ def test_fill_debug_also_keeps_vote_and_warning_lines(tmp_path, monkeypatch):
     assert "TEXT: P [?] 0.01" in dbg  # refused line still there
     assert "WARNING: page 1: 1 of 1 [?] left" in dbg  # vote/warning now saved too
     assert any("WARNING: page 1" in m for m in logs)  # still shown on screen
+
+# --- Session 36 item 4 (option 3): single-vote fills stay but are flagged
+def test_single_vote_fill_is_kept_and_flagged():
+    logs = []
+    done = [{"text": "versus −10.8", "method": "hybrid"}]
+    engine._vote_pages(done, [(0, 1, "versus [?]10.8", ["F1:1"])], logs.append)
+    assert done[0]["text"] == "versus −10.8"  # kept, not sent back
+    flag = [m for m in logs if "confirmed only once" in m]
+    assert len(flag) == 1
+    assert "page 1: 1 fill(s) confirmed only once (−10.8)" in flag[0]
+    assert "check against the PDF" in flag[0]
+
+def test_fill_confirmed_twice_is_not_flagged():
+    logs = []
+    done = [{"text": "−5 mA", "method": "hybrid"},
+            {"text": "−5 mA", "method": "hybrid"}]
+    hybrid = [(0, 1, "[?]5 mA", ["F1:1"]), (1, 2, "[?]5 mA", ["F1:1"])]
+    engine._vote_pages(done, hybrid, logs.append)
+    assert not any("confirmed only once" in m for m in logs)

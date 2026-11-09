@@ -435,6 +435,16 @@ def _vote_pages(done, hybrid, log):
             if back:
                 log(f"    page {n}: {back} fill(s) disagree with the same font "
                     "code elsewhere - back to [?]")
+            # Item 4, option 3: a fill whose font code has a single vote is
+            # kept but flagged (checked against its own line only).
+            import re
+            parts = hint.split(MARK)
+            once = [g + re.match(r"\S{0,8}", parts[k + 1]).group(0)
+                    for k, (c, g) in enumerate(zip(codes, new))
+                    if g is not None and c in keep and c not in agreed]
+            if once:
+                log(f"    page {n}: {len(once)} fill(s) confirmed only once "
+                    f"({', '.join(once)}) - check against the PDF")
             done[idx]["text"] = _put(hint, [g if g is not None else MARK for g in new])
         total = hint.count(MARK)
         left = done[idx]["text"].count(MARK)
