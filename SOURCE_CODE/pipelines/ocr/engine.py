@@ -468,15 +468,24 @@ def _process_file(path: Path, out_dir, header: str, model: str, call, log,
             log(f"    page {page['page']}: AI reading...")
             text = call(TRANSCRIBE_PROMPT, images=[page["png"]]).strip()
             done.append({"page": page["page"], "text": text, "method": "vision"})
-    _vote_pages(done, hybrid, log)
+    vote_log = []  # vote and [?]-left lines, also saved in FILL_DEBUG
+
+    def _vote_log(msg):
+        log(msg)
+        vote_log.append(msg.strip())
+
+    _vote_pages(done, hybrid, _vote_log)
     full = "\n\n".join(f"[Page {p['page']}]\n{p['text']}" for p in done)
-    if debug:
+    if debug or vote_log:
         dbg = Path(out_dir) / f"{header}_FILL_DEBUG.txt"
         dbg.parent.mkdir(parents=True, exist_ok=True)
-        dbg.write_text("".join(
+        refused_txt = "".join(
             f"[Page {n}]\nTEXT: {line}\nAI:   "
             f"{ans if ans is not None else '(no line returned)'}\n\n"
-            for n, line, ans in debug), encoding="utf-8")
+            for n, line, ans in debug)
+        vote_txt = ("--- Document vote and warnings ---\n"
+                    + "".join(f"{m}\n" for m in vote_log)) if vote_log else ""
+        dbg.write_text(refused_txt + vote_txt, encoding="utf-8")
         log(f"    AI answers for refused lines: {dbg}")
     log("    summarising...")
     try:

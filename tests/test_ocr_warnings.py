@@ -13,3 +13,19 @@ def test_vote_warning_says_not_confirmed():
     assert "check against the PDF" in warn[0]
     assert "AI changed other text" not in warn[0]
     assert done[0]["method"] == "hybrid_unresolved"
+
+def test_fill_debug_also_keeps_vote_and_warning_lines(tmp_path, monkeypatch):
+    from pathlib import Path
+    page = {"page": 1, "text": None, "hint": "P [?] 0.01", "png": b"x",
+            "codes": None}
+    monkeypatch.setattr(engine.reader, "read_input", lambda path: [page])
+
+    def call(prompt, images=None):
+        return "1| P 0.01"  # the model drops the sign -> line refused
+
+    logs = []
+    engine._process_file(Path("a.pdf"), tmp_path, "H", "m", call, logs.append)
+    dbg = (tmp_path / "H_FILL_DEBUG.txt").read_text(encoding="utf-8")
+    assert "TEXT: P [?] 0.01" in dbg  # refused line still there
+    assert "WARNING: page 1: 1 of 1 [?] left" in dbg  # vote/warning now saved too
+    assert any("WARNING: page 1" in m for m in logs)  # still shown on screen
