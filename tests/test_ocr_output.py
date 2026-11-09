@@ -96,3 +96,63 @@ def test_control_characters_do_not_break_the_docx(tmp_path):
     text = "\n".join(p.text for p in docx.Document(str(docx_path)).paragraphs)
     assert "BP 140/90 mmHg ok" in text
     assert "summary" in text
+
+
+
+# --- Next work item 1: LaTeX in AI-written summaries (Session 36) ----------
+# The prompts ask for plain symbols, but models still write $\pm$ etc.
+# strip_latex() turns known commands into Unicode in code. It leaves money
+# ($5), [?] marks and unknown commands exactly as they are.
+
+@pytest.mark.parametrize("raw, want", [
+    (r"mean $\pm$ SD", "mean ± SD"),
+    (r"age $\geq$ 18 and $\leq$ 65", "age ≥ 18 and ≤ 65"),
+    (r"week 6 $\rightarrow$ week 12", "week 6 → week 12"),
+    (r"2 $\times$ 3", "2 × 3"),
+    (r"$-20.2 \pm 23.9$", "-20.2 ± 23.9"),
+    (r"37$^\circ$C", "37°C"),
+    (r"50\% reduction", "50% reduction"),
+    (r"P $\le$ 0.05, $\leq$ and $\leftarrow$", "P ≤ 0.05, ≤ and ←"),
+    (r"bare \pm in text", "bare ± in text"),
+])
+def test_strip_latex_gives_plain_symbols(raw, want):
+    assert output.strip_latex(raw) == want
+
+
+@pytest.mark.parametrize("raw", [
+    "costs $5 and $10",
+    "P [?] 0.01 and [?]10.8",
+    "no latex here",
+    r"$\unknowncmd$ stays",
+    "",
+])
+def test_strip_latex_leaves_other_text_alone(raw):
+    assert output.strip_latex(raw) == raw
+
+
+def test_strip_latex_none_stays_none():
+    assert output.strip_latex(None) is None
+
+def test_summary_files_have_no_latex(tmp_path):
+    text = (r"## Results" "\n"
+            r"- Pain $-20.2 \pm 23.9$ vs $-14.9 \pm 16.4$" "\n"
+            r"- P [?] 0.01")
+    docx_path, md_path = output.write_summary(tmp_path, "H", "SUMMARY", text,
+                                              "gemma4:e4b")
+    md = md_path.read_text(encoding="utf-8")
+    assert "$" not in md and r"\pm" not in md
+    assert "-20.2 ± 23.9" in md and "P [?] 0.01" in md
+    paras = " ".join(t for t, _ in _docx_paragraphs(docx_path))
+    assert r"\pm" not in paras and "-20.2 ± 23.9" in paras
+
+def test_record_summary_has_no_latex_but_page_text_is_verbatim(tmp_path):
+    pages = [{"page": 1, "text": r"Raw $\pm$ stays as read", "method": "text"}]
+    docx_path, md_path = output.write_record(
+        tmp_path, "H", "a.pdf", r"Pain $-20.2 \pm 23.9$", pages, "gemma4:e4b")
+    md = md_path.read_text(encoding="utf-8")
+    assert "Pain -20.2 ± 23.9" in md
+    assert r"Raw $\pm$ stays as read" in md
+    paras = [t for t, _ in _docx_paragraphs(docx_path)]
+    assert "Pain -20.2 ± 23.9" in paras
+    assert r"Raw $\pm$ stays as read" in paras
+

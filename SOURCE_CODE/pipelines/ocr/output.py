@@ -28,6 +28,52 @@ def _clean(text):
     return _XML_BAD.sub("", text) if text else text
 
 
+# LaTeX that models still write in AI summaries, turned into plain symbols.
+# Used only on AI-written summary text, never on OCR page text (verbatim).
+# Unknown commands are left as they are, so nothing is guessed.
+_LATEX_SYMBOLS = {
+    "pm": "±", "mp": "∓", "times": "×", "div": "÷", "cdot": "·",
+    "geq": "≥", "ge": "≥", "geqslant": "≥", "leq": "≤", "le": "≤",
+    "leqslant": "≤", "neq": "≠", "ne": "≠", "approx": "≈", "sim": "~",
+    "rightarrow": "→", "to": "→", "leftarrow": "←", "Rightarrow": "⇒",
+    "leftrightarrow": "↔", "uparrow": "↑", "downarrow": "↓",
+    "infty": "∞", "degree": "°",
+    "alpha": "α", "beta": "β", "gamma": "γ", "delta": "δ", "Delta": "Δ",
+    "kappa": "κ", "lambda": "λ", "mu": "μ", "sigma": "σ", "chi": "χ",
+}
+_LATEX_CMD = re.compile(r"\\([A-Za-z]+)(?![A-Za-z])")
+_LATEX_DEGREE = re.compile(r"\^\s*\{?\s*\\circ\s*\}?")
+_LATEX_ESCAPE = re.compile(r"\\([%&#])")
+_LATEX_MATH = re.compile(r"\$([^$\n]+?)\$")
+
+
+def _latex_symbols(text):
+    text = _LATEX_DEGREE.sub("°", text)
+    text = _LATEX_ESCAPE.sub(r"\1", text)
+    return _LATEX_CMD.sub(
+        lambda m: _LATEX_SYMBOLS.get(m.group(1), m.group(0)), text)
+
+
+def strip_latex(text):
+    """Known LaTeX commands -> Unicode; $...$ removed only around LaTeX.
+
+    "$\\pm$" -> "±", "37$^\\circ$C" -> "37°C", "50\\%" -> "50%".
+    Money ("$5 and $10"), [?] marks and unknown commands stay as they are.
+    None stays None.
+    """
+    if not text:
+        return text
+
+    def _math(m):
+        inner = m.group(1)
+        if "\\" not in inner:
+            return m.group(0)  # not LaTeX, e.g. "$5 and $"
+        plain = _latex_symbols(inner)
+        return plain.strip() if "\\" not in plain else m.group(0)
+
+    return _latex_symbols(_LATEX_MATH.sub(_math, text))
+
+
 def make_header(name: str, now: datetime | None = None) -> str:
     """'<name>_<YYYY-MM-DD>' from the typed name; blank -> 'OCR_<date>_<HHMM>'."""
     now = now or datetime.now()
@@ -66,7 +112,7 @@ def write_record(out_dir, header: str, source_name: str, summary: str,
     """Write <rec_dir or out_dir/records>/<header>_<stem>_<ext>.docx and .md."""
     rec_dir = Path(rec_dir) if rec_dir else Path(out_dir) / "records"
     rec_dir.mkdir(parents=True, exist_ok=True)
-    summary = _clean(summary) or ""
+    summary = strip_latex(_clean(summary)) or ""
     pages = [{**p, "text": _clean(p.get("text"))} for p in pages]
 
     stem = _record_stem(header, source_name)
@@ -104,7 +150,7 @@ def write_summary(out_dir, header: str, kind: str, text: str,
         raise ValueError(f"Unknown summary kind: {kind!r}")
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
-    text = _clean(text) or ""
+    text = strip_latex(_clean(text)) or ""
     docx_path = out_dir / f"{header}_{kind}.docx"
     md_path = out_dir / f"{header}_{kind}.md"
     title = f"{header} {kind.title()}"

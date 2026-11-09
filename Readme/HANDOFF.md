@@ -48,8 +48,8 @@ so those catches happen at session open, not mid-work.
 
 | Component      | Status |
 |----------------|--------|
-| Tests          | 988 passed, 10 deselected on v2.6-ocr-editor; 816 on main (`python -m pytest -m "not live" --tb=short -q`) |
-| Branch         | main = fa4edb9 (PR #3). v2.6-ocr-editor = Sessions 33-35 work, HEAD c812a99, open as draft PR #4 (Setup menu, Streamlit/Render removal, Ollama model rule, httpx pin, moved-folder launcher check, SR Anthropic warning, test-local-pins CI job, OCR mode). Do not merge until the "Before the OCR merge" items in Next work are done. Version stays 2.5.0; bump to 2.6.0 after OCR is merged |
+| Tests          | 1005 passed, 10 deselected on v2.6-ocr-editor; 816 on main (`python -m pytest -m "not live" --tb=short -q`) |
+| Branch         | main = fa4edb9 (PR #3). v2.6-ocr-editor = Sessions 33-36 work, open as draft PR #4 (Setup menu, Streamlit/Render removal, Ollama model rule, httpx pin, moved-folder launcher check, SR Anthropic warning, test-local-pins CI job, OCR mode). Do not merge until the "Before the OCR merge" items in Next work are done. Version stays 2.5.0; bump to 2.6.0 after OCR is merged |
 | CI             | green on draft PR #4 (2026-11-09), both jobs: test (requirements-ci.txt, 988 passed, 44 warnings) and test-local-pins (requirements-local.txt like the launchers, 988 passed, 57 warnings). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
 | Deploy         | None: CLI only, local first. Render service deleted 2026-10-27; Streamlit UI and Render files removed in Session 33. UptimeRobot monitor for the old Render URL: not yet confirmed paused/deleted (user, outside the repo) |
 | Writing mode   | one-pass (write + edit + review in one call); tracks Topic 800 / Article 3,500 / Report 500 / Synopsis 1,500; on main since fa4edb9; tested on gemma4:e4b; terminal menus only |
@@ -77,11 +77,9 @@ Collected from the Session 34-35 logs on 2026-11-09. Those logs keep the
 detail and evidence; this list is the only place to tick items off.
 
 Before the OCR merge (PR #4):
-1. OCR summary: strip LaTeX in code after the model. Only the prompts ask
-   for plain symbols (engine.py TRANSCRIBE_PROMPT / SUMMARY_PROMPT;
-   SYNOPSIS_PROMPT does not ask at all). Plan: pure `strip_latex()` in
-   `pipelines/ocr/output.py`, called in `write_summary` only; records stay
-   untouched (they are the checked copy of the source text).
+1. DONE (Session 36): `strip_latex()` in `pipelines/ocr/output.py`, used
+   on AI summaries in `write_summary` and `write_record`; OCR page text
+   stays verbatim. Still to do: look at a real Ang SUMMARY.
 2. OCR summary prompt must copy [?] exactly (Session 35: -0.3 came out as
    0.3) and must label the week-12 change from baseline correctly (it came
    out as "Week 6 to Week 12").
@@ -1643,3 +1641,31 @@ Expected: a clean tree in sync with origin, the top commit is this handoff, and 
   marks) become Word bullets.
 - TODO next chat: Writing .docx tables (reuse OCR reader); --report path
   .doc skip message; SR re-check on qwen3-vl-plus against the PDFs.
+
+
+## Session 36 - 2026-11-09 - branch v2.6-ocr-editor
+
+- Session-opening checklist, all four items run: 1 test count 988 = README
+  line 7. 2 56 RESOLVED_ISSUES rows (pattern `^\|\s*(\d+)\s*\|`), no `(#N)`
+  in README.md; `#(\d+)` had found only 5, so checklist item 2 now names
+  the row pattern. 3 Open Issues = README Known Issues (#2 Medium, #3 Low).
+  4 LaTeX claim confirmed: only the prompts asked for plain symbols, there
+  was no cleanup in code (SYNOPSIS_PROMPT did not ask at all).
+- CI on draft PR #4: both jobs 988 passed (44 / 57 warnings).
+- 911cb5e: HANDOFF tidy: Current State to Session 36 with an OCR row,
+  new "Next work" list, checklist item 2 pattern.
+- Next work item 1 DONE: `strip_latex()` in `pipelines/ocr/output.py`.
+  Known commands become Unicode (\pm ±, \geq ≥, \rightarrow →, ^\circ °,
+  \% %, Greek letters ...). A command is matched as a whole name, so \le
+  never matches inside \leq. `$...$` is removed only when everything
+  inside converts. Money ("$5"), [?] and unknown commands are not changed.
+  Used on the AI summary in `write_summary` and `write_record`; OCR page
+  text is not touched (it is the checked copy of the source).
+  Tests: 17 in tests/test_ocr_output.py, failed before the fix
+  (AttributeError; `$` still in the SUMMARY .md). Suite: 988 -> 1005
+  passed, 10 deselected.
+- Not yet checked: a real menu-8 run on Ang to look at the SUMMARY.
+- Lesson: the first tidy paste overwrote the Session 35 "TODO SR" block,
+  and the second paste duplicated Next work. Both were caught before
+  commit by the diff stat (+67/-34 against about +50/-15 expected) and by
+  counting the anchors. Check both after any large paste.
