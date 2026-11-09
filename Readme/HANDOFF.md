@@ -49,7 +49,7 @@ so those catches happen at session open, not mid-work.
 | Component      | Status |
 |----------------|--------|
 | Tests          | 1027 passed, 10 deselected on main (v2.6.0, bcd42d9) (`python -m pytest -m "not live" --tb=short -q`) |
-| Branch         | main = bcd42d9 (PR #4 merged 2026-11-09 as a merge commit; v2.6.0, OCR mode). It brought in Sessions 33-36: Setup menu, Streamlit/Render removal, Ollama model rule, httpx pin, moved-folder launcher check, SR Anthropic warning, test-local-pins CI job, OCR mode. v2.6-ocr-editor = 106c9ef, fully merged (branch kept for now) |
+| Branch         | main = bcd42d9 (PR #4 merged 2026-11-09 as a merge commit; v2.6.0, OCR mode). It brought in Sessions 33-36: Setup menu, Streamlit/Render removal, Ollama model rule, httpx pin, moved-folder launcher check, SR Anthropic warning, test-local-pins CI job, OCR mode. v2.6-ocr-editor = 106c9ef, fully merged; branch deleted 2026-11-09 (local and GitHub), together with the older merged v2.5-major-updates (1de797a) |
 | CI             | green on main at bcd42d9 (2026-11-09), both jobs: test (requirements-ci.txt, 1027 passed, 44 warnings) and test-local-pins (requirements-local.txt like the launchers, 1027 passed, 57 warnings). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
 | Deploy         | None: CLI only, local first. Render service deleted 2026-10-27; Streamlit UI and Render files removed in Session 33. UptimeRobot monitor for the old Render URL: not yet confirmed paused/deleted (user, outside the repo) |
 | Writing mode   | one-pass (write + edit + review in one call); tracks Topic 800 / Article 3,500 / Report 500 / Synopsis 1,500; on main since fa4edb9; tested on gemma4:e4b; terminal menus only |
@@ -1830,3 +1830,9 @@ Expected: a clean tree in sync with origin, the top commit is this handoff, and 
   Current State rows Tests / Branch / CI updated to bcd42d9; OCR mode row
   no longer says "branch only". v2.6-ocr-editor (106c9ef) is fully merged
   and kept for now.
+- Branches deleted 2026-11-09 (user's choice), after `git branch -a --merged
+  main` listed both and `git log main..v2.6-ocr-editor` was empty:
+  v2.6-ocr-editor (106c9ef) and the older v2.5-major-updates (1de797a),
+  local (`git branch -d`) and GitHub (`git push origin --delete`), then
+  `git fetch --prune`. Only main is left. All commits stay in main's
+  history, so the commit IDs in this log are still valid. Branch row updated.
