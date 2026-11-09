@@ -17,10 +17,13 @@ Before treating any Open Issue as work, and before ending the session:
 1. **Test count check.** Grep `README.md` for `Tests: NNN passed`; run
    `python -m pytest -m "not live" --collect-only -q | tail -1` (or
    equivalent) and confirm the two match. Update README if not.
-2. **Closed-issue citation grep.** For each issue number in
-   `Readme/RESOLVED_ISSUES.md`, grep `README.md` and this file for
-   `(#N)`. Any hit is a stale citation — replace with a positive
-   description or a REVIEWER_GUIDE section reference.
+2. **Closed-issue citation grep.** Take the issue numbers from the table
+   rows of `Readme/RESOLVED_ISSUES.md` (pattern `^\|\s*(\d+)\s*\|`; print
+   the count so "clean" cannot mean "never ran"). The pattern `#(\d+)`
+   finds only numbers cited in passing. Grep `README.md` and this file's
+   Current State / Open Issues / Next work sections for `(#N)`. Any hit
+   is a stale citation; replace it with a positive description or a
+   REVIEWER_GUIDE section reference. Hits inside session logs are history.
 3. **Open Issues table drift.** Confirm `Readme/HANDOFF.md`'s Open
    Issues table matches `README.md`'s Known Issues table (same numbers,
    same priorities). They live in two files and drift silently.
@@ -41,16 +44,17 @@ so those catches happen at session open, not mid-work.
 
 ---
 
-## Current State (Session 34, v2.5.0 on main, 2026-11-06)
+## Current State (Session 36, v2.5.0 on main, 2026-11-09)
 
 | Component      | Status |
 |----------------|--------|
 | Tests          | 988 passed, 10 deselected on v2.6-ocr-editor; 816 on main (`python -m pytest -m "not live" --tb=short -q`) |
-| Branch         | main = fa4edb9 (PR #3). v2.6-ocr-editor = Sessions 33-35 work, open as draft PR #4 (Setup menu, Streamlit/Render removal, Ollama model rule, httpx pin, moved-folder launcher check, SR Anthropic warning, test-local-pins CI job). Do not merge until OCR is done. Version stays 2.5.0; bump to 2.6.0 after OCR is merged |
-| CI             | green on draft PR #4, both jobs: test (requirements-ci.txt, 845 passed, 44 warnings) and test-local-pins (requirements-local.txt like the launchers, 845 passed, 57 warnings). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
-| Deploy         | None: CLI only, local first. Render service deleted 2026-10-27; Streamlit UI and Render files removed in Session 33. UptimeRobot monitor: confirm paused/deleted |
+| Branch         | main = fa4edb9 (PR #3). v2.6-ocr-editor = Sessions 33-35 work, HEAD c812a99, open as draft PR #4 (Setup menu, Streamlit/Render removal, Ollama model rule, httpx pin, moved-folder launcher check, SR Anthropic warning, test-local-pins CI job, OCR mode). Do not merge until the "Before the OCR merge" items in Next work are done. Version stays 2.5.0; bump to 2.6.0 after OCR is merged |
+| CI             | green on draft PR #4 (2026-11-09), both jobs: test (requirements-ci.txt, 988 passed, 44 warnings) and test-local-pins (requirements-local.txt like the launchers, 988 passed, 57 warnings). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
+| Deploy         | None: CLI only, local first. Render service deleted 2026-10-27; Streamlit UI and Render files removed in Session 33. UptimeRobot monitor for the old Render URL: not yet confirmed paused/deleted (user, outside the repo) |
 | Writing mode   | one-pass (write + edit + review in one call); tracks Topic 800 / Article 3,500 / Report 500 / Synopsis 1,500; on main since fa4edb9; tested on gemma4:e4b; terminal menus only |
-| SR pipeline    | working via CLI with Qwen; Ang 2010 verified against PDF (NFR week 6, unanimous N=3); text-fallback drops now surface in Stage 4 `[SKIP]` block |
+| OCR mode       | `--mode ocr`, launcher menu 8 (branch only). Reads PDF / image / .txt / .docx; .doc refused with a message. Records in `reports/ocr/<header>/`, SUMMARY / SYNOPSIS in `output/ocr/`. Ollama by default; Qwen / OpenAI only behind the cloud gate; groq / deepseek / anthropic refused. Broken-font PDFs: text layer with [?], AI fills symbols only, document-wide vote per font code (Ang 2010: 19 of 139 [?] left, checked against the PDF) |
+| SR pipeline    | working via CLI with Qwen; Ang 2010 verified against PDF (NFR week 6, unanimous N=3); text-fallback drops surface in Stage 4 `[SKIP]` block. Hard-coded `qwen-vl-plus` (404 on the current key) still in the SR extractors (see Next work) |
 | Providers      | Ollama (default, local, never falls back to cloud; model = OLLAMA_MODEL in .env, else gemma4:e4b) / DeepSeek / Qwen (SR) / OpenAI / Anthropic / Groq. Anthropic and Gemini are geo-restricted on the dev machine; the planned Anthropic -> Gemini switch is on hold |
 
 
@@ -64,6 +68,45 @@ Issue numbers below match `README.md` > Known Issues.
 |----|-------|----------|------------|
 | 2  | WeasyPrint not installed; PDF report falls back to HTML | Medium | |
 | 3  | Anthropic and Gemini geo-restricted from dev machine | Low | VPN or skip. Blocks the planned Anthropic -> Gemini switch. |
+
+---
+
+## Next work (start here)
+
+Collected from the Session 34-35 logs on 2026-11-09. Those logs keep the
+detail and evidence; this list is the only place to tick items off.
+
+Before the OCR merge (PR #4):
+1. OCR summary: strip LaTeX in code after the model. Only the prompts ask
+   for plain symbols (engine.py TRANSCRIBE_PROMPT / SUMMARY_PROMPT;
+   SYNOPSIS_PROMPT does not ask at all). Plan: pure `strip_latex()` in
+   `pipelines/ocr/output.py`, called in `write_summary` only; records stay
+   untouched (they are the checked copy of the source text).
+2. OCR summary prompt must copy [?] exactly (Session 35: -0.3 came out as
+   0.3) and must label the week-12 change from baseline correctly (it came
+   out as "Week 6 to Week 12").
+3. OCR output: lines starting "- " or "* " (Table 2 minus signs, footnote
+   marks) must not become Word bullets.
+4. OCR fill: codes with a single vote are kept unchecked; Ang p1 abstract
+   font still has 17 [?] left. Option: send broken-font pages to a stronger
+   vision model (qwen3-vl-plus, cloud, behind the gate).
+
+After the merge:
+5. SR: see "TODO SR (next chat, do in this order)" in the Session 35 log
+   for full detail. Replace hard-coded `qwen-vl-plus` with
+   `QWEN_VISION_MODEL` (data_extractor.py, table_extractor.py,
+   scripts/nondet_probe.py; grep again before editing); broken text layers
+   in all 5 SR papers (text-based screening and RoB2 for CBT-women and
+   zsy234 UNVERIFIED); allow Ollama vision models for SR.
+6. Writing: .docx tables never reach the AI (`_load_input_files` reads
+   paragraphs only; reuse the OCR reader); a read error is sent as
+   "[Could not read <name>]" as if it were document text; check whether
+   the `--report` path still skips .doc without a message (ae074cd fixed
+   the menu path).
+7. Session 28 priorities, still open: vote `outcome_selected` /
+   `timepoint_selected`; Ang outcome change S26 -> S27 (evidence in
+   `Readme/evidence/s26_issue11/`); decoder `!`-for-space gap (low).
+8. Menu 7 Data Analysis: design questions first.
 
 
 ---
@@ -153,7 +196,7 @@ confirmed DASHSCOPE_ANTHROPIC_URL / DASHSCOPE_OPENAI_URL are dead config
 hardware: a 14B pull and a demo run converging. Do before rollout.
 
 
-## Next Session Priorities (Session 28)
+## Session 28 priorities (history; the open ones are listed in "Next work")
 
 1. **Vote `outcome_selected` / `timepoint_selected`.** Carryover from
    S26 priority 3 and now more urgent: today's Ang stability could be
