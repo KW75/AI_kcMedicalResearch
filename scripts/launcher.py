@@ -3,6 +3,7 @@
 #  (version shown in the banner is parsed live from SOURCE_CODE/main.py)
 # =============================================================================
 
+import getpass
 import re
 import subprocess
 import sys
@@ -24,17 +25,17 @@ except ImportError:
 BASE   = Path(__file__).resolve().parent.parent
 PYTHON = sys.executable
 
-# Ollama model list, default and descriptions, shared with the app so the
-# launcher and the UI show the same thing. ollama_models.py is stdlib only.
+# Default model, model list and descriptions come from SOURCE_CODE/ollama_models.py
+# (stdlib only, so the launcher can import it).
 _SOURCE_DIR = str(BASE / 'SOURCE_CODE')
 if _SOURCE_DIR not in sys.path:
     sys.path.append(_SOURCE_DIR)
 
 from ollama_models import (  # noqa: E402
-    RANKS_SOURCE, choose_default, describe, list_ollama_models,
-    missing_ranked, model_capabilities,
+    OLLAMA_DEFAULT_MODEL, describe, list_ollama_models, model_capabilities, ollama_version,
 )
 from time_limits import CHOICES as TIME_CHOICES, DEFAULT as TIME_DEFAULT, LABELS as TIME_LABELS  # noqa: E402
+import env_file  # noqa: E402
 
 
 def _project_meta() -> tuple[str, str]:
@@ -167,15 +168,22 @@ RESET = _R
 #  Pipeline / provider tables
 # -----------------------------------------------------------------------------
 MODES = [
-    ('1', 'Coding',       '--mode coding'),
-    ('2', 'Writing',      '--mode writing'),
-    ('3', 'Appraisal',    '--mode appraisal'),
-    ('4', 'Search',       '--mode search'),
-    ('5', 'RCT Search',   '--mode rct_search'),
-    ('6', 'SR Pipeline',  '--mode sr'),
-    ('7', 'Dry Run',      '--dry-run'),
-    ('8', 'Pipeline UI',  '--ui'),
+    ('1',  'Coding',        '--mode coding'),
+    ('2',  'Writing',       '--mode writing'),
+    ('3',  'Appraisal',     '--mode appraisal'),
+    ('4',  'Search',        '--mode search'),
+    ('5',  'RCT Search',    '--mode rct_search'),
+    ('6',  'SR Pipeline',   '--mode sr'),
+    ('7',  'Data Analysis', None),        # coming soon
+    ('8',  'OCR',           '--mode ocr'),
+    ('9',  'Dry Run',       '--dry-run'),
+    ('10', 'Setup',         'setup'),     # launcher sub-menu, not a main.py flag
 ]
+
+HELP_FILE = BASE / "Readme" / "flashcard-help.html"
+ENV_FILE     = BASE / ".env"
+ENV_TEMPLATE = BASE / ".env.example"
+
 
 PROVIDERS = [
     ('1', 'Ollama',    'local - free - default',  '--provider ollama'),
@@ -188,6 +196,9 @@ PROVIDERS = [
 
 VISION_PROVIDERS  = {'qwen', 'openai', 'anthropic', 'groq'}
 BLOCKED_FOR_SR    = {'ollama', 'deepseek'}
+OCR_PROVIDERS     = {'ollama', 'qwen', 'openai'}
+BLOCKED_FOR_OCR   = {'groq', 'deepseek', 'anthropic'}
+
 
 _MODE_INPUT_MAP = {
     '--mode coding':     'coding',
@@ -257,8 +268,9 @@ def banner() -> None:
     _py = _py[:23]
     print(f'  {FRAME}║{RESET}   {LOGO}██╔═██╗ ██║{RESET}{W(9)}'
           f'{ACCENT}Python   {RESET}{GOOD}{_py}{RESET}{W(23 - len(_py))}{FRAME}║{RESET}')
+    _run = 'local first / cloud API'
     print(f'  {FRAME}║{RESET}   {LOGO}██║  ██╗╚██████╗{RESET}{W(4)}'
-          f'{ACCENT}Deploy   {RESET}{INFO}render.com / local{RESET}{W(5)}{FRAME}║{RESET}')
+          f'{ACCENT}Runs     {RESET}{INFO}{_run}{RESET}{W(23 - len(_run))}{FRAME}║{RESET}')
     print(f'  {FRAME}║{RESET}   {LOGO}╚═╝  ╚═╝ ╚═════╝{RESET}{W(36)}{FRAME}║{RESET}')
 
     print(f'  {FRAME}║{RESET}                                                       {FRAME}║{RESET}')
@@ -272,8 +284,9 @@ def banner() -> None:
 
     print(f'  {FRAME}║{RESET}  {INFO}Modes  :{RESET}  '
           f'{TEXT}coding  writing  appraisal  search{RESET}{W(8)}{FRAME} ║{RESET}')
+    _modes2 = 'rct_search  sr  data_analysis  ocr'
     print(f'  {FRAME}║{RESET}  {INFO}         {RESET}  '
-          f'{TEXT}rct_search  sr  dry-run  ui{RESET}{W(12)}{FRAME}   ║{RESET}')
+          f'{TEXT}{_modes2}{RESET}{W(42 - len(_modes2))}{FRAME}║{RESET}')
     print(f'  {FRAME}║{RESET}  {INFO}Providers:{RESET} '
           f'{ACCENT}ollama  qwen  groq  openai  anthropic{RESET}{W(3)}{FRAME}  ║{RESET}')
     print(f'  {FRAME}║{RESET}  {INFO}Help   :{RESET}  '
@@ -305,7 +318,7 @@ def pick_mode():
         left_col  = col_items[:mid]
         right_col = col_items[mid:]
 
-        # column inner width = 2 + 1 + 2 + 18 + 2 = 25
+        # column inner width = 1 + 2 (key, right-aligned) + 2 + 18 + 2 = 25
         CW = 25
 
         # -- top border --------------------------------------------------------
@@ -314,10 +327,10 @@ def pick_mode():
         # -- data rows ---------------------------------------------------------
         for i in range(mid):
             l_key, l_lbl, _ = left_col[i]
-            left_cell  = f'  {ACCENT}{l_key}{RESET}  {TEXT}{l_lbl:<18}{RESET}  '
+            left_cell  = f' {ACCENT}{l_key:>2}{RESET}  {TEXT}{l_lbl:<18}{RESET}  '
             if i < len(right_col):
                 r_key, r_lbl, _ = right_col[i]
-                right_cell = f'  {ACCENT}{r_key}{RESET}  {TEXT}{r_lbl:<18}{RESET}  '
+                right_cell = f' {ACCENT}{r_key:>2}{RESET}  {TEXT}{r_lbl:<18}{RESET}  '
             else:
                 right_cell = ' ' * CW
             print(f'  {FRAME}│{RESET}{left_cell}{FRAME}│{RESET}{right_cell}{FRAME}│{RESET}')
@@ -325,12 +338,12 @@ def pick_mode():
         # -- divider before footer ---------------------------------------------
         print(f'  {FRAME}├{"-" * CW}┼{"-" * CW}┤{RESET}')
 
-        # -- footer row 1: 9 / H -----------------------------------------------
-        print(f'  {FRAME}│{RESET}  {ACCENT}9{RESET}  {TEXT}{"Custom flags":<18}{RESET}  '
-              f'{FRAME}│{RESET}  {ACCENT}H{RESET}  {TEXT}{"Help guide":<18}{RESET}  {FRAME}│{RESET}')
+        # -- footer row 1: C / H -----------------------------------------------
+        print(f'  {FRAME}│{RESET} {ACCENT} C{RESET}  {TEXT}{"Custom flags":<18}{RESET}  '
+              f'{FRAME}│{RESET} {ACCENT} H{RESET}  {TEXT}{"Help guide":<18}{RESET}  {FRAME}│{RESET}')
 
         # -- footer row 2: X / blank -------------------------------------------
-        print(f'  {FRAME}│{RESET}  {ACCENT}X{RESET}  {TEXT}{"Exit":<18}{RESET}  '
+        print(f'  {FRAME}│{RESET} {ACCENT} X{RESET}  {TEXT}{"Exit":<18}{RESET}  '
               f'{FRAME}│{RESET}{" " * CW}{FRAME}│{RESET}')
 
         # -- bottom border -----------------------------------------------------
@@ -341,7 +354,7 @@ def pick_mode():
         print()
 
         choice = safe_input(
-            f'  {ACCENT}>> Enter choice [1-9 / H / X]: {RESET}',
+            f'  {ACCENT}>> Enter choice [1-10 / C / H / X]: {RESET}',
             default='X'
         ).upper()
 
@@ -349,62 +362,83 @@ def pick_mode():
             return None, None, False, False
         if choice == 'H':
             return None, None, False, True
-        if choice == '9':
+        if choice == 'C':
             return None, None, True, False
         for key, label, flag in MODES:
             if choice == key:
                 return label, flag, False, False
 
-        print(f'\n  {ERR}Invalid choice - please enter 1-9, H, or X.{RESET}')
+        print(f'\n  {ERR}Invalid choice - please enter 1-10, C, H, or X.{RESET}')
         safe_input(f'  {INFO}Press Enter to try again...{RESET}')
 
 
 # -----------------------------------------------------------------------------
 #  Provider selection menu
 # -----------------------------------------------------------------------------
-def pick_ollama_model() -> str:
-    """Ask which pulled Ollama model to use.
+def _with_tag(name: str) -> str:
+    """'llama3.2' and 'llama3.2:latest' are the same model to Ollama."""
+    name = name.strip()
+    return name if ':' in name else f'{name}:latest'
 
-    Returns the model name, or '' if Ollama cannot be reached (the app then
-    chooses a model itself). Enter picks the default.
+
+def pick_ollama_model() -> str:
+    """Ask which pulled Ollama model to use for this job.
+
+    Default = OLLAMA_MODEL in .env (set in Setup), else OLLAMA_DEFAULT_MODEL.
+    Only models that can chat ('completion' capability) are listed, so
+    embedding models are hidden. If the default is not pulled it is still
+    the Enter choice: no silent switch - the job stops with a pull message.
+    Returns '' if no chat model can be listed (the app then uses the default).
     """
+    default = (env_file.read_values(ENV_FILE).get('OLLAMA_MODEL', '').strip()
+               or OLLAMA_DEFAULT_MODEL)
+
     models = list_ollama_models()
     if not models:
         print()
         print(f'  {WARN}!  Could not list Ollama models. Is the Ollama app running?{RESET}')
-        print(f'  {INFO}   Continuing without a model choice; the app will pick one.{RESET}')
+        print(f'  {INFO}   Continuing with the default model: {default}{RESET}')
         return ''
 
-    default = choose_default(models)
     caps = {m['name']: model_capabilities(None, m['name']) for m in models}
-    missing = missing_ranked(models)
+    # An empty set means /api/show did not answer: show the model rather
+    # than hide it. Only models Ollama reports as non-chat are hidden.
+    chat = [m for m in models
+            if 'completion' in caps[m['name']] or not caps[m['name']]]
+    if not chat:
+        print()
+        print(f'  {WARN}!  No chat model is pulled (only embedding models).{RESET}')
+        print(f'  {INFO}   Run:  ollama pull {default}{RESET}')
+        return ''
+
+    default_pulled = _with_tag(default) in {_with_tag(m['name']) for m in chat}
 
     while True:
         print()
         section_header('SELECT  LOCAL  MODEL')
         print()
-        for i, m in enumerate(models, start=1):
-            mark = f'  {GOOD}(default){RESET}' if m['name'] == default else ''
+        for i, m in enumerate(chat, start=1):
+            is_default = _with_tag(m['name']) == _with_tag(default)
+            mark = f'  {GOOD}(default){RESET}' if is_default else ''
             print(f'  {ACCENT}{i}{RESET}  {TEXT}{describe(m, caps[m["name"]])}{RESET}{mark}')
         print()
-        print(f'  {INFO}Ranks: {RANKS_SOURCE}. Image/OCR = the model can read images;{RESET}')
-        print(f'  {INFO}the app does not send images to Ollama yet (OCR mode is planned).{RESET}')
-        if missing:
+        print(f'  {INFO}Image/OCR = the model can read images; OCR (menu 8){RESET}')
+        print(f'  {INFO}uses it to read scans and photos.{RESET}')
+        if not default_pulled:
             print()
-            print(f'  {INFO}Also in the comparison, not installed yet:{RESET}')
-            for name in missing:
-                print(f'     {INFO}ollama pull {name}{RESET}')
+            print(f'  {WARN}!  Default model {default} is not pulled.{RESET}')
+            print(f'  {INFO}   Run:  ollama pull {default}   or pick a number below.{RESET}')
         print()
 
         choice = safe_input(
-            f'  {ACCENT}>> Enter choice [1-{len(models)}] or Enter for {default}: {RESET}',
+            f'  {ACCENT}>> Enter choice [1-{len(chat)}] or Enter for {default}: {RESET}',
             default='',
         ).strip()
         if choice == '':
             return default
-        if choice.isdigit() and 1 <= int(choice) <= len(models):
-            return models[int(choice) - 1]['name']
-        print(f'\n  {ERR}Invalid choice. Please enter 1-{len(models)} or press Enter.{RESET}')
+        if choice.isdigit() and 1 <= int(choice) <= len(chat):
+            return chat[int(choice) - 1]['name']
+        print(f'\n  {ERR}Invalid choice. Please enter 1-{len(chat)} or press Enter.{RESET}')
 
 
 def pick_time_limit() -> str:
@@ -438,6 +472,7 @@ def time_limit_flag(mode_flag: str) -> str:
 
 def pick_provider(mode_flag: str = '') -> str:
     is_sr = (mode_flag == '--mode sr')
+    is_ocr = (mode_flag == '--mode ocr')
 
     while True:
         print()
@@ -453,12 +488,12 @@ def pick_provider(mode_flag: str = '') -> str:
         for key, name, desc, flag in PROVIDERS:
             prov_id = flag.split()[-1] if flag else 'ollama'
 
-            if is_sr and prov_id in BLOCKED_FOR_SR:
+            if (is_sr and prov_id in BLOCKED_FOR_SR) or (is_ocr and prov_id in BLOCKED_FOR_OCR):
                 badge = f'{ERR}{"x no vision":<{BADGE_W}}{RESET}'
                 prow  = (f'  {FRAME}│{RESET}  {INFO}{key}{RESET}  '
                          f'{INFO}{name:<12}{RESET}  {INFO}{desc:<26}{RESET}'
                          f'{badge}{FRAME}│{RESET}')
-            elif is_sr and prov_id in VISION_PROVIDERS:
+            elif (is_sr and prov_id in VISION_PROVIDERS) or (is_ocr and prov_id in OCR_PROVIDERS):
                 badge = f'{GOOD}{"+ vision":<{BADGE_W}}{RESET}'
                 prow  = (f'  {FRAME}│{RESET}  {ACCENT}{key}{RESET}  '
                          f'{TEXT}{name:<12}{RESET}  {INFO}{desc:<26}{RESET}'
@@ -475,6 +510,12 @@ def pick_provider(mode_flag: str = '') -> str:
             print(f'  {WARN}⚠  SR Pipeline requires a vision-capable provider.{RESET}')
             print(f'  {INFO}   Supported: {GOOD}qwen, openai, anthropic, groq{RESET}')
             print(f'  {INFO}   Blocked:   {ERR}ollama, deepseek{RESET}')
+            print()
+
+        if is_ocr:
+            print(f'  {WARN}!  OCR needs a provider that can read page images.{RESET}')
+            print(f'  {INFO}   Supported: {GOOD}ollama (vision model), qwen, openai{RESET}')
+            print(f'  {INFO}   Blocked:   {ERR}groq, deepseek, anthropic{RESET}')
             print()
 
         choice = safe_input(
@@ -511,7 +552,15 @@ def pick_provider(mode_flag: str = '') -> str:
             safe_input(f'  {INFO}Press Enter to choose again...{RESET}')
             continue
 
-        if prov_id == 'ollama':
+        if is_ocr and prov_id in BLOCKED_FOR_OCR:
+            print()
+            print(f'  {ERR}x  {prov_id} cannot read page images for OCR.{RESET}')
+            print(f'  {GOOD}  Use: ollama (local), qwen or openai.{RESET}')
+            print()
+            safe_input(f'  {INFO}Press Enter to choose again...{RESET}')
+            continue
+
+        if prov_id == 'ollama' and not is_ocr:
             model = pick_ollama_model()
             if model:
                 return f'{prov_flag} --model {model}'
@@ -615,55 +664,271 @@ def run_custom() -> None:
     _run_cmd(cmd, label='custom')
 
 
-def run_ui() -> None:
-    cmd = [PYTHON, str(BASE / "SOURCE_CODE" / 'main.py'), '--ui']
+def coming_soon(label: str) -> None:
     print()
-    print(f'  {FRAME}╔══ Streamlit UI ══════════════════════════════════════════╗{RESET}')
-    print(f'  {FRAME}║{RESET}  {GOOD}Opening :{RESET}  {ACCENT}http://localhost:8501{RESET}{"  " * 12}{FRAME}║{RESET}')
-    print(f'  {FRAME}║{RESET}  {INFO}Stop    :{RESET}  {INFO}Close browser tab then press Ctrl+C{RESET}  {FRAME}        ║{RESET}')
-    print(f'  {FRAME}╚══════════════════════════════════════════════════════════╝{RESET}')
+    print(f'  {WARN}{label}: coming soon.{RESET}')
+    safe_input(f'  {INFO}Press Enter to return to menu...{RESET}')
+
+
+def open_help() -> bool:
+    """Open Readme/flashcard-help.html in the browser. True if opened."""
+    if not HELP_FILE.is_file():
+        print()
+        print(f'  {ERR}Help page not found:{RESET}  {TEXT}{HELP_FILE}{RESET}')
+        safe_input(f'  {INFO}Press Enter to return to menu...{RESET}')
+        return False
+    import webbrowser
+    try:
+        opened = webbrowser.open(HELP_FILE.resolve().as_uri())
+    except Exception:
+        opened = False
+    if not opened:
+        print()
+        print(f'  {WARN}Could not open a browser. Open this file yourself:{RESET}')
+        print(f'  {TEXT}{HELP_FILE}{RESET}')
+        safe_input(f'  {INFO}Press Enter to return to menu...{RESET}')
+        return False
+    return True
+
+
+API_KEY_ITEMS = [
+    ('1', 'Qwen',      'DASHSCOPE_API_KEY'),
+    ('2', 'Groq',      'GROQ_API_KEY'),
+    ('3', 'DeepSeek',  'DEEPSEEK_API_KEY'),
+    ('4', 'OpenAI',    'OPENAI_API_KEY'),
+    ('5', 'Anthropic', 'ANTHROPIC_API_KEY'),
+]
+
+
+def _save_api_key(label: str, var: str) -> None:
+    """Ask for one key (hidden) and save it to .env. Never prints the value."""
     print()
     try:
-        proc = subprocess.Popen(cmd, cwd=str(BASE))
-        proc.wait()
+        # Plain prompt: getpass writes it straight to the console, where
+        # colour codes may show up as raw characters on Windows.
+        secret = getpass.getpass(f'  Paste the {label} key (hidden; Enter = keep current): ')
     except (KeyboardInterrupt, EOFError):
-        proc.terminate()
-        print(f'\n  {WARN}UI stopped.  Returning to menu...{RESET}\n')
+        print(f'\n  {INFO}Cancelled - nothing changed.{RESET}')
+        return
+    if not secret.strip():
+        print(f'  {INFO}No change - kept the current {var}.{RESET}')
+        return
+    try:
+        env_file.set_value(ENV_FILE, var, secret, template=ENV_TEMPLATE)
+    except ValueError as e:
+        print(f'  {ERR}{e} Nothing was saved.{RESET}')
+        return
+    except OSError as e:
+        print(f'  {ERR}Could not save .env ({e.strerror or type(e).__name__}). Nothing was changed.{RESET}')
+        return
+    shown = env_file.mask(env_file.read_values(ENV_FILE).get(var, ''))
+    print(f'  {ACCENT}Saved {var} ({shown}) to .env{RESET}')
+    if os.environ.get(var):
+        print(f'  {WARN}Note: {var} is also set in your system environment variables.{RESET}')
+        print(f'  {WARN}That copy wins, so the .env value is ignored until you remove it.{RESET}')
 
 
-def show_help() -> None:
-    help_file = BASE / "Readme" / "flashcard-help.html"
-    opened = False
-    if help_file.exists():
-        try:
-            import webbrowser
-            webbrowser.open(str(help_file))
-            opened = True
-        except Exception:
-            pass
+def api_keys_menu() -> None:
+    while True:
+        clear()
+        section_header('SETUP - API KEYS')
+        values = env_file.read_values(ENV_FILE)
+        print()
+        for key, label, var in API_KEY_ITEMS:
+            print(f'  {ACCENT}{key}{RESET}  {TEXT}{label:<10}{RESET} '
+                  f'{INFO}{var:<18}{RESET}  {TEXT}{env_file.mask(values.get(var, ""))}{RESET}')
+        print(f'  {ACCENT}0{RESET}  {TEXT}Back{RESET}')
+        print()
+        print(f'  {INFO}Keys are saved to .env in the project folder (never committed).{RESET}')
+        print()
+        choice = safe_input(f'  {ACCENT}>> Enter choice [0-5]: {RESET}', default='0')
+        if choice in ('0', ''):
+            return
+        item = next((i for i in API_KEY_ITEMS if i[0] == choice), None)
+        if item is None:
+            print(f'\n  {ERR}Invalid choice - please enter 0-5.{RESET}')
+        else:
+            _save_api_key(item[1], item[2])
+        safe_input(f'  {INFO}Press Enter to continue...{RESET}')
 
-    if not opened:
+
+# -----------------------------------------------------------------------------
+#  Setup -> Local AI (Ollama)
+# -----------------------------------------------------------------------------
+# Names Ollama accepts, e.g. qwen3:4b or hf.co/user/model:Q4_K_M. Must start
+# with a letter or digit so it can never look like a command option.
+_MODEL_NAME_RE = re.compile(r'^[A-Za-z0-9][A-Za-z0-9._:/-]{0,199}$')
+
+
+def _ollama_exe() -> str:
+    """Full path of the ollama program, or '' if it is not installed."""
+    found = shutil.which('ollama')
+    if found:
+        return found
+    if os.name == 'nt':
+        local = os.environ.get('LOCALAPPDATA', '')
+        if local:
+            guess = Path(local) / 'Programs' / 'Ollama' / 'ollama.exe'
+            if guess.is_file():
+                return str(guess)
+    return ''
+
+
+def _local_default_model() -> str:
+    """OLLAMA_MODEL from .env, else the code default (gemma4:e4b)."""
+    values = env_file.read_values(ENV_FILE) if ENV_FILE.exists() else {}
+    return values.get('OLLAMA_MODEL', '').strip() or OLLAMA_DEFAULT_MODEL
+
+
+def _warn_if_system_ollama_model() -> None:
+    value = os.environ.get('OLLAMA_MODEL', '')
+    if value:
+        print(f'  {WARN}Note: OLLAMA_MODEL={value} is also set in your system environment variables{RESET}')
+        print(f'  {WARN}(Windows: System Properties -> Environment Variables). That copy wins,{RESET}')
+        print(f'  {WARN}so the .env value is ignored until you remove it.{RESET}')
+
+
+def _save_default_model(name: str) -> None:
+    try:
+        env_file.set_value(ENV_FILE, 'OLLAMA_MODEL', name, template=ENV_TEMPLATE)
+    except ValueError as e:
+        print(f'  {ERR}{e} Nothing was saved.{RESET}')
+        return
+    except OSError as e:
+        print(f'  {ERR}Could not save .env ({e.strerror or type(e).__name__}). Nothing was changed.{RESET}')
+        return
+    print(f'  {ACCENT}Saved OLLAMA_MODEL={name} to .env - used whenever you pick Ollama.{RESET}')
+    _warn_if_system_ollama_model()
+
+
+def _change_default_model(models: list) -> None:
+    """Pick from pulled chat models only (Ollama says 'completion')."""
+    caps = {m['name']: model_capabilities(None, m['name']) for m in models}
+    chat = [m for m in models if 'completion' in caps[m['name']]]
+    print()
+    if not chat:
+        print(f'  {WARN}No chat models pulled yet - use 2 to pull one first.{RESET}')
+        return
+    current = _local_default_model()
+    for i, m in enumerate(chat, 1):
+        mark = f'  {ACCENT}(current default){RESET}' if m['name'] == current else ''
+        print(f'  {ACCENT}{i}{RESET}  {TEXT}{describe(m, caps[m["name"]])}{RESET}{mark}')
+    print()
+    choice = safe_input(f'  {ACCENT}>> New default [1-{len(chat)}] or Enter to cancel: {RESET}')
+    if not choice:
+        print(f'  {INFO}Cancelled - default not changed.{RESET}')
+        return
+    if not (choice.isdigit() and 1 <= int(choice) <= len(chat)):
+        print(f'  {ERR}Invalid choice - default not changed.{RESET}')
+        return
+    _save_default_model(chat[int(choice) - 1]['name'])
+
+
+def _pull_model(exe: str) -> None:
+    print()
+    print(f'  {INFO}Find model names at https://ollama.com/search (e.g. qwen3:4b).{RESET}')
+    name = safe_input(f'  {ACCENT}>> Model to pull (Enter to cancel): {RESET}')
+    if not name:
+        print(f'  {INFO}Cancelled.{RESET}')
+        return
+    if not _MODEL_NAME_RE.match(name):
+        print(f'  {ERR}Invalid model name - use letters, digits and . _ : / - only (e.g. qwen3:4b).{RESET}')
+        return
+    print(f'  {WARN}Models are big downloads (often 2-10 GB) and use that much disk space.{RESET}')
+    answer = safe_input(f'  {ACCENT}>> Download {name}? [y/N]: {RESET}')
+    if answer.lower() not in ('y', 'yes'):
+        print(f'  {INFO}Cancelled - nothing downloaded.{RESET}')
+        return
+    print(f'  {INFO}Running: ollama pull {name}   (Ctrl+C to stop){RESET}')
+    try:
+        rc = subprocess.run([exe, 'pull', name]).returncode
+    except KeyboardInterrupt:
+        print(f'\n  {WARN}Download stopped. Pull it again later to resume.{RESET}')
+        return
+    except OSError as e:
+        print(f'  {ERR}Download failed - could not start ollama ({e.strerror or type(e).__name__}).{RESET}')
+        return
+    if rc != 0:
+        print(f'  {ERR}Download failed (ollama exit code {rc}). Check the name at https://ollama.com/search.{RESET}')
+        return
+    print(f'  {ACCENT}{name} is ready.{RESET}')
+    answer = safe_input(f'  {ACCENT}>> Make {name} the default model? [y/N]: {RESET}')
+    if answer.lower() in ('y', 'yes'):
+        _save_default_model(name)
+
+
+def local_ai_menu() -> None:
+    clear()
+    section_header('SETUP - LOCAL AI (OLLAMA)')
+    exe = _ollama_exe()
+    if not exe:
+        print()
+        print(f'  {WARN}Ollama is not installed.{RESET}')
+        print(f'  {TEXT}Download it from https://ollama.com/download, install it,{RESET}')
+        print(f'  {TEXT}then come back here to pull a model.{RESET}')
+        safe_input(f'  {INFO}Press Enter to return to menu...{RESET}')
+        return
+    version = ollama_version()
+    if not version:
+        print()
+        print(f'  {WARN}Ollama is installed but not running.{RESET}')
+        print(f'  {TEXT}Start the Ollama app (Windows: Start menu -> Ollama), then try again.{RESET}')
+        safe_input(f'  {INFO}Press Enter to return to menu...{RESET}')
+        return
+    while True:
+        models = list_ollama_models()
+        default = _local_default_model()
+        want = default if ':' in default else default + ':latest'
+        state = 'pulled' if any(m['name'] == want for m in models) else 'NOT pulled yet - use 2'
+        print()
+        print(f'  {TEXT}Ollama {version} - running{RESET}')
+        print(f'  {TEXT}Default model: {default} ({state}){RESET}')
+        _warn_if_system_ollama_model()
+        print()
+        print(f'  {ACCENT}1{RESET}  {TEXT}Change default model{RESET}')
+        print(f'  {ACCENT}2{RESET}  {TEXT}Pull a new model{RESET}')
+        print(f'  {ACCENT}0{RESET}  {TEXT}Back{RESET}')
+        print()
+        choice = safe_input(f'  {ACCENT}>> Enter choice [0-2]: {RESET}', default='0')
+        if choice in ('0', ''):
+            return
+        if choice == '1':
+            _change_default_model(models)
+        elif choice == '2':
+            _pull_model(exe)
+        else:
+            print(f'\n  {ERR}Invalid choice - please enter 0-2.{RESET}')
+
+
+SETUP_ITEMS = [
+    ('1', 'API keys',          'saved to .env, typed hidden'),
+    ('2', 'Local AI (Ollama)', 'check install, default model, pull models'),
+    ('3', 'Open Help',         'help page in your browser'),
+]
+
+
+def setup_menu() -> None:
+    while True:
         clear()
         banner()
-        section_header('QUICK  HELP')
+        section_header('SETUP')
         print()
-        entries = [
-            ('coding',     'AI-assisted manuscript coding'),
-            ('writing',    'AI writing pipeline'),
-            ('appraisal',  'Critical appraisal of studies'),
-            ('search',     'Literature search'),
-            ('rct_search', 'PubMed + Europe PMC RCT search'),
-            ('sr',         '6-stage systematic review (vision)'),
-            ('dry-run',    'Test without calling APIs'),
-            ('--ui',       'Launch Streamlit web interface'),
-        ]
-        for mode, desc in entries:
-            print(f'  {ACCENT}{mode:<14}{RESET}  {TEXT}{desc}{RESET}')
+        for key, label, desc in SETUP_ITEMS:
+            print(f'  {ACCENT}{key}{RESET}  {TEXT}{label:<20}{RESET}  {INFO}{desc}{RESET}')
+        print(f'  {ACCENT}0{RESET}  {TEXT}Back to main menu{RESET}')
         print()
-        print(f'  {INFO}Full guide:{RESET}  {ACCENT}python SOURCE_CODE/main.py --help-guide{RESET}')
-        print()
-
-    safe_input(f'  {INFO}Press Enter to return to menu...{RESET}')
+        choice = safe_input(f'  {ACCENT}>> Enter choice [0-3]: {RESET}', default='0')
+        if choice in ('0', ''):
+            return
+        if choice == '1':
+            api_keys_menu()
+        elif choice == '2':
+            local_ai_menu()
+        elif choice == '3':
+            open_help()
+        else:
+            print(f'\n  {ERR}Invalid choice - please enter 0-3.{RESET}')
+            safe_input(f'  {INFO}Press Enter to try again...{RESET}')
 
 
 # -----------------------------------------------------------------------------
@@ -685,7 +950,7 @@ def main() -> None:
                 break
 
             if is_help:
-                show_help()
+                open_help()
                 continue
 
             if is_custom:
@@ -693,9 +958,12 @@ def main() -> None:
                 safe_input(f'  {INFO}Press Enter to return to menu...{RESET}')
                 continue
 
-            if mode_flag == '--ui':
-                run_ui()
-                safe_input(f'  {INFO}Press Enter to return to menu...{RESET}')
+            if mode_flag is None:          # 7 Data Analysis
+                coming_soon(label)
+                continue
+
+            if mode_flag == 'setup':       # 10 Setup
+                setup_menu()
                 continue
 
             input_mode = _MODE_INPUT_MAP.get(mode_flag)

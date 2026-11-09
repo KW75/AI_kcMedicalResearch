@@ -22,6 +22,7 @@ without reading the closing notes there.
 | 16 | Streamlit UI kept API keys in `st.session_state` | v2.4.9 - per-session only; "Clear stored keys" button |
 | 17 | `providers.py` probed Ollama at import | v2.4.9 - lazy on first use |
 | 18 | SR heavy imports pulled in for every mode | v2.4.9 |
+| 19 | macOS install failed (pyarrow source build, "can't find Rust compiler") | 2026-09-02 (v2.4.13) - python.org 3.11.9 + pinned `requirements-local.txt` (pyarrow 12.0.1, chromadb 0.5.23); launchers reject conda. Verified on Intel macOS 11. Not yet run on Apple Silicon (reasoned from wheel tags). |
 | 20 | Pre-v2.4.7 launcher wrote API keys to `%TEMP%` `.bat` | Session 15 - keys rotated |
 | 21 | `--provider ollama` could fall back to a cloud provider | v2.4.8 - `LOCAL_ONLY_PROVIDERS` |
 | 22 | UTF-8 BOMs in 23 source files | v2.4.8 - stripped; `check_no_bom.py` guards |

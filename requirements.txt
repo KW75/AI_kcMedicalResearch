@@ -1,9 +1,8 @@
-# requirements.txt - local development and Docker installs
+# requirements.txt - local development installs
 #
 # Shared deps live in requirements-base.txt. This file adds developer tools
 # and platform-specific packages.
 #
-#   Render : requirements-render.txt  (standalone, pinned)
 #   CI     : requirements-ci.txt
 #   OCR    : requirements-ocr.txt     (optional, see note below)
 #

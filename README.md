@@ -3,22 +3,18 @@
 A multi-mode AI assistant for medical research, critical appraisal, systematic review, coding, and writing. Local-first: uses Ollama on your own machine by default, so input stays local. Cloud providers (DeepSeek, Qwen, OpenAI, Anthropic, Groq) are available when you choose one for a job.
 
 
-    Version: 2.5.0
-    Tests: 816 passed, 3 skipped, 11 deselected
+    Version: 2.6.0
+    Tests: 1027 passed, 10 deselected
            (reproduce with `python -m pytest -m "not live" --tb=short -q`)
     CI: GitHub Actions - Green
     GitHub: https://github.com/KW75/AI_kcMedicalResearch
-    Live App: https://ai-kcmedicalresearch.onrender.com
-    Health Check: https://ai-kcmedicalresearch.onrender.com/_stcore/health
-    Uptime: UptimeRobot (5-min monitoring, prevents cold starts)
 
-**CONFIDENTIALITY:** the hosted app and every cloud provider transmit your
-input to an external API. For patient-identifiable or confidential data, run
+
+**CONFIDENTIALITY:** every cloud provider transmits your input to an external
+API. For patient-identifiable or confidential data, run
 locally with `--provider ollama` (see Providers).
 
 ## Quick Start
-
-Hosted app, nothing to install: https://ai-kcmedicalresearch.onrender.com
 
 Local install (python.org Python 3.11 + venv, Windows and macOS): see
 Local Setup below. Full instructions, including the pinned local install
@@ -79,24 +75,22 @@ Option A - Free / local (Ollama), no API key:
 3. Copy `.env.example` to `.env` and confirm this line matches the model you
    pulled (already set by default):
        OLLAMA_MODEL=gemma4:e4b
-   (If you pulled a different chat model, put its exact name here, or comment
-    the line out to let the app pick: gemma4:e4b if pulled, otherwise the
-    largest model you have. The embedding model must stay nomic-embed-text
+   (If you pulled a different chat model, put its exact name here. If the
+    line is commented out, the app uses gemma4:e4b. It never switches model
+    on its own: if the model is not pulled, the job stops and tells you to
+    run `ollama pull <model>`. The embedding model must stay nomic-embed-text
     unless you change EMBEDDING_MODEL.)
 4. Ollama runs in the background after install; the app connects automatically.
-5. When you choose Ollama in the CLI launcher, it lists the models you have
-   pulled with their size, whether they read images (Image/OCR), and their
-   coding and reasoning ranks from the 2026-10 local model comparison
-   (1 = best). Press Enter for the default (gemma4:e4b) or type a number to
-   match the model to your hardware. Ranked models you have not pulled are
-   shown as `ollama pull ...` commands. The web UI (--ui) shows the same list as a dropdown when the provider is Ollama. If Ollama isn't running or no model is pulled, Run is disabled with a warning.
+5. When you choose Ollama in the CLI launcher, it lists the chat models you
+   have pulled with their size and whether they read images (Image/OCR).
+   Embedding models are hidden. Press Enter for your default (OLLAMA_MODEL in
+   .env, else gemma4:e4b) or type a number to use another model for this job.
 
 
-Note: v2.5 changed the default from qwen2.5:14b-instruct to gemma4:e4b. In
-the 2026-10 local model comparison gemma4:e4b ranked best for coding and
-second for reasoning, is smaller (6.6 GB vs 9.0 GB), and is the only one of
-the five that reads images (for the planned OCR mode). qwen2.5:14b-instruct
-still works if you already have it.
+Note: v2.5 changed the default from qwen2.5:14b-instruct to gemma4:e4b. It is
+smaller (6.6 GB vs 9.0 GB) and reads images (for the planned OCR mode).
+qwen2.5:14b-instruct still works if you already have it: set OLLAMA_MODEL to
+its name.
 
 Option B - Cloud provider (DeepSeek, Qwen, OpenAI, Anthropic, Groq):
 1. Copy `.env.example` to `.env`.
@@ -108,8 +102,7 @@ Large local models on slower machines may need longer. Choose with
 `--time-limit 15|30|60|none` (minutes; `none` = wait until the model
 finishes, stop with Ctrl+C). Example:
 `python SOURCE_CODE/main.py --mode writing --time-limit 60`
-The launcher asks for it after the model (Enter = 15 minutes), and the web UI has a "Time limit per AI call" dropdown.
-
+The launcher asks for it after the model (Enter = 15 minutes).
 
 
 ## Modes
@@ -136,8 +129,6 @@ The launcher asks for it after the model (Enter = 15 minutes), and the web UI ha
 
 
 **Confidentiality gate.** Ollama runs entirely on your machine and starts without any prompt. If you choose a cloud provider, the app first lists every external service your input could be sent to (the chosen provider plus any `FALLBACK_PROVIDERS` backups) and asks `Continue? [y/N]`. Pressing Enter cancels. For scripted or non-interactive runs, add `--confirm-cloud` to accept explicitly; without it, a run with no keyboard attached is refused. Search modes always contact PubMed / Europe PMC (and DuckDuckGo for Search) with your search terms, even when the AI model is local.
-
-The Streamlit UI shows the same list and keeps the Run button disabled until you tick a consent box; on the hosted (Render) version, uploaded files are already on Render's servers, so use a local install with Ollama for confidential work.
 
 On transient errors (timeout, 429, 502, 503) the system tries the next
 provider. Default chain: DeepSeek -> Qwen -> Groq (`FALLBACK_PROVIDERS`).
@@ -183,9 +174,10 @@ Copy `.env.example` to `.env`. `.env` is gitignored.
     EMBEDDING_MODEL=nomic-embed-text
     CLI_THEME=dark
 
-If you used the Streamlit UI before v2.4.7, rotate your API keys and delete
-any `%TEMP%\ai_km_run_*.bat` files - that version wrote keys to disk in
-plaintext. Clearing `.env` does not revoke a key.
+If you used the old Streamlit web interface before v2.4.7 (the interface was
+removed in v2.6), rotate your API keys and delete any `%TEMP%\ai_km_run_*.bat`
+files - that version wrote keys to disk in plaintext. Clearing `.env` does not
+revoke a key.
 
 ## Running Tests
 
@@ -313,12 +305,6 @@ The end of Stage 3 prints a DATA PROVENANCE SUMMARY listing every study with
 overridden values or auto-derived metadata. Both must be described in the
 review's data-collection methods.
 
-## Deployment (Render)
-
-- Auto-deploy on push to `main`
-- Build: `pip install --upgrade pip && pip install --no-cache-dir --only-binary=:all: -r requirements-render.txt && pip install --no-cache-dir --no-deps docx2txt==0.8`
-- UptimeRobot pings every 5 min
-
 ## Known Issues
 
 Issue numbers are stable so that HANDOFF.md and commit messages can cite
@@ -326,9 +312,8 @@ them; gaps are closed issues. Closed issues: `Readme/RESOLVED_ISSUES.md`.
 
 | #  | Issue | Priority | What to do |
 |----|-------|----------|------------|
-| 19 | macOS install | RESOLVED | Fixed 2026-09-02. python.org 3.11.9 + requirements-local.txt (pyarrow 12.0.1, chromadb 0.5.23) verified end-to-end on Intel macOS 11. Launchers reject conda and guide to python.org. NOT yet run on Apple Silicon (reasoned from wheel tags). |
 | 2  | WeasyPrint not installed; PDF report falls back to HTML | Medium | |
-| 3  | Anthropic geo-restricted from dev machine | Low | VPN or skip. |
+| 3  | Anthropic and Gemini geo-restricted from dev machine | Low | VPN or skip. Blocks the planned Anthropic -> Gemini switch. |
 
 
 #9 (SD/SE confusion) and #10 (within- vs between-group) are mitigated by the
@@ -375,7 +360,6 @@ On branch:
 
 Noted, not fixed:
 - rob2_tool.py reads `OLLAMA_URL`; the rest of the app reads `OLLAMA_HOST`.
-- main.py SR route uses raw `OLLAMA_MODEL`, not `_resolve_ollama_model()`.
 - An Ollama SR run screens locally, then fails at extraction (no vision).
   It should stop at the start, like the DeepSeek warning.
 - main.call_ai swallows streaming errors (`except Exception: pass`), so an

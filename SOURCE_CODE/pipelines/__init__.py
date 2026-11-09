@@ -11,4 +11,4 @@ Contains all pipeline implementations:
 - sr: Systematic review
 """
 
-__version__ = "2.3.0"
+__version__ = "2.6.0"

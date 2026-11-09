@@ -143,7 +143,7 @@ except KeyboardInterrupt:
 # ---------------------------------------------------------------------------
 # Version
 # ---------------------------------------------------------------------------
-VERSION = "2.5.0"
+VERSION = "2.6.0"
 
 # ---------------------------------------------------------------------------
 # Paths
@@ -255,7 +255,7 @@ from providers import (
     OLLAMA_HOST, OLLAMA_MODEL, OPENAI_API_KEY, OPENAI_MODEL,
     ANTHROPIC_API_KEY, ANTHROPIC_MODEL, DEEPSEEK_API_KEY, DEEPSEEK_MODEL,
     GROQ_API_KEY, GROQ_MODEL, DASHSCOPE_API_KEY, DASHSCOPE_BASE_URL,
-    QWEN_MODEL,QWEN_VISION_MODEL,DEFAULT_PROVIDER,
+    QWEN_MODEL, QWEN_VISION_MODEL, DEFAULT_PROVIDER, _resolve_ollama_model,
 )
 EMBEDDING_PROVIDER = os.getenv("EMBEDDING_PROVIDER", "ollama")
 EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "nomic-embed-text")
@@ -438,7 +438,7 @@ def data_destinations(mode: str, provider: str) -> list[str]:
     SR calls its provider directly (no fallback chain), so it lists only the
     chosen provider. Other modes go through call_ai -> call_ai_with_fallback.
     """
-    if mode == "sr":
+    if mode in ("sr", "ocr"):
         return [provider]
     return provider_attempt_order(provider, _fallback_chain_from_env())
 
@@ -488,8 +488,10 @@ def confirm_data_destinations(
         print(f"        or, if it is busy or times out: {', '.join(names[1:])}")
     if services:
         print(f"        Search terms are also sent to: {', '.join(services)}.")
+    if mode == "ocr":
+        print("        For OCR this means page images and the text of your documents")
+        print("        (the cloud AI also writes the summary).")
     print("        Do not use for patient-identifiable or confidential data.")
-
     if confirm_cloud:
         print("        Confirmed in advance with --confirm-cloud.")
         print()
@@ -1356,8 +1358,26 @@ def fetch_pubmed_articles(
 # SR launcher
 # ---------------------------------------------------------------------------
 
+def _sr_default_model(provider: str) -> str:
+    """Default model for the SR route when --model is not given.
+
+    Ollama follows the Session 33 rule via providers._resolve_ollama_model()
+    (OLLAMA_MODEL, else gemma4:e4b), never an empty name. Unknown providers
+    fall back to the Qwen vision model, as before.
+    """
+    table = {
+        "qwen":      QWEN_VISION_MODEL,
+        "deepseek":  DEEPSEEK_MODEL,
+        "openai":    OPENAI_MODEL,
+        "anthropic": ANTHROPIC_MODEL,
+        "groq":      GROQ_MODEL,
+        "ollama":    _resolve_ollama_model(),
+    }
+    return table.get(provider, QWEN_VISION_MODEL)
+
+
 def run_sr_launcher(provider: str = "", model: str = "") -> None:
-    """Run the SR automation pipeline (CLI mode  - no Streamlit)."""
+    """Run the SR automation pipeline (CLI mode)."""
     import shutil
     import subprocess as _sp
     import json as _json
@@ -1497,15 +1517,6 @@ def run_sr_launcher(provider: str = "", model: str = "") -> None:
 
     # -- Step 4: resolve provider and model ------------------------------------
 
-    _DEFAULT_MODELS = {
-        "qwen":      QWEN_VISION_MODEL,
-        "deepseek":  DEEPSEEK_MODEL,
-        "openai":    OPENAI_MODEL,
-        "anthropic": ANTHROPIC_MODEL,
-        "groq":      GROQ_MODEL,
-        "ollama":    OLLAMA_MODEL,
-    }
-    
     _provider = provider or "qwen"
     
     # --- Provider check for vision support ---
@@ -1535,7 +1546,7 @@ def run_sr_launcher(provider: str = "", model: str = "") -> None:
             return
     
 
-    _model = model or _DEFAULT_MODELS.get(_provider, QWEN_VISION_MODEL)
+    _model = model or _sr_default_model(_provider)
 
 
     # -- Step 5: run sr/main.py (as a module so relative imports resolve) -----
@@ -1827,20 +1838,10 @@ def handle_search_mode(provider: str, model: str, sub_mode: str = None) -> None:
     print("  1. Topic Search  (web synopsis with reference links)")
     print("  2. Article Search (PubMed by article type + comparison)")
     
-    # Determine sub-mode
-    is_cloud = any([
-        os.environ.get('RENDER'),
-        os.environ.get('STREAMLIT_SERVER_PORT'),
-        os.environ.get('STREAMLIT_SHARING'),
-    ])
-    
+    # Determine sub-mode   
     if sub_mode:
         sub = sub_mode
         print(f"   - Using sub-mode: {sub}")
-    elif is_cloud:
-        # Cloud environment - use default
-        print("  [i]  Cloud environment detected. Defaulting to Topic Search (1).")
-        sub = "1"
     else:
         # Local - interactive
         try:
@@ -2290,7 +2291,7 @@ def parse_args(args: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--model",          type=str, default=None)
     parser.add_argument("--mode",           type=str, default="coding",
                         choices=["coding", "writing", "rct_search",
-                                 "appraisal", "search", "sr"])
+                                 "appraisal", "search", "sr", "ocr"])
     parser.add_argument("--report",         action="store_true", default=False,
                         help="Generate a writing report from input/writing/ files")
     parser.add_argument("--revise",         action="store_true", default=False,
@@ -2324,8 +2325,6 @@ def parse_args(args: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--list-roles",     action="store_true", default=False)
     parser.add_argument("--help-guide",     action="store_true", default=False,
                         help="Open the interactive HTML help guide in your browser")
-    parser.add_argument("--ui",             action="store_true", default=False,
-                        help="Launch the main Streamlit UI")
     parser.add_argument('--sub', '--submode', type=str, default=None,
                     help='Sub-mode selection: 1=Topic Search, 2=Article Search')
     ns = parser.parse_args(args)
@@ -2338,6 +2337,43 @@ def parse_args(args: list[str] | None = None) -> argparse.Namespace:
 # ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
+def sr_provider_warning(mode: str, provider: str):
+    """Return the SR warning for a provider that skips checks, else None.
+
+    Anthropic extraction (_extract_anthropic) gets structured JSON, not the
+    PDF text, so it calls _flag_suspect_source_quotes(source_text=None).
+    Two checks cannot run there: the verbatim quote-in-source check and the
+    text-line SD/SE check (_flag_possible_se_as_sd). Group/timepoint and the
+    other source-quote checks still run. See REVIEWER_GUIDE.md section 6.
+    """
+    if mode != "sr" or provider != "anthropic":
+        return None
+    return (
+        "\n[!] Note: with --provider anthropic, two SR checks cannot run, "
+        "because this route has no extracted text from the PDF:\n"
+        "    - source quotes are not checked word for word against the "
+        "paper's text\n"
+        "    - the text-line SD/SE check does not run\n"
+        "    The other checks still run. See docs/sr/REVIEWER_GUIDE.md "
+        "section 6, which explains when to prefer --provider qwen.\n"
+        "    Manual verification against source PDFs remains required "
+        "either way.\n"
+    )
+
+
+OCR_PROVIDERS = ("ollama", "qwen", "openai")
+
+
+def ocr_provider_error(mode: str, provider: str) -> str | None:
+    """OCR needs a provider that can read page images: local Ollama (vision
+    models), Qwen or OpenAI. Others are refused: DeepSeek has no image input;
+    Groq/Anthropic are not wired for OCR yet."""
+    if mode == "ocr" and provider not in OCR_PROVIDERS:
+        return (f"OCR: {provider} cannot be used to read page images. "
+                "Use --provider ollama (local), qwen or openai.")
+    return None
+
+
 def run_cli(args: argparse.Namespace) -> None:
     """Dispatch parsed CLI arguments to the correct handler.
 
@@ -2351,35 +2387,15 @@ def run_cli(args: argparse.Namespace) -> None:
     entry-point guard below owns the clean-exit message.
     """
 
-    # Anthropic-path tripwire gap (#61): _extract_anthropic and
-    # assess_by_file_id bypass the source-quote, SD/SE, and
-    # group/timepoint checks that the qwen path runs. Warn at point
-    # of use until the checks are ported to the Anthropic path.
-    if args.mode == "sr" and args.provider == "anthropic":
-        print(
-            "\n[!] Warning: --provider anthropic runs SR extraction without "
-            "the source-quote, SD/SE, or group-timepoint tripwires.\n"
-            "    See Known Issue #61. For full tripwire coverage use "
-            "--provider qwen (default vision model).\n"
-            "    Manual verification against source PDFs remains required "
-            "either way.\n"
-        )
+    sr_warning = sr_provider_warning(args.mode, args.provider)
+    if sr_warning:
+        print(sr_warning)
+    ocr_error = ocr_provider_error(args.mode, args.provider)
+    if ocr_error:
+        print(ocr_error)
+        sys.exit(1)
 
-    if args.ui:
-        import subprocess as _sp
-        proc = _sp.Popen(
-            [sys.executable, "-m", "streamlit", "run",
-             str(SOURCE_CODE_DIR / "ui" / "app.py"),
-             "--server.runOnSave", "false"],
-            cwd=str(Path(__file__).resolve().parent.parent),
-        )
-        print("UI launched -- open http://localhost:8501 in your browser.")
-        print("Press Ctrl+C to stop the UI server.")
-        try:
-            proc.wait()
-        except KeyboardInterrupt:
-            proc.terminate()
-        raise SystemExit(0)
+
 
     non_ai_flags = (
         args.list_sessions
@@ -2469,6 +2485,13 @@ def run_cli(args: argparse.Namespace) -> None:
             provider=args.provider,
             model=args.model,
             dry_run=args.dry_run,
+        )
+    elif args.mode == "ocr":
+        from pipelines.ocr import cli as ocr_cli
+        ocr_cli.run(
+            BASE_DIR, model=args.model, provider=args.provider,
+            confirm=lambda p: confirm_data_destinations(
+                "ocr", p, confirm_cloud=args.confirm_cloud),
         )
     elif args.mode == "appraisal":
         handle_appraisal_mode(

@@ -17,10 +17,13 @@ Before treating any Open Issue as work, and before ending the session:
 1. **Test count check.** Grep `README.md` for `Tests: NNN passed`; run
    `python -m pytest -m "not live" --collect-only -q | tail -1` (or
    equivalent) and confirm the two match. Update README if not.
-2. **Closed-issue citation grep.** For each issue number in
-   `Readme/RESOLVED_ISSUES.md`, grep `README.md` and this file for
-   `(#N)`. Any hit is a stale citation — replace with a positive
-   description or a REVIEWER_GUIDE section reference.
+2. **Closed-issue citation grep.** Take the issue numbers from the table
+   rows of `Readme/RESOLVED_ISSUES.md` (pattern `^\|\s*(\d+)\s*\|`; print
+   the count so "clean" cannot mean "never ran"). The pattern `#(\d+)`
+   finds only numbers cited in passing. Grep `README.md` and this file's
+   Current State / Open Issues / Next work sections for `(#N)`. Any hit
+   is a stale citation; replace it with a positive description or a
+   REVIEWER_GUIDE section reference. Hits inside session logs are history.
 3. **Open Issues table drift.** Confirm `Readme/HANDOFF.md`'s Open
    Issues table matches `README.md`'s Known Issues table (same numbers,
    same priorities). They live in two files and drift silently.
@@ -41,18 +44,18 @@ so those catches happen at session open, not mid-work.
 
 ---
 
-## Current State (Session 32, v2.5.0 on main, 2026-10-27)
-
+## Current State (Session 36, v2.6.0 on main, 2026-11-09)
 
 | Component      | Status |
 |----------------|--------|
-| Tests          | 816 passed, 3 skipped, 11 deselected on v2.6-ocr-editor (`python -m pytest -m "not live" --tb=short -q`); main 737 |
-| Branch         | v2.6-ocr-editor, 17 commits ahead of main (2a37319) incl. this HANDOFF update; not merged |
-| CI             | green (455b2d8; 28e616e; 3a9081b and 6813b12 also confirmed green); v2.6-ocr-editor not checked |
-| Render deploy  | 2a37319 live; DEFAULT_PROVIDER=qwen only, no API key on Render; users enter their own key in the sidebar (tested OK) |
-| Writing mode   | one-pass (write + edit + review in one call); tracks Topic 800 / Article 3,500 / Report 500 / Synopsis 1,500; tested on gemma4:e4b (branch only) |
-| SR pipeline    | working via CLI with Qwen; Ang 2010 verified against PDF (NFR week 6, unanimous N=3); text-fallback drops now surface in Stage 4 `[SKIP]` block |
-| Providers      | Ollama (default, local) / DeepSeek / Qwen (SR) / OpenAI / Anthropic / Groq / Ollama (local, never falls back) |
+| Tests          | 1027 passed, 10 deselected on v2.6-ocr-editor; 816 on main (`python -m pytest -m "not live" --tb=short -q`) |
+| Branch         | main = fa4edb9 (PR #3). v2.6-ocr-editor = Sessions 33-36 work, open as draft PR #4 (Setup menu, Streamlit/Render removal, Ollama model rule, httpx pin, moved-folder launcher check, SR Anthropic warning, test-local-pins CI job, OCR mode). Do not merge until the "Before the OCR merge" items in Next work are done. Version stays 2.5.0; bump to 2.6.0 after OCR is merged |
+| CI             | green on draft PR #4 (2026-11-09), both jobs: test (requirements-ci.txt, 1027 passed, 44 warnings) and test-local-pins (requirements-local.txt like the launchers, 1027 passed, 57 warnings). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
+| Deploy         | None: CLI only, local first. Render service deleted 2026-10-27; Streamlit UI and Render files removed in Session 33. UptimeRobot monitor for the old Render URL: not yet confirmed paused/deleted (user, outside the repo) |
+| Writing mode   | one-pass (write + edit + review in one call); tracks Topic 800 / Article 3,500 / Report 500 / Synopsis 1,500; on main since fa4edb9; tested on gemma4:e4b; terminal menus only |
+| OCR mode       | `--mode ocr`, launcher menu 8 (branch only). Reads PDF / image / .txt / .docx; .doc refused with a message. Records in `reports/ocr/<header>/`, SUMMARY / SYNOPSIS in `output/ocr/`. Ollama by default; Qwen / OpenAI only behind the cloud gate; groq / deepseek / anthropic refused. Broken-font PDFs: text layer with [?], AI fills symbols only, document-wide vote per font code (Ang 2010: 19 of 139 [?] left, checked against the PDF) |
+| SR pipeline    | working via CLI with Qwen; Ang 2010 verified against PDF (NFR week 6, unanimous N=3); text-fallback drops surface in Stage 4 `[SKIP]` block. Hard-coded `qwen-vl-plus` (404 on the current key) still in the SR extractors (see Next work) |
+| Providers      | Ollama (default, local, never falls back to cloud; model = OLLAMA_MODEL in .env, else gemma4:e4b) / DeepSeek / Qwen (SR) / OpenAI / Anthropic / Groq. Anthropic and Gemini are geo-restricted on the dev machine; the planned Anthropic -> Gemini switch is on hold |
 
 
 Issue numbers below match `README.md` > Known Issues.
@@ -63,9 +66,56 @@ Issue numbers below match `README.md` > Known Issues.
 
 | #  | Issue | Priority | What to do |
 |----|-------|----------|------------|
-| 19 | macOS install | RESOLVED | Fixed 2026-09-02. python.org 3.11.9 + requirements-local.txt (pyarrow 12.0.1, chromadb 0.5.23) verified end-to-end on Intel macOS 11. Launchers reject conda and guide to python.org. NOT yet run on Apple Silicon (reasoned from wheel tags). |
 | 2  | WeasyPrint not installed; PDF report falls back to HTML | Medium | |
-| 3  | Anthropic geo-restricted from dev machine | Low | VPN or skip. |
+| 3  | Anthropic and Gemini geo-restricted from dev machine | Low | VPN or skip. Blocks the planned Anthropic -> Gemini switch. |
+
+---
+
+## Next work (start here)
+
+Collected from the Session 34-35 logs on 2026-11-09. Those logs keep the
+detail and evidence; this list is the only place to tick items off.
+
+Before the OCR merge (PR #4):
+1. DONE (Session 36): `strip_latex()` in `pipelines/ocr/output.py`, used
+   on AI summaries in `write_summary` and `write_record`; OCR page text
+   stays verbatim. Still to do: look at a real Ang SUMMARY.
+2. DONE in code (Session 36): `KEEP_RULES` in engine.py (copy every [?]
+   exactly; keep each change value with the reference point the text gives,
+   e.g. change from baseline; never make up a time span) is added to
+   SUMMARY_PROMPT, SYNOPSIS_PROMPT and PART_PROMPT. SYNOPSIS_PROMPT now asks
+   for plain symbols too. Not yet checked on a real Ang run. Also seen in
+   that summary, not fixed: `strip_latex` leaves `$P = 0.8$` as written
+   (no backslash between the dollar signs); "decrease of -10.2" is a double
+   negative.
+3. DONE in code (Session 36): the record .docx page text was already
+   plain `Normal` paragraphs. The AI summary's Markdown now becomes Word
+   formatting via `_add_markdown()` in output.py. Open choice: wrap the
+   record .md page text in a code fence (see the Session 36 log).
+4. DONE in code (Session 36, option 3): single-vote fills stay but are
+   flagged "confirmed only once - check against the PDF" on screen and
+   in FILL_DEBUG. Open choice: also list them in the record .docx/.md.
+5. SR: see "TODO SR (next chat, do in this order)" in the Session 35 log
+   for full detail. Replace hard-coded `qwen-vl-plus` with
+   `QWEN_VISION_MODEL` (data_extractor.py, table_extractor.py,
+   scripts/nondet_probe.py; grep again before editing); broken text layers
+   in all 5 SR papers (text-based screening and RoB2 for CBT-women and
+   zsy234 UNVERIFIED); allow Ollama vision models for SR.
+6. Writing: .docx tables never reach the AI (`_load_input_files` reads
+   paragraphs only; reuse the OCR reader); a read error is sent as
+   "[Could not read <name>]" as if it were document text; check whether
+   the `--report` path still skips .doc without a message (ae074cd fixed
+   the menu path).
+7. Session 28 priorities, still open: vote `outcome_selected` /
+   `timepoint_selected`; Ang outcome change S26 -> S27 (evidence in
+   `Readme/evidence/s26_issue11/`); decoder `!`-for-space gap (low).
+8. Menu 7 Data Analysis: design questions first.
+9. Post-merge OCR (details in the Session 36 log): list "confirmed only
+   once" fills in the record .docx/.md; code-fence the record .md page
+   text; convert LaTeX in fill answers (`$\pm$`) before `_accept`;
+   Tesseract as second reader (trust alone only for minus; lookup
+   TESSERACT_CMD -> PATH -> install folders incl. Mac Homebrew); check
+   how `relevance_screener.py` behaves when tesseract.exe is not on PATH.
 
 
 ---
@@ -155,7 +205,7 @@ confirmed DASHSCOPE_ANTHROPIC_URL / DASHSCOPE_OPENAI_URL are dead config
 hardware: a 14B pull and a demo run converging. Do before rollout.
 
 
-## Next Session Priorities (Session 28)
+## Session 28 priorities (history; the open ones are listed in "Next work")
 
 1. **Vote `outcome_selected` / `timepoint_selected`.** Carryover from
    S26 priority 3 and now more urgent: today's Ang stability could be
@@ -814,3 +864,961 @@ Details, commits and follow-ups: see "Session 32" at the end of this file.
     commands once (a double paste gave `-WrapGet-ChildItem`).
   - For multi-part edits, compare `git diff --stat` with the expected size
     before committing: 1f8df30 (+13/-43) was missing this whole log.
+
+## Session 33 handoff: "UI startup" (written end of Session 32)
+
+- State at end of Session 32: main = origin/main = fa4edb9 (PR #3 merged:
+  Writing mode one-pass, four tracks). v2.6-ocr-editor = fa4edb9 + HANDOFF
+  commits (not yet on main; they go with the next PR). Tests: 816 passed,
+  3 skipped, 11 deselected (local and CI on PR #3). Version stays 2.5.0;
+  bump to 2.6.0 after OCR is merged.
+- Not yet confirmed: Render "Deploy live" hash (expected fa4edb9; the user saw
+  the live app's API working); CI run on main for fa4edb9 (expected 816).
+- JOB (user's words): Rename this pipeline to "UI startup". It provides users
+  who have difficulty to locate where to put their input files and find the
+  output files, set up API's. The work button will bring users to the
+  corresponding CLI pipelines. This applies to all the pipelines in the UI
+  with minimal coding.
+- Meaning: the Streamlit UI is a front door, not a place where pipelines run.
+  It handles (1) input: upload or locate files in input/<mode>/, (2) output:
+  the output browser for output/<mode>/, (3) API keys: sidebar, kept in
+  st.session_state, passed to the CLI via env= (never written to disk).
+  Run opens the matching CLI pipeline in a terminal, where all menus are
+  answered. No per-mode UI controls and no new CLI flags: the Session 32 idea
+  of --track / --word-limit / --instructions / --no-files is DROPPED.
+- DECISION 1 (ask the user first): Render has no terminal. _run_cli_cloud
+  uses stdin=subprocess.DEVNULL (ui/app.py line 638), so menu modes stop at
+  their first input() (Writing: "Select track [0-4]" main.py line 1943;
+  also Appraisal and Search). Options: (a) on Render, UI startup shows
+  guidance + output browser only and Run explains the pipelines run locally;
+  (b) allow hosted Run only for modes that ask no questions; (c) flags later.
+- DECISION 2 (DECIDED by the user, end of Session 32): launcher menu becomes
+  7 Data Analysis (new), 8 OCR (new), 9 Dry Run (was 7), 10 Startup UI
+  (was 8 "Pipeline UI", renamed). Dry Run and the UI are KEPT, not replaced;
+  this supersedes the older plan (#4 Data Analysis replaces Dry Run, #5 OCR
+  replaces option 8). Name: user said "UI startup" first, then "Startup UI";
+  use "Startup UI" unless the user says otherwise (confirm once).
+- Menu work order: (1) renumber 9 Dry Run and 10 Startup UI, and add
+  placeholders for 7 and 8 that print "coming soon" and return to the menu.
+  Test-first: pin the new numbers and labels in launcher tests, and update
+  any existing tests that expect 7 = Dry Run or 8 = Pipeline UI. (2) Startup
+  UI job (above). (3) OCR as option 8 (Task A). (4) Data Analysis as
+  option 7 (#4: data file -> Python/R/Excel statistics -> Ollama model
+  explains/checks/reports; needs its own design questions first).
+- Places a new menu number touches: scripts/launcher.py MODES / menu
+  numbers / _MODE_INPUT_MAP / show_help(); README launcher table;
+  Readme/flashcard-help.html; the four launchers (.bat etc.) if they print
+  the menu. First read-only check:
+  `Select-String -Path scripts\launcher.py -Pattern 'Dry Run|Pipeline UI|"7"|"8"|def show_help|def main_menu|MODES' -Encoding utf8 | Select-Object LineNumber, Line`
+- Known facts (Session 32, ui/app.py): "in the terminal" help text at lines
+  89, 113, 130, 147, 149; launch messages at 1207-1208 ("session launched in
+  a new terminal window"); _build_cli_cmd 484 (passes --sub at 496);
+  RENDER* detection 475-477 and _RENDER_VARS 534; _launch_terminal 598;
+  _run_cli_cloud 607; _launch_terminal_local 666; file_uploader on home
+  page 936, SR page 1071, mode page 1122; hosted-upload note 1172.
+- First read-only commands:
+  `Select-String -Path SOURCE_CODE\ui\app.py, scripts\launcher.py, README.md, Readme\flashcard-help.html -Pattern 'Pipeline UI|Streamlit|page_title|--ui|option 8' -Encoding utf8 | Select-Object Filename, LineNumber, Line`
+  Rename places expected: app.py page title/header (_render_header ~387),
+  launcher menu label + show_help(), README, flashcard-help.html, HANDOFF.
+- Working rules unchanged: read-only first, failing test (fails for the
+  right reason), code, full suite, check_no_bom.py, docs, commit/push.
+  CI runs only on PRs to main (ci.yml lines 4-7). Merging to main deploys
+  to Render. Check syntax after editing main.py/app.py with ast.parse.
+- After UI startup: Task A OCR (search HANDOFF for "Task A").
+- Rule for every new mode: decide its UI startup entry (input folder,
+  output folder, Run -> CLI) and its Render behaviour.
+
+## Session 33 - 2026-10-27 - branch v2.6-ocr-editor
+
+Decisions (these replace the "Session 33 handoff" plan above: DECISION 1 and
+the Startup UI job are dropped):
+- Streamlit UI removed completely (replaces the Session 29 decision to keep it).
+  Without Run, uploads or keys it added nothing the launcher and Help don't.
+- Render service deleted. It held no API keys, only `DEFAUL_PROVIDER`
+  (misspelt, so never read) and `PYTHON_VERSION`. Steps: auto-deploy off,
+  suspend (health 503), check no local Streamlit (port 8501 free), delete
+  (health 404).
+- Launcher menu: 7 Data Analysis (coming soon), 8 OCR (coming soon),
+  9 Dry Run, 10 Setup.
+- Setup sub-menu: 1 API keys (getpass, written to .env, only that line
+  changed, .env.example copied if no .env, UTF-8 no BOM); 2 Local AI
+  (check Ollama installed/running, choose default model, pull a new model);
+  3 Open Help (Readme/flashcard-help.html, path relative to the launcher).
+  All .env reading/writing goes in a new stdlib-only SOURCE_CODE/env_file.py.
+- Model list: live facts only. MODEL_RANKS and "Not pulled yet" hints are
+  dropped. A model is selectable only if /api/show lists `completion`
+  (embedding models are excluded by capability, not by name).
+- Default model: OLLAMA_MODEL from Setup, else gemma4:e4b
+  (OLLAMA_DEFAULT_MODEL, the only model name left in code). `--model` or a
+  job-time pick applies to that job only. The .env.example OLLAMA_MODEL line
+  gets commented out so an unset value means "built-in default".
+- If the default model isn't pulled: the launcher offers "pull it now" or
+  "choose a pulled model for this job only". With no TTY, the job stops:
+  "Run `ollama pull <model>` or choose another in Setup". No silent switch
+  to the largest model (replaces choose_default's fallback).
+- Pulling: Setup runs `ollama pull <name>` (name checked against a pattern,
+  no shell, [y/N] size warning, Ctrl+C cancels, then "make it default?").
+  It also offers to pull the embedding model (EMBEDDING_MODEL or
+  nomic-embed-text). Setup points users to ollama.com/download and never
+  installs Ollama itself.
+
+Commit 0 (this commit): path_utils.py no longer creates data/ or docker/,
+and docker_dir, data_dir, get_docker_path() and get_docker_file() are
+removed. Nothing else used them. PATH_MANAGER = PathManager() runs
+_ensure_directories() on import, which is why deleting the empty folders
+by hand never stuck. Verified: after importing utils.path_utils,
+Test-Path data, docker -> False, False. tests/test_path_utils_dirs.py (3;
+2 failed with AssertionError before the fix). Suite: 816 -> 819 passed.
+
+Order of work: 1 menu renumber + Setup/Open Help; 2 env_file.py + API keys;
+3 ollama_models.py cleanup (ranks out, capability filter, default rule);
+4 Setup -> Local AI; 5 remove Streamlit and Render; 6 update flashcard-help.html.
+
+Commit 5 list (remove together): ui/app.py, tests/test_ui.py and the other
+UI tests (test_ui_cloud_gate, test_ui_model_picker, test_ui_time_limit,
+AppTest renders), --ui in main.py and the launcher, streamlit in the
+requirements files, .streamlit/ (config.toml, secrets.toml.example) and
+.gitignore line `.streamlit/secrets.toml`, render.yaml,
+requirements-render.txt, tests/test_render_without_chromadb.py, the whole
+assets/ folder, and in path_utils.py the ui_dir and assets_dir mkdir entries
+plus get_assets_path()/get_assets(). Keep: streaming.py (not Streamlit),
+the pyarrow==12.0.1 pin (chromadb needs it), `.gitattributes` `*.ico binary`.
+Expect a large test-count drop; record before/after.
+
+Notes:
+- assets/icon_AI_kcMedicalResearch.ico was used only by the user's desktop
+  shortcut; copied outside the repo before commit 5. No script uses it.
+- The two untracked PNGs (icon_Data_Analysis, logo_OCR) were deleted;
+  made for the dropped UI.
+- Forest plot path disagrees: flashcard-help.html line 273 says
+  output/figures/, README line 226 says output/sr/figures/. Check
+  mirror_figures (main.py ~1569) in commit 6.
+- Still stale (from the session-open read): #19 is RESOLVED but still in the
+  Open Issues table; Providers row lists Ollama twice; Session 28 "[APPLY +
+  add test pinning the 404->pull-message mapping]" not confirmed; Session 28
+  priority "vote outcome_selected/timepoint_selected" never closed; the
+  2026-09-02 notes still say llama3.2. Fix in a docs commit.
+
+### Commit 1 - launcher menu
+- Menu: 1-6 pipelines, 7 Data Analysis (coming soon), 8 OCR (coming soon), 9 Dry Run, 10 Setup; C Custom flags (was 9), H Help, X Exit.
+- Setup sub-menu: 1 API keys (coming soon - commit 2), 2 Local AI (coming soon - commit 4), 3 Open Help, 0 Back.
+- run_ui() and the --ui launch removed from the launcher; show_help() replaced by open_help() using HELP_FILE = Readme/flashcard-help.html.
+- Banner: Render "Deploy" line replaced by "Runs  local first / cloud API"; Modes line 2 is now `rct_search  sr  data_analysis  ocr` (ui and dry-run dropped).
+- tests/test_launcher_menu.py (20 tests) incl. a banner width guard, proven to fail when the padding is off by 2.
+- Desktop shortcut checked: targets scripts/windows/AI_kcMedicalResearch_CLI.bat, icon C:\icon_AI_kcMedicalResearch.ico (outside repo) - unaffected by commit 5.
+- Added to the commit 5 list: scripts/windows/AI_kcMedicalResearch_UI.bat, scripts/macos/Mac_kcMedicalResearch_UI.sh, assets/ (via git rm -r, plus assets_dir/get_assets* in path_utils.py), README lines 92/140 (web UI text), README line 186 (keep, reword).
+
+### Commit 2 - Setup -> API keys
+- New SOURCE_CODE/env_file.py (stdlib only): read_values, set_value, mask. set_value changes only the target key's active lines (all duplicates), appends a missing key, leaves comments/blank lines/order alone, keeps CRLF or LF, writes UTF-8 without BOM, copies .env.example if .env is missing, saves via temp file + os.replace (temp name .env.<random>.tmp is covered by .gitignore '.env.*'). Rejects bad key names and values with spaces, quotes or line breaks; error messages never include the value.
+- Launcher Setup item 1 is live: api_keys_menu() lists Qwen (DASHSCOPE_API_KEY), Groq, DeepSeek, OpenAI, Anthropic with masked values (****abcd / (not set)); key typed hidden via getpass; Enter keeps the current key; Ctrl+C cancels; "Saved" message reads the value back from .env and shows only the mask; warns if the same name is also a system environment variable (load_dotenv does not override those).
+- No "clear key" option yet (edit .env by hand). Ollama has no key; its model setting is Setup item 2 (commit 4).
+- Checked 2026-10-28: no *_API_KEY / DEFAULT_PROVIDER / OLLAMA_MODEL system environment variables on this machine; user's .env is CRLF and lacks GROQ/OPENAI/ANTHROPIC key lines (appended on first save).
+- Tests: tests/test_env_file.py (26), tests/test_launcher_api_keys.py (10, temp .env only - real .env never touched); test_setup_items_1_and_2_are_placeholders narrowed to item 2.
+- Commit 3 note: .env.example is stale - v2.4.6 header (line 3), "ranked best" text (67-69), "let the app pick ... largest model" (76-77, contradicts no-silent-switch), Docker note (85-86).
+
+### Commit 3 - remove Streamlit UI and Render deploy
+- Commit order changed: 3 = Streamlit/Render removal (was 5), 4 = ollama_models tidy + default-model rule + .env.example (was 3), 5 = Setup -> Local AI (was 4), 6 = flashcard-help.html + forest-plot path. Reason: ui/app.py and test_ui_model_picker.py used RANKS_SOURCE/choose_default, so removing them first avoids editing code that is about to be deleted.
+- git rm (22 files): SOURCE_CODE/ui/, .streamlit/, assets/, render.yaml, requirements-render.txt, scripts/windows/AI_kcMedicalResearch_UI.bat, scripts/macos/Mac_kcMedicalResearch_UI.sh, SOURCE_CODE/pipelines/sr/run_sr_ui.bat (dead: launched sr/src/ui/app.py, removed in Session 4), tests/test_ui.py, test_ui_cloud_gate.py, test_ui_model_picker.py, test_ui_time_limit.py, test_render_without_chromadb.py (84 tests).
+- main.py: --ui flag and Streamlit launch block removed; Search-mode cloud detection (RENDER / STREAMLIT_* -> default Topic Search) removed, so Search always asks or uses --sub.
+- path_utils.py: ui_dir, assets_dir, get_assets_path, get_assets removed; import no longer creates assets/.
+- streamlit removed from requirements-base.txt, requirements-local.txt, SOURCE_CODE/pipelines/sr/requirements.txt; Render notes removed from requirements*.txt and rag.py comment; .gitignore .streamlit line removed. pyarrow==12.0.1 pin KEPT (chromadb). streaming.py kept.
+- README: Render links, hosted-app line, web-UI sentences and Deployment (Render) section removed; pre-v2.4.7 key-rotation note kept and reworded.
+- Guard: tests/test_no_streamlit.py (9 tests: files gone, no --ui/streamlit/is_cloud in main.py, no ui/assets in PathManager, no streamlit in requirements, pyarrow pin kept, .gitignore, README).
+- Left for commit 4: README lines on model ranks and "ollama pull" hints, ollama_models.py docstring mentioning ui/app.py.
+
+### Commit 4 - Ollama default-model rule, no rankings
+- Rule: model = OLLAMA_MODEL in .env, else OLLAMA_DEFAULT_MODEL (gemma4:e4b). No auto-detection and no silent switching. A model that is not pulled fails with the plain-language 404 message ("ollama pull <model>").
+- providers.py: _resolve_ollama_model() = OLLAMA_MODEL or default (no network call, no cache). Deleted _ollama_detect_best_model and _OLLAMA_MODEL_RESOLVED. get_default_model("ollama") returns the real model; the startup probe uses the same rule.
+- ollama_models.py: deleted MODEL_RANKS, RANKS_SOURCE, rank_label, missing_ranked, choose_default, _norm, _SKIP_PATTERNS. list_ollama_models lists every model; describe() has no rank text.
+- launcher.py pick_ollama_model: default read from .env each time the picker opens; lists only models with the 'completion' capability (embedding models hidden); Ollama unreachable or no chat model -> returns ''. Default not pulled -> warning, still the Enter choice. No ranks, no pull hints.
+- main.py: new _sr_default_model(provider). The SR route (--mode sr --provider ollama) used raw OLLAMA_MODEL and sent an empty model name when unset; fixed. README "Noted, not fixed" line removed.
+- sr/main.py: docstring only (resolve_model now never stops for Ollama).
+- .env.example: removed v2.4.6 header, ranking text and Docker note; OLLAMA_MODEL comment explains the rule. README Step 3/5 and the v2.5 note rewritten.
+- Tests: test_providers TestOllamaModelRule; test_streaming 3 tests; test_sr_cli_model_resolution (placeholder test replaced by 2); test_launcher_model_picker rewritten (10 picker tests, autouse temp .env); test_ollama_models (9 rank/choose_default tests deleted, TestNoRankings added); new tests/test_sr_default_model.py (4). Suite 799 -> 802.
+- Note: tests/test_main.py::TestMainProviderCalls::test_call_ai_fallback_to_ollama is a live test (real DeepSeek call, got 400 on 2026-10-28). Always run test_main.py with -m "not live".
+- Deferred to commit 5 (Setup -> Local AI): pull offer [y/N], 404 message to mention Setup, plain-language 404 in streaming.py (currently raw "Ollama streaming error 404").
+
+### Commit 5 - Setup -> Local AI (Ollama)
+
+- Setup item 2 now opens `local_ai_menu()` in scripts/launcher.py (was "coming soon").
+- Status line: Ollama version (new `ollama_version()` in ollama_models.py, GET /api/version)
+  and the default model (`OLLAMA_MODEL` in .env, else gemma4:e4b), marked pulled / NOT pulled yet.
+- Not installed (`_ollama_exe()`: PATH, then %LOCALAPPDATA%\Programs\Ollama\ollama.exe):
+  shows https://ollama.com/download and no menu. Installed but not running: says so, no menu.
+- 1 Change default model: lists pulled models whose /api/show capabilities include
+  `completion` (embedding models hidden), saves `OLLAMA_MODEL` via env_file.set_value.
+  Enter cancels. Warns if a Windows/system `OLLAMA_MODEL` variable would override .env.
+- 2 Pull a new model: name checked against `^[A-Za-z0-9][A-Za-z0-9._:/-]{0,199}$`
+  (no spaces, cannot start with `-`), size warning, `Download <name>? [y/N]` (Enter = no),
+  runs `[ollama, "pull", name]` as a list (no shell). Ctrl+C stops; non-zero exit = "failed".
+  Only after a successful pull: `Make <name> the default model? [y/N]`.
+- Tests: tests/test_launcher_local_ai.py (15, nothing touches real Ollama or .env),
+  TestVersion in tests/test_ollama_models.py (2); deleted the item-2 placeholder test
+  in tests/test_launcher_menu.py. Full suite 818 passed, 3 skipped, 10 deselected (2026-10-28).
+- Still open: streaming.py `_stream_ollama` shows a raw HTTP 404 when the model is not
+  pulled; providers.py already says "ollama pull <model>". Next commit.
+
+### Commit 6 - same "model not pulled" message when streaming
+
+- New `ollama_model_missing_message(model)` in providers.py: "The local AI model '<model>'
+  is not installed yet", the `ollama pull <model>` command, and the launcher route
+  (10 Setup -> 2 Local AI -> 2 Pull a new model).
+- Used by the Ollama call in providers.py and by streaming._stream_ollama on HTTP 404.
+  Before this, streaming showed the raw "Ollama streaming error 404". Other HTTP codes unchanged.
+- Tests: tests/test_ollama_missing_model.py (3, urlopen patched). Full suite 821 passed,
+  3 skipped, 10 deselected (2026-10-28).
+- Closes the "Still open" item in Commit 5.
+
+## Session 33 handoff - for the next chat (2026-10-28)
+
+Repo D:\AI_kcMedicalResearch, branch `v2.6-ocr-editor`, Windows PowerShell, `.venv`.
+`main` is still at fa4edb9 (PR #3, 816 tests). The branch has 8 commits (7 code + this
+handoff), all pushed, **not merged yet** (no PR opened).
+
+### Session 33 commits
+
+| Commit | What |
+|---|---|
+| e4d57cd | path_utils stops creating `data/` and `docker/` |
+| c297396 | Launcher menu: 7 Data Analysis, 8 OCR, 9 Dry Run, 10 Setup |
+| 982c46b | Setup -> API keys saved to `.env` (new `SOURCE_CODE/env_file.py`) |
+| 1264d0c | Removed Streamlit UI and Render deploy (local-first CLI only) |
+| 7fff199 | Ollama: `OLLAMA_MODEL` else gemma4:e4b, no rankings or auto-detect |
+| 189491a | Setup -> Local AI: Ollama status, change default model, pull models |
+| b67873e | Same "model not pulled" message when streaming |
+
+Tests: **821 passed, 3 skipped, 10 deselected** (`python -m pytest -m "not live" --tb=short -q`).
+
+### Where things stand
+
+- **CLI only.** The Streamlit UI, `--ui`, `SOURCE_CODE/ui/`, `assets/`, `.streamlit/`, `render.yaml`,
+  `requirements-render.txt`, `*_UI.bat`/`*_UI.sh` and `run_sr_ui.bat` are gone. The Render service
+  was deleted (the health URL returns 404). README line ~179 still mentions the old Streamlit
+  interface on purpose (it's the API-key rotation note).
+- **Launcher menu** (`scripts/launcher.py`): 1 Coding, 2 Writing, 3 Appraisal, 4 Search,
+  5 RCT Search, 6 SR Pipeline, 7 Data Analysis (coming soon), 8 OCR (coming soon), 9 Dry Run,
+  10 Setup, C Custom flags, H Help (`Readme/flashcard-help.html`), X Exit.
+- **Setup (10):**
+  - 1 API keys: 5 keys typed hidden (getpass), saved by `env_file.set_value`, shown masked.
+    Warns if a system environment variable would override `.env`.
+  - 2 Local AI: `local_ai_menu()` shows the Ollama version and the default model.
+    1 Change default (chat models only), 2 Pull a model (name checked, `[y/N]`, no shell).
+    If Ollama is not installed it shows https://ollama.com/download; if not running it says so.
+  - 3 Open Help.
+- **Ollama model rule:** `OLLAMA_MODEL` from `.env`, else `OLLAMA_DEFAULT_MODEL = "gemma4:e4b"`
+  (`ollama_models.py`). No auto-detection and no silent switching. A model that isn't pulled
+  gives `ollama_model_missing_message()` (providers.py), used by both the normal and the streaming call.
+- **`ollama_models.py`** (stdlib only): `list_ollama_models` (/api/tags),
+  `model_capabilities` (/api/show), `ollama_version` (/api/version), `describe`.
+  "Chat model" = capabilities include `completion`.
+- **Safety rules kept:** Ollama never falls back to a cloud provider (`LOCAL_ONLY_PROVIDERS`).
+  The SR pipeline blocks ollama and deepseek (no image input).
+- **`env_file.py`** keeps `.env` CRLF/LF line endings, never writes a BOM, and saves through a temp
+  file + `os.replace` (`.env.*.tmp` is gitignored).
+
+### Working rules (same as before)
+
+- Test-first, one step at a time: write a failing test, run it, then edit the code, then run the full suite.
+- Edit bottom-up so line numbers stay valid. Save as UTF-8 without BOM; run
+  `python scripts/check_no_bom.py` after every edit.
+- Always use `-m "not live"`. `test_main.py::test_call_ai_fallback_to_ollama` makes a real
+  DeepSeek call (it returned 400 on 2026-10-28).
+- Use `git --no-pager ...`. In `git grep`, put patterns that start with `-` after `-e`.
+- Commit with `git commit -F D:\commit_msg.txt`, and **check its first line first**
+  (`Get-Content D:\commit_msg.txt -TotalCount 1`). f1dbc36 went out with a stale message and
+  had to be amended and force-pushed (now c297396).
+- On split imports inside `( ... )`, check that each line ends in a comma, not a full stop.
+- The launcher tests load `scripts/launcher.py` by path with colorama mocked. The Local AI tests count
+  `safe_input` calls, so don't add "Press Enter" prompts after actions there.
+- CRLF->LF warnings on `git add` for new test files are harmless.
+- Line viewer helper (define it once per PowerShell window):
+  `function Show($f, $a, $b) { "--- $f ($a-$b)"; $i = 0; Get-Content $f -Encoding utf8 | ForEach-Object { $i++; if ($i -ge $a -and $i -le $b) { "${i}: $_" } } }`
+
+### Next options (user to choose)
+
+1. **Open a PR `v2.6-ocr-editor` -> `main`.** After the merge, update the Tests row
+   ("816 on main") to 821.
+2. **8 OCR.** gemma4:e4b can read images, but the app doesn't send images to Ollama yet:
+   `call_ollama` and `_stream_ollama` are text-only. `.env` has TESSERACT_PATH and POPPLER_PATH;
+   `utils/document_reader.py` already accepts image extensions. Start with read-only checks.
+3. **7 Data Analysis** (placeholder).
+
+Outside the repo (user): pause or delete the UptimeRobot monitor for the deleted Render URL.
+The desktop shortcut icon now lives at `C:\icon_AI_kcMedicalResearch.ico`, so it wasn't affected
+when `assets/` was removed.
+
+### First commands for the next session (read-only)
+
+```powershell
+git status -sb
+git --no-pager log --oneline -9
+python scripts/check_no_bom.py
+python -m pytest -m "not live" --tb=line -q
+```
+Expected: a clean tree in sync with origin, the top commit is this handoff, and 821 passed,
+3 skipped, 10 deselected.
+
+## Session 34 - 2026-11-06 - branch v2.6-ocr-editor
+
+- Dev machine: every console script in .venv\Scripts failed with "Fatal error
+  in launcher". The venv was created at D:\ai-automation-tool and the folder
+  was later renamed; pip's .exe stubs store the absolute interpreter path.
+  `python` and `python -m ...` kept working (pyvenv.cfg `home` is what Python
+  uses), which is why nothing in the handoff commands noticed.
+  Fixed in place: `pip freeze --exclude-editable` to D:\frozen.txt, then
+  `python -m pip install --force-reinstall --no-deps -r D:\frozen.txt`
+  (129 packages, same versions, from cache). Scan for the old path: 31 stale
+  stubs before, 0 after. Suite unchanged (821).
+- pyvenv.cfg `command` line still named D:\ai-automation-tool after the
+  reinstall (pip never rewrites it). Edited by hand to
+  D:\AI_kcMedicalResearch\.venv; Python does not read that line.
+- Launchers (Windows .bat and macOS .sh):
+  A. pip is called as `python -m pip`, never through the pip stub.
+  B. New moved-folder check: reads the `command` line in .venv\pyvenv.cfg; if
+     it does not name this folder's .venv, prints "This app folder was moved
+     since setup" and asks "Rebuild the app environment now? [Y/n]". Yes
+     renames .venv to .venv.old, rebuilds from requirements-local.txt, and
+     deletes .venv.old only after a successful install; any failure restores
+     .venv.old. An existing .venv.old stops the launcher with an explanation.
+  Tests: tests/test_launcher_venv_move.py (12; 10 failed before the change).
+  Suite: 821 -> 833 passed, 3 skipped, 10 deselected.
+  Checked by hand on Windows: real folder -> no box, straight to the menu;
+  copy at D:\kc_move_test -> box shown, rebuild ran, new `command` names the
+  copy, .venv.old removed, no stub points at the old folder,
+  pyarrow 12.0.1 / chromadb 0.5.23 installed, no streamlit.
+  macOS script: `bash -n` syntax check only; not run on a Mac.
+- FOUND, NOT FIXED (next commit): a fresh install from requirements-local.txt
+  breaks every OpenAI-compatible and Anthropic call. It pins openai==1.43.0
+    and anthropic==0.34.2 but not httpx; pip installs httpx 0.28.1, which
+  removed `proxies`, and the old SDKs crash with
+  "Client.__init__() got an unexpected keyword argument 'proxies'".
+  89 errors/failures in the copy's test run. Ollama unaffected (urllib).
+  Fix to test: pin httpx<0.28 in requirements-local.txt, then rerun in the copy.
+- requirements-local.txt is NOT fully pinned (the 2026-09-02 note says it is):
+  packages it does not name float to the newest version (the copy got
+  packaging 26.3, pygments 2.21.0).
+- Dev venv drift: this machine's venv has pyarrow 24.0.0, chromadb 1.5.9,
+  openai 2.41.1, anthropic 0.120.0 and still has streamlit 1.60.0. Colleagues
+  get the pinned versions above, so local test runs do not represent them.
+  Consider rebuilding the dev venv from requirements-local.txt plus pytest.
+- Other failures in the copy, not colleague-facing: test_gitignore_input.py
+  (4) needs a .git folder; test_main.py::TestMainValidation::
+  test_validate_api_keys_qwen_with_key failed without .env (check whether it
+  depends on the developer's real .env).
+- Follow-up C (not done): the launcher only runs setup when .venv\Scripts\
+  python.exe is missing, so a setup interrupted halfway is never retried.
+  Needs a success marker and a rule for existing venvs without one.
+- To delete when done: D:\kc_move_test (copy, about 1 GB plus rebuilt venv),
+  D:\frozen.txt.
+- Lesson: a pip reinstall regenerates the stubs but not pyvenv.cfg. Any check
+  that reads pyvenv.cfg sees the original creation path until it is edited
+  or the venv is rebuilt.
+
+### Session 34 commit 2 - httpx pin for colleagues' installs
+- Launcher commit 2c7c57f pushed (821 -> 833).
+- requirements-local.txt: added httpx==0.27.2 (fixes the FOUND item above).
+  Checked in D:\kc_move_test: 89 `proxies` errors -> 0; 828 passed, 5 failed
+  (the 4 .git + 1 .env failures, as expected); pyarrow/chromadb unchanged.
+  Tests: tests/test_requirements_local_pins.py (2; both failed before).
+  Suite: 833 -> 835 passed, 3 skipped, 10 deselected.
+- Why CI missed it: CI installs requirements-ci.txt -> requirements-base.txt
+  (newest SDKs); dev uses requirements.txt -> base too. Nothing installs
+  requirements-local.txt, the file colleagues get. Follow-up: a CI job that
+  installs requirements-local.txt and runs the suite.
+- Follow-up: SR requirements.txt wants anthropic>=0.40.0; requirements-local
+  pins 0.34.2. Raising it needs its own test in the copy.
+- Push 403 (fixed): git uses `store --file=C:/Users/user/.git-credentials-github`
+  for github.com (one token for every repo). On 31 Oct a fine-grained token
+  for another KW75 repo replaced it. Fix: added AI_kcMedicalResearch to that
+  token (Contents: Read and write). Lesson: a token made for one repo
+  must list every repo pushed from this machine.
+- Still to delete: D:\kc_move_test, D:\frozen.txt, D:\commit_msg.txt.
+
+
+### Session 34 close
+- Cleanup done: D:\kc_move_test, D:\frozen.txt, D:\commit_msg.txt deleted.
+- Dev venv: activate.bat and activate (bash) also had the old path; fixed by
+  hand (local only, .venv is untracked). PowerShell Activate.ps1 was fine.
+  pip.exe runs from this folder. Housekeeping item "confirm .venv\Scripts\
+  Python is the one resolving" is confirmed: cmd and PowerShell both
+  resolve .venv\Scripts\python.exe first.
+- This machine also has Python 3.14; rebuild the dev venv with py -3.11.
+- Follow-ups (not urgent, suggested order):
+  1. CI job that installs requirements-local.txt (+ pytest) and runs the
+     suite; today nothing tests the file colleagues install.
+  2. macOS launcher moved-folder check verified by `bash -n` only; run it
+     on a Mac.
+  3. SR requirements.txt wants anthropic>=0.40.0; requirements-local pins
+     0.34.2. Raise it only after a fresh-copy test.
+  4. requirements-local.txt is not fully pinned (unnamed packages float).
+  5. Some tests write real files to output/writing/ and reports/rct_search/
+     instead of tmp_path; check .gitignore covers output/ and reports/.
+  6. Launcher follow-up C: retry a setup that failed halfway.
+  7. Dev venv drift: newer pyarrow/chromadb/SDKs and still streamlit.
+  8. test_validate_api_keys_qwen_with_key may depend on the developer's .env.
+
+## Session 34 (cont.) - 2026-11-06 - folders for planned OCR / data_analysis
+- The app now creates input\, output\ and reports\ ocr and data_analysis
+  folders itself. path_utils.py has future_mode_subdirs = ['ocr',
+  'data_analysis'] (input/output/reports only, no docs/). Git ignores
+  input/*, output/ and reports/, so a fresh clone gets them on first run.
+- Tests: test_path_utils_dirs.py +2 (folders created; no docs/ folder yet).
+  Suite: 835 -> 837 passed, 3 skipped, 10 deselected.
+- Found: the 10 .gitkeep files in output\ and reports\ exist only on this
+  machine. .gitignore lines 13-14 ignore them, so they do nothing.
+- main.py lines 187-202 is a second, partial folder list (sr missing from
+  reports). Left unchanged because path_utils runs at every start.
+- When OCR or data_analysis code is written: move the name into
+  mode_subdirs, add it to the main.py --mode choices and _MODE_EXTENSIONS,
+  and add it to the mode list in test_e2e.py line 269.
+
+## Session 34 (cont.) - 2026-11-06 - test cleanup, Gemini checked
+- Checked tests for leftovers from the removed Streamlit UI: none are
+  redundant. The UI matches in test_launcher_menu.py, test_ollama_models.py
+  and test_no_streamlit.py are guards that stop the UI coming back; keep
+  them. Other matches ("render") are about report output, not UI.
+- Deleted 3 placeholder tests from test_main.py (TestMainProviderCalls):
+  two Ollama, one OpenAI. Each was @pytest.mark.skip with body `pass`;
+  real calls are covered by test_live_providers.py.
+  Suite: 837 passed, 3 skipped -> 837 passed, 0 skipped, 10 deselected.
+- Found, not fixed: test_call_openai_provider_missing_key is marked
+  @pytest.mark.live but makes no network call, so it never runs. Its patch
+  target SOURCE_CODE.main.OPENAI_API_KEY may also be wrong (the Anthropic
+  test below patches the provider module). Remove the mark and fix the
+  patch target, test-first.
+- Gemini API is not available in our region (checked 2026-11-06), so the
+  planned Anthropic -> Gemini move was stopped. Anthropic kept (needs VPN).
+  No-VPN options: DeepSeek (text only), Qwen (has a vision model), Ollama.
+
+## Session 35 - 2026-11-06 - branch v2.6-ocr-editor
+
+- Session-opening checklist, all four items run:
+  1. Test count: 837/847 collected (10 deselected) = README line 7.
+  2. Closed-issue citations: 55 RESOLVED_ISSUES rows, no `(#N)` in README.md
+     or HANDOFF.md. Note: the pattern `#(\d+)` only finds numbers cited in
+     passing (5 of them), not the table rows. Use `^\|\s*(\d+)\s*\|` and
+     print the count, so "clean" cannot mean "never ran".
+  3. Open Issues tables matched (#19, #2, #3). #19 was RESOLVED but still
+     listed: moved to RESOLVED_ISSUES.md and removed from both tables.
+  4. Spot check found the #61 warning (below).
+- Gaps in issue numbers (53-60, 63-65) are not lost rows. The archive
+  renumbering table maps old 53/54/60 to new 43/44/49; #63/#64 were working
+  numbers for #51/#52.
+- Current State table updated to Session 34 (no Render; 15 branch commits not
+  through CI; providers). Anthropic AND Gemini are geo-restricted on the dev
+  machine (#3); the Anthropic -> Gemini switch is on hold.
+- Session 28 "[APPLY + add test pinning the 404->pull message]" CLOSED:
+  tests/test_providers.py::test_ollama_404_tells_user_to_pull_model
+  (non-streaming) and tests/test_ollama_missing_model.py (streaming + helper).
+- Session 28 priorities still open: 1 vote outcome_selected /
+  timepoint_selected; 2 Ang outcome change S26 -> S27; 3 decoder `!` (low).
+- Corrections to the 2026-09-02 notes (left as history): the Ollama model is
+  OLLAMA_MODEL in .env, else gemma4:e4b (no llama3.2, no auto-detect);
+  requirements-local.txt is NOT fully pinned (unnamed packages float; httpx
+  pinned in Session 34).
+- Forest plot: primary copy reports/sr/<RUN_ID>/output/figures/, mirror shown
+  to the user output/sr/figures/ (project_layout.py; main.py mirror_figures).
+  README is right; flashcard-help.html "output/figures/" is wrong. Fix in the
+  flashcard commit.
+- Found, fixed next commit: main.py SR Anthropic warning (~line 2351) says the
+  Anthropic path runs without the source-quote, SD/SE and group-timepoint
+  tripwires, and cites resolved #61. In the code, _extract_anthropic calls
+  _flag_suspect_source_quotes and (per #50) group/timepoint runs; only the
+  text-line SD/SE check cannot run (REVIEWER_GUIDE §6). This is the same
+  claim the S23 lesson called false, still printed to users.
+- SR Anthropic warning corrected. New main.sr_provider_warning(mode, provider);
+  run_cli prints it. It now says only two checks cannot run on
+  --provider anthropic (verbatim quote-in-source, text-line SD/SE) and that the
+  rest still run, and points to docs/sr/REVIEWER_GUIDE.md section 6 instead of
+  closed #61. tests/test_sr_anthropic_warning.py (5); seen failing first
+  (4 AttributeError + 1 on "Known Issue #61"). Suite: 837 -> 842.
+- Noted, not fixed: REVIEWER_GUIDE section 6 "Quote-check number matching" row
+  says unicode-vs-ASCII minus signs can still miss; #68 (Session 27) fixed that
+  in _number_in_text. Thousands-separator claim not yet checked. Separate docs
+  commit after grepping _number_in_text.
+- Draft PR #4 opened (v2.6-ocr-editor -> main); CI green, 842 passed,
+  10 deselected, 44 warnings (same unpinned-version warnings as Session 29).
+- New CI job test-local-pins: installs requirements-local.txt exactly as both
+  launchers do (pip upgrade, then -r requirements-local.txt; no build-essential),
+  runs pip check, logs pip freeze, then the not-live suite. No pysqlite3-binary
+  (colleagues never get it). tests/test_ci_matches_launchers.py (3; 2 failed
+  first) pins that a CI job installs the launchers' file. Suite: 842 -> 845.
+- CI on d7f11f1 (PR #4): both jobs green, 845 passed. test-local-pins shows
+  57 warnings vs 44 (older pinned versions; not failing, look when convenient).
+- REVIEWER_GUIDE section 6 "Quote-check number matching" row corrected:
+  unicode minus/dash signs now match (#68, _number_in_text lines 1144-1145);
+  thousands separators still miss (1234 vs 1,234 or 1 234), since [.,] is only
+  allowed when the value has a decimal point (line 1156). Docs only.
+  
+### OCR design (agreed Session 35, not built yet)
+- `--mode ocr`, launcher menu 8. Both functions use the same flow:
+  OCR -> record (summary of the file at the top + full OCR text below) in
+  output/ocr/records/ -> summary output in output/ocr/.
+  1 Single file: choose one file from input/ocr/. Record saved to
+    output/ocr/records/; that file's summary saved to output/ocr/.
+  2 Document set: every file in input/ocr/ (any stack of documents, e.g.
+    patient records or lecture notes). One record per file in
+    output/ocr/records/; then one synopsis built from the per-file summaries
+    (not the full texts, so more files fit locally) saved to output/ocr/.
+    Each synopsis point names its source file. Records are kept if the
+    synopsis fails.
+- Records: one heading per page ("Page 3") in the full-text part.
+  All outputs are .docx + .md.
+- Names: the user types a short name (e.g. PT0123, Cardio_lectures); the app
+  adds the date: records <name>_<YYYY-MM-DD>_<original>.docx; output
+  <name>_<date>_SUMMARY.docx (function 1) or <name>_<date>_SYNOPSIS.docx
+  (function 2). Enter = OCR_<date>_<time>. Advise against real patient names
+  in file names.
+- Input from input/ocr/: .pdf, .jpg, .jpeg, .png, .tif, .tiff, .bmp, .gif,
+  .webp (.docx also read as text in a set). Images are converted to PNG before
+  sending to the model. PDF pages with a text layer are read directly (no AI);
+  only pages without text go to the model. pymupdf renders pages, pillow reads
+  images (both in requirements-local.txt). Input files are never moved.
+  Later option: .heic (needs pillow-heif, a new package).
+- Providers: same routine as other pipelines. Ollama default; cloud only per
+  job behind the consent warning. Like SR: only the chosen provider (no
+  FALLBACK_PROVIDERS chain), DeepSeek blocked (no image input).
+- Models: any pulled Ollama model whose /api/show capabilities include
+  `vision` (gemma4:e4b confirmed: completion, vision, audio, tools, thinking).
+  No fixed model list, so larger vision models on newer hardware work with no
+  code change. The list shows sizes. No vision model -> stop before the job,
+  point to Setup -> Local AI -> Pull a new model. qwen3:8b and
+  qwen2.5:14b-instruct are text-only.
+- Synopsis size limit on Ollama: decide when building (app sends
+  num_ctx 32768; gemma4:e4b supports 131072).
+- Later: amend the SR pipeline to use the same vision-capability check for
+  Ollama instead of blocking all Ollama models.
+- OCR step 1 done: providers.call_ollama_provider takes optional
+  images=[png_bytes, ...], sent base64 in the "images" field of /api/generate.
+  Text-only calls send no "images" key (request unchanged).
+  tests/test_ollama_images.py (3; 2 failed first with "unexpected keyword
+  argument 'images'"). Suite: 845 -> 848. Not yet: streaming.py image input
+  (OCR will use the non-streaming call).
+- OCR step 2 done: new SOURCE_CODE/pipelines/ocr/ (__init__.py, reader.py).
+  list_inputs(folder): supported files, name order, any-case extension.
+  read_input(path): pages {"page", "text", "png"}, exactly one set. PDF page
+  with >= 20 characters of text is read directly; otherwise rendered to PNG
+  at 200 dpi. Images (.jpg .jpeg .png .tif .tiff .bmp .gif .webp) converted
+  to PNG; multi-page TIFF gives one page per frame. Unsupported -> ValueError.
+  tests/test_ocr_reader.py (13; failed first with "No module named
+  'pipelines.ocr'"). Suite: 848 -> 861. Not yet: .docx in a set.
+- OCR step 3: pipelines/ocr/output.py writes records and the SUMMARY /
+  SYNOPSIS as .docx + .md. Header = typed name + date (blank ->
+  OCR_<date>_<time>). Record names keep the extension
+  (<header>_<file>_<ext>) so scan01.pdf and scan01.png never clash. OCR text
+  is written verbatim (no markdown-to-Word conversion); every file ends with
+  an AI note naming the model. tests/test_ocr_output.py (9; failed first with
+  "cannot import name 'output'"). Suite: 861 -> 870.
+- OCR design update: inputs also include .txt, .doc and .docx. They are read
+  as text (no AI reading), then summarised like any other file. .doc reading
+  uses pywin32 (Windows only), so check the Mac behaviour. Not built yet.
+- OCR step 4: pipelines/ocr/engine.py. run_single (function 1) and run_set
+  (function 2) share _process_file: text-layer pages are kept as they are,
+  PNG pages go to the vision model (TRANSCRIBE_PROMPT: "do not summarise"),
+  then the file is summarised and the record is written. One bad file does
+  not stop a set; no SYNOPSIS if every file fails. Default AI is the local
+  Ollama model; tests use a fake. tests/test_ocr_engine.py (8; failed first
+  with "cannot import name 'engine'"). Suite: 870 -> 878.
+  Not yet: real Ollama run, --mode ocr / menu 8. A long set may go over
+  num_ctx 32768 when summarised.
+- OCR step 5a: --mode ocr in main.py; prompts in pipelines/ocr/cli.py
+  (function 1/2 -> file -> name -> vision model). Only models reporting
+  'vision' are listed; default OLLAMA_MODEL if it has vision, else
+  gemma4:e4b. Checks that need no typing run first (no input files, no
+  vision model -> "ollama pull gemma4:e4b"). data_destinations: ocr lists
+  only the chosen provider, like sr. Cloud OCR refused for now
+  (ocr_provider_error). tests/test_ocr_cli.py (16). Suite: 878 -> 894.
+  Not yet: launcher menu 8 (5b), cloud OCR with consent, real-scan test.
+- OCR prompts simplified (user request): input/ocr/ decides the function -
+  one file -> record + SUMMARY, several -> records + SYNOPSIS. The "Choose
+  1 or 2" and "File number" questions were removed. Questions left: "Scan
+  title/name" (header; spaces -> _, capitals kept) and model.
+  tests/test_ocr_cli.py rewritten (still 16). Next: .txt/.docx in a set.
+- OCR records folder (user request): engine takes records_root; records go
+  to <records_root>/<header>/ (CLI will pass reports/ocr). A header already
+  used (records folder or SUMMARY/SYNOPSIS exists) gets _2, _3 ... (typed
+  name or blank default OCR_<date>_<time>), so a repeat scan never
+  overwrites. output.write_record takes rec_dir. tests/test_ocr_engine.py
+  +3 (failed first on 'records_root'). Suite: 894 -> 897.
+  Not yet: cli.py passes reports/ocr (prompts still use output/ocr/records).
+- OCR CLI: cli.py passes records_root=reports/ocr, so --mode ocr writes
+  records to reports/ocr/<header>/ and the SUMMARY/SYNOPSIS to output/ocr/.
+  "Done" line shows the records folder. tests/test_ocr_cli.py +2 (failed
+  first, records_root was None). Suite: 897 -> 899.
+- OCR real-file test (Session 35): --mode ocr --provider ollama with
+  gemma4:e4b works for one file (record + SUMMARY) and several files
+  (records + SYNOPSIS). Records in reports/ocr/<header>/, repeat header
+  gets _2. Still to check: a photo/scan page (AI read path) on real input.
+  Next: .txt/.docx/.doc in a set, then launcher menu 8 (5b).
+- OCR text inputs: reader.py reads .txt (UTF-8 with/without BOM, else
+  cp1252) and .docx (paragraphs + tables in document order, row ->
+  "cell | cell", merged cell once) as one text page, no AI. A file with no
+  text raises ValueError, so it is listed as failed. .doc is refused with
+  "save it as .docx". Correction to the earlier note: the app has NO
+  pywin32 .doc reader; utils/document_reader.py tries textract (not in any
+  requirements file) and silently falls back to _extract_with_alternative.
+  main._read_docx not reused: it hides errors as text and skips tables.
+  tests/test_ocr_reader_text.py (8); test_ocr_reader.py examples changed
+  from .txt/.docx to .xyz/.xlsx. Suite: 899 -> 907.
+  Next: launcher menu 8 (5b). Later: .doc support.
+- OCR real-file test, text inputs (Session 35): a set of PDF + .txt +
+  .docx (with table) works; text files go straight to summarising (no AI
+  reading), records and SYNOPSIS written as expected.
+- OCR .doc real test: refused with "save it as .docx", nothing crashed.
+  Fixed two output issues it showed: the file name was printed twice
+  (reader messages no longer include the name) and "Done: 0 record(s) in
+  <folder>" named a folder that was never created (now "No records
+  written."). +2 tests. Suite: 907 -> 909. Next: launcher menu 8 (5b).
+- Cloud OCR step 1: call_openai_provider and call_qwen_provider accept
+  images (shared _user_content: one image_url part per page as
+  data:image/png;base64, then the prompt; same format as SR's
+  _call_vision_api). No images -> request unchanged. Qwen with images and
+  no --model uses QWEN_VISION_MODEL (qwen-vl-max). tests/test_cloud_images.py
+  (7; 4 failed first on 'images'). Suite: 909 -> 916.
+  Agreed design (user): no local vision model / Ollama not running ->
+  offer pull or cloud (Qwen default, OpenAI); [CLOUD] confidentiality
+  banner + typed "y" / --confirm-cloud; chosen provider only, no fallback;
+  DeepSeek blocked. Groq/Anthropic later (Groq default model likely
+  text-only; Anthropic uses a different image format, geo-restricted).
+  Notes for later: PROVIDER_CAPABILITIES marks ollama vision False
+  (outdated, per-model); SR uses qwen-vl-plus vs providers default
+  qwen-vl-max.
+  Next: OCR offers cloud when no local vision model, then menu 8 (5b).
+- Cloud OCR step 2 (main.py): ocr_provider_error allows ollama, qwen and
+  openai (OCR_PROVIDERS); other providers refused ("cannot be used to read
+  page images"). The [CLOUD] banner adds "For OCR this means page images of
+  your documents." Suite: 916 -> 917. Not yet: cli.py still runs Ollama only,
+  so --provider qwen/openai shows the cloud banner but reads locally. Next:
+  cli.py offers qwen/openai when no local vision model, after typed "y".
+- Cloud OCR step 3: cli.run takes provider + confirm. --provider qwen/openai
+  sends page images to that provider (run_cli already showed [CLOUD] and got
+  "y"); Ollama is not asked. --provider ollama with no local vision model
+  offers qwen/openai (only those with an API key set); runs only after the
+  [CLOUD] banner and typed "y", Enter cancels. engine.cloud_call(provider,
+  model) wraps call_qwen_provider/call_openai_provider. The AI note names
+  e.g. "qwen-vl-max (qwen, cloud)". tests/test_ocr_cli_cloud.py (7; all
+  failed first). Suite: 917 -> 924. Not yet: real cloud OCR run; menu 8 (5b).
+- Cloud OCR real test works: --provider qwen, one photo (.jpeg) -> record
+  (Page 1 AI read) + SUMMARY, AI note "qwen3-vl-plus (qwen, cloud)".
+- Qwen vision model fix: qwen-vl-max and qwen-vl-plus return 404 "Model not
+  exist" on our key (dashscope-intl); qwen2.5-vl-* and *-latest return 403.
+  Only qwen3-vl-plus and qwen-vl-ocr work (probe 2026-11-07, /models list).
+  providers.py line 41 default QWEN_VISION_MODEL -> qwen3-vl-plus. An env
+  QWEN_VISION_MODEL still overrides it (a leftover session variable caused
+  one false 404 during testing).
+- TODO SR (next chat, do in this order):
+  1. Qwen defaults: main._sr_default_model("qwen") already uses
+     providers.QWEN_VISION_MODEL (qwen3-vl-plus). Leftover hard-coded
+     qwen-vl-plus (404 model_not_found on this key): data_extractor.py 199,
+     table_extractor.py 14 and 279, scripts/nondet_probe.py 145 -> use the
+     constant. Verified SR results (e.g. Ang 2010, unanimous N=3) came from
+     an older Qwen vision model: re-check the next real SR run vs the PDFs.
+  2. Broken PDF text layers (has_broken_symbols over input/sr): all 5 SR
+     papers flagged. Ang 2010 lost signs (OCR fill + vote handles this);
+     CBT-prefrontal lost degree/(R)/(C); s10608 p4 lost ligatures ti/tt/ft;
+     CBT-women (S1877886015) and zsy234 are gibberish in fitz, pdfplumber
+     and pypdf alike (font encoding, not a library bug; not a clean shift).
+     SR text paths read this silently: relevance_screener.py 127,
+     rob2_tool.py 142, extraction/pdf_parser.extract_text, extractor text
+     fallback. Fix: has_broken_symbols()/gibberish check -> page image path
+     or WARNING. Until then, text-based screening and RoB2 for CBT-women
+     and zsy234 are UNVERIFIED. Extraction uses images (likely fine).
+  3. Local LLM for SR (as in OCR): SR is cloud-only today. Blocks:
+     scripts/launcher.py BLOCKED_FOR_SR = {ollama, deepseek} (198, checked
+     487 and 532); data_extractor.py vision_providers = qwen/openai/
+     anthropic/groq (219-228); providers.py PROVIDER_CAPABILITIES ollama
+     vision=False (77); main.py sr_provider_warning in run_cli. Plan: allow
+     ollama when the picked model has 'vision' (ollama_models.
+     model_capabilities, as OCR does); vision per model, not per provider;
+     data_extractor reaches Ollama via _openai_compat_creds -> OLLAMA_URL/v1
+     (check image_url parts work there, or use call_ollama_provider
+     images=); check OLLAMA_CONTEXT fits 5 page images per call; no local
+     vision model -> offer cloud after typed y (same as OCR); deepseek
+     stays blocked (no vision). Test: gemma4:e4b on Ang, N=3 agreement,
+     compare field by field with qwen3-vl-plus and the PDF.
+- TODO OCR banner: in cloud mode the summary/synopsis is also written by the
+  cloud model, so text (.txt, .docx, PDF text layers) leaves the machine too,
+  not only page images. Fix the "For OCR this means page images..." line.
+- DONE Writing .doc check: Writing never reads .doc. writing._load_input_files
+  (all Writing roles) and the --report path in main.py filter by extension,
+  and .doc is not listed, so it was skipped silently. _load_input_files now
+  prints "[SKIP] <name>: old Word .doc files cannot be read - open it in Word
+  and save it as .docx". tests/test_writing_doc_skip.py: 3 tests (2 failed
+  first). Suite: 934 -> 937.
+  DocumentReader's .doc -> textract -> Latin-1 binary fallback is unreachable:
+  no pipeline under SOURCE_CODE calls DocumentReader.extract_text or
+  batch_extract (grep 2026-11-07; scripts/ and tests/ not checked).
+- TODO Writing: --report path (main.py ~985-998) still skips .doc silently;
+  the Writing menu's list_input_names leaves .doc out with no message.
+- TODO Writing: _load_input_files reads .docx paragraphs only, so tables
+  (e.g. lab values) never reach the AI. On a read error it sends
+  "[Could not read <name>]" to the AI as if it were the document text
+  (main._read_docx does the same). The OCR reader already handles tables.
+- DONE OCR banner TODO: [CLOUD] banner (main.py) and the no-local-model
+  cloud offer (cli.py) now say page images AND the text of your documents
+  leave the machine (the cloud AI also writes the summary).
+  tests/test_ocr_cli.py: one assert added (failed first). Suite still 924.
+- OCR step 5b: launcher menu 8 runs --mode ocr (7 Data Analysis still a
+  placeholder). pick_provider for OCR: ollama/qwen/openai "+ vision";
+  groq/deepseek/anthropic "x no vision" and refused (OCR_PROVIDERS,
+  BLOCKED_FOR_OCR). Ollama skips the launcher's model list, because cli.py
+  lists only vision models (plus the cloud offer when there are none).
+  Model-list note no longer says "OCR mode is planned". Applied with a
+  one-off patch script, not committed. test_launcher_menu.py: menu 8 now
+  expects "--mode ocr", 8 removed from the placeholder test.
+  test_launcher_model_picker.py: TestPickProviderOcr (7; 5 failed first).
+  Suite: 924 -> 930. Not yet: real run from menu 8.
+- OCR Word-writer fix: output._clean strips characters XML/Word cannot hold
+  (control chars, NULL, lone surrogates; tab/newline/CR kept) from page text,
+  summary and SUMMARY/SYNOPSIS before writing .docx/.md. Cause: Ang 2010 PDF
+  text layer ("All strings must be XML compatible" from lxml). Menu 8 re-run
+  on Ang PDF with gemma4:e4b: record + SUMMARY written, text reads normally.
+  tests/test_ocr_output.py: 1 test added (failed first). Suite: 930 -> 931.
+- DONE OCR context: SUMMARY/SYNOPSIS no longer risk silent truncation.
+  call_ollama_provider already sends num_ctx = OLLAMA_CONTEXT (default 32768;
+  not Ollama's small default). engine._summarise: text budget =
+  (OLLAMA_CONTEXT - 8192 answer - 1000 prompt) x 3 chars/token (~70,000 chars
+  at 32k). Fits -> one call, prompt unchanged. Too long -> split at paragraph
+  breaks, notes per part (PART_PROMPT keeps numbers/units exactly), then
+  combined (COMBINE_PROMPT); log "long text: summarised in N parts". Max 3
+  rounds, then the file fails with a clear error. SYNOPSIS uses the same guard
+  (built from per-file summaries, so only very large sets split). Cloud uses
+  the same cautious budget. tests/test_ocr_engine.py: 3 tests added (failed
+  first). Suite: 931 -> 934. OLLAMA_CONTEXT default left at 32768 (shared by
+  all pipelines; bigger window = more GPU memory).
+- DONE OCR parts test (2026-11-08, OLLAMA_CONTEXT=12000, Ang 2010): record
+  written; parts summary dropped NFR pain and FIQ results that the one-call
+  summary kept. Summary failure now keeps the record (commit 4acdb91).
+- INTERIM OCR broken symbols: Ang 2010 text layer gives "\x02" for ± and
+  "\x01" for = (font-specific, cannot be mapped). reader.has_broken_symbols()
+  now sends such PDF pages to the vision model. Signs are back, but
+  gemma4:e4b added silent errors elsewhere: FIQ PI ">= 2" lost the 2,
+  "-65 to -5 msec" became "<= 65 to <= 5", "week 6" became "week 0",
+  Table 1 anticonvulsants UC 33 became 40, last sentence words dropped,
+  reference names misspelled.
+- DONE OCR hybrid safety (2026-11-08): broken PDF pages keep the text layer
+  with [?] per lost symbol; the model may only fill [?]; fill_symbols()
+  refuses any other change. Ang 2010 run (hybrid_test): all 5 pages refused
+  (139 [?] left) - but no wrong letters or digits (33, week 6, ">= 2" kept).
+- DONE OCR per-line fill (Ang, gemma4:e4b, second_test_2026-11-08): 64 of
+  139 [?] filled, 75 left (p1 21/23, p2 2/6, p3 11/30, p4 41/77, p5 0/3).
+  No letter or digit changed. BUT wrong symbols pass the check: ± filled as
+  "=" (p1 "mean = SD"; p4 Table 2 "mean = SD mA", "32.5 = 15", "37.6 = 10",
+  "56.3 = 30.5"; "0.0 = 4.1"); "ES <= 0.6" likely "=". ASCII "+/-", ">=",
+  "<=" accepted as fills.
+- FOUND in FILL_DEBUG: most refusals are answers on the wrong line number
+  (drift up to 10 lines on p4 with 15 lines per call; some lines missing).
+  Model drops minus signs ("[?]65 to [?]5" -> "65 to 5") and reads
+  "mean ± SD" as "mean = SD" - refusing those was correct.
+- DONE OCR (A) content matching + LINES_PER_CALL 5 (match_test_2026-11-08):
+  84 of 139 [?] filled, 55 left (p1 18/23, p2 3/6, p3 6/30, p4 28/77,
+  p5 0/3). Table 2 header and baselines "+/-" now right. Still wrong: p1
+  "(mean =" for ±; NEW sign error p1 "±10.8" (minus filled as ±); p3
+  footnote "P < 0.01" vs p4 body "P = 0.01" - check PDF. Record mixes
+  "+/-", "+-", "±" and hyphen for minus.
+- TODO OCR next (do first): (B) reader keeps (font, code) of each [?];
+  per-line rule: same code -> same fill, different codes of the same font
+  -> different fills (refuses "±10.8 ± 24.1", "mean = SD 4.4 ± 13.7");
+  then per-code vote over the document (>=2 votes, >=80%); normalise
+  +/- +- >= <= and hyphen-minus first; conflict keeps [?] + WARNING;
+  never guess minus. Font codes in Ang: 8 (font, code) pairs, 139 total.
+- DONE OCR per-code check B1 (codes_test_2026-11-08): reader keeps font:code
+  per [?]; on one line same code = same symbol, different codes from one
+  font = different symbols; +/-, +-, >=, <=, hyphen normalised to ± ≥ ≤ −.
+  56 of 139 [?] left (p1 18, p2 2, p3 8, p4 28, p5 0). Fixed: "versus
+  ±10.8" -> "−10.8"; Table 2 all ± and −. Still wrong: p1 "(mean =" (one
+  [?] on the line, should be ±). Check vs PDF: p3 "¶ P < 0.01", p4
+  "adjusted P > 0.8", "P < 0.3". B2 (document-wide vote) is next.
+- DONE OCR document vote B2 (vote_test_2026-11-09): fills compared per
+  font:code over the whole document (>=2 votes, >=80% agree): majority sign
+  fills every [?] of that code and corrects others; no majority -> back to
+  [?]; two codes of one font with one sign trusted by neither. 19 of 139
+  [?] left (p1 17, p2 0, p3 0, p4 2, p5 0; was 56). Fixed: p3 "P = 0.01",
+  p4 "adjusted P = 0.8", "P = 0.3" (were < > <); p1 "(mean =" back to [?].
+  Checked vs PDF page images: all of these, p3 Table 1 "Education >12"
+  (earlier runs had ≥12, wrong) and p5 "FIQ pain = 0.2, FIQ PI = 0.5,
+  FIQ total = 0.6" (3 vote corrections) are correct.
+- TODO OCR: single-vote codes are kept unchecked (Education >12 was right
+  by luck); p1 abstract font still 17 [?] (model answers wrong lines);
+  summary still LaTeX ($\pm$) and says "Week 6 to Week 12" for the
+  week-12 change from baseline. Copying text from such PDFs loses the
+  sign too - check signs on the page image.
+- TODO OCR option: broken-font pages to a stronger vision model
+  (qwen3-vl-plus, cloud, with confidentiality prompt) if many [?] remain.
+- TODO OCR summary: strip LaTeX in code after the model; prompt must copy
+  [?] exactly (summary dropped [?] before numbers: -0.3 shown as 0.3);
+  week-12 change still labelled "Week 6 to Week 12".
+- TODO OCR output: lines starting "- " or "* " (Table 2 minus, footnote
+  marks) become Word bullets.
+- TODO next chat: Writing .docx tables (reuse OCR reader); --report path
+  .doc skip message; SR re-check on qwen3-vl-plus against the PDFs.
+
+
+## Session 36 - 2026-11-09 - branch v2.6-ocr-editor
+
+- Session-opening checklist, all four items run: 1 test count 988 = README
+  line 7. 2 56 RESOLVED_ISSUES rows (pattern `^\|\s*(\d+)\s*\|`), no `(#N)`
+  in README.md; `#(\d+)` had found only 5, so checklist item 2 now names
+  the row pattern. 3 Open Issues = README Known Issues (#2 Medium, #3 Low).
+  4 LaTeX claim confirmed: only the prompts asked for plain symbols, there
+  was no cleanup in code (SYNOPSIS_PROMPT did not ask at all).
+- CI on draft PR #4: both jobs 988 passed (44 / 57 warnings).
+- 911cb5e: HANDOFF tidy: Current State to Session 36 with an OCR row,
+  new "Next work" list, checklist item 2 pattern.
+- Next work item 1 DONE: `strip_latex()` in `pipelines/ocr/output.py`.
+  Known commands become Unicode (\pm ±, \geq ≥, \rightarrow →, ^\circ °,
+  \% %, Greek letters ...). A command is matched as a whole name, so \le
+  never matches inside \leq. `$...$` is removed only when everything
+  inside converts. Money ("$5"), [?] and unknown commands are not changed.
+  Used on the AI summary in `write_summary` and `write_record`; OCR page
+  text is not touched (it is the checked copy of the source).
+  Tests: 17 in tests/test_ocr_output.py, failed before the fix
+  (AttributeError; `$` still in the SUMMARY .md). Suite: 988 -> 1005
+  passed, 10 deselected.
+- Not yet checked: a real menu-8 run on Ang to look at the SUMMARY.
+- Lesson: the first tidy paste overwrote the Session 35 "TODO SR" block,
+  and the second paste duplicated Next work. Both were caught before
+  commit by the diff stat (+67/-34 against about +50/-15 expected) and by
+  counting the anchors. Check both after any large paste.
+- Next work item 2 DONE in code: `KEEP_RULES` in engine.py (copy every
+  [?] exactly; keep each change value with the reference point the text
+  gives; never make up a time span), added to SUMMARY_PROMPT,
+  SYNOPSIS_PROMPT and PART_PROMPT. SYNOPSIS_PROMPT now has PLAIN_SYMBOLS
+  too. Evidence (vote_test_2026-11-09, run before the fix): the SUMMARY put
+  7.3 ± 9.2 vs −5.4 ± 13.5 under "Week 6 to Week 12". The record's Table 2
+  row is "Week 12 change‡" with footnote "‡ Change in reference to
+  baseline measurement", so it is baseline to week 12. That SUMMARY kept
+  every sign, because the body text repeats the numbers with signs filled.
+  The abstract's [?] (e.g. `versus [?]10.2`) has no such backup, so the
+  rule stays. Tests: tests/test_ocr_prompts.py (7; all failed before the
+  fix with AssertionError; they check keywords, not exact wording).
+  Suite: 1005 -> 1012 passed, 10 deselected.
+- Seen in the same SUMMARY, not fixed: `strip_latex` leaves `$P = 0.8$`
+  and `$P = 0.005$` as written (no backslash inside, so it is treated
+  like money); "decrease of −10.2" is a double negative.
+- `$P = 0.8$` FIXED: `strip_latex` now removes the dollar signs when the
+  text between them is one letter, then = < > ≤ or ≥, then a number
+  (`$P = 0.8$` becomes `P = 0.8`, `$n = 15$` becomes `n = 15`). Money is
+  unchanged (`$5 and $10`, `from $5 < $10`, `$5 = $5`): the text after the
+  first $ starts with a digit, so it can't match. Tests: 8 in
+  tests/test_ocr_output.py (the 5 statistic cases failed before the fix
+  with AssertionError; the 3 money cases passed before and after). Suite:
+  1012 -> 1020 passed, 10 deselected. CI on 2f4cbd3: both jobs 1012 passed.
+  Still open from that SUMMARY: "decrease of −10.2" (double negative).
+- Real run `s36_check` (menu 8, ollama gemma4:e4b, Ang 2010) confirmed
+  all three Session 36 fixes: SUMMARY has `±` and `(P = 0.8)`, no `$`;
+  `[?]20.2`, `[?]14.9` and `[?]8.9` copied exactly; heading is "Baseline
+  to Week 12". Every summary number checked against page 4 / Table 2.
+  19 [?] left (page 1: 17), same as Session 35.
+- Page 1 looked one line shifted in FILL_DEBUG, but that is not a bug:
+  `refused` stores the answer given under each line's number, while
+  `fill_lines` matches answers by content (engine.py docstring, lines
+  306-311). Lines are refused because the model drops signs (`5.4` for
+  `[?]5.4`); `+/-`, `>=` etc. are already normalised (`_SAME_SIGN`).
+  A wrong sign (`>` for `=`) on a one-[?] line passes `_accept`; only
+  the document vote catches it.
+- Why the vote left page 1's [?] is not identified: FILL_DEBUG (68
+  lines) holds only refused answers, and the run window was closed.
+  Possible causes: under VOTE_MIN votes, under VOTE_SHARE agreement, or
+  two codes of one font with the same sign. TODO: write the vote log
+  lines to FILL_DEBUG too.
+- TODO: the warning in `_vote_pages` says "AI changed other text on
+  those lines", but a [?] can also be left by a dropped sign or a vote
+  send-back. Reword to "could not be confirmed - check against the PDF".
+- Next work item 3 confirmed in this run: footnotes `* Values are...`
+  (Table 1) and `* NFR = ...` (Table 2) become list items in the record
+  .docx. New, cosmetic: the SUMMARY .docx shows nested bullets as
+  `- *   CBT: ...`.
+- Next work item 3 re-checked on `s36_check`: the record .docx page text
+  was already right. All `* ` / `- ` lines, including the footnotes
+  `* Values are...` and `* NFR = ...`, are `Normal` paragraphs, word for
+  word. They only look like bullets in the record .md viewer, and that
+  file's text is also correct.
+- The real problem was the AI summary: `write_summary` and the Summary
+  section of `write_record` wrote its Markdown as literal text
+  (`*   **Title:** ...`). FIXED: `_add_markdown()` in output.py turns
+  # headings, * / - / + bullets (2 levels: `List Bullet`,
+  `List Bullet 2`) and **bold** into Word formatting. Record summary
+  headings start at level 4, below "Summary" (2) and the page headings
+  (3). Page text never goes through it. The .md files are unchanged.
+  Tests: 2 new in tests/test_ocr_output.py; suite 1020 -> 1022 passed,
+  10 deselected.
+- Open choice (not done): wrap each page's text in the record .md in a
+  code fence so Markdown viewers show it word for word.
+- `[?]`-left warning reworded (engine.py `_vote_pages`): "(AI changed
+  other text on those lines)" -> "(could not be confirmed) - check
+  against the PDF". A [?] can also be left by a dropped sign or a vote
+  send-back, so the old text blamed the wrong cause. Test:
+  tests/test_ocr_warnings.py (new); suite 1022 -> 1023 passed, 10
+  deselected. CI green on 4039254 (1022 both jobs).
+- FILL_DEBUG now also saves the document-vote and [?]-left lines
+  (engine.py `_process_file`): `_vote_pages` gets a wrapper that still
+  logs to screen and keeps a copy; the file ends with a
+  "--- Document vote and warnings ---" section. The file is written when
+  there are refused lines or vote lines (before: refused lines only).
+  Next real run shows why each [?] was left without rerunning.
+  Cosmetic, not changed: the screen line "AI answers for refused lines:
+  <file>" also prints when the file holds only vote lines.
+  Test: tests/test_ocr_warnings.py (+1); suite 1023 -> 1024 passed,
+  10 deselected. CI green on aa668ae (1023 both jobs).
+- Real run `s36_vote` (menu 8, ollama gemma4:e4b, Ang 2010), first run
+  with vote lines in FILL_DEBUG: 7 [?] left (s36_check: 19; same PDF and
+  model, so the count varies run to run with the model's answers).
+  Per page: p1 23 [?], vote filled 14, 5 left (abstract minus signs
+  before 10.2, 5.4, 20.2, 14.9, 8.9); p2 6, 2 filled, 1 sent back, 1
+  left (`FIQ pain score [?]3`); p3 30, 1 filled + 1 corrected, 1 sent
+  back, 1 left (`Education [?]12 years`); p4 77, 32 filled, 0 left;
+  p5 3, 0 left. Vote fills checked against Table 2 / page 4 were right.
+- Page 1 cause identified (too few votes): in the abstract only `−10.8`
+  passed `_accept`, so its font code had 1 vote (< VOTE_MIN 2). It is
+  kept unchecked, not copied. A live example of Next work item 4.
+- FIXED: `strip_latex` left `($\text{mean} ± \text{SD } -0.3 ± 2.2$ ...)`
+  in the summary. `_LATEX_TEXT` now unwraps \text, \textrm, \textit,
+  \textbf, \mathrm, \mathit, \mathbf, \operatorname inside $...$ and
+  squeezes double spaces; a span with an unknown command still stays.
+  Test: tests/test_ocr_output.py (+1); suite 1024 -> 1025 passed,
+  10 deselected. CI green on 0e09d81 (1024 both jobs).
+- Not fixable in code: the "Week 6 to Week 12" heading came back despite
+  KEEP_RULES (the prompt lowers the risk, the small model does not always
+  follow it). User caveat: check summary time spans against the tables.
+- Idea, not done: fill answers also contain LaTeX (`$\pm$` despite
+  LINES_PROMPT), and `_FILL` refuses `$` and `\`. Converting LaTeX in the
+  answers before `_accept` would be safe (`codes_agree` still applies).
+- Next work item 4 DONE in code (option 3, chosen by the user): a fill
+  whose font code has a single vote (in `keep`, not in `agreed`) stays,
+  but `_vote_pages` logs "page N: K fill(s) confirmed only once (−10.8)
+  - check against the PDF". Each fill is shown with up to 8 characters
+  of the text after it, so the user can find it in the PDF. The line goes
+  to screen and FILL_DEBUG (via the vote wrapper). Not yet in the record
+  .docx/.md: decide separately. Options 1 (keep silently) and 2 (send
+  back to [?]) were rejected: 1 hides the risk, 2 loses correct fills
+  such as `−10.8` in s36_vote.
+  Tests: tests/test_ocr_warnings.py (+2); suite 1025 -> 1027 passed,
+  10 deselected. CI green on d224006 (1025 both jobs).
+- Tesseract test (post-merge experiment, nothing in code yet).
+  Tesseract 5.5.0 is installed at C:\Program Files\Tesseract-OCR but not
+  on PATH (pytesseract raised TesseractNotFoundError until tesseract_cmd
+  was set). Mac: `brew install tesseract` -> /opt/homebrew/bin (Apple
+  Silicon) or /usr/local/bin (Intel). Lookup order to build:
+  TESSERACT_CMD in .env -> PATH -> usual install folders -> clear
+  message, skip, keep [?].
+  Ang pages at 300 dpi, the 7 [?] left in s36_vote: abstract minus signs
+  before 10.2, 5.4, 20.2, 14.9, 8.9 read as `—` (all right); `pain score
+  [?]3` and `Education [?]12` read as `>` (right: the user checked the
+  PDF at 400%; the AI's fill was wrong and safely refused). But `±` was
+  read as `+` everywhere, and real `≥` (p2 "score ≥2", p3 "score ≥10",
+  p4 "score ≥10") as `=`.
+  Design: trust a Tesseract fill alone only for minus (`—`/`–`/`-` ->
+  `−`; add `—` to `_SAME_SIGN`). `=`, `>`, `<`, `+` count only when the
+  AI fill or the document vote agrees. Fill per [?], not per line, so a
+  `+` in a `±` spot never comes in. Expected on s36_vote: 7 left -> 2.
+- Check (SR TODO): `relevance_screener.py` imports pytesseract, but
+  tesseract.exe is not on PATH on the dev machine. Find out whether that
+  path fails or is silently skipped.
+- Version set to 2.6.0 for the PR #4 merge (user's choice): README.md
+  line 6, main.py VERSION (line 146), pipelines/__init__.py __version__
+  (was stale at 2.3.0), CLI .bat lines 4/160, Mac .sh lines 4/19. No
+  test checks the version; suite still 1027 passed, 10 deselected.
+  Mac launcher exists (scripts/macos/Mac_kcMedicalResearch_CLI.sh), so
+  Mac is supported. Post-merge items collected as Next work item 9.
+  After merge: update the branch row (main = new merge commit).

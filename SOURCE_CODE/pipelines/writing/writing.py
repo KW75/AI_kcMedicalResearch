@@ -200,6 +200,9 @@ def _load_input_files(input_dir: Path) -> list:
     if not input_dir.exists():
         return results
     for f in sorted(input_dir.iterdir()):
+        if f.is_file() and f.suffix.lower() == ".doc":
+            print(f"  [SKIP] {f.name}: old Word .doc files cannot be read - open it in Word and save it as .docx")
+            continue        
         if not f.is_file() or f.suffix.lower() not in extensions:
             continue
         suffix = f.suffix.lower()

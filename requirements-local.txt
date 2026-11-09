@@ -2,7 +2,7 @@
 #
 # WHY THIS FILE EXISTS:
 # The open-ended pins in requirements.txt / requirements-base.txt let pip pull
-# bleeding-edge pyarrow (via chromadb and streamlit). On macOS those newest
+# bleeding-edge pyarrow (via chromadb). On macOS those newest
 # versions have no prebuilt wheel, so pip builds from source and fails with
 # "can't find Rust compiler" (Known Issue #19).
 #
@@ -38,12 +38,12 @@ pillow==10.4.0
 #     on cp311. Newer pyarrow drops the older-macOS wheels -> Rust build. ---
 pyarrow==12.0.1
 
-# --- UI ---
-streamlit==1.38.0
-
 # --- Providers ---
 anthropic==0.34.2
 openai==1.43.0
+# httpx 0.28 removed `proxies`, which the two SDKs above still pass;
+# unpinned, pip installs 0.28+ and every cloud call crashes (Session 34).
+httpx==0.27.2
 groq==0.11.0
 
 # --- RAG / vector store (hard dependency: utils/rag.py imports chromadb at
