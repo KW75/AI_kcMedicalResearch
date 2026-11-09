@@ -1789,3 +1789,23 @@ Expected: a clean tree in sync with origin, the top commit is this handoff, and 
   such as `−10.8` in s36_vote.
   Tests: tests/test_ocr_warnings.py (+2); suite 1025 -> 1027 passed,
   10 deselected. CI green on d224006 (1025 both jobs).
+- Tesseract test (post-merge experiment, nothing in code yet).
+  Tesseract 5.5.0 is installed at C:\Program Files\Tesseract-OCR but not
+  on PATH (pytesseract raised TesseractNotFoundError until tesseract_cmd
+  was set). Mac: `brew install tesseract` -> /opt/homebrew/bin (Apple
+  Silicon) or /usr/local/bin (Intel). Lookup order to build:
+  TESSERACT_CMD in .env -> PATH -> usual install folders -> clear
+  message, skip, keep [?].
+  Ang pages at 300 dpi, the 7 [?] left in s36_vote: abstract minus signs
+  before 10.2, 5.4, 20.2, 14.9, 8.9 read as `—` (all right); `pain score
+  [?]3` and `Education [?]12` read as `>` (right: the user checked the
+  PDF at 400%; the AI's fill was wrong and safely refused). But `±` was
+  read as `+` everywhere, and real `≥` (p2 "score ≥2", p3 "score ≥10",
+  p4 "score ≥10") as `=`.
+  Design: trust a Tesseract fill alone only for minus (`—`/`–`/`-` ->
+  `−`; add `—` to `_SAME_SIGN`). `=`, `>`, `<`, `+` count only when the
+  AI fill or the document vote agrees. Fill per [?], not per line, so a
+  `+` in a `±` spot never comes in. Expected on s36_vote: 7 left -> 2.
+- Check (SR TODO): `relevance_screener.py` imports pytesseract, but
+  tesseract.exe is not on PATH on the dev machine. Find out whether that
+  path fails or is silently skipped.
