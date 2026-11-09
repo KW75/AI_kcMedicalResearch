@@ -26,16 +26,30 @@ TRANSCRIBE_PROMPT = (
     "If the image has no text, reply [no text]. Write symbols as plain "
     "characters (±, ≥, −), not LaTeX."
 )
+
+
+# Rules every prompt that writes summary text must carry (Session 36).
+# Ang 2010: the summary turned the table's "Week 12 change (from baseline)"
+# into a week-6-to-week-12 span, and a summary once dropped a [?] before a
+# number (-0.3 shown as 0.3).
+KEEP_RULES = (
+    "Copy every [?] exactly where it stands: it marks a symbol the PDF font "
+    "lost (often a minus sign); never drop it or guess the symbol. Keep each "
+    "change value with the reference point the text gives (e.g. change from "
+    "baseline at week 12); never join two timepoints into a span the text "
+    "does not state."
+)
+PLAIN_SYMBOLS = "Write symbols as plain characters (±, ≥, −), not LaTeX."
 SUMMARY_PROMPT = (
     "Summarise the document below. Use only information in the text; do not "
     "add facts. Keep key numbers, dates, names and units exactly as written. "
-    "Use short headings and bullet points. Write symbols as plain "
-    "characters (±, ≥, −), not LaTeX."
+    "Use short headings and bullet points. " + KEEP_RULES + " " + PLAIN_SYMBOLS
 )
 SYNOPSIS_PROMPT = (
     "Write one synopsis of the document set below, using the per-file "
     "summaries. Use only information in the summaries; do not add facts. "
-    "Say which file each point comes from, e.g. (from <file name>)."
+    "Say which file each point comes from, e.g. (from <file name>). "
+    + KEEP_RULES + " " + PLAIN_SYMBOLS
 )
 
 
@@ -46,8 +60,9 @@ SYNOPSIS_PROMPT = (
 PART_PROMPT = (
     "This is one part of a longer text. Write concise notes on this part "
     "only. Keep every number, unit, name and date exactly as written. Do not "
-    "add anything that is not in the text."
+    "add anything that is not in the text. " + KEEP_RULES
 )
+
 COMBINE_PROMPT = (
     "The notes below were made from consecutive parts of one longer text, "
     "in order. Use them as the source for this task."

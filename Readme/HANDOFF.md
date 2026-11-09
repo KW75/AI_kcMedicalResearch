@@ -48,7 +48,7 @@ so those catches happen at session open, not mid-work.
 
 | Component      | Status |
 |----------------|--------|
-| Tests          | 1005 passed, 10 deselected on v2.6-ocr-editor; 816 on main (`python -m pytest -m "not live" --tb=short -q`) |
+| Tests          | 1012 passed, 10 deselected on v2.6-ocr-editor; 816 on main (`python -m pytest -m "not live" --tb=short -q`) |
 | Branch         | main = fa4edb9 (PR #3). v2.6-ocr-editor = Sessions 33-36 work, open as draft PR #4 (Setup menu, Streamlit/Render removal, Ollama model rule, httpx pin, moved-folder launcher check, SR Anthropic warning, test-local-pins CI job, OCR mode). Do not merge until the "Before the OCR merge" items in Next work are done. Version stays 2.5.0; bump to 2.6.0 after OCR is merged |
 | CI             | green on draft PR #4 (2026-11-09), both jobs: test (requirements-ci.txt, 988 passed, 44 warnings) and test-local-pins (requirements-local.txt like the launchers, 988 passed, 57 warnings). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
 | Deploy         | None: CLI only, local first. Render service deleted 2026-10-27; Streamlit UI and Render files removed in Session 33. UptimeRobot monitor for the old Render URL: not yet confirmed paused/deleted (user, outside the repo) |
@@ -80,9 +80,14 @@ Before the OCR merge (PR #4):
 1. DONE (Session 36): `strip_latex()` in `pipelines/ocr/output.py`, used
    on AI summaries in `write_summary` and `write_record`; OCR page text
    stays verbatim. Still to do: look at a real Ang SUMMARY.
-2. OCR summary prompt must copy [?] exactly (Session 35: -0.3 came out as
-   0.3) and must label the week-12 change from baseline correctly (it came
-   out as "Week 6 to Week 12").
+2. DONE in code (Session 36): `KEEP_RULES` in engine.py (copy every [?]
+   exactly; keep each change value with the reference point the text gives,
+   e.g. change from baseline; never make up a time span) is added to
+   SUMMARY_PROMPT, SYNOPSIS_PROMPT and PART_PROMPT. SYNOPSIS_PROMPT now asks
+   for plain symbols too. Not yet checked on a real Ang run. Also seen in
+   that summary, not fixed: `strip_latex` leaves `$P = 0.8$` as written
+   (no backslash between the dollar signs); "decrease of -10.2" is a double
+   negative.
 3. OCR output: lines starting "- " or "* " (Table 2 minus signs, footnote
    marks) must not become Word bullets.
 4. OCR fill: codes with a single vote are kept unchecked; Ang p1 abstract
@@ -1669,3 +1674,19 @@ Expected: a clean tree in sync with origin, the top commit is this handoff, and 
   and the second paste duplicated Next work. Both were caught before
   commit by the diff stat (+67/-34 against about +50/-15 expected) and by
   counting the anchors. Check both after any large paste.
+- Next work item 2 DONE in code: `KEEP_RULES` in engine.py (copy every
+  [?] exactly; keep each change value with the reference point the text
+  gives; never make up a time span), added to SUMMARY_PROMPT,
+  SYNOPSIS_PROMPT and PART_PROMPT. SYNOPSIS_PROMPT now has PLAIN_SYMBOLS
+  too. Evidence (vote_test_2026-11-09, run before the fix): the SUMMARY put
+  7.3 ± 9.2 vs −5.4 ± 13.5 under "Week 6 to Week 12". The record's Table 2
+  row is "Week 12 change‡" with footnote "‡ Change in reference to
+  baseline measurement", so it is baseline to week 12. That SUMMARY kept
+  every sign, because the body text repeats the numbers with signs filled.
+  The abstract's [?] (e.g. `versus [?]10.2`) has no such backup, so the
+  rule stays. Tests: tests/test_ocr_prompts.py (7; all failed before the
+  fix with AssertionError; they check keywords, not exact wording).
+  Suite: 1005 -> 1012 passed, 10 deselected.
+- Seen in the same SUMMARY, not fixed: `strip_latex` leaves `$P = 0.8$`
+  and `$P = 0.005$` as written (no backslash inside, so it is treated
+  like money); "decrease of −10.2" is a double negative.
