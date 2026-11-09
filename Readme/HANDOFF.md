@@ -1699,3 +1699,27 @@ Expected: a clean tree in sync with origin, the top commit is this handoff, and 
   with AssertionError; the 3 money cases passed before and after). Suite:
   1012 -> 1020 passed, 10 deselected. CI on 2f4cbd3: both jobs 1012 passed.
   Still open from that SUMMARY: "decrease of −10.2" (double negative).
+- Real run `s36_check` (menu 8, ollama gemma4:e4b, Ang 2010) confirmed
+  all three Session 36 fixes: SUMMARY has `±` and `(P = 0.8)`, no `$`;
+  `[?]20.2`, `[?]14.9` and `[?]8.9` copied exactly; heading is "Baseline
+  to Week 12". Every summary number checked against page 4 / Table 2.
+  19 [?] left (page 1: 17), same as Session 35.
+- Page 1 looked one line shifted in FILL_DEBUG, but that is not a bug:
+  `refused` stores the answer given under each line's number, while
+  `fill_lines` matches answers by content (engine.py docstring, lines
+  306-311). Lines are refused because the model drops signs (`5.4` for
+  `[?]5.4`); `+/-`, `>=` etc. are already normalised (`_SAME_SIGN`).
+  A wrong sign (`>` for `=`) on a one-[?] line passes `_accept`; only
+  the document vote catches it.
+- Why the vote left page 1's [?] is not identified: FILL_DEBUG (68
+  lines) holds only refused answers, and the run window was closed.
+  Possible causes: under VOTE_MIN votes, under VOTE_SHARE agreement, or
+  two codes of one font with the same sign. TODO: write the vote log
+  lines to FILL_DEBUG too.
+- TODO: the warning in `_vote_pages` says "AI changed other text on
+  those lines", but a [?] can also be left by a dropped sign or a vote
+  send-back. Reword to "could not be confirmed - check against the PDF".
+- Next work item 3 confirmed in this run: footnotes `* Values are...`
+  (Table 1) and `* NFR = ...` (Table 2) become list items in the record
+  .docx. New, cosmetic: the SUMMARY .docx shows nested bullets as
+  `- *   CBT: ...`.
