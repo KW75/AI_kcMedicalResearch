@@ -77,13 +77,15 @@ Updated at Session 37 open (2026-11-09). PR #4 is merged (bcd42d9). Items
 closed in Session 36 are removed; the Session 36 log keeps the evidence.
 This list is the only place to tick items off.
 
-OCR
-1. Output by input count (user request, Session 37). One file: reports/ocr/<header>/
-   keeps the raw text layer with [?] plus FILL_DEBUG; output/ocr/ gets a full
-   text reproduction (.docx + .md) with confirmed [?] filled, for doctors to read,
-   edit and extract from. Several files: SYNOPSIS as now. Design in the Session 37 log.
-   Replaces the open choices "list single-vote fills in the record" and
-   "code-fence the record .md".
+1. One-file run (decided Session 37): no SUMMARY. reports/ocr/<header>/
+   keeps the raw text layer with every [?] as extracted, plus FILL_DEBUG.
+   output/ocr/ gets only <name>_<date>_TEXT.docx and .md: the full text,
+   page by page, with each [?] the document-wide vote confirms replaced by
+   its symbol; [?] without a majority stay as [?]. Single-vote fills: see
+   the Session 37 log (option A = stay [?], option B = fill + yellow).
+   Several files: SYNOPSIS as now, plus each file's filled text in
+   reports/ocr/<header>/. Replaces the open choices "list single-vote fills
+   in the record" and "code-fence the record .md".
 2. Tesseract as a second reader for [?] left after the AI fill and vote.
    Design and Ang evidence in the Session 36 log (trust alone only for minus;
    add `—` to `_SAME_SIGN`; fill per [?]; expected 7 -> 2 on s36_vote).
@@ -197,6 +199,8 @@ qwen2.5:7b-instruct offered as the low-resource fallback.
   "run: ollama pull <model>"; connection-refused now says "make sure Ollama
   is running". [APPLY + add test pinning the 404->pull-message mapping;
   existing tests may assert the old "HTTP error 404" string - run suite.]
+  CLOSED (Session 35): test_providers.py::test_ollama_404_tells_user_to_pull_model
+  and tests/test_ollama_missing_model.py.
 
 Verified by code review only: confirmed coding pipeline honours OLLAMA_MODEL
 (coding.py uses an injected call_llm_fn, no hard-coded model); confirmed
@@ -402,6 +406,7 @@ Fix (generic, all Macs):
 - Standardize on python.org 3.11.9 universal2 (Intel + Apple Silicon).
 - New requirements-local.txt: fully pinned, pyarrow==12.0.1 (has prebuilt
   cp311 wheels for macosx_10_14_x86_64 AND macosx_11_0_arm64), chromadb==0.5.23.
+  Not fully pinned: packaging/pygments floated (Session 34).
   Installs with no Rust build.
 - chromadb is a HARD dependency: utils/rag.py imports it at module top level;
   main.py imports the appraisal pipeline unconditionally -> app crashes on
@@ -427,6 +432,8 @@ Resolved this session:
 - Ollama models (offline route):
   - Chat: app auto-detects the largest pulled model; falls back to "llama3.2"
     (providers.py:211). OLLAMA_MODEL in .env overrides.
+    Superseded (Session 33 commit 4): model = OLLAMA_MODEL in .env, else
+    gemma4:e4b; no auto-detection.
   - Embeddings (RAG - appraisal/SR pipelines): defaults to "nomic-embed-text"
     (main.py:261, rag.py:30). EMBEDDING_MODEL in .env overrides.
   - README Step 2 tells colleagues to pull BOTH:
@@ -452,7 +459,6 @@ On main before branching:
   .env.example `OLLAMA_MODEL=` lines to the constant.
 - Verified by reading the code: Ollama never falls back to cloud, on the
   streaming route (stream_ai -> _stream_ollama only) or the batch route
-  (call_ai_with_fallback chain = [ollama]). The 2026-09-02 macOS note
   "app fell back and completed" cannot have been Ollama falling back to
   cloud; that run must have used another provider. Superseded (Session 33 commit 4): model = OLLAMA_MODEL in .env, else gemma4:e4b; no auto-detection. The same note calls requirements-local.txt "fully pinned". Add: Not fully pinned: packaging/pygments floated (Session 34).
 
