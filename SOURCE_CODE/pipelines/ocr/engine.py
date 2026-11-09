@@ -439,8 +439,8 @@ def _vote_pages(done, hybrid, log):
         total = hint.count(MARK)
         left = done[idx]["text"].count(MARK)
         if left:
-            log(f"    WARNING: page {n}: {left} of {total} [?] left (AI changed "
-                "other text on those lines) - check against the PDF")
+            log(f"    WARNING: page {n}: {left} of {total} [?] left (could not "
+                "be confirmed) - check against the PDF")
         done[idx]["method"] = ("hybrid" if not left else
                                "hybrid_unresolved" if left == total else "hybrid_partial")
 

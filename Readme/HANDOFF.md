@@ -48,9 +48,9 @@ so those catches happen at session open, not mid-work.
 
 | Component      | Status |
 |----------------|--------|
-| Tests          | 1022 passed, 10 deselected on v2.6-ocr-editor; 816 on main (`python -m pytest -m "not live" --tb=short -q`) |
+| Tests          | 1023 passed, 10 deselected on v2.6-ocr-editor; 816 on main (`python -m pytest -m "not live" --tb=short -q`) |
 | Branch         | main = fa4edb9 (PR #3). v2.6-ocr-editor = Sessions 33-36 work, open as draft PR #4 (Setup menu, Streamlit/Render removal, Ollama model rule, httpx pin, moved-folder launcher check, SR Anthropic warning, test-local-pins CI job, OCR mode). Do not merge until the "Before the OCR merge" items in Next work are done. Version stays 2.5.0; bump to 2.6.0 after OCR is merged |
-| CI             | green on draft PR #4 (2026-11-09), both jobs: test (requirements-ci.txt, 1012 passed, 44 warnings) and test-local-pins (requirements-local.txt like the launchers, 1012 passed, 57 warnings). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
+| CI             | green on draft PR #4 (2026-11-09), both jobs: test (requirements-ci.txt, 1022 passed, 44 warnings) and test-local-pins (requirements-local.txt like the launchers, 1022 passed, 57 warnings). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
 | Deploy         | None: CLI only, local first. Render service deleted 2026-10-27; Streamlit UI and Render files removed in Session 33. UptimeRobot monitor for the old Render URL: not yet confirmed paused/deleted (user, outside the repo) |
 | Writing mode   | one-pass (write + edit + review in one call); tracks Topic 800 / Article 3,500 / Report 500 / Synopsis 1,500; on main since fa4edb9; tested on gemma4:e4b; terminal menus only |
 | OCR mode       | `--mode ocr`, launcher menu 8 (branch only). Reads PDF / image / .txt / .docx; .doc refused with a message. Records in `reports/ocr/<header>/`, SUMMARY / SYNOPSIS in `output/ocr/`. Ollama by default; Qwen / OpenAI only behind the cloud gate; groq / deepseek / anthropic refused. Broken-font PDFs: text layer with [?], AI fills symbols only, document-wide vote per font code (Ang 2010: 19 of 139 [?] left, checked against the PDF) |
@@ -1741,3 +1741,10 @@ Expected: a clean tree in sync with origin, the top commit is this handoff, and 
   10 deselected.
 - Open choice (not done): wrap each page's text in the record .md in a
   code fence so Markdown viewers show it word for word.
+- `[?]`-left warning reworded (engine.py `_vote_pages`): "(AI changed
+  other text on those lines)" -> "(could not be confirmed) - check
+  against the PDF". A [?] can also be left by a dropped sign or a vote
+  send-back, so the old text blamed the wrong cause. Test:
+  tests/test_ocr_warnings.py (new); suite 1022 -> 1023 passed, 10
+  deselected. CI green on 4039254 (1022 both jobs).
+
