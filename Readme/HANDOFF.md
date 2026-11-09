@@ -48,9 +48,9 @@ so those catches happen at session open, not mid-work.
 
 | Component      | Status |
 |----------------|--------|
-| Tests          | 1012 passed, 10 deselected on v2.6-ocr-editor; 816 on main (`python -m pytest -m "not live" --tb=short -q`) |
+| Tests          | 1020 passed, 10 deselected on v2.6-ocr-editor; 816 on main (`python -m pytest -m "not live" --tb=short -q`) |
 | Branch         | main = fa4edb9 (PR #3). v2.6-ocr-editor = Sessions 33-36 work, open as draft PR #4 (Setup menu, Streamlit/Render removal, Ollama model rule, httpx pin, moved-folder launcher check, SR Anthropic warning, test-local-pins CI job, OCR mode). Do not merge until the "Before the OCR merge" items in Next work are done. Version stays 2.5.0; bump to 2.6.0 after OCR is merged |
-| CI             | green on draft PR #4 (2026-11-09), both jobs: test (requirements-ci.txt, 988 passed, 44 warnings) and test-local-pins (requirements-local.txt like the launchers, 988 passed, 57 warnings). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
+| CI             | green on draft PR #4 (2026-11-09), both jobs: test (requirements-ci.txt, 1012 passed, 44 warnings) and test-local-pins (requirements-local.txt like the launchers, 1012 passed, 57 warnings). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
 | Deploy         | None: CLI only, local first. Render service deleted 2026-10-27; Streamlit UI and Render files removed in Session 33. UptimeRobot monitor for the old Render URL: not yet confirmed paused/deleted (user, outside the repo) |
 | Writing mode   | one-pass (write + edit + review in one call); tracks Topic 800 / Article 3,500 / Report 500 / Synopsis 1,500; on main since fa4edb9; tested on gemma4:e4b; terminal menus only |
 | OCR mode       | `--mode ocr`, launcher menu 8 (branch only). Reads PDF / image / .txt / .docx; .doc refused with a message. Records in `reports/ocr/<header>/`, SUMMARY / SYNOPSIS in `output/ocr/`. Ollama by default; Qwen / OpenAI only behind the cloud gate; groq / deepseek / anthropic refused. Broken-font PDFs: text layer with [?], AI fills symbols only, document-wide vote per font code (Ang 2010: 19 of 139 [?] left, checked against the PDF) |
@@ -1690,3 +1690,12 @@ Expected: a clean tree in sync with origin, the top commit is this handoff, and 
 - Seen in the same SUMMARY, not fixed: `strip_latex` leaves `$P = 0.8$`
   and `$P = 0.005$` as written (no backslash inside, so it is treated
   like money); "decrease of −10.2" is a double negative.
+- `$P = 0.8$` FIXED: `strip_latex` now removes the dollar signs when the
+  text between them is one letter, then = < > ≤ or ≥, then a number
+  (`$P = 0.8$` becomes `P = 0.8`, `$n = 15$` becomes `n = 15`). Money is
+  unchanged (`$5 and $10`, `from $5 < $10`, `$5 = $5`): the text after the
+  first $ starts with a digit, so it can't match. Tests: 8 in
+  tests/test_ocr_output.py (the 5 statistic cases failed before the fix
+  with AssertionError; the 3 money cases passed before and after). Suite:
+  1012 -> 1020 passed, 10 deselected. CI on 2f4cbd3: both jobs 1012 passed.
+  Still open from that SUMMARY: "decrease of −10.2" (double negative).

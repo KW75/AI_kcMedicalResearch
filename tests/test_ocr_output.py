@@ -156,3 +156,24 @@ def test_record_summary_has_no_latex_but_page_text_is_verbatim(tmp_path):
     assert "Pain -20.2 ± 23.9" in paras
     assert r"Raw $\pm$ stays as read" in paras
 
+
+# Statistics in $...$ with no backslash (Ang SUMMARY: "($P = 0.8$)").
+# Only "letter, comparison, number" loses its $; money stays (Session 36).
+@pytest.mark.parametrize("raw, want", [
+    ("($P = 0.8$)", "(P = 0.8)"),
+    ("adjusted $P = 0.005$", "adjusted P = 0.005"),
+    ("$P < 0.01$", "P < 0.01"),
+    ("$n = 15$ per arm", "n = 15 per arm"),
+    ("$r = -0.45$", "r = -0.45"),
+])
+def test_strip_latex_plain_statistic_in_dollars(raw, want):
+    assert output.strip_latex(raw) == want
+
+
+@pytest.mark.parametrize("raw", [
+    "from $5 < $10",
+    "costs $5 and $10",
+    "$5 = $5",
+])
+def test_strip_latex_money_with_comparison_stays(raw):
+    assert output.strip_latex(raw) == raw

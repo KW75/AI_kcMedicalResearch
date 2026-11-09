@@ -67,6 +67,9 @@ def strip_latex(text):
     def _math(m):
         inner = m.group(1)
         if "\\" not in inner:
+            stat = inner.strip()
+            if re.fullmatch(r"[A-Za-z]\s*[=<>≤≥]\s*[−-]?\d[\d.,]*", stat):
+                return stat  # "$P = 0.8$" -> "P = 0.8"; money starts with a digit
             return m.group(0)  # not LaTeX, e.g. "$5 and $"
         plain = _latex_symbols(inner)
         return plain.strip() if "\\" not in plain else m.group(0)
