@@ -48,9 +48,9 @@ so those catches happen at session open, not mid-work.
 
 | Component      | Status |
 |----------------|--------|
-| Tests          | 1024 passed, 10 deselected on v2.6-ocr-editor; 816 on main (`python -m pytest -m "not live" --tb=short -q`) |
+| Tests          | 1025 passed, 10 deselected on v2.6-ocr-editor; 816 on main (`python -m pytest -m "not live" --tb=short -q`) |
 | Branch         | main = fa4edb9 (PR #3). v2.6-ocr-editor = Sessions 33-36 work, open as draft PR #4 (Setup menu, Streamlit/Render removal, Ollama model rule, httpx pin, moved-folder launcher check, SR Anthropic warning, test-local-pins CI job, OCR mode). Do not merge until the "Before the OCR merge" items in Next work are done. Version stays 2.5.0; bump to 2.6.0 after OCR is merged |
-| CI             | green on draft PR #4 (2026-11-09), both jobs: test (requirements-ci.txt, 1023 passed, 44 warnings) and test-local-pins (requirements-local.txt like the launchers, 1023 passed, 57 warnings). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
+| CI             | green on draft PR #4 (2026-11-09), both jobs: test (requirements-ci.txt, 1024 passed, 44 warnings) and test-local-pins (requirements-local.txt like the launchers, 1024 passed, 57 warnings). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
 | Deploy         | None: CLI only, local first. Render service deleted 2026-10-27; Streamlit UI and Render files removed in Session 33. UptimeRobot monitor for the old Render URL: not yet confirmed paused/deleted (user, outside the repo) |
 | Writing mode   | one-pass (write + edit + review in one call); tracks Topic 800 / Article 3,500 / Report 500 / Synopsis 1,500; on main since fa4edb9; tested on gemma4:e4b; terminal menus only |
 | OCR mode       | `--mode ocr`, launcher menu 8 (branch only). Reads PDF / image / .txt / .docx; .doc refused with a message. Records in `reports/ocr/<header>/`, SUMMARY / SYNOPSIS in `output/ocr/`. Ollama by default; Qwen / OpenAI only behind the cloud gate; groq / deepseek / anthropic refused. Broken-font PDFs: text layer with [?], AI fills symbols only, document-wide vote per font code (Ang 2010: 19 of 139 [?] left, checked against the PDF) |
@@ -1757,4 +1757,27 @@ Expected: a clean tree in sync with origin, the top commit is this handoff, and 
   <file>" also prints when the file holds only vote lines.
   Test: tests/test_ocr_warnings.py (+1); suite 1023 -> 1024 passed,
   10 deselected. CI green on aa668ae (1023 both jobs).
+- Real run `s36_vote` (menu 8, ollama gemma4:e4b, Ang 2010), first run
+  with vote lines in FILL_DEBUG: 7 [?] left (s36_check: 19; same PDF and
+  model, so the count varies run to run with the model's answers).
+  Per page: p1 23 [?], vote filled 14, 5 left (abstract minus signs
+  before 10.2, 5.4, 20.2, 14.9, 8.9); p2 6, 2 filled, 1 sent back, 1
+  left (`FIQ pain score [?]3`); p3 30, 1 filled + 1 corrected, 1 sent
+  back, 1 left (`Education [?]12 years`); p4 77, 32 filled, 0 left;
+  p5 3, 0 left. Vote fills checked against Table 2 / page 4 were right.
+- Page 1 cause identified (too few votes): in the abstract only `−10.8`
+  passed `_accept`, so its font code had 1 vote (< VOTE_MIN 2). It is
+  kept unchecked, not copied. A live example of Next work item 4.
+- FIXED: `strip_latex` left `($\text{mean} ± \text{SD } -0.3 ± 2.2$ ...)`
+  in the summary. `_LATEX_TEXT` now unwraps \text, \textrm, \textit,
+  \textbf, \mathrm, \mathit, \mathbf, \operatorname inside $...$ and
+  squeezes double spaces; a span with an unknown command still stays.
+  Test: tests/test_ocr_output.py (+1); suite 1024 -> 1025 passed,
+  10 deselected. CI green on 0e09d81 (1024 both jobs).
+- Not fixable in code: the "Week 6 to Week 12" heading came back despite
+  KEEP_RULES (the prompt lowers the risk, the small model does not always
+  follow it). User caveat: check summary time spans against the tables.
+- Idea, not done: fill answers also contain LaTeX (`$\pm$` despite
+  LINES_PROMPT), and `_FILL` refuses `$` and `\`. Converting LaTeX in the
+  answers before `_accept` would be safe (`codes_agree` still applies).
 

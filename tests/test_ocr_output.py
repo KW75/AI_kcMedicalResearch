@@ -214,3 +214,15 @@ def test_record_docx_summary_formatted_but_page_text_stays_plain(tmp_path):
     assert paras["Baseline to Week 6:"].style.name == "List Bullet"
     assert paras["* Values are the mean ± SD"].style.name == "Normal"
     assert paras["- 0.3 not a bullet"].style.name == "Normal"
+
+# --- Session 36 s36_vote: \text{...} wrappers kept the $...$ in the summary
+def test_strip_latex_unwraps_text_commands():
+    cases = [
+        ("CBT ($\\text{mean} ± \\text{SD } -0.3 ± 2.2$ vs 0.2 ± 1.7)",
+         "CBT (mean ± SD -0.3 ± 2.2 vs 0.2 ± 1.7)"),
+        ("$\\text{mean} \\pm \\text{SD}$", "mean ± SD"),
+        ("4.4 $\\mathrm{mA}$", "4.4 mA"),
+        ("$\\text{a} \\unknowncmd$ stays", "$\\text{a} \\unknowncmd$ stays"),
+    ]
+    for given, want in cases:
+        assert output.strip_latex(given) == want, given

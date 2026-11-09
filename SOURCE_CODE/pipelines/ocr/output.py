@@ -45,6 +45,10 @@ _LATEX_CMD = re.compile(r"\\([A-Za-z]+)(?![A-Za-z])")
 _LATEX_DEGREE = re.compile(r"\^\s*\{?\s*\\circ\s*\}?")
 _LATEX_ESCAPE = re.compile(r"\\([%&#])")
 _LATEX_MATH = re.compile(r"\$([^$\n]+?)\$")
+# \text{mean} etc.: keep the words, drop the wrapper (only inside $...$)
+_LATEX_TEXT = re.compile(
+    r"\\(?:text|textrm|textit|textbf|mathrm|mathit|mathbf|operatorname)"
+    r"\s*\{([^{}]*)\}")
 
 
 def _latex_symbols(text):
@@ -71,7 +75,8 @@ def strip_latex(text):
             if re.fullmatch(r"[A-Za-z]\s*[=<>≤≥]\s*[−-]?\d[\d.,]*", stat):
                 return stat  # "$P = 0.8$" -> "P = 0.8"; money starts with a digit
             return m.group(0)  # not LaTeX, e.g. "$5 and $"
-        plain = _latex_symbols(inner)
+        plain = _latex_symbols(_LATEX_TEXT.sub(r"\1", inner))
+        plain = re.sub(r" {2,}", " ", plain)  # "\text{SD } -0.3" -> "SD -0.3"
         return plain.strip() if "\\" not in plain else m.group(0)
 
     return _latex_symbols(_LATEX_MATH.sub(_math, text))
