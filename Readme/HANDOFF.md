@@ -48,7 +48,7 @@ so those catches happen at session open, not mid-work.
 
 | Component      | Status |
 |----------------|--------|
-| Tests          | 1020 passed, 10 deselected on v2.6-ocr-editor; 816 on main (`python -m pytest -m "not live" --tb=short -q`) |
+| Tests          | 1022 passed, 10 deselected on v2.6-ocr-editor; 816 on main (`python -m pytest -m "not live" --tb=short -q`) |
 | Branch         | main = fa4edb9 (PR #3). v2.6-ocr-editor = Sessions 33-36 work, open as draft PR #4 (Setup menu, Streamlit/Render removal, Ollama model rule, httpx pin, moved-folder launcher check, SR Anthropic warning, test-local-pins CI job, OCR mode). Do not merge until the "Before the OCR merge" items in Next work are done. Version stays 2.5.0; bump to 2.6.0 after OCR is merged |
 | CI             | green on draft PR #4 (2026-11-09), both jobs: test (requirements-ci.txt, 1012 passed, 44 warnings) and test-local-pins (requirements-local.txt like the launchers, 1012 passed, 57 warnings). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
 | Deploy         | None: CLI only, local first. Render service deleted 2026-10-27; Streamlit UI and Render files removed in Session 33. UptimeRobot monitor for the old Render URL: not yet confirmed paused/deleted (user, outside the repo) |
@@ -88,8 +88,10 @@ Before the OCR merge (PR #4):
    that summary, not fixed: `strip_latex` leaves `$P = 0.8$` as written
    (no backslash between the dollar signs); "decrease of -10.2" is a double
    negative.
-3. OCR output: lines starting "- " or "* " (Table 2 minus signs, footnote
-   marks) must not become Word bullets.
+3. DONE in code (Session 36): the record .docx page text was already
+   plain `Normal` paragraphs. The AI summary's Markdown now becomes Word
+   formatting via `_add_markdown()` in output.py. Open choice: wrap the
+   record .md page text in a code fence (see the Session 36 log).
 4. OCR fill: codes with a single vote are kept unchecked; Ang p1 abstract
    font still has 17 [?] left. Option: send broken-font pages to a stronger
    vision model (qwen3-vl-plus, cloud, behind the gate).
@@ -1723,3 +1725,19 @@ Expected: a clean tree in sync with origin, the top commit is this handoff, and 
   (Table 1) and `* NFR = ...` (Table 2) become list items in the record
   .docx. New, cosmetic: the SUMMARY .docx shows nested bullets as
   `- *   CBT: ...`.
+- Next work item 3 re-checked on `s36_check`: the record .docx page text
+  was already right. All `* ` / `- ` lines, including the footnotes
+  `* Values are...` and `* NFR = ...`, are `Normal` paragraphs, word for
+  word. They only look like bullets in the record .md viewer, and that
+  file's text is also correct.
+- The real problem was the AI summary: `write_summary` and the Summary
+  section of `write_record` wrote its Markdown as literal text
+  (`*   **Title:** ...`). FIXED: `_add_markdown()` in output.py turns
+  # headings, * / - / + bullets (2 levels: `List Bullet`,
+  `List Bullet 2`) and **bold** into Word formatting. Record summary
+  headings start at level 4, below "Summary" (2) and the page headings
+  (3). Page text never goes through it. The .md files are unchanged.
+  Tests: 2 new in tests/test_ocr_output.py; suite 1020 -> 1022 passed,
+  10 deselected.
+- Open choice (not done): wrap each page's text in the record .md in a
+  code fence so Markdown viewers show it word for word.

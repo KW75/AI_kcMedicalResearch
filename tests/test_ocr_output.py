@@ -177,3 +177,40 @@ def test_strip_latex_plain_statistic_in_dollars(raw, want):
 ])
 def test_strip_latex_money_with_comparison_stays(raw):
     assert output.strip_latex(raw) == raw
+
+# --- Session 36: AI summary Markdown becomes Word formatting; page text stays plain
+MD_SUMMARY = (
+    "## Key Results\n"
+    "*   **Baseline to Week 6:**\n"
+    "    *   CBT group: 4.4 ± 13.7 mA\n"
+    "- UC group: −10.2 ± 9.9 mA\n"
+    "Plain closing line."
+)
+
+
+def _paras(path):
+    import docx
+    return docx.Document(str(path)).paragraphs
+
+
+def test_summary_docx_turns_markdown_into_word_formatting(tmp_path):
+    docx_path, md_path = output.write_summary(tmp_path, "H", "SUMMARY", MD_SUMMARY, "m")
+    paras = {p.text: p for p in _paras(docx_path)}
+    assert paras["Key Results"].style.name.startswith("Heading")
+    assert paras["Baseline to Week 6:"].style.name == "List Bullet"
+    assert any(r.bold for r in paras["Baseline to Week 6:"].runs)
+    assert paras["CBT group: 4.4 ± 13.7 mA"].style.name == "List Bullet 2"
+    assert paras["UC group: −10.2 ± 9.9 mA"].style.name == "List Bullet"
+    assert paras["Plain closing line."].style.name == "Normal"
+    assert not any("*" in t or t.startswith("#") for t in paras)
+    # the .md keeps the Markdown as the model wrote it
+    assert "**Baseline to Week 6:**" in md_path.read_text(encoding="utf-8")
+
+
+def test_record_docx_summary_formatted_but_page_text_stays_plain(tmp_path):
+    pages = [{**PAGES[0], "text": "* Values are the mean ± SD\n- 0.3 not a bullet"}]
+    docx_path, _ = output.write_record(tmp_path, "H", "a.pdf", MD_SUMMARY, pages, "m")
+    paras = {p.text: p for p in _paras(docx_path)}
+    assert paras["Baseline to Week 6:"].style.name == "List Bullet"
+    assert paras["* Values are the mean ± SD"].style.name == "Normal"
+    assert paras["- 0.3 not a bullet"].style.name == "Normal"

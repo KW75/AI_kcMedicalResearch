@@ -110,6 +110,40 @@ def _page_heading(page: dict) -> str:
     return f"Page {page['page']} ({label})"
 
 
+# AI summaries come back as Markdown; turn it into Word formatting. Only for
+# AI-written summary text - OCR page text never goes through this (verbatim).
+_MD_HEADING = re.compile(r"^\s*(#{1,6})\s+(.*)$")
+_MD_BULLET = re.compile(r"^(\s*)[*+-]\s+(.*)$")
+_MD_RULE = re.compile(r"^\s*([-*_])\1{2,}\s*$")
+_MD_BOLD = re.compile(r"\*\*(.+?)\*\*")
+
+
+def _add_markdown(document, text: str, min_level: int = 1) -> None:
+    """Add AI summary Markdown: # headings, * / - bullets (2 levels), **bold**."""
+    for line in text.strip().splitlines():
+        if not line.strip():
+            document.add_paragraph("")
+            continue
+        if _MD_RULE.match(line):
+            continue
+        m = _MD_HEADING.match(line)
+        if m:
+            level = min(max(len(m.group(1)), min_level), 9)
+            document.add_heading(m.group(2).replace("**", "").strip(), level=level)
+            continue
+        m = _MD_BULLET.match(line)
+        if m:
+            indent = len(m.group(1).expandtabs(4))
+            style = "List Bullet 2" if indent >= 2 else "List Bullet"
+            body = m.group(2)
+        else:
+            style, body = None, line
+        para = document.add_paragraph(style=style)
+        for k, piece in enumerate(_MD_BOLD.split(body)):
+            if piece:
+                para.add_run(piece).bold = (k % 2 == 1)
+
+
 def write_record(out_dir, header: str, source_name: str, summary: str,
                  pages: list[dict], model: str, rec_dir=None) -> tuple[Path, Path]:
     """Write <rec_dir or out_dir/records>/<header>_<stem>_<ext>.docx and .md."""
@@ -134,8 +168,7 @@ def write_record(out_dir, header: str, source_name: str, summary: str,
     document = docx.Document()
     document.add_heading(source_name, level=0)
     document.add_heading("Summary", level=2)
-    for line in summary.strip().splitlines():
-        document.add_paragraph(line)
+    _add_markdown(document, summary, min_level=4)
     document.add_heading("Full text", level=2)
     for page in pages:
         document.add_heading(_page_heading(page), level=3)
@@ -165,8 +198,7 @@ def write_summary(out_dir, header: str, kind: str, text: str,
 
     document = docx.Document()
     document.add_heading(title, level=0)
-    for line in text.strip().splitlines():
-        document.add_paragraph(line)
+    _add_markdown(document, text)
     _add_note(document, model)
     document.save(str(docx_path))
     return docx_path, md_path
