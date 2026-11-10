@@ -48,7 +48,7 @@ so those catches happen at session open, not mid-work.
 
 | Component      | Status |
 |----------------|--------|
-| Tests          | 1027 passed, 10 deselected on main (v2.6.0, bcd42d9) (`python -m pytest -m "not live" --tb=short -q`) |
+| Tests          | 1039 passed, 10 deselected on v2.7-sr-fixes (Session 37); main 1027 (v2.6.0) (`python -m pytest -m "not live" --tb=short -q`) |
 | Branch         | main = 82eba10 (docs-only commits after the bcd42d9 merge); work continues on v2.7-sr-fixes. (PR #4 merged 2026-11-09 as a merge commit; v2.6.0, OCR mode). It brought in Sessions 33-36: Setup menu, Streamlit/Render removal, Ollama model rule, httpx pin, moved-folder launcher check, SR Anthropic warning, test-local-pins CI job, OCR mode. v2.6-ocr-editor = 106c9ef, fully merged; branch deleted 2026-11-09 (local and GitHub), together with the older merged v2.5-major-updates (1de797a) |
 | CI             | green on main at bcd42d9 (2026-11-09), both jobs: test (requirements-ci.txt, 1027 passed, 44 warnings) and test-local-pins (requirements-local.txt like the launchers, 1027 passed, 57 warnings). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
 | Deploy         | None: CLI only, local first. Render service deleted 2026-10-27; Streamlit UI and Render files removed in Session 33. UptimeRobot monitor for the old Render URL: not yet confirmed paused/deleted (user, outside the repo) |
@@ -97,14 +97,30 @@ This list is the only place to tick items off.
    despite KEEP_RULES: not fixable in code; user checks time spans.
 
 SR (do 4 before 5 and 6)
-4. Replace hard-coded `qwen-vl-plus` with `QWEN_VISION_MODEL`
-   (data_extractor.py, table_extractor.py, scripts/nondet_probe.py; grep again
-   before editing). Then a baseline SR run on qwen3-vl-plus, checked against
-   the PDFs: earlier verified results came from the old model.
+4. DONE in code (Session 37): SR model from one rule,
+   `providers.sr_default_model` (qwen -> QWEN_VISION_MODEL = qwen3-vl-plus).
+   Used by main._sr_default_model, sr/main.resolve_model, DataExtractor,
+   HybridTableExtractor (model=None) and nondet_probe.py (--model None).
+   Hard-coded qwen-vl-plus removed; .env.example / README now say
+   qwen3-vl-plus (pinned by tests/test_qwen_vision_model.py).
+   Still to do: baseline SR run on qwen3-vl-plus, checked against the PDFs
+   (earlier verified results came from the old model); re-run the
+   nondet probe on the new model before REVIEWER_GUIDE §6 claims anything
+   about its determinism.
 5. Broken text layers in all 5 SR papers: route SR text paths through the OCR
    reader (see Session 37 log). Until then, text-based screening and RoB2 for
    CBT-women and zsy234 are UNVERIFIED. Also check how relevance_screener.py
    behaves when tesseract.exe is not on PATH.
+   Manual [?] correction (decided Session 37): run 1 carries on and warns
+   "[?] left: N" per paper, writing the reader's text to an editable
+   reports/sr/text/<paper>.md (with a hash of the PDF). Run 2 reads the
+   corrected file if the PDF hash still matches (log "[CORRECTED TEXT]",
+   otherwise warn and ignore it) and writes a run-1 vs run-2 comparison of
+   screening, RoB2 domains and text_fallback values. Vision extraction reads
+   page images, so corrections don't reach it; use study_overrides.yaml.
+   The source-quote check must use the same corrected text.
+   HybridTableExtractor is built only by tests (no pipeline caller):
+   decide whether to wire it in or remove it.
 6. Allow Ollama vision models for SR (Session 35 log, TODO SR item 3).
 7. Session 28 priorities: vote `outcome_selected` / `timepoint_selected`;
    Ang outcome change S26 -> S27 (`Readme/evidence/s26_issue11/`);
@@ -460,7 +476,7 @@ On main before branching:
 - Verified by reading the code: Ollama never falls back to cloud, on the
   streaming route (stream_ai -> _stream_ollama only) or the batch route
   "app fell back and completed" cannot have been Ollama falling back to
-  cloud; that run must have used another provider. Superseded (Session 33 commit 4): model = OLLAMA_MODEL in .env, else gemma4:e4b; no auto-detection. The same note calls requirements-local.txt "fully pinned". Add: Not fully pinned: packaging/pygments floated (Session 34).
+  cloud; that run must have used another provider. 
 
 On branch:
 - SR screening could send article text to DeepSeek.
@@ -1859,3 +1875,13 @@ Expected: a clean tree in sync with origin, the top commit is this handoff, and 
   Tesseract -> SR reader swap (items 5-6).
 - main = 82eba10 at session open (two docs-only commits after the bcd42d9
   merge). v2.7-ocr-text was planned last chat but never created.
+- SR model rule (Next work item 4): providers.sr_default_model is now the
+  only SR model table. Found while checking: a normal launcher SR run was
+  never affected (main.py always passes --model), but a direct run of
+  `python -m SOURCE_CODE.pipelines.sr.main --provider qwen` without --model
+  used get_default_model -> QWEN_MODEL (text) and sent page images to it;
+  two tests in test_sr_cli_model_resolution.py pinned that. The probe's
+  --model defaulted to qwen-vl-plus (404 on the current key). Local .env
+  has no QWEN_VISION_MODEL line, so runs use the code default qwen3-vl-plus.
+  Tests: test_qwen_vision_model.py (9), test_sr_cli_model_resolution.py
+  rewritten (+2), test_sr_default_model.py (+1). Suite 1027 -> 1039.

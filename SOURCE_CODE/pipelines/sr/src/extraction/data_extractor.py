@@ -196,14 +196,18 @@ SOURCE_QUOTE_WARNING_BRANCHES = (
 class DataExtractor:
     def __init__(self, pico_criteria: Optional[dict] = None,
                  pico_outcome: Optional[str] = None,
-                 model: str = "qwen-vl-plus",
+                 model: Optional[str] = None,
                  provider: str = "qwen",
                  api_key: Optional[str] = None,
                  temperature: Optional[float] = None,
                  seed: Optional[int] = ...,
                  n_agreement: Optional[int] = None):
         self.provider = provider.lower()
-        self.model = model
+        if model:
+            self.model = model
+        else:
+            from .model_default import sr_model_for
+            self.model = sr_model_for(self.provider)
         # Explicit kwargs win; otherwise env; otherwise module defaults.
         # `seed=...` (Ellipsis) means "not passed" so that an explicit
         # seed=None can still mean "send no seed".

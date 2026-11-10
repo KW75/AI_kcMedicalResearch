@@ -11,7 +11,7 @@ Strategy order:
 
 Usage:
     from extraction.table_extractor import HybridTableExtractor
-    extractor = HybridTableExtractor(pico_criteria=pico, provider="qwen", model="qwen-vl-plus")
+    extractor = HybridTableExtractor(pico_criteria=pico, provider="qwen")
     result = extractor.extract(pdf_path, filename)
 """
 from __future__ import annotations
@@ -276,14 +276,18 @@ class HybridTableExtractor:
         pico_criteria: dict | None = None,
         pico_outcome: str | None = None,
         provider: str = "qwen",
-        model: str = "qwen-vl-plus",
+        model: str | None = None,
         call_llm_fn=None,
         api_key: str | None = None,
     ):
         self.pico = pico_criteria or {}
         self.outcome = pico_outcome or self.pico.get("outcome", "")
         self.provider = provider
-        self.model = model
+        if model:
+            self.model = model
+        else:
+            from .model_default import sr_model_for
+            self.model = sr_model_for(provider)
         self.call_llm_fn = call_llm_fn
         self.api_key = api_key
 

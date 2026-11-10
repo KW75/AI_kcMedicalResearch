@@ -24,3 +24,14 @@ def test_qwen_uses_the_vision_model():
 
 def test_unknown_provider_falls_back_to_qwen_vision():
     assert main._sr_default_model("nonsense") == main.QWEN_VISION_MODEL
+
+
+def test_follows_the_shared_rule_in_providers(monkeypatch):
+    """Session 37: one table. main._sr_default_model must follow
+    providers.sr_default_model (the rule sr/main.resolve_model and the
+    extractors use), so a patched or .env value reaches both routes."""
+    monkeypatch.setattr(providers, "QWEN_VISION_MODEL", "dummy-vl")
+    monkeypatch.setattr(providers, "OPENAI_MODEL", "dummy-openai")
+    assert main._sr_default_model("qwen") == "dummy-vl"
+    assert main._sr_default_model("openai") == "dummy-openai"
+    assert main._sr_default_model("nonsense") == "dummy-vl"

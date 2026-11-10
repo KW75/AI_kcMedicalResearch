@@ -256,6 +256,7 @@ from providers import (
     ANTHROPIC_API_KEY, ANTHROPIC_MODEL, DEEPSEEK_API_KEY, DEEPSEEK_MODEL,
     GROQ_API_KEY, GROQ_MODEL, DASHSCOPE_API_KEY, DASHSCOPE_BASE_URL,
     QWEN_MODEL, QWEN_VISION_MODEL, DEFAULT_PROVIDER, _resolve_ollama_model,
+    sr_default_model,
 )
 EMBEDDING_PROVIDER = os.getenv("EMBEDDING_PROVIDER", "ollama")
 EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "nomic-embed-text")
@@ -1361,19 +1362,13 @@ def fetch_pubmed_articles(
 def _sr_default_model(provider: str) -> str:
     """Default model for the SR route when --model is not given.
 
-    Ollama follows the Session 33 rule via providers._resolve_ollama_model()
-    (OLLAMA_MODEL, else gemma4:e4b), never an empty name. Unknown providers
-    fall back to the Qwen vision model, as before.
+    Session 37: the table lives in providers.sr_default_model, shared with
+    pipelines/sr/main.resolve_model and the SR extractors, so the launcher
+    route and a direct SR run cannot disagree. Qwen gets QWEN_VISION_MODEL;
+    Ollama follows the Session 33 rule (OLLAMA_MODEL, else gemma4:e4b);
+    unknown providers fall back to the Qwen vision model, as before.
     """
-    table = {
-        "qwen":      QWEN_VISION_MODEL,
-        "deepseek":  DEEPSEEK_MODEL,
-        "openai":    OPENAI_MODEL,
-        "anthropic": ANTHROPIC_MODEL,
-        "groq":      GROQ_MODEL,
-        "ollama":    _resolve_ollama_model(),
-    }
-    return table.get(provider, QWEN_VISION_MODEL)
+    return sr_default_model(provider)
 
 
 def run_sr_launcher(provider: str = "", model: str = "") -> None:

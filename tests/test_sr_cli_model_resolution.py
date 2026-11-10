@@ -1,7 +1,14 @@
 """
 Session 24, #65: the SR CLI passed --model's None default through to every
-stage, so Qwen failed on the first call. resolve_model must fall back to
-the provider's configured default and fail loudly when there isn't one.
+stage, so Qwen failed on the first call. resolve_model must fall back to a
+default and fail loudly when there isn't one.
+
+Session 37: the fallback is the SR rule (providers.sr_default_model), not
+the chat default. SR sends page images, so Qwen must get QWEN_VISION_MODEL,
+not the text model QWEN_MODEL. Before the fix, a direct run of
+`python -m SOURCE_CODE.pipelines.sr.main --provider qwen` without --model
+sent page images to the text model. The launcher route was safe because
+main.py always passes --model.
 """
 import pytest
 
@@ -10,20 +17,33 @@ from pipelines.sr.main import resolve_model
 
 
 def test_explicit_model_wins(monkeypatch):
-    monkeypatch.setattr(providers, "QWEN_MODEL", "qwen-from-env")
+    monkeypatch.setattr(providers, "QWEN_VISION_MODEL", "qwen-vl-from-env")
     assert resolve_model("qwen", "qwen-explicit") == "qwen-explicit"
 
 
-def test_falls_back_to_provider_default(monkeypatch):
-    monkeypatch.setattr(providers, "QWEN_MODEL", "qwen-from-env")
-    assert resolve_model("qwen", None) == "qwen-from-env"
-    assert resolve_model("qwen", "") == "qwen-from-env"
+def test_qwen_falls_back_to_vision_model_not_text_model(monkeypatch):
+    monkeypatch.setattr(providers, "QWEN_MODEL", "qwen-text-model")
+    monkeypatch.setattr(providers, "QWEN_VISION_MODEL", "qwen-vl-from-env")
+    assert resolve_model("qwen", None) == "qwen-vl-from-env"
+    assert resolve_model("qwen", "") == "qwen-vl-from-env"
 
 
-def test_fails_loudly_when_no_default(monkeypatch):
-    monkeypatch.setattr(providers, "QWEN_MODEL", "")
-    with pytest.raises(SystemExit, match="QWEN_MODEL"):
+def test_fails_loudly_when_no_vision_default(monkeypatch):
+    monkeypatch.setattr(providers, "QWEN_MODEL", "qwen-text-model")
+    monkeypatch.setattr(providers, "QWEN_VISION_MODEL", "")
+    with pytest.raises(SystemExit, match="QWEN_VISION_MODEL"):
         resolve_model("qwen", None)
+
+
+def test_other_cloud_provider_uses_its_model(monkeypatch):
+    monkeypatch.setattr(providers, "OPENAI_MODEL", "openai-from-env")
+    assert resolve_model("openai", None) == "openai-from-env"
+
+
+def test_fails_loudly_names_the_provider_variable(monkeypatch):
+    monkeypatch.setattr(providers, "OPENAI_MODEL", "")
+    with pytest.raises(SystemExit, match="OPENAI_MODEL"):
+        resolve_model("openai", None)
 
 
 def test_ollama_unset_uses_the_default_model(monkeypatch):
