@@ -245,6 +245,7 @@ class HTMLReportGenerator:
             if "low"  in j2: return f'<td><span class="rl">Low</span></td>'
             if "some" in j2: return f'<td><span class="rs">Some Concerns</span></td>'
             if "high" in j2: return f'<td><span class="rh">High</span></td>'
+            if "not assessed" in j2: return '<td><span style="color:#6b7280;font-style:italic">Not assessed</span></td>'
             return "<td>--</td>"
         rows=[]
         for r in results:

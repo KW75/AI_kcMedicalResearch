@@ -48,7 +48,7 @@ so those catches happen at session open, not mid-work.
 
 | Component      | Status |
 |----------------|--------|
-| Tests          | 1084 passed, 10 deselected on v2.10-sr-screening (Session 37); main 1064 (ef66b9f) (`python -m pytest -m "not live" --tb=short -q`) |
+| Tests          | 1106 passed, 10 deselected on v2.10-sr-screening (Session 37); main 1064 (ef66b9f) (`python -m pytest -m "not live" --tb=short -q`) |
 | Branch         | main = ef66b9f (PR #7 merged 2026-11-10: F7 truth fixture sr_truth.yaml + scripts/sr_score_run.py); work continues on v2.10-sr-screening (comparator wording, then screening plan). Earlier on 2026-11-10: PR #6 = 0dcd01f (F4 gate + [SENSITIVITY]), PR #5 = 788c89f (one SR model rule, qwen3-vl-plus); branches v2.7-sr-fixes, v2.8-sr-review-gate, v2.9-sr-fixture deleted. PR #4 merged 2026-11-09 as bcd42d9 (v2.6.0, OCR mode; Sessions 33-36); v2.6-ocr-editor (106c9ef) and v2.5-major-updates (1de797a) deleted 2026-11-09 |
 | CI             | green on main at bcd42d9 (2026-11-09), both jobs: test (requirements-ci.txt, 1027 passed, 44 warnings) and test-local-pins (requirements-local.txt like the launchers, 1027 passed, 57 warnings). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
 | Deploy         | None: CLI only, local first. Render service deleted 2026-10-27; Streamlit UI and Render files removed in Session 33. UptimeRobot monitor for the old Render URL: not yet confirmed paused/deleted (user, outside the repo) |
@@ -2024,6 +2024,52 @@ Expected: a clean tree in sync with origin, the top commit is this handoff, and 
   Data Extraction) list every study with override_fields / override_note, note
   in full (McCrae arms combined; Lami). Before this it was only in the log and
   extracted_data.csv. tests/test_sr_report_overrides.py (5 tests).
+- Shared text in screening + RoB2 (Session 37, commit b3d804c): Stage 2 of
+  sr/main.py calls get_paper_text once per PDF, saves input/sr/paper_text/
+  <stem>.txt (git-ignored, hand corrections kept), screener and RoB2 get
+  paper_text= and no longer reopen the PDF. First run 20261110_234448:
+  Karlsson 24 s, McCrae 32 s (Tesseract, all pages broken font). Rerun
+  20261111_001942: all 5 "reused saved text", [?] 139/46/0/21/0, files
+  untouched, 5 INCLUDE. Scorer identical in both runs (no drift on scored
+  fields).
+- Launcher criteria write (commit afd90a3): SOURCE_CODE/main.py Step 3 now
+  calls pipelines/sr/src/utils/criteria_file.write_criteria_if_changed -
+  writes prisma_criteria.yaml only if the parsed content differs, no line
+  wrapping (old yaml.dump wrapped the comparator at 80 chars and left the
+  tree modified after every run). Verified: launcher printed "unchanged
+  (same PICO)", file time and git status unchanged. tests/
+  test_sr_criteria_write.py (7). OPEN: launcher still hard-codes
+  inclusion_criteria [RCT, Adult participants] and exclusion_criteria
+  [Non-RCT, Animal studies]; hand edits to those in the yaml would be
+  overwritten on the next run.
+- RoB2 overall rule (Session 37): rob2_tool.apply_rob2_overall on both
+  paths - any High domain -> High; all 5 Low -> Low; all 5 assessed
+  otherwise -> Some concerns; domains missing and none High -> Not
+  assessed. Model answer kept in new column overall_model. Failed
+  assessment is "Not assessed" (was "High"); html_report shows it in grey,
+  not as a red High badge. Found because Ang had Missing data = High but
+  overall "Some concerns" in runs 20261110_234448 and 20261111_001942.
+  tests/test_sr_rob2_overall.py (9).
+- Findings from runs 20261110_234448 / 20261111_001942 (still open):
+  Ang N 17/15 (truth 15/13) in BOTH runs - consistent extraction error, not
+  drift; quote in the same row says 15 and 13 -> F8. Jensen quotes Table 1
+  baseline (60.5 +/- 4.0), means empty, skipped; flag says unanimous.
+  Lami quote looks invented; McCrae control labelled WLC but quote is the
+  CBT-P row (F8). RoB2 still sees only the first 6000 chars (MAX_ROB2_CHARS):
+  justifications say "in the abstract/excerpt"; McCrae missing data "not
+  reported" though Figure 1 has 27/30/28; McCrae randomisation Low on weak
+  grounds (near-equal groups, registered).
+- Running: desktop start.bat -> launcher -> SR runs
+  "python -m SOURCE_CODE.pipelines.sr.main --pdf-dir input\sr --provider
+  qwen --model qwen3-vl-plus --effect-measure SMD". Plain
+  "python SOURCE_CODE\main.py" starts the CODING pipeline (--mode default).
+  Console capture: Ctrl+A, Enter in the window, paste to
+  reports\sr_run_console.txt (no log file is written to the run folder).
+- NEXT (in order): (1) RoB2 gets Methods/Results sections of the shared
+  text instead of the first 6000 chars (test first); (2) F8 quote-vs-field
+  checks (arm label vs group label, Ns in quote vs extracted N); (3) F6;
+  (4) [SENSITIVITY] and waiting-list subgroup in the report; (5) local-first
+  SR.
 
 
 

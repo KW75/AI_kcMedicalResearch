@@ -47,6 +47,50 @@ def _openai_compat_creds(provider: str, api_key: Optional[str] = None):
     raise ValueError(f"Unknown provider: {provider}")
 
 
+_ROB2_KEYS = ("randomisation", "deviations", "missing_data",
+              "outcome_measurement", "reported_result")
+NOT_ASSESSED = "Not assessed"
+
+
+def _norm_judgement(v):
+    """'High risk' / 'LOW' / 'some concerns' -> High / Low / Some concerns."""
+    s = str(v or "").strip().lower()
+    if "high" in s:
+        return "High"
+    if "some" in s or "concern" in s:
+        return "Some concerns"
+    if "low" in s:
+        return "Low"
+    return None
+
+
+def apply_rob2_overall(result: dict) -> dict:
+    """RoB 2 overall from the domains (Session 37: Ang had a High domain but
+    the model said 'Some concerns'). Any High -> High; all five Low -> Low;
+    all five assessed otherwise -> Some concerns; domains missing and none
+    High -> Not assessed. The model's own answer is kept in overall_model."""
+    doms = result.get("domains")
+    if not isinstance(doms, dict):
+        doms = {}
+    result["domains"] = {k: (_norm_judgement(v) or v) for k, v in doms.items()}
+    vals = [_norm_judgement(result["domains"].get(k)) for k in _ROB2_KEYS]
+    result["overall_model"] = result.get("overall_judgment")
+    if "High" in vals:
+        overall = "High"
+    elif None in vals:
+        overall = NOT_ASSESSED
+    elif all(v == "Low" for v in vals):
+        overall = "Low"
+    else:
+        overall = "Some concerns"
+    if overall != _norm_judgement(result["overall_model"]):
+        logger.info(f"[ROB2] {result.get('filename', '?')}: overall set to "
+                    f"'{overall}' by the domain rule (model said "
+                    f"'{result['overall_model']}')")
+    result["overall_judgment"] = overall
+    return result
+
+
 class RoB2Assessor:
     def __init__(self, model="qwen-plus-latest", provider="qwen", api_key: Optional[str] = None):
         # NOTE: default matches providers.py's QWEN_MODEL default (text
@@ -88,10 +132,11 @@ class RoB2Assessor:
             from ..utils.json_utils import extract_json
             r = extract_json(raw)
             r.update({"file_id": file_id, "filename": filename, "error": None})
-            return r
+            return apply_rob2_overall(r)
         except Exception as e:
             return {"file_id": file_id, "filename": filename, "error": str(e),
-                    "domains": {}, "overall_judgment": "High"}
+                    "domains": {}, "overall_judgment": NOT_ASSESSED,
+                    "overall_model": None}
 
     def _call_with_images(self, base64_images: list, prompt: str) -> str:
         """Send PDF pages as base64 images via OpenAI-compatible vision API."""
@@ -226,11 +271,12 @@ class RoB2Assessor:
             from ..utils.json_utils import extract_json
             r = extract_json(raw)
             r.update({"file_id": None, "filename": filename, "error": None})
-            return r
+            return apply_rob2_overall(r)
         except Exception as e:
             logger.error(f"RoB2 assessment failed {filename}: {e}")
             return {"file_id": None, "filename": filename, "error": str(e),
-                    "domains": {}, "overall_judgment": "High"}
+                    "domains": {}, "overall_judgment": NOT_ASSESSED,
+                    "overall_model": None}
 
     def assess_batch(self, included_records, delay_seconds=1.5) -> list:
         results = []
