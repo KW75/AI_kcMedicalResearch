@@ -65,9 +65,9 @@ def _run_folder(tmp_path, rows, overrides=None):
     return tmp_path
 
 
-def test_truth_file_has_three_checked_studies(truth):
+def test_truth_file_has_four_checked_studies(truth):
     checked = sorted(a for a, s in truth["studies"].items() if s["checked"])
-    assert checked == ["Ang", "Jensen", "Lami"]
+    assert checked == ["Ang", "Jensen", "Lami", "McCrae"]
 
 
 def test_exact_values_match(sc, truth):
@@ -122,7 +122,7 @@ def test_baseline_run_flags_wrong_pooled_studies(sc, truth, tmp_path):
     assert by["McCrae"]["included_in_meta"] is False
     report = sc.format_report(results)
     assert "WRONG" in report
-    assert "3 checked" in report and "0 fully correct" in report
+    assert "4 checked" in report and "0 fully correct" in report
     assert sc.exit_code(results) == 1
 
 

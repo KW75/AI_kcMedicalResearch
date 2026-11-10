@@ -22,3 +22,17 @@
   note: >-
     Table 4, post-intervention CBT-P vs UMC. Ns are post-intervention
     (28/36), not baseline (34/41). Verified from PDF pages 12-13.
+
+zsy234.pdf:
+  first_author: McCrae
+  year: 2019
+  n_intervention: 57
+  n_control: 28
+  mean_intervention: 46.86
+  sd_intervention: 24.06
+  mean_control: 52.38
+  sd_control: 24.04
+  note: "Multi-arm trial (CBT-I, CBT-P, WLC). CBT-I and CBT-P combined into one intervention arm (Cochrane Handbook 23.3.4): CBT-I 47.01 (24.79) n 27, CBT-P 46.72 (23.81) n 30. Control WLC 52.38 (24.04) n 28. Morning pain VAS 0-100, post-treatment, mixed-model means, Table 3 p9. N = completed post-treatment (Figure 1). Evening pain in Table 3 not used. Waiting-list subgroup."
+
+
+

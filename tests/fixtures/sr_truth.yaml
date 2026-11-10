@@ -51,6 +51,12 @@ studies:
 
   McCrae:
     year: 2019
-    checked: false
+    checked: true
     comparator_type: waiting_list
-    note: "Control must be the WLC arm, not CBT-P. Which CBT arm (CBT-I or CBT-P) is the intervention is not decided"
+    n_intervention: 57
+    n_control: 28
+    mean_intervention: 46.86
+    sd_intervention: 24.06
+    mean_control: 52.38
+    sd_control: 24.04
+    note: "CBT-I + CBT-P combined (Cochrane 23.3.4) vs WLC; morning pain VAS, post-treatment, Table 3 p9; N = completers (Fig 1). Hand-checked Session 37."
