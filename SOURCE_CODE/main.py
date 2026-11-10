@@ -1500,12 +1500,11 @@ def run_sr_launcher(provider: str = "", model: str = "") -> None:
         }
         
         prisma_path = SOURCE_CODE_DIR / "pipelines" / "sr" / "config" / "prisma_criteria.yaml"
-        prisma_path.parent.mkdir(parents=True, exist_ok=True)
-        prisma_path.write_text(
-            _yaml.dump(cfg_yaml, allow_unicode=True, sort_keys=False),
-            encoding="utf-8",
-        )
-        print(f"\n   - prisma_criteria.yaml updated with PICO")
+        from pipelines.sr.src.utils.criteria_file import write_criteria_if_changed
+        if write_criteria_if_changed(prisma_path, cfg_yaml):
+            print(f"\n   - prisma_criteria.yaml updated with PICO")
+        else:
+            print(f"\n   - prisma_criteria.yaml unchanged (same PICO)")
         print(f"     PubMed query: {cfg_yaml.get('pubmed_query_cleaned', 'n/a')}")
     else:
         print("\n  [i] Using existing prisma_criteria.yaml")
