@@ -48,7 +48,7 @@ so those catches happen at session open, not mid-work.
 
 | Component      | Status |
 |----------------|--------|
-| Tests          | 1067 passed, 10 deselected on v2.10-sr-screening (Session 37); main 1064 (ef66b9f) (`python -m pytest -m "not live" --tb=short -q`) |
+| Tests          | 1079 passed, 10 deselected on v2.10-sr-screening (Session 37); main 1064 (ef66b9f) (`python -m pytest -m "not live" --tb=short -q`) |
 | Branch         | main = ef66b9f (PR #7 merged 2026-11-10: F7 truth fixture sr_truth.yaml + scripts/sr_score_run.py); work continues on v2.10-sr-screening (comparator wording, then screening plan). Earlier on 2026-11-10: PR #6 = 0dcd01f (F4 gate + [SENSITIVITY]), PR #5 = 788c89f (one SR model rule, qwen3-vl-plus); branches v2.7-sr-fixes, v2.8-sr-review-gate, v2.9-sr-fixture deleted. PR #4 merged 2026-11-09 as bcd42d9 (v2.6.0, OCR mode; Sessions 33-36); v2.6-ocr-editor (106c9ef) and v2.5-major-updates (1de797a) deleted 2026-11-09 |
 | CI             | green on main at bcd42d9 (2026-11-09), both jobs: test (requirements-ci.txt, 1027 passed, 44 warnings) and test-local-pins (requirements-local.txt like the launchers, 1027 passed, 57 warnings). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
 | Deploy         | None: CLI only, local first. Render service deleted 2026-10-27; Streamlit UI and Render files removed in Session 33. UptimeRobot monitor for the old Render URL: not yet confirmed paused/deleted (user, outside the repo) |
@@ -1989,6 +1989,29 @@ Expected: a clean tree in sync with origin, the top commit is this handoff, and 
   rob2_decisions.yaml; tool proposes, doctor confirms). Then extraction on OCR
   text with number-in-text and arm-label checks (F6 + F8). NOTE: .gitignore
   ignores input/sr/* - decision files need a !-exception if they are to be tracked.
+- Shared paper text (Session 37, v2.10-sr-screening): new
+  SOURCE_CODE/pipelines/sr/src/utils/paper_text.py, get_paper_text(pdf, cache_dir)
+  built on pipelines/ocr/reader.py. Text-layer page -> text; few lost symbols ->
+  [?] kept and counted; broken-font page (ratio >= 0.05 AND >= 20 [?]) ->
+  Tesseract; scanned page -> Tesseract; Tesseract missing -> warning, marks kept.
+  Saved as <cache_dir>/<stem>.txt, no BOM; reruns reuse it (manual [?] fixes
+  respected). tests/test_sr_paper_text.py (12 tests). NOT yet wired into
+  screening/RoB2/extraction; no AI fill or Tesseract counter-check of [?] yet.
+  Real-paper trial (no AI, PDF_RENDER_DPI 200): Ang 139 [?], Jensen 46 (mostly
+  copyright signs), Lami 21 (lost "ti" ligature); Karlsson 8670 -> 0 (11 pages
+  Tesseract, 25 s), McCrae 10378 -> 0 (15 pages, 30 s). Broken ratio per page:
+  Ang/Jensen/Lami <= 0.013, Karlsson/McCrae 0.101-0.138 on every page.
+  Finding: the old screener's _try_cmap_offset_decode (#18) "succeeds" on these
+  two (offset +1) but leaves spaces lost and digits WRONG ("Submitted: 15 March,
+  2018" -> "904M]rch+1/07"; Karlsson shift not uniform). Old screener therefore
+  fed wrong numbers to the AI for Karlsson/McCrae; RoB2 had no decode at all.
+  Tesseract got "Submitted: 15. March, 2018" right. Caution for F6/F8: Tesseract
+  adds stray dots ("15. March", "approximately. 4 million") - check before
+  extraction trusts numbers next to dots.
+  Also: screening and RoB2 prompts take only the first 6000 chars
+  (MAX_SCREEN_CHARS, MAX_ROB2_CHARS) - RoB2 likely never sees most of Methods;
+  later step: send Methods/Results sections from the saved text.
+
 
 
 
