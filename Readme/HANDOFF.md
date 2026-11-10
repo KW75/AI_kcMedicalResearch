@@ -1885,3 +1885,45 @@ Expected: a clean tree in sync with origin, the top commit is this handoff, and 
   has no QWEN_VISION_MODEL line, so runs use the code default qwen3-vl-plus.
   Tests: test_qwen_vision_model.py (9), test_sr_cli_model_resolution.py
   rewritten (+2), test_sr_default_model.py (+1). Suite 1027 -> 1039.
+- SR baseline on qwen3-vl-plus (run 20261110_120707, override OFF, then restored).
+  Papers: Ang 2010, Jensen 2012 (CBT-prefrontal), Karlsson 2015 (CBT-women),
+  Lami 2018 (s10608-017-9875-4), McCrae 2019 (zsy234). All 5 screened INCLUDE 0.95.
+  Values hand-checked against the PDF text layer (pymupdf):
+  - Jensen: pooled 45.6/20.1 vs 57.8/21.9, N 19/15. 45.6 = mean AGE (p2); 57.8,
+    20.1, 21.9 not in the PDF. True: Table 3 p7, Posttreat weekly pain VAS
+    49 +/- 19 (CBT) vs 59 +/- 26 (controls), means and SDs per footnote.
+    N randomised 25/18 (p1, Fig 1 p3); 40 in fMRI analysis (p5); per-arm N behind
+    Table 3 not in text layer - provisional. Comparator = waiting list; PICO says
+    placebo or active - screener included anyway (outcome False). Question for user.
+  - Lami: pooled 4.8/2.1 vs 6.2/2.3, N 38/41; runs gave 4.8 / 3.2 / 4.2. 6.2 not in
+    the PDF; quote does not match the PDF. True (Table 4 p12, = override): CBT-P vs
+    UMC 7.35 (2.08) vs 7.40 (1.29), N 28/36. Pooled g = -0.63 was the only
+    significant study; true values give an effect near zero.
+  - Ang: means/SDs match Table 2; N 17/15 extracted, week-6 row says 15/13.
+  - Karlsson: values plausible (post-treatment column); year/DOI/source blank.
+  - McCrae: correctly excluded (within-subject means with SE).
+  Old vs new (20260901_164801_without override vs 20261110_120707): old model got
+  Ang N 15/13, Jensen 49.0(19.0) vs 59.0(26.0) N 25/18, Lami 7.35(2.08) vs
+  7.4(1.29) right (Lami old flag single_run, N blank); qwen3-vl-plus got all wrong.
+  Old model not recorded (likely qwen-vl-max via launcher); it now returns 404 on
+  our key (Session 35), so no rollback. Cause = model regression; pipeline gaps
+  pre-existed and were masked.
+  New run: every wrong pooled value carried a mandatory flag (Jensen: no_majority
+  x4 + table_shift; Lami: no_majority on both means); unflagged Ang/Karlsson means
+  were right. Stage 4 only LOGS [MANDATORY] (_log_stage4_summary); the pooling
+  decision is the try block in the effect-size loop (sr/main.py ~634-726), which
+  never reads nondet_flag.
+  Findings (no code yet):
+  F1 source-quote warning does not stop pooling (Jensen).
+  F2 quote check tests numbers against the model's own quote, never the PDF (Lami).
+  F3 N can come from another row/timepoint than the means, unflagged (Ang).
+  F4 mandatory nondet flag (no_majority/table_shift) still pools (Lami, Jensen).
+     Fix: raise "needs review: runs disagree (<flag>)" in the try block after the
+     outcome_match check; existing [SKIP] other-studies block reports it. Open:
+     rows with verified study_overrides values must pass (override not applied in
+     sr/main.py - locate first).
+  F5 metadata fields blank (Karlsson).
+  F6 each extracted number must appear in the PDF text; catches unflagged wrong N
+     (Ang) and single_run rows. Needs the OCR reader (item 5): [?] -> "unverifiable".
+  F7 regression fixture from hand-checked values (Lami, Jensen, Ang N).
+  Order after PR #5: F4 gate (test-first), then F7, then F6, then local-first SR.
