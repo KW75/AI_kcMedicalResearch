@@ -48,7 +48,7 @@ so those catches happen at session open, not mid-work.
 
 | Component      | Status |
 |----------------|--------|
-| Tests          | 1079 passed, 10 deselected on v2.10-sr-screening (Session 37); main 1064 (ef66b9f) (`python -m pytest -m "not live" --tb=short -q`) |
+| Tests          | 1084 passed, 10 deselected on v2.10-sr-screening (Session 37); main 1064 (ef66b9f) (`python -m pytest -m "not live" --tb=short -q`) |
 | Branch         | main = ef66b9f (PR #7 merged 2026-11-10: F7 truth fixture sr_truth.yaml + scripts/sr_score_run.py); work continues on v2.10-sr-screening (comparator wording, then screening plan). Earlier on 2026-11-10: PR #6 = 0dcd01f (F4 gate + [SENSITIVITY]), PR #5 = 788c89f (one SR model rule, qwen3-vl-plus); branches v2.7-sr-fixes, v2.8-sr-review-gate, v2.9-sr-fixture deleted. PR #4 merged 2026-11-09 as bcd42d9 (v2.6.0, OCR mode; Sessions 33-36); v2.6-ocr-editor (106c9ef) and v2.5-major-updates (1de797a) deleted 2026-11-09 |
 | CI             | green on main at bcd42d9 (2026-11-09), both jobs: test (requirements-ci.txt, 1027 passed, 44 warnings) and test-local-pins (requirements-local.txt like the launchers, 1027 passed, 57 warnings). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
 | Deploy         | None: CLI only, local first. Render service deleted 2026-10-27; Streamlit UI and Render files removed in Session 33. UptimeRobot monitor for the old Render URL: not yet confirmed paused/deleted (user, outside the repo) |
@@ -2011,6 +2011,19 @@ Expected: a clean tree in sync with origin, the top commit is this handoff, and 
   Also: screening and RoB2 prompts take only the first 6000 chars
   (MAX_SCREEN_CHARS, MAX_ROB2_CHARS) - RoB2 likely never sees most of Methods;
   later step: send Methods/Results sections from the saved text.
+- McCrae 2019 hand-checked (Session 37, user decided option C): multi-arm trial
+  (CBT-I, CBT-P, WLC). CBT-I + CBT-P combined vs WLC (Cochrane Handbook 23.3.4):
+  46.86 (24.06) n 57 vs 52.38 (24.04) n 28; morning pain VAS 0-100,
+  post-treatment, Table 3 p9; N = completed post-treatment (Figure 1); evening
+  pain not used; g about -0.23 (calculated). Both earlier runs were wrong (1 Sep:
+  whole-sample SEs 47.14/52.67; 20261110_174457: CBT-I vs CBT-P, allocated N
+  39/37). Entry in input/sr/study_overrides.yaml; sr_truth.yaml McCrae
+  checked: true (scorer now 4 checked). Commit 58c02d9.
+- Reviewer-entered data in the report (Session 37, user: "mentioned in the
+  report"): report_generator.py (Word, under Methods) and html_report.py (under
+  Data Extraction) list every study with override_fields / override_note, note
+  in full (McCrae arms combined; Lami). Before this it was only in the log and
+  extracted_data.csv. tests/test_sr_report_overrides.py (5 tests).
 
 
 

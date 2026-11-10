@@ -29,6 +29,25 @@ class ReportGenerator:
         doc.add_heading("Methods",1)
         doc.add_heading("Eligibility Criteria",2)
         doc.add_paragraph(" | ".join(f"{k.upper()}: {v}" for k,v in pico.items()))
+        # Session 37: reviewer-entered values (study_overrides.yaml) are stated
+        # in the report, not only in the log and extracted_data.csv.
+        _ov = [r for r in (extraction_results or [])
+               if isinstance(r, dict) and (r.get("override_fields") or r.get("override_note"))]
+        if _ov:
+            doc.add_heading("Reviewer-entered data", 2)
+            doc.add_paragraph(
+                f"{len(_ov)} of {len(extraction_results)} extracted studies use values "
+                f"entered by a reviewer from the source PDF (input/sr/study_overrides.yaml), "
+                f"not values extracted by the model. Report them as manually extracted.")
+            for r in _ov:
+                m = r.get("study_metadata") or {}
+                label = f"{m.get('first_author') or r.get('filename', '?')} ({m.get('year', '')})"
+                parts = [label + ":"]
+                if r.get("override_note"):
+                    parts.append(str(r["override_note"]))
+                if r.get("override_fields"):
+                    parts.append(f"Fields: {r['override_fields']}")
+                doc.add_paragraph(" ".join(parts), style="List Bullet")
         doc.add_heading("Results",1)
         doc.add_heading("Meta-Analysis",2)
         doc.add_paragraph(

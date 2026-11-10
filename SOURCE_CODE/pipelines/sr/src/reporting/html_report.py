@@ -84,6 +84,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   <div class="section" id="ex">
     <div class="sh"><h2>Data Extraction</h2></div>
     <div class="tw"><table><thead><tr><th>Study</th><th>Country</th><th>N Int.</th><th>N Con.</th><th>Intervention</th><th>Comparator</th><th>Outcome</th><th>Effect</th><th>95% CI</th><th>p</th><th>DOI</th></tr></thead><tbody>{extraction_rows}</tbody></table></div>
+    {overrides_html}
   </div>
   <div class="section" id="rob">
     <div class="sh"><h2>Risk of Bias &mdash; Cochrane RoB 2.0</h2></div>
@@ -131,6 +132,7 @@ class HTMLReportGenerator:
             criteria_html=self._criteria_html(inclusion_criteria,exclusion_criteria),
             screening_rows=self._screening_rows(screening_results),
             extraction_rows=self._extraction_rows(extraction_results),
+            overrides_html=self._overrides_html(extraction_results),
             rob_rows=self._rob_rows(rob_results or []),
             ci_lower_display=f"{ma_result.get('ci_lower',0):.3f}",
             ci_upper_display=f"{ma_result.get('ci_upper',0):.3f}",
@@ -214,6 +216,26 @@ class HTMLReportGenerator:
                         f"<td>{po.get('effect_estimate','--')}</td><td>{self._e(ci)}</td>"
                         f"<td>{po.get('p_value','--')}</td><td>{doi_h}</td></tr>")
         return "\n".join(rows)
+
+    def _overrides_html(self, results):
+        """Session 37: list studies whose values were entered by a reviewer."""
+        ov = [r for r in (results or [])
+              if isinstance(r, dict) and (r.get("override_fields") or r.get("override_note"))]
+        if not ov:
+            return ""
+        items = []
+        for r in ov:
+            m = r.get("study_metadata") or {}
+            label = f"{m.get('first_author') or r.get('filename', '?')} ({m.get('year', '')})"
+            note = f" {self._e(r['override_note'])}" if r.get("override_note") else ""
+            fields = (f" <span style='color:#6b7280;'>Fields: {self._e(r['override_fields'])}</span>"
+                      if r.get("override_fields") else "")
+            items.append(f"<li><strong>{self._e(label)}</strong>:{note}{fields}</li>")
+        return ("<div class='wb' style='margin-top:14px;'><strong>Reviewer-entered data.</strong> "
+                f"{len(ov)} of {len(results)} extracted studies use values entered by a reviewer "
+                "from the source PDF (input/sr/study_overrides.yaml), not values extracted by the model. "
+                "Report them as manually extracted.<ul style='margin:6px 0 0 18px;'>"
+                + "".join(items) + "</ul></div>")
 
     def _rob_rows(self,results):
         if not results:
