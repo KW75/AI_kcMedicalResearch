@@ -97,3 +97,57 @@ def test_needs_review_with_missing_n_is_not_reported_as_missing_n(caplog):
     txt = "\n".join(caplog.messages)
     assert "needs review" in txt
     assert "for missing per-arm N" not in txt
+
+
+# --- both estimates (Session 37 decision): primary excludes needs-review
+# studies; [SENSITIVITY] pools them in for comparison ----------------------
+
+def _main_mod():
+    for cand in ("pipelines.sr.main", "SOURCE_CODE.pipelines.sr.main"):
+        try:
+            return importlib.import_module(cand)
+        except ImportError:
+            continue
+    pytest.skip("pipelines.sr.main not importable from this cwd")
+
+
+class _FakeMA:
+    seen = []
+
+    def run(self, data, effect_measure):
+        _FakeMA.seen.append(len(data))
+        return {"pooled_effect": -0.1, "ci_lower": -0.5, "ci_upper": 0.3, "I2": 10.0}
+
+
+def test_sensitivity_pools_primary_plus_review_rows(monkeypatch, caplog):
+    main_mod = _main_mod()
+    _FakeMA.seen.clear()
+    monkeypatch.setattr(main_mod, "MetaAnalyzer", _FakeMA)
+    rows = [{"study": "Ang (2010)"}, {"study": "Karlsson (2015)"}]
+    review = [{"study": "Jensen (2012)"}, {"study": "Lami (2018)"}]
+    with caplog.at_level(logging.INFO):
+        main_mod._log_review_sensitivity(rows, review, "SMD")
+    txt = "\n".join(caplog.messages)
+    assert _FakeMA.seen == [4]
+    assert "[SENSITIVITY]" in txt and "INCLUDING 2 needs-review" in txt
+    assert "Jensen (2012)" in txt and "Lami (2018)" in txt
+    assert "primary estimate excludes them" in txt
+
+
+def test_sensitivity_quiet_when_nothing_gated(monkeypatch, caplog):
+    main_mod = _main_mod()
+    _FakeMA.seen.clear()
+    monkeypatch.setattr(main_mod, "MetaAnalyzer", _FakeMA)
+    with caplog.at_level(logging.INFO):
+        main_mod._log_review_sensitivity([{"study": "A"}, {"study": "B"}], [], "SMD")
+    assert _FakeMA.seen == []
+    assert "nothing to compare" in "\n".join(caplog.messages)
+
+
+def test_loop_keeps_gated_effect_sizes_and_calls_sensitivity():
+    src = (ROOT / "SOURCE_CODE" / "pipelines" / "sr" / "main.py").read_text(encoding="utf-8")
+    loop = src[src.index("meta_audit= []"):src.index("write_results(layout.results_csv")]
+    assert "review_rows.append(" in loop, "gated studies' effect sizes are not kept"
+    tail = src[src.index("write_results(layout.results_csv"):src.index("if len(rows) < 2:")]
+    assert "_log_review_sensitivity(rows, review_rows" in tail, \
+        "sensitivity must run before the '< 2 studies' abort"

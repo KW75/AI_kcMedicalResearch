@@ -139,6 +139,36 @@ def _row_has_extracted_value(row: dict) -> bool:
     return False
 
 
+def _log_review_sensitivity(rows, review_rows, effect_measure):
+    """F4 comparison (Session 37): pool primary + needs-review studies.
+
+    The primary estimate excludes studies whose N runs disagreed. This
+    second estimate puts them back so the reviewer sees how much they move
+    the result. Comparison only - never the reported estimate.
+    """
+    if not review_rows:
+        logger.info("[SENSITIVITY] no needs-review studies - nothing to compare.")
+        return None
+    allrows = list(rows) + list(review_rows)
+    names = ", ".join(str(r.get("study", "?")) for r in review_rows)
+    k = len(review_rows)
+    if len(allrows) < 2:
+        logger.warning(f"[SENSITIVITY] {k} needs-review stud"
+                       f"{'y' if k == 1 else 'ies'} ({names}); < 2 studies "
+                       f"in total - no comparison estimate.")
+        return None
+    ma = MetaAnalyzer().run(data=pd.DataFrame(allrows),
+                            effect_measure=effect_measure)
+    logger.warning(
+        f"[SENSITIVITY] Pooled {effect_measure} INCLUDING {k} needs-review "
+        f"stud{'y' if k == 1 else 'ies'} ({names}): "
+        f"{ma['pooled_effect']:.3f} [{ma['ci_lower']:.3f},{ma['ci_upper']:.3f}] "
+        f"I2={ma['I2']:.1f}% (k={len(allrows)}). For comparison only - the "
+        f"runs disagreed on these studies' numbers; the primary estimate "
+        f"excludes them.")
+    return ma
+
+
 def _log_stage4_summary(meta_audit: list[dict],
                         er: list[dict],
                         effect_measure: str) -> None:
@@ -587,6 +617,7 @@ def main():
 
     rows      = []
     meta_audit= []
+    review_rows = []   # F4: gated studies, pooled only in [SENSITIVITY]
     for r in er:
         m  = r.get("study_metadata",  {})
         po = r.get("primary_outcome", {})
@@ -636,23 +667,21 @@ def main():
             "nondet_flag"             : nondet_flag_to_cell(r.get("nondet_flag")),
             "nondet_runs"             : r.get("nondet_runs"),
             "override_fields"         : r.get("override_fields"),
+        }       
+        # F4 gate (Session 37): runs disagreed -> not in the primary pool unless
+        # a reviewer overrode every flagged field; still pooled in [SENSITIVITY].
+        _review = review_skip_reason(audit_row["nondet_flag"],
+                                     audit_row["override_fields"])
+        if not _review and nondet_cell_is_mandatory(audit_row["nondet_flag"]):
+            logger.info(
+                f"[AGREEMENT] {m.get('first_author','?')}: runs disagreed but "
+                f"every flagged field was overridden in study_overrides.yaml "
+                f"- pooled with reviewer values.")
 
-        }
         try:
             if po.get("outcome_match") is False:
                 raise ValueError(
                     f"outcome_match=False: {po.get('match_rationale', '')}")
-            # F4 gate (Session 37): runs disagreed -> not pooled unless a
-            # reviewer overrode every flagged field.
-            _review = review_skip_reason(audit_row["nondet_flag"],
-                                         audit_row["override_fields"])
-            if _review:
-                raise ValueError(_review)
-            if nondet_cell_is_mandatory(audit_row["nondet_flag"]):
-                logger.info(
-                    f"[AGREEMENT] {m.get('first_author','?')}: runs disagreed "
-                    f"but every flagged field was overridden in "
-                    f"study_overrides.yaml - pooled with reviewer values.")
             est, cl, cu = (po.get("effect_estimate"),
                            po.get("ci_lower_95"),
                            po.get("ci_upper_95"))
@@ -715,7 +744,7 @@ def main():
             plausibility_flag = _check_plausibility(
                 args.effect_measure, float(est), author_label)
 
-            rows.append({
+            _row = {
                 "study"               : author_label,
                 "effect_estimate"     : float(est),
                 "ci_lower"            : float(cl),
@@ -728,24 +757,32 @@ def main():
                 "sd_intervention"     : po.get("sd_intervention"),
                 "mean_control"        : po.get("mean_control"),
                 "sd_control"          : po.get("sd_control"),
-            })
+            }
             audit_row.update({
                 "hedges_g"          : float(est),
                 "ci_lower"          : float(cl),
                 "ci_upper"          : float(cu),
-                "included_in_meta"  : True,
+                "included_in_meta"  : not _review,
                 "plausibility_flag" : plausibility_flag,
             })
+            if _review:
+                review_rows.append(_row)
+                audit_row["skip_reason"] = _review
+                logger.warning(f"Skip study: {_review} "
+                               f"(kept for the [SENSITIVITY] comparison)")
+            else:
+                rows.append(_row)
 
         except Exception as e:
             logger.warning(f"Skip study: {e}")
-            audit_row["skip_reason"] = str(e)
+            audit_row["skip_reason"] = f"{_review}; also: {e}" if _review else str(e)
 
         meta_audit.append(audit_row)
 
     write_results(layout.results_csv, meta_audit)
 
     _log_stage4_summary(meta_audit, er, args.effect_measure)
+    _log_review_sensitivity(rows, review_rows, args.effect_measure)
 
     # ---------------------------------------------------------------------
     # [OUTCOME/TIMEPOINT] provenance surfacing (#22 / #51).
