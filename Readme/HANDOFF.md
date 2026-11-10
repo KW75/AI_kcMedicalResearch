@@ -1937,4 +1937,18 @@ Expected: a clean tree in sync with origin, the top commit is this handoff, and 
   F7 regression fixture from hand-checked values (Lami, Jensen, Ang N).
   Order after PR #5: F4 gate DONE (v2.8-sr-review-gate, both estimates); next F7
      (regression fixture), then F6, then [SENSITIVITY] in the report, then local-first SR.
+- F4 gate real run 20261110_174457 (qwen3-vl-plus, override ON): Lami runs
+  disagreed (no_majority x2 + table_shift) but all six fields overridden ->
+  pooled with reviewer values, g -0.03 (gate override path confirmed). Jensen:
+  all 3 runs empty -> skipped "insufficient mean/SD/N"; flag reads "unanimous"
+  (agreement on nothing - misleading); quotes are Table 1 baseline. Ang N 17/15
+  again, own quote says 15/13 (F3). McCrae now INCLUDED g +0.01 but control quote
+  is the CBT-P row while control_group = WLC: CBT-I vs CBT-P, wrong comparison;
+  only majority flags, gate does not apply. [SENSITIVITY]: nothing to compare.
+  F8 (new): quote-vs-field checks, no PDF needed - control/intervention quote arm
+  label must match the group label; Ns in the quote must match extracted N.
+  Question for user: waiting-list comparator (Jensen, Karlsson, McCrae) vs PICO
+  "placebo or active".
+
+     
 
