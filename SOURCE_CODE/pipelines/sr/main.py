@@ -25,7 +25,9 @@ from .src.utils.project_layout import SRProjectLayout
 from .src.utils.audit_logger import (
     write_screens, write_extracts, write_rob2, write_results,
     nondet_flag_to_cell, nondet_cell_is_mandatory, NONDET_CELL_UNANIMOUS,
+    review_skip_reason,
 )
+
 
 def resolve_model(provider: str, model):
     """CLI > SR default model. Fail loudly if neither exists.
@@ -317,6 +319,8 @@ def _log_stage4_summary(meta_audit: list[dict],
             or r.get("mean_control") is not None)
         and (r.get("n_intervention") is None
              or r.get("n_control") is None)
+        # F4: a review-gated study is reported as such, not as missing N.
+        and not str(r.get("skip_reason") or "").startswith("needs review")
     ]
     if skipped_missing_n:
         logger.warning(
@@ -631,11 +635,24 @@ def main():
             # carry a readable cell; the raw list stays in extracted.csv.
             "nondet_flag"             : nondet_flag_to_cell(r.get("nondet_flag")),
             "nondet_runs"             : r.get("nondet_runs"),
+            "override_fields"         : r.get("override_fields"),
+
         }
         try:
             if po.get("outcome_match") is False:
                 raise ValueError(
                     f"outcome_match=False: {po.get('match_rationale', '')}")
+            # F4 gate (Session 37): runs disagreed -> not pooled unless a
+            # reviewer overrode every flagged field.
+            _review = review_skip_reason(audit_row["nondet_flag"],
+                                         audit_row["override_fields"])
+            if _review:
+                raise ValueError(_review)
+            if nondet_cell_is_mandatory(audit_row["nondet_flag"]):
+                logger.info(
+                    f"[AGREEMENT] {m.get('first_author','?')}: runs disagreed "
+                    f"but every flagged field was overridden in "
+                    f"study_overrides.yaml - pooled with reviewer values.")
             est, cl, cu = (po.get("effect_estimate"),
                            po.get("ci_lower_95"),
                            po.get("ci_upper_95"))

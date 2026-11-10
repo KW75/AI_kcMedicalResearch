@@ -42,6 +42,49 @@ def nondet_cell_is_mandatory(cell: str) -> bool:
     return any(m in (cell or "") for m in NONDET_MANDATORY_MARKERS)
 
 
+# F4 gate (Session 37). The four numbers a table_shift can move.
+_REVIEW_NUMERIC_FIELDS = ("mean_intervention", "sd_intervention",
+                          "mean_control", "sd_control")
+
+
+def _overridden_fields(override_fields) -> set:
+    """Field names from StudyOverrides.apply's override_fields string,
+    e.g. "n_control(41->36); mean_control(confirmed 7.4)" -> {...}."""
+    names = set()
+    for part in str(override_fields or "").split(";"):
+        name = part.strip().split("(", 1)[0].strip()
+        if name:
+            names.add(name)
+    return names
+
+
+def review_skip_reason(cell, override_fields=None):
+    """F4 gate: None = may be pooled; str = keep OUT of the pooled estimate.
+
+    A mandatory nondet flag (no_majority / table_shift) means the N runs read
+    different table cells; baseline 20261110_120707 pooled Jensen and Lami
+    with numbers that are not in the PDFs. The row passes only if a reviewer
+    overrode every flagged field (table_shift: all four means/SDs).
+    """
+    cell = cell or ""
+    if not nondet_cell_is_mandatory(cell):
+        return None
+    done = _overridden_fields(override_fields)
+    still_open = []
+    for tok in (t.strip() for t in cell.split("|")):
+        if tok == "table_shift":
+            if not all(f in done for f in _REVIEW_NUMERIC_FIELDS):
+                still_open.append(tok)
+        elif tok.endswith(":no_majority"):
+            if tok.split(":", 1)[0] not in done:
+                still_open.append(tok)
+    if not still_open:
+        return None
+    return ("needs review: runs disagree (" + "|".join(still_open) + ") - "
+            "verify against the PDF, or enter the values in "
+            "input/sr/study_overrides.yaml with a source-page note")
+
+
 def _write_csv(path: Path, rows: list[dict], fieldnames: list[str]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w", newline="", encoding="utf-8") as f:
