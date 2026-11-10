@@ -1,0 +1,56 @@
+# tests/fixtures/sr_truth.yaml
+# Reviewer hand-checked values (Session 37), read from the PDF text layer.
+# Used by scripts/sr_score_run.py to score a real SR run against the truth.
+# Primary outcome: pain intensity, post-intervention. Keyed by first author.
+# checked: false = reported by the scorer but not scored.
+tolerance: 0.1
+
+studies:
+  Ang:
+    year: 2010
+    checked: true
+    source: "Table 2, Week 6 change, pain mean +/- SD; Ns from the same row"
+    comparator_type: active          # usual care
+    mean_intervention: -20.2
+    sd_intervention: 23.9
+    mean_control: -14.9
+    sd_control: 16.4
+    n_intervention: 15
+    n_control: 13
+
+  Jensen:
+    year: 2012
+    checked: true
+    source: "Table 3 p7, Posttreat weekly pain VAS, means and SDs (footnote)"
+    comparator_type: waiting_list
+    mean_intervention: 49
+    sd_intervention: 19
+    mean_control: 59
+    sd_control: 26
+    n_intervention: 25
+    n_control: 18
+    n_status: provisional            # randomised N (p1); N behind Table 3 not stated
+
+  Lami:
+    year: 2018
+    checked: true
+    source: "Table 4 p12, post-intervention CBT-P vs UMC; Ns post-intervention"
+    comparator_type: active          # usual medical care
+    mean_intervention: 7.35
+    sd_intervention: 2.08
+    mean_control: 7.40
+    sd_control: 1.29
+    n_intervention: 28
+    n_control: 36
+
+  Karlsson:
+    year: 2015
+    checked: false
+    comparator_type: waiting_list
+    note: "Run values 3.88 (1.05) vs 3.67 (0.75), N 24/24 plausible; columns and N not hand-checked"
+
+  McCrae:
+    year: 2019
+    checked: false
+    comparator_type: waiting_list
+    note: "Control must be the WLC arm, not CBT-P. Which CBT arm (CBT-I or CBT-P) is the intervention is not decided"
