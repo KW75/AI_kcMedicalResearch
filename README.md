@@ -4,7 +4,7 @@ A multi-mode AI assistant for medical research, critical appraisal, systematic r
 
 
     Version: 2.6.0
-    Tests: 1027 passed, 10 deselected
+    Tests: 1039 passed, 10 deselected
            (reproduce with `python -m pytest -m "not live" --tb=short -q`)
     CI: GitHub Actions - Green
     GitHub: https://github.com/KW75/AI_kcMedicalResearch
@@ -138,7 +138,7 @@ Auth errors (401, 403) never fall back.
 only provider that keeps input on your own machine.
 
 Qwen and vision: `QWEN_MODEL` (default `qwen-plus-latest`) is text-only. SR
-automatically uses `QWEN_VISION_MODEL` (default `qwen-vl-max`); no `--model`
+automatically uses `QWEN_VISION_MODEL` ((default `qwen3-vl-plus`); no `--model`
 flag needed.
 
 ## Streaming
@@ -164,7 +164,7 @@ Copy `.env.example` to `.env`. `.env` is gitignored.
     DASHSCOPE_API_KEY=sk-...
     DASHSCOPE_BASE_URL=https://dashscope-intl.aliyuncs.com/compatible-mode/v1
     QWEN_MODEL=qwen-plus-latest
-    QWEN_VISION_MODEL=qwen-vl-max
+    QWEN_VISION_MODEL=qwen3-vl-plus
     OPENAI_API_KEY=sk-...
     ANTHROPIC_API_KEY=sk-ant-...
 

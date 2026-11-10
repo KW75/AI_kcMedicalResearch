@@ -28,24 +28,28 @@ from .src.utils.audit_logger import (
 )
 
 def resolve_model(provider: str, model):
-    """CLI > provider's configured default. Fail loudly if neither exists.
+    """CLI > SR default model. Fail loudly if neither exists.
 
     The --model help text has always promised the provider default, but the
     CLI passed args.model (None) straight through to every stage, so Qwen
     rejected the very first call with "you must provide a model parameter"
-    (Session 24, #65). It resolves via providers.get_default_model, the same
-    value the providers themselves use.
+    (Session 24, #65).
 
+    Session 37: the fallback is providers.sr_default_model, the same rule
+    main.py uses for the launcher route. It used get_default_model, which
+    gives Qwen its chat model (QWEN_MODEL), so a direct run without --model
+    sent page images to a text-only model.
     """
     if model:
         return model
-    from providers import get_default_model
-    default = get_default_model(provider)
+    from providers import sr_default_model
+    default = sr_default_model(provider)
     if not default or default.startswith("("):
+        var = ("QWEN_VISION_MODEL" if (provider or "").lower() == "qwen"
+               else f"{provider.upper()}_MODEL")
         raise SystemExit(
             f"--model not given and no default model is configured for "
-            f"provider {provider!r}. Set {provider.upper()}_MODEL in .env "
-            f"or pass --model.")
+            f"provider {provider!r}. Set {var} in .env or pass --model.")
     return default
 
 

@@ -48,12 +48,12 @@ so those catches happen at session open, not mid-work.
 
 | Component      | Status |
 |----------------|--------|
-| Tests          | 1027 passed, 10 deselected on main (v2.6.0, bcd42d9) (`python -m pytest -m "not live" --tb=short -q`) |
-| Branch         | main = bcd42d9 (PR #4 merged 2026-11-09 as a merge commit; v2.6.0, OCR mode). It brought in Sessions 33-36: Setup menu, Streamlit/Render removal, Ollama model rule, httpx pin, moved-folder launcher check, SR Anthropic warning, test-local-pins CI job, OCR mode. v2.6-ocr-editor = 106c9ef, fully merged; branch deleted 2026-11-09 (local and GitHub), together with the older merged v2.5-major-updates (1de797a) |
+| Tests          | 1039 passed, 10 deselected on v2.7-sr-fixes (Session 37); main 1027 (v2.6.0) (`python -m pytest -m "not live" --tb=short -q`) |
+| Branch         | main = 82eba10 (docs-only commits after the bcd42d9 merge); work continues on v2.7-sr-fixes. (PR #4 merged 2026-11-09 as a merge commit; v2.6.0, OCR mode). It brought in Sessions 33-36: Setup menu, Streamlit/Render removal, Ollama model rule, httpx pin, moved-folder launcher check, SR Anthropic warning, test-local-pins CI job, OCR mode. v2.6-ocr-editor = 106c9ef, fully merged; branch deleted 2026-11-09 (local and GitHub), together with the older merged v2.5-major-updates (1de797a) |
 | CI             | green on main at bcd42d9 (2026-11-09), both jobs: test (requirements-ci.txt, 1027 passed, 44 warnings) and test-local-pins (requirements-local.txt like the launchers, 1027 passed, 57 warnings). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
 | Deploy         | None: CLI only, local first. Render service deleted 2026-10-27; Streamlit UI and Render files removed in Session 33. UptimeRobot monitor for the old Render URL: not yet confirmed paused/deleted (user, outside the repo) |
 | Writing mode   | one-pass (write + edit + review in one call); tracks Topic 800 / Article 3,500 / Report 500 / Synopsis 1,500; on main since fa4edb9; tested on gemma4:e4b; terminal menus only |
-| OCR mode       | `--mode ocr`, launcher menu 8. Reads PDF / image / .txt / .docx; .doc refused with a message. Records in `reports/ocr/<header>/`, SUMMARY / SYNOPSIS in `output/ocr/`. Ollama by default; Qwen / OpenAI only behind the cloud gate; groq / deepseek / anthropic refused. Broken-font PDFs: text layer with [?], AI fills symbols only, document-wide vote per font code (Ang 2010: 19 of 139 [?] left, checked against the PDF) |
+| OCR mode       | `--mode ocr`, launcher menu 8. Reads PDF / image / .txt / .docx; .doc refused with a message. Records in `reports/ocr/<header>/`, SUMMARY / SYNOPSIS in `output/ocr/`. Ollama by default; Qwen / OpenAI only behind the cloud gate; groq / deepseek / anthropic refused. Broken-font PDFs: text layer with [?], AI fills symbols only, document-wide vote per font code. [?] left varies run to run (Ang 2010, gemma4:e4b: 19 in s36_check, 7 in s36_vote; vote fills checked against Table 2) |
 | SR pipeline    | working via CLI with Qwen; Ang 2010 verified against PDF (NFR week 6, unanimous N=3); text-fallback drops surface in Stage 4 `[SKIP]` block. Hard-coded `qwen-vl-plus` (404 on the current key) still in the SR extractors (see Next work) |
 | Providers      | Ollama (default, local, never falls back to cloud; model = OLLAMA_MODEL in .env, else gemma4:e4b) / DeepSeek / Qwen (SR) / OpenAI / Anthropic / Groq. Anthropic and Gemini are geo-restricted on the dev machine; the planned Anthropic -> Gemini switch is on hold |
 
@@ -73,49 +73,68 @@ Issue numbers below match `README.md` > Known Issues.
 
 ## Next work (start here)
 
-Collected from the Session 34-35 logs on 2026-11-09. Those logs keep the
-detail and evidence; this list is the only place to tick items off.
+Updated at Session 37 open (2026-11-09). PR #4 is merged (bcd42d9). Items
+closed in Session 36 are removed; the Session 36 log keeps the evidence.
+This list is the only place to tick items off.
 
-Before the OCR merge (PR #4):
-1. DONE (Session 36): `strip_latex()` in `pipelines/ocr/output.py`, used
-   on AI summaries in `write_summary` and `write_record`; OCR page text
-   stays verbatim. Still to do: look at a real Ang SUMMARY.
-2. DONE in code (Session 36): `KEEP_RULES` in engine.py (copy every [?]
-   exactly; keep each change value with the reference point the text gives,
-   e.g. change from baseline; never make up a time span) is added to
-   SUMMARY_PROMPT, SYNOPSIS_PROMPT and PART_PROMPT. SYNOPSIS_PROMPT now asks
-   for plain symbols too. Not yet checked on a real Ang run. Also seen in
-   that summary, not fixed: `strip_latex` leaves `$P = 0.8$` as written
-   (no backslash between the dollar signs); "decrease of -10.2" is a double
-   negative.
-3. DONE in code (Session 36): the record .docx page text was already
-   plain `Normal` paragraphs. The AI summary's Markdown now becomes Word
-   formatting via `_add_markdown()` in output.py. Open choice: wrap the
-   record .md page text in a code fence (see the Session 36 log).
-4. DONE in code (Session 36, option 3): single-vote fills stay but are
-   flagged "confirmed only once - check against the PDF" on screen and
-   in FILL_DEBUG. Open choice: also list them in the record .docx/.md.
-5. SR: see "TODO SR (next chat, do in this order)" in the Session 35 log
-   for full detail. Replace hard-coded `qwen-vl-plus` with
-   `QWEN_VISION_MODEL` (data_extractor.py, table_extractor.py,
-   scripts/nondet_probe.py; grep again before editing); broken text layers
-   in all 5 SR papers (text-based screening and RoB2 for CBT-women and
-   zsy234 UNVERIFIED); allow Ollama vision models for SR.
-6. Writing: .docx tables never reach the AI (`_load_input_files` reads
-   paragraphs only; reuse the OCR reader); a read error is sent as
-   "[Could not read <name>]" as if it were document text; check whether
-   the `--report` path still skips .doc without a message (ae074cd fixed
-   the menu path).
-7. Session 28 priorities, still open: vote `outcome_selected` /
-   `timepoint_selected`; Ang outcome change S26 -> S27 (evidence in
-   `Readme/evidence/s26_issue11/`); decoder `!`-for-space gap (low).
-8. Menu 7 Data Analysis: design questions first.
-9. Post-merge OCR (details in the Session 36 log): list "confirmed only
-   once" fills in the record .docx/.md; code-fence the record .md page
-   text; convert LaTeX in fill answers (`$\pm$`) before `_accept`;
-   Tesseract as second reader (trust alone only for minus; lookup
-   TESSERACT_CMD -> PATH -> install folders incl. Mac Homebrew); check
-   how `relevance_screener.py` behaves when tesseract.exe is not on PATH.
+1. One-file run (decided Session 37): no SUMMARY. reports/ocr/<header>/
+   keeps the raw text layer with every [?] as extracted, plus FILL_DEBUG.
+   output/ocr/ gets only <name>_<date>_TEXT.docx and .md: the full text,
+   page by page, with each [?] the document-wide vote confirms replaced by
+   its symbol; [?] without a majority stay as [?]. Single-vote fills: see
+   the Session 37 log (option A = stay [?], option B = fill + yellow).
+   Several files: SYNOPSIS as now, plus each file's filled text in
+   reports/ocr/<header>/. Replaces the open choices "list single-vote fills
+   in the record" and "code-fence the record .md".
+2. Tesseract as a second reader for [?] left after the AI fill and vote.
+   Design and Ang evidence in the Session 36 log (trust alone only for minus;
+   add `—` to `_SAME_SIGN`; fill per [?]; expected 7 -> 2 on s36_vote).
+   Lookup: TESSERACT_CMD -> PATH -> install folders (incl. Mac Homebrew) -> skip.
+3. Leftovers from s36_check / s36_vote: "decrease of −10.2" double negative;
+   nested bullets shown as `- *   CBT:` in SUMMARY .docx; "AI answers for refused
+   lines" prints when the file holds only vote lines; convert LaTeX in fill
+   answers (`$\pm$`) before `_accept`. "Week 6 to Week 12" heading can return
+   despite KEEP_RULES: not fixable in code; user checks time spans.
+
+SR (do 4 before 5 and 6)
+4. DONE in code (Session 37): SR model from one rule,
+   `providers.sr_default_model` (qwen -> QWEN_VISION_MODEL = qwen3-vl-plus).
+   Used by main._sr_default_model, sr/main.resolve_model, DataExtractor,
+   HybridTableExtractor (model=None) and nondet_probe.py (--model None).
+   Hard-coded qwen-vl-plus removed; .env.example / README now say
+   qwen3-vl-plus (pinned by tests/test_qwen_vision_model.py).
+   Still to do: baseline SR run on qwen3-vl-plus, checked against the PDFs
+   (earlier verified results came from the old model); re-run the
+   nondet probe on the new model before REVIEWER_GUIDE §6 claims anything
+   about its determinism.
+5. Broken text layers in all 5 SR papers: route SR text paths through the OCR
+   reader (see Session 37 log). Until then, text-based screening and RoB2 for
+   CBT-women and zsy234 are UNVERIFIED. Also check how relevance_screener.py
+   behaves when tesseract.exe is not on PATH.
+   Manual [?] correction (decided Session 37): run 1 carries on and warns
+   "[?] left: N" per paper, writing the reader's text to an editable
+   reports/sr/text/<paper>.md (with a hash of the PDF). Run 2 reads the
+   corrected file if the PDF hash still matches (log "[CORRECTED TEXT]",
+   otherwise warn and ignore it) and writes a run-1 vs run-2 comparison of
+   screening, RoB2 domains and text_fallback values. Vision extraction reads
+   page images, so corrections don't reach it; use study_overrides.yaml.
+   The source-quote check must use the same corrected text.
+   HybridTableExtractor is built only by tests (no pipeline caller):
+   decide whether to wire it in or remove it.
+6. Allow Ollama vision models for SR (Session 35 log, TODO SR item 3).
+7. Session 28 priorities: vote `outcome_selected` / `timepoint_selected`;
+   Ang outcome change S26 -> S27 (`Readme/evidence/s26_issue11/`);
+   decoder `!`-for-space gap (low).
+
+Writing
+8. Read input through the OCR reader so .docx tables reach the AI; a read
+   error must be a [SKIP] message, not "[Could not read <name>]" sent as
+   document text; `--report` path (main.py ~985-998) and `list_input_names`
+   still skip .doc silently.
+
+Other
+9. Menu 7 Data Analysis: design questions first.
+10. UptimeRobot monitor for the deleted Render URL: confirm paused/deleted (user).
 
 
 ---
@@ -196,6 +215,8 @@ qwen2.5:7b-instruct offered as the low-resource fallback.
   "run: ollama pull <model>"; connection-refused now says "make sure Ollama
   is running". [APPLY + add test pinning the 404->pull-message mapping;
   existing tests may assert the old "HTTP error 404" string - run suite.]
+  CLOSED (Session 35): test_providers.py::test_ollama_404_tells_user_to_pull_model
+  and tests/test_ollama_missing_model.py.
 
 Verified by code review only: confirmed coding pipeline honours OLLAMA_MODEL
 (coding.py uses an injected call_llm_fn, no hard-coded model); confirmed
@@ -378,7 +399,7 @@ hardware: a 14B pull and a demo run converging. Do before rollout.
   (S29); safe only because a different file happened to call it correctly.
 
 
-Handoff prepared: 2026-08-29, Session 27.
+Durable Lessons last added: Session 29 (2026-10-22).
 ---
 
 ## Session - 2026-09-02 - macOS install (Issue #19) RESOLVED
@@ -401,6 +422,7 @@ Fix (generic, all Macs):
 - Standardize on python.org 3.11.9 universal2 (Intel + Apple Silicon).
 - New requirements-local.txt: fully pinned, pyarrow==12.0.1 (has prebuilt
   cp311 wheels for macosx_10_14_x86_64 AND macosx_11_0_arm64), chromadb==0.5.23.
+  Not fully pinned: packaging/pygments floated (Session 34).
   Installs with no Rust build.
 - chromadb is a HARD dependency: utils/rag.py imports it at module top level;
   main.py imports the appraisal pipeline unconditionally -> app crashes on
@@ -426,6 +448,8 @@ Resolved this session:
 - Ollama models (offline route):
   - Chat: app auto-detects the largest pulled model; falls back to "llama3.2"
     (providers.py:211). OLLAMA_MODEL in .env overrides.
+    Superseded (Session 33 commit 4): model = OLLAMA_MODEL in .env, else
+    gemma4:e4b; no auto-detection.
   - Embeddings (RAG - appraisal/SR pipelines): defaults to "nomic-embed-text"
     (main.py:261, rag.py:30). EMBEDDING_MODEL in .env overrides.
   - README Step 2 tells colleagues to pull BOTH:
@@ -451,9 +475,8 @@ On main before branching:
   .env.example `OLLAMA_MODEL=` lines to the constant.
 - Verified by reading the code: Ollama never falls back to cloud, on the
   streaming route (stream_ai -> _stream_ollama only) or the batch route
-  (call_ai_with_fallback chain = [ollama]). The 2026-09-02 macOS note
   "app fell back and completed" cannot have been Ollama falling back to
-  cloud; that run must have used another provider.
+  cloud; that run must have used another provider. 
 
 On branch:
 - SR screening could send article text to DeepSeek.
@@ -1307,9 +1330,7 @@ Expected: a clean tree in sync with origin, the top commit is this handoff, and 
 - Current State table updated to Session 34 (no Render; 15 branch commits not
   through CI; providers). Anthropic AND Gemini are geo-restricted on the dev
   machine (#3); the Anthropic -> Gemini switch is on hold.
-- Session 28 "[APPLY + add test pinning the 404->pull message]" CLOSED:
-  tests/test_providers.py::test_ollama_404_tells_user_to_pull_model
-  (non-streaming) and tests/test_ollama_missing_model.py (streaming + helper).
+- Session 28 "[APPLY + add test pinning the 404->pull message]" CLOSED (Session 35): test_providers.py::test_ollama_404_tells_user_to_pull_model and tests/test_ollama_missing_model.py.
 - Session 28 priorities still open: 1 vote outcome_selected /
   timepoint_selected; 2 Ang outcome change S26 -> S27; 3 decoder `!` (low).
 - Corrections to the 2026-09-02 notes (left as history): the Ollama model is
@@ -1836,3 +1857,73 @@ Expected: a clean tree in sync with origin, the top commit is this handoff, and 
   local (`git branch -d`) and GitHub (`git push origin --delete`), then
   `git fetch --prune`. Only main is left. All commits stay in main's
   history, so the commit IDs in this log are still valid. Branch row updated.
+
+## Session 37 - 2026-11-09 - branch v2.7-sr-fixes
+
+- Docs: Next work rebuilt (Session 36 items closed); OCR row [?] count
+  marked run-dependent; corrections added to the 2026-09-02 and Session 28
+  notes; Durable Lessons footer fixed.
+- Decided: one-file OCR run writes no SUMMARY; output is the filled text
+  reproduction only (Next work item 1). Single-vote fills: option A (stay
+  [?]) or B (fill + yellow) still to choose. Agreed: Tesseract as second
+  reader (item 2), SR reads through the OCR reader after the
+  QWEN_VISION_MODEL baseline (items 4-6), Writing reads through the OCR
+  reader (item 8).
+- Order changed at session open: SR first. Next work item 4
+  (QWEN_VISION_MODEL in place of hard-coded qwen-vl-plus) and the baseline
+  SR run on this branch; then Writing reader swap -> one-file TEXT output ->
+  Tesseract -> SR reader swap (items 5-6).
+- main = 82eba10 at session open (two docs-only commits after the bcd42d9
+  merge). v2.7-ocr-text was planned last chat but never created.
+- SR model rule (Next work item 4): providers.sr_default_model is now the
+  only SR model table. Found while checking: a normal launcher SR run was
+  never affected (main.py always passes --model), but a direct run of
+  `python -m SOURCE_CODE.pipelines.sr.main --provider qwen` without --model
+  used get_default_model -> QWEN_MODEL (text) and sent page images to it;
+  two tests in test_sr_cli_model_resolution.py pinned that. The probe's
+  --model defaulted to qwen-vl-plus (404 on the current key). Local .env
+  has no QWEN_VISION_MODEL line, so runs use the code default qwen3-vl-plus.
+  Tests: test_qwen_vision_model.py (9), test_sr_cli_model_resolution.py
+  rewritten (+2), test_sr_default_model.py (+1). Suite 1027 -> 1039.
+- SR baseline on qwen3-vl-plus (run 20261110_120707, override OFF, then restored).
+  Papers: Ang 2010, Jensen 2012 (CBT-prefrontal), Karlsson 2015 (CBT-women),
+  Lami 2018 (s10608-017-9875-4), McCrae 2019 (zsy234). All 5 screened INCLUDE 0.95.
+  Values hand-checked against the PDF text layer (pymupdf):
+  - Jensen: pooled 45.6/20.1 vs 57.8/21.9, N 19/15. 45.6 = mean AGE (p2); 57.8,
+    20.1, 21.9 not in the PDF. True: Table 3 p7, Posttreat weekly pain VAS
+    49 +/- 19 (CBT) vs 59 +/- 26 (controls), means and SDs per footnote.
+    N randomised 25/18 (p1, Fig 1 p3); 40 in fMRI analysis (p5); per-arm N behind
+    Table 3 not in text layer - provisional. Comparator = waiting list; PICO says
+    placebo or active - screener included anyway (outcome False). Question for user.
+  - Lami: pooled 4.8/2.1 vs 6.2/2.3, N 38/41; runs gave 4.8 / 3.2 / 4.2. 6.2 not in
+    the PDF; quote does not match the PDF. True (Table 4 p12, = override): CBT-P vs
+    UMC 7.35 (2.08) vs 7.40 (1.29), N 28/36. Pooled g = -0.63 was the only
+    significant study; true values give an effect near zero.
+  - Ang: means/SDs match Table 2; N 17/15 extracted, week-6 row says 15/13.
+  - Karlsson: values plausible (post-treatment column); year/DOI/source blank.
+  - McCrae: correctly excluded (within-subject means with SE).
+  Old vs new (20260901_164801_without override vs 20261110_120707): old model got
+  Ang N 15/13, Jensen 49.0(19.0) vs 59.0(26.0) N 25/18, Lami 7.35(2.08) vs
+  7.4(1.29) right (Lami old flag single_run, N blank); qwen3-vl-plus got all wrong.
+  Old model not recorded (likely qwen-vl-max via launcher); it now returns 404 on
+  our key (Session 35), so no rollback. Cause = model regression; pipeline gaps
+  pre-existed and were masked.
+  New run: every wrong pooled value carried a mandatory flag (Jensen: no_majority
+  x4 + table_shift; Lami: no_majority on both means); unflagged Ang/Karlsson means
+  were right. Stage 4 only LOGS [MANDATORY] (_log_stage4_summary); the pooling
+  decision is the try block in the effect-size loop (sr/main.py ~634-726), which
+  never reads nondet_flag.
+  Findings (no code yet):
+  F1 source-quote warning does not stop pooling (Jensen).
+  F2 quote check tests numbers against the model's own quote, never the PDF (Lami).
+  F3 N can come from another row/timepoint than the means, unflagged (Ang).
+  F4 mandatory nondet flag (no_majority/table_shift) still pools (Lami, Jensen).
+     Fix: raise "needs review: runs disagree (<flag>)" in the try block after the
+     outcome_match check; existing [SKIP] other-studies block reports it. Open:
+     rows with verified study_overrides values must pass (override not applied in
+     sr/main.py - locate first).
+  F5 metadata fields blank (Karlsson).
+  F6 each extracted number must appear in the PDF text; catches unflagged wrong N
+     (Ang) and single_run rows. Needs the OCR reader (item 5): [?] -> "unverifiable".
+  F7 regression fixture from hand-checked values (Lami, Jensen, Ang N).
+  Order after PR #5: F4 gate (test-first), then F7, then F6, then local-first SR.

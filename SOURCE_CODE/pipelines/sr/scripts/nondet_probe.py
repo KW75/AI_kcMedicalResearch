@@ -142,7 +142,9 @@ def main():
     ap.add_argument("pdfs", nargs="+", help="PDF paths")
     ap.add_argument("--runs", type=int, default=3)
     ap.add_argument("--provider", default="qwen")
-    ap.add_argument("--model", default="qwen-vl-plus")
+    ap.add_argument("--model", default=None,
+                    help="default: providers.sr_default_model(provider), "
+                         "i.e. QWEN_VISION_MODEL for qwen")
     ap.add_argument("--pico", default=None,
                     help="prisma_criteria.yaml (or any yaml with a pico block)")
     ap.add_argument("--env", default=".env", help=".env to load (default ./.env)")

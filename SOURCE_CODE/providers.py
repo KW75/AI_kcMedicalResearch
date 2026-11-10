@@ -642,6 +642,26 @@ def get_default_model(provider: str) -> str:
     return defaults.get(provider, "")
 
 
+def sr_default_model(provider: str) -> str:
+    """Default model for the SR pipeline when --model is not given.
+
+    SR sends page images, so Qwen gets the vision model (QWEN_VISION_MODEL),
+    not the chat model (QWEN_MODEL). Ollama follows the Session 33 rule
+    (OLLAMA_MODEL, else gemma4:e4b). Unknown providers fall back to the Qwen
+    vision model, as main._sr_default_model always did; this picks a model
+    name only, never where data is sent.
+    """
+    table = {
+        "qwen":      QWEN_VISION_MODEL,
+        "deepseek":  DEEPSEEK_MODEL,
+        "openai":    OPENAI_MODEL,
+        "anthropic": ANTHROPIC_MODEL,
+        "groq":      GROQ_MODEL,
+        "ollama":    _resolve_ollama_model(),
+    }
+    return table.get((provider or "").lower(), QWEN_VISION_MODEL)
+
+
 def list_available_providers() -> list[dict]:
     """Return a list of all providers with their configuration status."""
     results = []
