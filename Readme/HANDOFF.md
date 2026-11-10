@@ -48,8 +48,8 @@ so those catches happen at session open, not mid-work.
 
 | Component      | Status |
 |----------------|--------|
-| Tests          | 1039 passed, 10 deselected on v2.7-sr-fixes (Session 37); main 1027 (v2.6.0) (`python -m pytest -m "not live" --tb=short -q`) |
-| Branch         | main = 82eba10 (docs-only commits after the bcd42d9 merge); work continues on v2.7-sr-fixes. (PR #4 merged 2026-11-09 as a merge commit; v2.6.0, OCR mode). It brought in Sessions 33-36: Setup menu, Streamlit/Render removal, Ollama model rule, httpx pin, moved-folder launcher check, SR Anthropic warning, test-local-pins CI job, OCR mode. v2.6-ocr-editor = 106c9ef, fully merged; branch deleted 2026-11-09 (local and GitHub), together with the older merged v2.5-major-updates (1de797a) |
+| Tests          | 1055 passed, 10 deselected on v2.8-sr-review-gate (Session 37); main 1039 (788c89f) (`python -m pytest -m "not live" --tb=short -q`) |
+| Branch         | main = 788c89f (PR #5 merged 2026-11-10: one SR model rule, qwen3-vl-plus, Session 37 docs and SR baseline findings); work continues on v2.8-sr-review-gate (F4 gate checkpoint 892b820 pushed, sensitivity comparison uncommitted). v2.7-sr-fixes deleted 2026-11-10 (local and GitHub). Earlier: PR #4 merged 2026-11-09 as bcd42d9 (v2.6.0, OCR mode; brought in Sessions 33-36: Setup menu, Streamlit/Render removal, Ollama model rule, httpx pin, moved-folder launcher check, SR Anthropic warning, test-local-pins CI job, OCR mode); v2.6-ocr-editor (106c9ef) and v2.5-major-updates (1de797a) deleted 2026-11-09 |
 | CI             | green on main at bcd42d9 (2026-11-09), both jobs: test (requirements-ci.txt, 1027 passed, 44 warnings) and test-local-pins (requirements-local.txt like the launchers, 1027 passed, 57 warnings). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
 | Deploy         | None: CLI only, local first. Render service deleted 2026-10-27; Streamlit UI and Render files removed in Session 33. UptimeRobot monitor for the old Render URL: not yet confirmed paused/deleted (user, outside the repo) |
 | Writing mode   | one-pass (write + edit + review in one call); tracks Topic 800 / Article 3,500 / Report 500 / Synopsis 1,500; on main since fa4edb9; tested on gemma4:e4b; terminal menus only |
@@ -1918,12 +1918,37 @@ Expected: a clean tree in sync with origin, the top commit is this handoff, and 
   F2 quote check tests numbers against the model's own quote, never the PDF (Lami).
   F3 N can come from another row/timepoint than the means, unflagged (Ang).
   F4 mandatory nondet flag (no_majority/table_shift) still pools (Lami, Jensen).
-     Fix: raise "needs review: runs disagree (<flag>)" in the try block after the
-     outcome_match check; existing [SKIP] other-studies block reports it. Open:
-     rows with verified study_overrides values must pass (override not applied in
-     sr/main.py - locate first).
+     DONE on v2.8-sr-review-gate (decided Session 37: BOTH estimates).
+     audit_logger.review_skip_reason(cell, override_fields): None = pool;
+     str = "needs review: runs disagree (<flags>)". Passes only if every flagged
+     field was overridden in study_overrides.yaml (apply() records
+     override_fields; table_shift needs all four means/SDs). sr/main.py: gate
+     before try; gated studies still get an effect size (included_in_meta False,
+     skip_reason set) and go to review_rows; _log_review_sensitivity pools
+     rows + review_rows as [SENSITIVITY] "for comparison only", right after
+     _log_stage4_summary (before the < 2 studies abort). Primary estimate
+     excludes them. Gated + missing N is reported as needs review, not missing N.
+     Tests: tests/test_sr_review_gate.py (16). Not yet: sensitivity estimate in
+     the Word/HTML report and forest plot; group-label no_majority cannot be
+     cleared by an override (not overridable) - stays gated.
   F5 metadata fields blank (Karlsson).
   F6 each extracted number must appear in the PDF text; catches unflagged wrong N
      (Ang) and single_run rows. Needs the OCR reader (item 5): [?] -> "unverifiable".
   F7 regression fixture from hand-checked values (Lami, Jensen, Ang N).
-  Order after PR #5: F4 gate (test-first), then F7, then F6, then local-first SR.
+  Order after PR #5: F4 gate DONE (v2.8-sr-review-gate, both estimates); next F7
+     (regression fixture), then F6, then [SENSITIVITY] in the report, then local-first SR.
+- F4 gate real run 20261110_174457 (qwen3-vl-plus, override ON): Lami runs
+  disagreed (no_majority x2 + table_shift) but all six fields overridden ->
+  pooled with reviewer values, g -0.03 (gate override path confirmed). Jensen:
+  all 3 runs empty -> skipped "insufficient mean/SD/N"; flag reads "unanimous"
+  (agreement on nothing - misleading); quotes are Table 1 baseline. Ang N 17/15
+  again, own quote says 15/13 (F3). McCrae now INCLUDED g +0.01 but control quote
+  is the CBT-P row while control_group = WLC: CBT-I vs CBT-P, wrong comparison;
+  only majority flags, gate does not apply. [SENSITIVITY]: nothing to compare.
+  F8 (new): quote-vs-field checks, no PDF needed - control/intervention quote arm
+  label must match the group label; Ns in the quote must match extracted N.
+  Question for user: waiting-list comparator (Jensen, Karlsson, McCrae) vs PICO
+  "placebo or active".
+
+     
+
