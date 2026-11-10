@@ -1949,6 +1949,19 @@ Expected: a clean tree in sync with origin, the top commit is this handoff, and 
   label must match the group label; Ns in the quote must match extracted N.
   Question for user: waiting-list comparator (Jensen, Karlsson, McCrae) vs PICO
   "placebo or active".
+- Decided Session 37 (user): waiting-list comparator INCLUDED, reported as a
+  subgroup: waiting list (Jensen, Karlsson, McCrae) vs active/placebo (Ang, Lami).
+  Needs: PICO comparator wording in prisma_criteria.yaml, comparator type per
+  study (screener rationale or study_overrides field), subgroup estimate in
+  Stage 4 and the report; warn when a subgroup has < 3 studies.
+- OCR tools vs SR accuracy (Session 37 analysis): OCR reader fixes screening/RoB2
+  on broken-font papers (Karlsson, McCrae - currently UNVERIFIED) and gives F6 a
+  trustworthy text layer ([?] -> "unverifiable"). It does NOT fix the baseline
+  extraction errors (Jensen wrong table, Lami invented, Ang N wrong row, McCrae
+  wrong arm): those text layers held the right numbers; the model chose wrongly.
+  Order: F7 fixture -> OCR reader in SR (item 5, with manual [?] rerun) -> F6 + F8
+  -> waiting-list subgroup -> local-first SR.
+
 
      
 
