@@ -48,8 +48,8 @@ so those catches happen at session open, not mid-work.
 
 | Component      | Status |
 |----------------|--------|
-| Tests          | 1055 passed, 10 deselected on v2.8-sr-review-gate (Session 37); main 1039 (788c89f) (`python -m pytest -m "not live" --tb=short -q`) |
-| Branch         | main = 788c89f (PR #5 merged 2026-11-10: one SR model rule, qwen3-vl-plus, Session 37 docs and SR baseline findings); work continues on v2.8-sr-review-gate (F4 gate checkpoint 892b820 pushed, sensitivity comparison uncommitted). v2.7-sr-fixes deleted 2026-11-10 (local and GitHub). Earlier: PR #4 merged 2026-11-09 as bcd42d9 (v2.6.0, OCR mode; brought in Sessions 33-36: Setup menu, Streamlit/Render removal, Ollama model rule, httpx pin, moved-folder launcher check, SR Anthropic warning, test-local-pins CI job, OCR mode); v2.6-ocr-editor (106c9ef) and v2.5-major-updates (1de797a) deleted 2026-11-09 |
+| Tests          | 1067 passed, 10 deselected on v2.10-sr-screening (Session 37); main 1064 (ef66b9f) (`python -m pytest -m "not live" --tb=short -q`) |
+| Branch         | main = ef66b9f (PR #7 merged 2026-11-10: F7 truth fixture sr_truth.yaml + scripts/sr_score_run.py); work continues on v2.10-sr-screening (comparator wording, then screening plan). Earlier on 2026-11-10: PR #6 = 0dcd01f (F4 gate + [SENSITIVITY]), PR #5 = 788c89f (one SR model rule, qwen3-vl-plus); branches v2.7-sr-fixes, v2.8-sr-review-gate, v2.9-sr-fixture deleted. PR #4 merged 2026-11-09 as bcd42d9 (v2.6.0, OCR mode; Sessions 33-36); v2.6-ocr-editor (106c9ef) and v2.5-major-updates (1de797a) deleted 2026-11-09 |
 | CI             | green on main at bcd42d9 (2026-11-09), both jobs: test (requirements-ci.txt, 1027 passed, 44 warnings) and test-local-pins (requirements-local.txt like the launchers, 1027 passed, 57 warnings). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
 | Deploy         | None: CLI only, local first. Render service deleted 2026-10-27; Streamlit UI and Render files removed in Session 33. UptimeRobot monitor for the old Render URL: not yet confirmed paused/deleted (user, outside the repo) |
 | Writing mode   | one-pass (write + edit + review in one call); tracks Topic 800 / Article 3,500 / Report 500 / Synopsis 1,500; on main since fa4edb9; tested on gemma4:e4b; terminal menus only |
@@ -1971,6 +1971,25 @@ Expected: a clean tree in sync with origin, the top commit is this handoff, and 
   20261110_174457 1/3 (Lami via override), Ang N 17/15 pooled wrong (exit 1).
   Old model's Jensen N 25/18 supports the truth N. 1 Sep run POOLED McCrae with
   SDs 2.36/2.27 on a 0-100 scale (likely SE) - unscored; hand-check McCrae next.
+- Comparator wording (decided Session 37, user): placebo, active comparator, or
+  waiting list; waiting-list trials INCLUDED and reported as a subgroup.
+  Updated on v2.10-sr-screening: SOURCE_CODE/pipelines/sr/config/prisma_criteria.yaml
+  (comparator, nested under a section) and input/sr/pico_sample.json (comparator +
+  formulator_output, 3 places). The old "Placebo or active comparator" could make
+  the screener exclude Jensen, Karlsson, McCrae. Guarded by
+  tests/test_sr_comparator_criteria.py (3 tests). New reviews: comparator is what
+  the doctor types (main.py ~line 1600); a waiting-list hint there is still TODO.
+- Screening/RoB2 plan (Session 37, agreed): screening reads OCR text with [?]
+  filled -> rule checks first (RCT, comparator type: placebo/active/waiting list)
+  -> 3-run AI vote, Ollama first, cloud only behind the warning gate -> split vote
+  or low confidence = NEEDS REVIEW, never exclude -> exclusion reason quote checked
+  against the OCR text -> reviewer-confirmed decisions saved in
+  input/sr/screening_decisions.yaml; reruns reuse them and show what changed.
+  RoB2: same pattern per domain (signalling answers with quotes, 3-run vote,
+  rob2_decisions.yaml; tool proposes, doctor confirms). Then extraction on OCR
+  text with number-in-text and arm-label checks (F6 + F8). NOTE: .gitignore
+  ignores input/sr/* - decision files need a !-exception if they are to be tracked.
+
 
 
 
