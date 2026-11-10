@@ -48,9 +48,9 @@ so those catches happen at session open, not mid-work.
 
 | Component      | Status |
 |----------------|--------|
-| Tests          | 1106 passed, 10 deselected on v2.10-sr-screening (Session 37); main 1064 (ef66b9f) (`python -m pytest -m "not live" --tb=short -q`) |
-| Branch         | main = ef66b9f (PR #7 merged 2026-11-10: F7 truth fixture sr_truth.yaml + scripts/sr_score_run.py); work continues on v2.10-sr-screening (comparator wording, then screening plan). Earlier on 2026-11-10: PR #6 = 0dcd01f (F4 gate + [SENSITIVITY]), PR #5 = 788c89f (one SR model rule, qwen3-vl-plus); branches v2.7-sr-fixes, v2.8-sr-review-gate, v2.9-sr-fixture deleted. PR #4 merged 2026-11-09 as bcd42d9 (v2.6.0, OCR mode; Sessions 33-36); v2.6-ocr-editor (106c9ef) and v2.5-major-updates (1de797a) deleted 2026-11-09 |
-| CI             | green on main at bcd42d9 (2026-11-09), both jobs: test (requirements-ci.txt, 1027 passed, 44 warnings) and test-local-pins (requirements-local.txt like the launchers, 1027 passed, 57 warnings). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
+| Tests          | 1129 passed, 10 deselected on v2.10-sr-screening (Session 38); main 1064 (ef66b9f) (`python -m pytest -m "not live" --tb=short -q`) |
+| Branch         | main = ef66b9f (PR #7 merged 2026-11-10: F7 truth fixture sr_truth.yaml + scripts/sr_score_run.py). Work on v2.10-sr-screening, PR #8 open: shared paper text (b3d804c), prisma_criteria write-if-changed (afd90a3), RoB2 overall rule (3e3785e), RoB2 Methods/Results text (Session 38). Branches v2.6-ocr-editor, v2.5-major-updates, v2.7-sr-fixes, v2.8-sr-review-gate, v2.9-sr-fixture deleted |
+| CI             | green on PR #8 at 3e3785e (1106 passed). Last confirmed on main: bcd42d9 (2026-11-09, 1027, both jobs). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
 | Deploy         | None: CLI only, local first. Render service deleted 2026-10-27; Streamlit UI and Render files removed in Session 33. UptimeRobot monitor for the old Render URL: not yet confirmed paused/deleted (user, outside the repo) |
 | Writing mode   | one-pass (write + edit + review in one call); tracks Topic 800 / Article 3,500 / Report 500 / Synopsis 1,500; on main since fa4edb9; tested on gemma4:e4b; terminal menus only |
 | OCR mode       | `--mode ocr`, launcher menu 8. Reads PDF / image / .txt / .docx; .doc refused with a message. Records in `reports/ocr/<header>/`, SUMMARY / SYNOPSIS in `output/ocr/`. Ollama by default; Qwen / OpenAI only behind the cloud gate; groq / deepseek / anthropic refused. Broken-font PDFs: text layer with [?], AI fills symbols only, document-wide vote per font code. [?] left varies run to run (Ang 2010, gemma4:e4b: 19 in s36_check, 7 in s36_vote; vote fills checked against Table 2) |
@@ -125,6 +125,13 @@ SR (do 4 before 5 and 6)
 7. Session 28 priorities: vote `outcome_selected` / `timepoint_selected`;
    Ang outcome change S26 -> S27 (`Readme/evidence/s26_issue11/`);
    decoder `!`-for-space gap (low).
+7a. RoB2 section picker (Session 38): check it on the real saved texts in
+    input/sr/paper_text/ (does every paper find Methods and Results? Karlsson
+    and McCrae are Tesseract text), then rerun RoB2 and compare with Session 37
+    runs (McCrae missing data should now see 27/30/28). Old route log line
+    in rob2_tool.py ("prompt uses first 6000") is stale; fix when touched.
+7b. scripts/sr_score_run.py: also save the score to reports/sr/<run_id>/score.txt
+    (UTF-8, no BOM; written by the script, not by PowerShell redirection).
 
 Writing
 8. Read input through the OCR reader so .docx tables reach the AI; a read
@@ -2070,10 +2077,25 @@ Expected: a clean tree in sync with origin, the top commit is this handoff, and 
   checks (arm label vs group label, Ns in quote vs extracted N); (3) F6;
   (4) [SENSITIVITY] and waiting-list subgroup in the report; (5) local-first
   SR.
+  
+## Session 38 - 2026-11-11 - branch v2.10-sr-screening (PR #8)
 
-
-
-
-
-     
-
+- RoB2 reads Methods + Results of the shared paper text instead of the first
+  6000 chars (Session 37 NEXT item 1). New stdlib-only
+  pipelines/sr/src/utils/paper_sections.py: rob2_text(text, limit,
+  fallback_chars) -> (text, note). Sends the start of the paper (title +
+  abstract, up to 1500 chars) + Methods + Results, within
+  MAX_ROB2_SECTION_CHARS = 20000. Each section gets half; space one section
+  does not need goes to the other. A heading is a line on its own (METHODS,
+  2. Methods, Methods., Materials/Patients and methods); a structured-abstract
+  label "Methods: ..." is not. Methods found more than once -> longest span
+  wins. No Methods heading -> first MAX_ROB2_CHARS (6000) as before, never a
+  failure. rob2_tool.py logs "[ROB2 TEXT] <file>: <note>" per paper.
+- MAX_ROB2_CHARS = 6000 kept as the page-reading budget (lines 192/251,
+  test_rob2_ocr_stops_when_budget_met). Prompt unchanged: it never said
+  "excerpt" or "abstract"; those words in Session 37 justifications came from
+  the cut text. Screener cut (relevance_screener.py, MAX_SCREEN_CHARS) unchanged.
+- Tests: tests/test_sr_paper_sections.py (23; 21 errored on the missing module
+  and 2 failed on the 6000 cut before the code). Suite: 1106 -> 1129 passed.
+- Not yet verified: built-in test papers only. Real saved texts and a RoB2
+  rerun are Next work 7a.

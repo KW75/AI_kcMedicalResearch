@@ -12,6 +12,7 @@ BETA_HEADER = "files-api-2025-04-14"
 # 6000-char first rung) anyway.
 MAX_ROB2_PAGES = 12    # pages considered, both extraction paths
 MAX_ROB2_CHARS = 6000  # total chars passed to the RoB2 prompt
+MAX_ROB2_SECTION_CHARS = 20000  # Methods + Results sent to the RoB2 prompt (Session 38); MAX_ROB2_CHARS stays the page-reading budget
 
 ROB2_PROMPT = """You are a Cochrane methodologist applying RoB 2.0.
 Assess the attached RCT across five domains. Return ONLY valid JSON:
@@ -264,8 +265,13 @@ class RoB2Assessor:
 
             if not pdf_text:
                 pdf_text = f"[Could not extract text from {filename}]"
-            if len(pdf_text) > MAX_ROB2_CHARS:
-                pdf_text = pdf_text[:MAX_ROB2_CHARS] + "\n...[truncated]"
+            # Session 38: Methods + Results instead of the first 6000 chars;
+            # no Methods heading -> first MAX_ROB2_CHARS as before.
+            from ..utils.paper_sections import rob2_text
+            pdf_text, _sec_note = rob2_text(
+                pdf_text, limit=MAX_ROB2_SECTION_CHARS,
+                fallback_chars=MAX_ROB2_CHARS)
+            logger.info(f"[ROB2 TEXT] {filename}: {_sec_note}")
 
             raw = self._call_with_text(pdf_text, ROB2_PROMPT)
             from ..utils.json_utils import extract_json
