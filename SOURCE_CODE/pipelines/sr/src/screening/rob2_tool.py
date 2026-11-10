@@ -127,94 +127,95 @@ class RoB2Assessor:
                 time.sleep(2)
         raise ValueError("Empty response from model after retry")
 
-    def assess_by_pdf_path(self, pdf_path: str, filename="") -> dict:
+    def assess_by_pdf_path(self, pdf_path: str, filename="", paper_text=None) -> dict:
         """Text-based RoB 2.0 assessment using pdfplumber with OCR fallback."""
         try:
-            pdf_text = ""
+            pdf_text = paper_text or ""
+            if not paper_text:   # Session 37: shared text given -> do not reopen the PDF
 
-            # --- Attempt 1: pdfplumber ---
-            try:
-                import pdfplumber
-                with pdfplumber.open(pdf_path) as pdf:
-                    chunks = []
-                    _total = 0
-                    for p in pdf.pages[:MAX_ROB2_PAGES]:
-                        t = (p.extract_text() or "").strip()
-                        if t:
-                            chunks.append(t)
-                            _total += len(t)
-                        if _total >= MAX_ROB2_CHARS:
-                            break
-                    pdf_text = "\n\n".join(chunks).strip()
-            except Exception as txt_err:
-                logger.warning(f"pdfplumber failed for {filename}: {txt_err}")
-
-            # --- Detect an unusable text layer and fall back to OCR ---
-            _fallback_reason = None
-            if not pdf_text:
-                _fallback_reason = "no extractable text layer"
-            elif "(cid:" in pdf_text:
-                _fallback_reason = "CID markers in text layer"
-            elif pdf_text.count(" ") < 20:
-                _fallback_reason = "text layer nearly space-free (possible broken CMap, see #18)"
-            if _fallback_reason:
-                logger.info(
-                    f"Unusable text layer for {filename} "
-                    f"({_fallback_reason}) - switching to OCR"
-                )
+                # --- Attempt 1: pdfplumber ---
                 try:
-                    import fitz
-                    import pytesseract
-                    import io
-                    from PIL import Image
-                    import sys
-                    if sys.platform == "win32":
-                        # Common default install location on Windows. Only
-                        # override if it's actually there - if the user
-                        # installed elsewhere or added tesseract to PATH,
-                        # leave pytesseract's own discovery alone.
-                        _default_win_path = (
-                            r"C:\Program Files\Tesseract-OCR\tesseract.exe"
-                        )
-                        if os.path.exists(_default_win_path):
-                            pytesseract.pytesseract.tesseract_cmd = _default_win_path
-                    # On macOS/Linux/Docker, tesseract is expected on PATH
-                    # (e.g. via apt-get/brew install tesseract-ocr) - setting
-                    # a Windows-only absolute path here would silently break
-                    # OCR everywhere else.
-                    # One shared budget, filled front-to-back, with early
-                    # stop once met. The old per-page t[:1500] cap over up
-                    # to 12 pages saturated at 12*1500 + 11*2 = 18022
-                    # chars (the exact counts seen in real runs), of which
-                    # the prompt truncation then kept only the first 6000
-                    # - most of the OCR time bought nothing. (The old page
-                    # selection list(range(3)) + list(range(3, n))[:9] was
-                    # also just the first 12 pages, written confusingly.)
-                    ocr_chunks = []
-                    _total = 0
-                    _pages_ocred = 0
-                    with fitz.open(pdf_path) as doc:
-                        for i in range(min(MAX_ROB2_PAGES, len(doc))):
-                            pix = doc[i].get_pixmap(matrix=fitz.Matrix(2, 2))
-                            img = Image.open(io.BytesIO(pix.tobytes("png")))
-                            t = pytesseract.image_to_string(img).strip()
-                            _pages_ocred += 1
+                    import pdfplumber
+                    with pdfplumber.open(pdf_path) as pdf:
+                        chunks = []
+                        _total = 0
+                        for p in pdf.pages[:MAX_ROB2_PAGES]:
+                            t = (p.extract_text() or "").strip()
                             if t:
-                                ocr_chunks.append(t)
+                                chunks.append(t)
                                 _total += len(t)
                             if _total >= MAX_ROB2_CHARS:
                                 break
-                    pdf_text = "\n\n".join(ocr_chunks).strip()
-                    _note = (
-                        f" (prompt uses first {MAX_ROB2_CHARS})"
-                        if len(pdf_text) > MAX_ROB2_CHARS else ""
-                    )
+                        pdf_text = "\n\n".join(chunks).strip()
+                except Exception as txt_err:
+                    logger.warning(f"pdfplumber failed for {filename}: {txt_err}")
+
+                # --- Detect an unusable text layer and fall back to OCR ---
+                _fallback_reason = None
+                if not pdf_text:
+                    _fallback_reason = "no extractable text layer"
+                elif "(cid:" in pdf_text:
+                    _fallback_reason = "CID markers in text layer"
+                elif pdf_text.count(" ") < 20:
+                    _fallback_reason = "text layer nearly space-free (possible broken CMap, see #18)"
+                if _fallback_reason:
                     logger.info(
-                        f"OCR extracted {len(pdf_text)} chars from "
-                        f"{_pages_ocred} page(s) of {filename}{_note}"
+                        f"Unusable text layer for {filename} "
+                        f"({_fallback_reason}) - switching to OCR"
                     )
-                except Exception as ocr_err:
-                    logger.warning(f"OCR failed for {filename}: {ocr_err}")
+                    try:
+                        import fitz
+                        import pytesseract
+                        import io
+                        from PIL import Image
+                        import sys
+                        if sys.platform == "win32":
+                            # Common default install location on Windows. Only
+                            # override if it's actually there - if the user
+                            # installed elsewhere or added tesseract to PATH,
+                            # leave pytesseract's own discovery alone.
+                            _default_win_path = (
+                                r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+                            )
+                            if os.path.exists(_default_win_path):
+                                pytesseract.pytesseract.tesseract_cmd = _default_win_path
+                        # On macOS/Linux/Docker, tesseract is expected on PATH
+                        # (e.g. via apt-get/brew install tesseract-ocr) - setting
+                        # a Windows-only absolute path here would silently break
+                        # OCR everywhere else.
+                        # One shared budget, filled front-to-back, with early
+                        # stop once met. The old per-page t[:1500] cap over up
+                        # to 12 pages saturated at 12*1500 + 11*2 = 18022
+                        # chars (the exact counts seen in real runs), of which
+                        # the prompt truncation then kept only the first 6000
+                        # - most of the OCR time bought nothing. (The old page
+                        # selection list(range(3)) + list(range(3, n))[:9] was
+                        # also just the first 12 pages, written confusingly.)
+                        ocr_chunks = []
+                        _total = 0
+                        _pages_ocred = 0
+                        with fitz.open(pdf_path) as doc:
+                            for i in range(min(MAX_ROB2_PAGES, len(doc))):
+                                pix = doc[i].get_pixmap(matrix=fitz.Matrix(2, 2))
+                                img = Image.open(io.BytesIO(pix.tobytes("png")))
+                                t = pytesseract.image_to_string(img).strip()
+                                _pages_ocred += 1
+                                if t:
+                                    ocr_chunks.append(t)
+                                    _total += len(t)
+                                if _total >= MAX_ROB2_CHARS:
+                                    break
+                        pdf_text = "\n\n".join(ocr_chunks).strip()
+                        _note = (
+                            f" (prompt uses first {MAX_ROB2_CHARS})"
+                            if len(pdf_text) > MAX_ROB2_CHARS else ""
+                        )
+                        logger.info(
+                            f"OCR extracted {len(pdf_text)} chars from "
+                            f"{_pages_ocred} page(s) of {filename}{_note}"
+                        )
+                    except Exception as ocr_err:
+                        logger.warning(f"OCR failed for {filename}: {ocr_err}")
 
             if not pdf_text:
                 pdf_text = f"[Could not extract text from {filename}]"
@@ -239,7 +240,8 @@ class RoB2Assessor:
                 results.append(self.assess_by_file_id(r["file_id"], r["filename"]))
             else:
                 results.append(self.assess_by_pdf_path(
-                    r.get("pdf_path", ""), r["filename"]))
+                    r.get("pdf_path", ""), r["filename"],
+                    paper_text=r.get("paper_text")))
             if i < len(included_records):
                 time.sleep(delay_seconds)
         return results

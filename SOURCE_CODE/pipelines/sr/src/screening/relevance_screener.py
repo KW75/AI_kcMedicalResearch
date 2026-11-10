@@ -117,103 +117,104 @@ class RelevanceScreener:
                     "confidence": 0.0, "pico_match": {}, "exclusion_reasons": [],
                     "rationale": f"Error: {e}", "is_rct": None, "error": str(e)}
 
-    def screen_by_pdf_path(self, pdf_path, filename="") -> dict:
+    def screen_by_pdf_path(self, pdf_path, filename="", paper_text=None) -> dict:
         try:
-            pdf_text = ""
-            try:
-                import pdfplumber
-                with pdfplumber.open(pdf_path) as pdf:
-                    pages    = pdf.pages[:MAX_SCREEN_PAGES]
-                    pdf_text = "\n\n".join(p.extract_text() or "" for p in pages).strip()
-            except Exception as txt_err:
-                logger.warning(f"pdfplumber failed for {filename}: {txt_err}")
-
-            # --- Detect an unusable text layer and fall back to OCR ---
-            # Three distinct conditions were previously logged under one
-            # blanket "Garbled text detected" message; name the reason so
-            # the log distinguishes a scan from a broken-CMap layer (#18).
-            _fallback_reason = None
-            if not pdf_text:
-                _fallback_reason = "no extractable text layer"
-            elif "(cid:" in pdf_text:
-                _fallback_reason = "CID markers in text layer"
-            elif pdf_text.count(" ") < 20:
-                _fallback_reason = "text layer nearly space-free (possible broken CMap, see #18)"
-
-            # #18: before falling back to OCR, try a CMap offset decode.
-            # Only helps the "shifted-by-N" failure mode, not (cid:XX)
-            # markers (missing ToUnicode entries can't be recovered by
-            # shifting). Skip when there is no text at all.
-            if _fallback_reason and _fallback_reason != "no extractable text layer" \
-                    and "(cid:" not in pdf_text:
-                decoded, offset = _try_cmap_offset_decode(pdf_text)
-                if decoded:
-                    logger.info(
-                        f"CMap offset decode succeeded for {filename} "
-                        f"(offset={offset:+d}) - skipping OCR fallback (#18)"
-                    )
-                    pdf_text = decoded
-                    _fallback_reason = None
-
-            if _fallback_reason:
-                logger.info(
-                    f"Unusable text layer for {filename} "
-                    f"({_fallback_reason}) - switching to OCR"
-                )
+            pdf_text = paper_text or ""
+            if not paper_text:   # Session 37: shared text given -> do not reopen the PDF
                 try:
-                    import fitz
-                    import pytesseract
-                    import io
-                    from PIL import Image
-                    import sys
-                    if sys.platform == "win32":
-                        # Common default install location on Windows. Only
-                        # override if it's actually there - if the user
-                        # installed elsewhere or added tesseract to PATH,
-                        # leave pytesseract's own discovery alone.
-                        _default_win_path = (
-                            r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+                    import pdfplumber
+                    with pdfplumber.open(pdf_path) as pdf:
+                        pages    = pdf.pages[:MAX_SCREEN_PAGES]
+                        pdf_text = "\n\n".join(p.extract_text() or "" for p in pages).strip()
+                except Exception as txt_err:
+                    logger.warning(f"pdfplumber failed for {filename}: {txt_err}")
+
+                # --- Detect an unusable text layer and fall back to OCR ---
+                # Three distinct conditions were previously logged under one
+                # blanket "Garbled text detected" message; name the reason so
+                # the log distinguishes a scan from a broken-CMap layer (#18).
+                _fallback_reason = None
+                if not pdf_text:
+                    _fallback_reason = "no extractable text layer"
+                elif "(cid:" in pdf_text:
+                    _fallback_reason = "CID markers in text layer"
+                elif pdf_text.count(" ") < 20:
+                    _fallback_reason = "text layer nearly space-free (possible broken CMap, see #18)"
+
+                # #18: before falling back to OCR, try a CMap offset decode.
+                # Only helps the "shifted-by-N" failure mode, not (cid:XX)
+                # markers (missing ToUnicode entries can't be recovered by
+                # shifting). Skip when there is no text at all.
+                if _fallback_reason and _fallback_reason != "no extractable text layer" \
+                        and "(cid:" not in pdf_text:
+                    decoded, offset = _try_cmap_offset_decode(pdf_text)
+                    if decoded:
+                        logger.info(
+                            f"CMap offset decode succeeded for {filename} "
+                            f"(offset={offset:+d}) - skipping OCR fallback (#18)"
                         )
-                        if os.path.exists(_default_win_path):
-                            pytesseract.pytesseract.tesseract_cmd = _default_win_path
-                    # On macOS/Linux/Docker, tesseract is expected on PATH
-                    # (e.g. via apt-get/brew install tesseract-ocr) - setting
-                    # a Windows-only absolute path here would silently break
-                    # OCR everywhere else.
-                    # One shared budget, filled front-to-back, matching the
-                    # pdfplumber path. The old per-page t[:800] cap starved
-                    # screening of the abstract and saturated at exactly
-                    # 8*800 + 7*2 = 6414 chars on every >=8-page paper -
-                    # the identical "OCR extracted 6414 chars" lines seen
-                    # across four different PDFs in real runs.
-                    ocr_chunks = []
-                    _total = 0
-                    _pages_ocred = 0
-                    with fitz.open(pdf_path) as doc:
-                        for i in range(min(MAX_SCREEN_PAGES, len(doc))):
-                            pix = doc[i].get_pixmap(matrix=fitz.Matrix(2, 2))
-                            img = Image.open(io.BytesIO(pix.tobytes("png")))
-                            t = pytesseract.image_to_string(img).strip()
-                            _pages_ocred += 1
-                            if t:
-                                ocr_chunks.append(t)
-                                _total += len(t)
-                            if _total >= MAX_SCREEN_CHARS:
-                                # Budget met - anything OCR'd beyond this
-                                # would be cut by the prompt truncation
-                                # below, so stop paying OCR time for it.
-                                break
-                    pdf_text = "\n\n".join(ocr_chunks).strip()
-                    _note = (
-                        f" (prompt uses first {MAX_SCREEN_CHARS})"
-                        if len(pdf_text) > MAX_SCREEN_CHARS else ""
-                    )
+                        pdf_text = decoded
+                        _fallback_reason = None
+
+                if _fallback_reason:
                     logger.info(
-                        f"OCR extracted {len(pdf_text)} chars from "
-                        f"{_pages_ocred} page(s) of {filename}{_note}"
+                        f"Unusable text layer for {filename} "
+                        f"({_fallback_reason}) - switching to OCR"
                     )
-                except Exception as ocr_err:
-                    logger.warning(f"OCR failed for {filename}: {ocr_err}")
+                    try:
+                        import fitz
+                        import pytesseract
+                        import io
+                        from PIL import Image
+                        import sys
+                        if sys.platform == "win32":
+                            # Common default install location on Windows. Only
+                            # override if it's actually there - if the user
+                            # installed elsewhere or added tesseract to PATH,
+                            # leave pytesseract's own discovery alone.
+                            _default_win_path = (
+                                r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+                            )
+                            if os.path.exists(_default_win_path):
+                                pytesseract.pytesseract.tesseract_cmd = _default_win_path
+                        # On macOS/Linux/Docker, tesseract is expected on PATH
+                        # (e.g. via apt-get/brew install tesseract-ocr) - setting
+                        # a Windows-only absolute path here would silently break
+                        # OCR everywhere else.
+                        # One shared budget, filled front-to-back, matching the
+                        # pdfplumber path. The old per-page t[:800] cap starved
+                        # screening of the abstract and saturated at exactly
+                        # 8*800 + 7*2 = 6414 chars on every >=8-page paper -
+                        # the identical "OCR extracted 6414 chars" lines seen
+                        # across four different PDFs in real runs.
+                        ocr_chunks = []
+                        _total = 0
+                        _pages_ocred = 0
+                        with fitz.open(pdf_path) as doc:
+                            for i in range(min(MAX_SCREEN_PAGES, len(doc))):
+                                pix = doc[i].get_pixmap(matrix=fitz.Matrix(2, 2))
+                                img = Image.open(io.BytesIO(pix.tobytes("png")))
+                                t = pytesseract.image_to_string(img).strip()
+                                _pages_ocred += 1
+                                if t:
+                                    ocr_chunks.append(t)
+                                    _total += len(t)
+                                if _total >= MAX_SCREEN_CHARS:
+                                    # Budget met - anything OCR'd beyond this
+                                    # would be cut by the prompt truncation
+                                    # below, so stop paying OCR time for it.
+                                    break
+                        pdf_text = "\n\n".join(ocr_chunks).strip()
+                        _note = (
+                            f" (prompt uses first {MAX_SCREEN_CHARS})"
+                            if len(pdf_text) > MAX_SCREEN_CHARS else ""
+                        )
+                        logger.info(
+                            f"OCR extracted {len(pdf_text)} chars from "
+                            f"{_pages_ocred} page(s) of {filename}{_note}"
+                        )
+                    except Exception as ocr_err:
+                        logger.warning(f"OCR failed for {filename}: {ocr_err}")
 
             if not pdf_text:
                 pdf_text = f"[Could not extract text from {filename}]"
@@ -325,7 +326,8 @@ class RelevanceScreener:
                 results.append(self.screen_by_file_id(r["file_id"], r["filename"]))
             else:
                 results.append(self.screen_by_pdf_path(
-                    r.get("pdf_path", ""), r["filename"]))
+                    r.get("pdf_path", ""), r["filename"],
+                    paper_text=r.get("paper_text")))
             if i < len(upload_records):
                 time.sleep(delay_seconds)
         return results

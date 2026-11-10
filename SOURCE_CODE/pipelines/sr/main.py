@@ -515,6 +515,30 @@ def main():
 
     # Stage 2: Screening
     logger.info("=== STAGE 2: Screening ===")
+    # Session 37: one shared text per paper (OCR reader; local Tesseract for
+    # scanned and broken-font pages), saved under input/sr/paper_text/ so a
+    # rerun reuses it - including a file the reviewer corrected by hand.
+    # Added after upload_manifest.csv so the text does not land in that CSV.
+    from .src.utils.paper_text import get_paper_text
+    _text_dir = Path(pdf_dir) / "paper_text"
+    _text_dir.mkdir(parents=True, exist_ok=True)
+    for r in recs:
+        if not r.get("pdf_path"):
+            continue
+        try:
+            _pt = get_paper_text(r["pdf_path"], _text_dir)
+        except Exception as _e:
+            logger.warning(
+                f"[PAPER TEXT] {r.get('filename')}: shared text failed ({_e}) "
+                f"- screening/RoB2 read this PDF themselves")
+            continue
+        r["paper_text"] = _pt["text"]
+        logger.info(
+            f"[PAPER TEXT] {r.get('filename')}: {_pt['unknown']} [?] left; "
+            f"scanned pages {_pt['scanned_pages']}; broken-font pages "
+            f"{_pt['broken_font_pages']}; "
+            f"{'reused saved text' if _pt['from_cache'] else 'new text saved'} "
+            f"-> {_pt['path']}")
     sr = RelevanceScreener(
         pico_criteria      = cfg["pico"],
         inclusion_criteria = cfg.get("inclusion_criteria", []),
