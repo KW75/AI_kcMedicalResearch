@@ -50,7 +50,7 @@ so those catches happen at session open, not mid-work.
 |----------------|--------|
 | Tests          | 1140 passed, 10 deselected on v2.10-sr-screening (Session 38); main 1064 (ef66b9f) (`python -m pytest -m "not live" --tb=short -q`) |
 | Branch         | main = ef66b9f (PR #7 merged 2026-11-10: F7 truth fixture sr_truth.yaml + scripts/sr_score_run.py). Work on v2.10-sr-screening, PR #8 open: shared paper text (b3d804c), prisma_criteria write-if-changed (afd90a3), RoB2 overall rule (3e3785e), RoB2 Methods/Results text (908f889, 306d838), registration lines to RoB2 (Session 38). Branches v2.6-ocr-editor, v2.5-major-updates, v2.7-sr-fixes, v2.8-sr-review-gate, v2.9-sr-fixture deleted |
-| CI             | green on PR #8 at de15a59 (1137 passed, both jobs). Last confirmed on main: bcd42d9 (2026-11-09, 1027, both jobs). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
+| CI             | green on PR #8 at 222e779 (1140 passed, both jobs). Last confirmed on main: bcd42d9 (2026-11-09, 1027, both jobs). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
 | Deploy         | None: CLI only, local first. Render service deleted 2026-10-27; Streamlit UI and Render files removed in Session 33. UptimeRobot monitor for the old Render URL: not yet confirmed paused/deleted (user, outside the repo) |
 | Writing mode   | one-pass (write + edit + review in one call); tracks Topic 800 / Article 3,500 / Report 500 / Synopsis 1,500; on main since fa4edb9; tested on gemma4:e4b; terminal menus only |
 | OCR mode       | `--mode ocr`, launcher menu 8. Reads PDF / image / .txt / .docx; .doc refused with a message. Records in `reports/ocr/<header>/`, SUMMARY / SYNOPSIS in `output/ocr/`. Ollama by default; Qwen / OpenAI only behind the cloud gate; groq / deepseek / anthropic refused. Broken-font PDFs: text layer with [?], AI fills symbols only, document-wide vote per font code. [?] left varies run to run (Ang 2010, gemma4:e4b: 19 in s36_check, 7 in s36_vote; vote fills checked against Table 2) |
@@ -125,12 +125,8 @@ SR (do 4 before 5 and 6)
 7. Session 28 priorities: vote `outcome_selected` / `timepoint_selected`;
    Ang outcome change S26 -> S27 (`Readme/evidence/s26_issue11/`);
    decoder `!`-for-space gap (low).
-7a. RoB2 rerun after the registration fix; compare with 20261111_081840
-    (python $env:TEMP\s38_compare.py 20261111_081840 <new>). Ang and Karlsson
-    should no longer say "no registration". McCrae missing_data: the model now
-    says 15/39, 10/37, 13/37 lost; check by hand against Figure 1 (27/30/28
-    completers = 12/7/9 lost). Lami ITT is only in Discussion line 1897 (not
-    sent). Stale rob2_tool.py log line "prompt uses first 6000": fix when touched.
+7a. Done in Session 38 (run 20261111_114651, see log). Left over: stale
+    rob2_tool.py log line "prompt uses first 6000" - fix when touched.
 7b. scripts/sr_score_run.py: also save the score to reports/sr/<run_id>/score.txt
     (UTF-8, no BOM; written by the script, not by PowerShell redirection).
 7c. RoB2 prompt: outcome_measurement came back Low for self-reported outcomes
@@ -138,6 +134,12 @@ SR (do 4 before 5 and 6)
     guidance gives Some concerns or High there. Jensen reported_result still
     cites the "excerpt". Study label "Ang 2008" (2010 paper; no year in the
     first 1500 chars) - the label comes from the model, note only.
+    Run 20261111_114651: registration lines reach RoB2 but are not used
+    (Ang does not mention NCT00965601; Karlsson says "trial registration not
+    mentioned"). McCrae says "no mention of ITT" although Methods line 662
+    says intention to treat (sent). Lami "ITT is implied (completers only)"
+    contradicts itself. McCrae attrition uses follow-up counts (Figure 1 text:
+    post 27/30/28, follow-up 24/27/23 of 39/37/37); WLC 13 vs 14.
 
 Writing
 8. Read input through the OCR reader so .docx tables reach the AI; a read
@@ -2144,5 +2146,14 @@ Expected: a clean tree in sync with origin, the top commit is this handoff, and 
   icon_input, icon_output, icon_reports; .ico for Windows, .png for Mac).
   tests/test_no_streamlit.py no longer lists icon_AI_kcMedicalResearch.ico
   as deleted; logo_AI_kcMedicalResearch.png stays on the list. 1140 passed.
-  Icons go in a separate commit after a size check (the 3 .ico are 4.3 MB each).
+  Icons committed in 222e779: ico rebuilt from the png (16-256 px), ~0.9 MB
+  instead of 15 MB.
+- c6b188f (score.txt) and 222e779 (icons) pushed; PR #8 CI green at 222e779,
+  1140 passed, both jobs.
+- Rerun 20261111_114651 (console.txt and score.txt in the run folder):
+  [ROB2 TEXT] Ang 15297 (+1 registration line), Jensen 30545, Karlsson 27919
+  (+3), Lami 28670, McCrae 48125 (+1). All 25 domain labels and 5 overall
+  the same as 20261111_081840 (all Some concerns). Score unchanged. The model
+  ignores sent registration and ITT lines -> 7c (prompt).
+
 
