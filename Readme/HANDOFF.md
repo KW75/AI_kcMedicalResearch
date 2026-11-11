@@ -50,7 +50,7 @@ so those catches happen at session open, not mid-work.
 |----------------|--------|
 | Tests          | 1144 passed, 10 deselected on v2.10-sr-screening (Session 38); main 1064 (ef66b9f) (`python -m pytest -m "not live" --tb=short -q`) |
 | Branch         | main = ef66b9f (PR #7 merged 2026-11-10: F7 truth fixture sr_truth.yaml + scripts/sr_score_run.py). Work on v2.10-sr-screening, PR #8 open: shared paper text (b3d804c), prisma_criteria write-if-changed (afd90a3), RoB2 overall rule (3e3785e), RoB2 Methods/Results text (908f889, 306d838), registration lines to RoB2 (Session 38). Branches v2.6-ocr-editor, v2.5-major-updates, v2.7-sr-fixes, v2.8-sr-review-gate, v2.9-sr-fixture deleted |
-| CI             | green on PR #8 at 222e779 (1140 passed, both jobs). Last confirmed on main: bcd42d9 (2026-11-09, 1027, both jobs). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
+| CI             | green on PR #8 at 5907fae (1144 passed, both jobs). Last confirmed on main: bcd42d9 (2026-11-09, 1027, both jobs). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
 | Deploy         | None: CLI only, local first. Render service deleted 2026-10-27; Streamlit UI and Render files removed in Session 33. UptimeRobot monitor for the old Render URL: not yet confirmed paused/deleted (user, outside the repo) |
 | Writing mode   | one-pass (write + edit + review in one call); tracks Topic 800 / Article 3,500 / Report 500 / Synopsis 1,500; on main since fa4edb9; tested on gemma4:e4b; terminal menus only |
 | OCR mode       | `--mode ocr`, launcher menu 8. Reads PDF / image / .txt / .docx; .doc refused with a message. Records in `reports/ocr/<header>/`, SUMMARY / SYNOPSIS in `output/ocr/`. Ollama by default; Qwen / OpenAI only behind the cloud gate; groq / deepseek / anthropic refused. Broken-font PDFs: text layer with [?], AI fills symbols only, document-wide vote per font code. [?] left varies run to run (Ang 2010, gemma4:e4b: 19 in s36_check, 7 in s36_vote; vote fills checked against Table 2) |
@@ -134,16 +134,32 @@ SR (do 4 before 5 and 6)
     guidance gives Some concerns or High there. Jensen reported_result still
     cites the "excerpt". Study label "Ang 2008" (2010 paper; no year in the
     first 1500 chars) - the label comes from the model, note only.
-    Run 20261111_114651 findings are NOT prompt evidence: _call_with_text cut
-    every RoB2 text to 6000 chars (see Session 38 log), so registration lines,
-    McCrae's ITT line 662 and Results never reached the model. Judge the
-    prompt only after rerun 7d. McCrae Figure 1 text: post 27/30/28,
-    follow-up 24/27/23 of 39/37/37 (model said 13 lost in WLC; text gives 14).
-7d. RoB2 rerun with the whole text (after the [6000, 3000] fix): console.txt
-    should show [ROB2 SEND] attempt 1: 15297 / 30545 / 27919 / 28670 / 48125
-    chars. Compare with 20261111_114651 (s38_compare.py) and check: Ang and
-    Karlsson registration, McCrae ITT (line 662), Lami ITT wording,
-    outcome_measurement for McCrae and Lami. Then decide 7c.
+    Run 20261111_121950 (whole text) is the prompt evidence: registration now
+    cited (Ang, Karlsson, McCrae), McCrae ITT seen, no "abstract/excerpt".
+    Still wrong: outcome_measurement Low for self-reported outcomes with
+    participants aware of their group (Karlsson says so itself; McCrae, Lami
+    also Low) - RoB 2 gives Some concerns or High there. McCrae missing_data
+    "9/7/5 withdrew" mixes "did not receive intervention" (9/7/0) with a WLC 5
+    not found in the Figure 1 text (post 27/30/28 of 39/37/37).
+7d. Done: run 20261111_121950 (see Session 38 log).
+7e. Pooled study count depends on the run (extraction, not RoB2):
+    20261111_114651 pooled 4 (Ang, Karlsson, Lami, McCrae); 20261111_121950
+    pooled 3. Karlsson values were identical in both (24/24, 3.88 (1.05) vs
+    3.67 (0.75)), but in 121950 one of 3 readings took other cells (4.05
+    (0.85) vs 3.43 (0.82)) -> table_shift -> mandatory review -> skipped
+    (g=0.226 kept for [SENSITIVITY]). Fix: hand-check which Karlsson cell is
+    the review's outcome/timepoint and put it in study_overrides.yaml with a
+    source-page note; add Ang n (truth 15/13). Jensen n also varies (25/18
+    vs 19/15), not pooled.
+7f. Score the AI separately from the overrides. Overridden values replace
+    both nested and flat columns in extracted_data.csv; the AI's own value
+    survives only in override_fields ("field(old->new)") and nondet_detail.
+    sr_score_run.py ignores both, so Lami/McCrae show ALL MATCH while the AI
+    was wrong (121950: Lami AI 38/41, 3.8 (2.1) vs 5.2 (2.3), truth 28/36,
+    7.35 (2.08) vs 7.4 (1.29); McCrae AI 37/37, means 47.14/52.67, no SD).
+    Add an "AI value" line per overridden study and a separate AI-accuracy
+    count in SUMMARY; test first. Then the Karlsson override (7e) costs no
+    accuracy information. Unit tests do not read study_overrides.yaml.
 
 Writing
 8. Read input through the OCR reader so .docx tables reach the AI; a read
@@ -2170,3 +2186,17 @@ Expected: a clean tree in sync with origin, the top commit is this handoff, and 
   [ROB2 SEND] attempt n: X of Y chars. tests/test_sr_rob2_send.py (4) checks
   the text at client.chat.completions.create. Comment at rob2_tool.py top
   updated. 1144 passed.
+- 5907fae pushed; PR #8 CI green, 1144 passed, both jobs. Rerun
+  30545 / 27919 / 28670 / 48125 chars, no retry. 7 domain labels changed vs
+  20261111_114651: Ang and Jensen deviations + reported_result -> Low;
+  Karlsson missing_data + outcome_measurement -> Low; Lami missing_data ->
+  High (Methods line 501: per-protocol analysis; completed 34/38/41 of 42),
+  so Lami overall High by the domain rule (model said Some concerns).
+  Registration IDs cited, McCrae ITT seen, label now "Ang 2010". Score:
+  Ang n WRONG as before; Jensen n WRONG 19/15 vs 25/18; Karlsson not pooled
+  (table_shift), so 3 studies pooled instead of 4 -> 7e.
+  superseded: Methods line 501 says per-protocol.
+- Overrides vs validity: the review result stays valid (reviewer-checked, values
+  traced in override_note); the AI accuracy check was circular for Lami/McCrae
+  -> 7f. test_extraction_regression_fixtures.py comment "Lami means stable,
+  only Ns drift" is outdated (121950: means no_majority 3.8/none/3.2).
