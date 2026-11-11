@@ -45,9 +45,15 @@ studies:
 
   Karlsson:
     year: 2015
-    checked: false
+    checked: true
+    source: "Table 2 p6, MPI-1 Pain severity (tertiary outcome), crude mean (SD) after treatment vs after wait list; n 24/24 (Fig. 2)"
     comparator_type: waiting_list
-    note: "Run values 3.88 (1.05) vs 3.67 (0.75), N 24/24 plausible; columns and N not hand-checked"
+    mean_intervention: 3.88
+    sd_intervention: 1.05
+    mean_control: 3.67
+    sd_control: 0.75
+    n_intervention: 24
+    n_control: 24
 
   McCrae:
     year: 2019

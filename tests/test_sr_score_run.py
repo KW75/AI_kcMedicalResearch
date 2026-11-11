@@ -65,9 +65,10 @@ def _run_folder(tmp_path, rows, overrides=None):
     return tmp_path
 
 
-def test_truth_file_has_four_checked_studies(truth):
+def test_truth_file_has_five_checked_studies(truth):
+    # Session 38: Karlsson hand-checked (Table 2 p6, MPI-1 Pain severity).
     checked = sorted(a for a, s in truth["studies"].items() if s["checked"])
-    assert checked == ["Ang", "Jensen", "Lami", "McCrae"]
+    assert checked == ["Ang", "Jensen", "Karlsson", "Lami", "McCrae"]
 
 
 def test_exact_values_match(sc, truth):
@@ -100,7 +101,12 @@ def test_empty_cell_is_missing(sc, truth):
 
 
 def test_unchecked_and_unknown_studies_are_not_scored(sc, truth):
-    k = sc.score_row(_row("Karlsson", "24", "24", "3.88", "1.05", "3.67", "0.75"), truth)
+    # Session 38: Karlsson is now hand-checked, so mark a copy unchecked;
+    # the not_checked path stays covered whatever the reviewer has checked.
+    import copy
+    t = copy.deepcopy(truth)
+    t["studies"]["Karlsson"]["checked"] = False
+    k = sc.score_row(_row("Karlsson", "24", "24", "3.88", "1.05", "3.67", "0.75"), t)
     assert k["status"] == "not_checked"
     u = sc.score_row(_row("Nobody", "1", "1", "1", "1", "1", "1"), truth)
     assert u["status"] == "no_truth"
@@ -122,7 +128,9 @@ def test_baseline_run_flags_wrong_pooled_studies(sc, truth, tmp_path):
     assert by["McCrae"]["included_in_meta"] is False
     report = sc.format_report(results)
     assert "WRONG" in report
-    assert "4 checked" in report and "0 fully correct" in report
+    # Session 38: Karlsson hand-checked; its baseline values match the truth.
+    assert "5 checked" in report and "1 fully correct" in report
+    assert "Karlsson" not in report.split("differ from the hand-checked truth:")[-1]
     assert sc.exit_code(results) == 1
 
 

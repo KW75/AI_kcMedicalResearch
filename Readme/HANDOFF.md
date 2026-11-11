@@ -50,7 +50,7 @@ so those catches happen at session open, not mid-work.
 |----------------|--------|
 | Tests          | 1149 passed, 10 deselected on v2.10-sr-screening (Session 38); main 1064 (ef66b9f) (`python -m pytest -m "not live" --tb=short -q`) |
 | Branch         | main = ef66b9f (PR #7 merged 2026-11-10: F7 truth fixture sr_truth.yaml + scripts/sr_score_run.py). Work on v2.10-sr-screening, PR #8 open: shared paper text (b3d804c), prisma_criteria write-if-changed (afd90a3), RoB2 overall rule (3e3785e), RoB2 Methods/Results text (908f889, 306d838), registration lines to RoB2 (Session 38). Branches v2.6-ocr-editor, v2.5-major-updates, v2.7-sr-fixes, v2.8-sr-review-gate, v2.9-sr-fixture deleted |
-| CI             | green on PR #8 at 5907fae (1144 passed, both jobs). Last confirmed on main: bcd42d9 (2026-11-09, 1027, both jobs). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
+| CI             | green on PR #8 at b0b4ab9 (1149 passed, both jobs). Last confirmed on main: bcd42d9 (2026-11-09, 1027, both jobs). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
 | Deploy         | None: CLI only, local first. Render service deleted 2026-10-27; Streamlit UI and Render files removed in Session 33. UptimeRobot monitor for the old Render URL: not yet confirmed paused/deleted (user, outside the repo) |
 | Writing mode   | one-pass (write + edit + review in one call); tracks Topic 800 / Article 3,500 / Report 500 / Synopsis 1,500; on main since fa4edb9; tested on gemma4:e4b; terminal menus only |
 | OCR mode       | `--mode ocr`, launcher menu 8. Reads PDF / image / .txt / .docx; .doc refused with a message. Records in `reports/ocr/<header>/`, SUMMARY / SYNOPSIS in `output/ocr/`. Ollama by default; Qwen / OpenAI only behind the cloud gate; groq / deepseek / anthropic refused. Broken-font PDFs: text layer with [?], AI fills symbols only, document-wide vote per font code. [?] left varies run to run (Ang 2010, gemma4:e4b: 19 in s36_check, 7 in s36_vote; vote fills checked against Table 2) |
@@ -142,19 +142,22 @@ SR (do 4 before 5 and 6)
     "9/7/5 withdrew" mixes "did not receive intervention" (9/7/0) with a WLC 5
     not found in the Figure 1 text (post 27/30/28 of 39/37/37).
 7d. Done: run 20261111_121950 (see Session 38 log).
-7e. Pooled study count depends on the run (extraction, not RoB2):
-    20261111_114651 pooled 4 (Ang, Karlsson, Lami, McCrae); 20261111_121950
-    pooled 3. Karlsson values were identical in both (24/24, 3.88 (1.05) vs
-    3.67 (0.75)), but in 121950 one of 3 readings took other cells (4.05
-    (0.85) vs 3.43 (0.82)) -> table_shift -> mandatory review -> skipped
-    (g=0.226 kept for [SENSITIVITY]). Fix: hand-check which Karlsson cell is
-    the review's outcome/timepoint and put it in study_overrides.yaml with a
-    source-page note; add Ang n (truth 15/13). Jensen n also varies (25/18
-    vs 19/15), not pooled.
+7e. Done (Session 38): Karlsson override (Table 2 p6, MPI-1 Pain severity,
+    crude 3.88 (1.05) vs 3.67 (0.75), n 24/24, checked in the PDF) and Ang Ns
+    only (Table 2 Week 6 n 15/13, not randomised 17/15). Karlsson now
+    checked: true in sr_truth.yaml. Run 20261111_161320 pools 4 again.
+    Jensen n still varies (25/18 vs 19/15), not pooled.
 7f. Done (Session 38): scorer adds "AI alone:" lines for overridden studies
     (AI value = number before "->" in override_fields, "absent" = MISSING,
     untouched fields count as the AI's value) and an "AI alone: N checked,
     K fully correct" SUMMARY line; exit code still follows the pooled values.
+7f+. Cosmetic: a study whose override only confirms the AI values
+    (Karlsson, all "confirmed") gets no "AI alone:" line, although it
+    counts in the AI-alone SUMMARY. Print "AI alone: ALL MATCH" there too.
+7g. Ang contributes Week 6 change scores; the other studies give
+    post-treatment values. Cochrane Handbook 10.5.2: do not mix change and
+    final values in an SMD. Reviewer decision: use Ang's Week 6 final values,
+    or switch to MD/sensitivity analysis.
 
 Writing
 8. Read input through the OCR reader so .docx tables reach the AI; a read
@@ -2201,4 +2204,13 @@ Expected: a clean tree in sync with origin, the top commit is this handoff, and 
   7.35/7.4 (sd_intervention 2.1 within tolerance of 2.08); McCrae AI N 37/37
   vs 57/28, means 47.14/52.67 vs 46.86/52.38, both SDs missing. Pooled
   SUMMARY and exit code unchanged. +5 tests, 1149 passed.
+- b0b4ab9 pushed; PR #8 CI green, 1149 passed, both jobs. 7e: Ang (Ns only)
+  and Karlsson overrides added; Karlsson hand-checked in the PDF (crude mean
+  (SD), adjusted means have no SD; tertiary outcome) and set checked: true in
+  sr_truth.yaml. Two tests relied on Karlsson unchecked:
+  test_unchecked_and_unknown_studies_are_not_scored now marks a copy
+  unchecked; baseline test now 5 checked, 1 fully correct. Count test renamed
+  to five. Run 20261111_161320: 4 pooled; SUMMARY 5 checked, 4 fully correct,
+  0 wrong AND POOLED; AI alone 5 checked, 1 fully correct (Karlsson). Lami AI
+  means 4.2/5.8 this run (3.8/5.2 in 121950), truth 7.35/7.4.
 

@@ -34,5 +34,33 @@ zsy234.pdf:
   sd_control: 24.04
   note: "Multi-arm trial (CBT-I, CBT-P, WLC). CBT-I and CBT-P combined into one intervention arm (Cochrane Handbook 23.3.4): CBT-I 47.01 (24.79) n 27, CBT-P 46.72 (23.81) n 30. Control WLC 52.38 (24.04) n 28. Morning pain VAS 0-100, post-treatment, mixed-model means, Table 3 p9. N = completed post-treatment (Figure 1). Evening pain in Table 3 not used. Waiting-list subgroup."
 
+"Arthritis Care Research - 2010 - Ang - Cognitive behavioral therapy attenuates nociceptive responding in patients with-1.pdf":
+  first_author: Ang
+  year: 2010
+  n_intervention: 15
+  n_control: 13
+  note: >-
+    Ns = Week 6 change Ns printed in Table 2 (CBT 15, UC 13), not randomised
+    17/15 (text lines 254-255); 4 did not complete, 1+1 refused follow-up,
+    1+1 NFR too painful (lines 255-258). Means/SDs left to the AI.
+    Verified from the PDF.
+
+"Cognitive behaviour therapy in women with fibromyalgia_ A randomized clinical trial - 1-s2.0-S1877886015000567-main.pdf":
+  first_author: Karlsson
+  year: 2015
+  n_intervention: 24
+  n_control: 24
+  mean_intervention: 3.88
+  sd_intervention: 1.05
+  mean_control: 3.67
+  sd_control: 0.75
+  note: >-
+    Table 2 p6, MPI-1 Pain severity (tertiary outcome), crude mean (SD)
+    after treatment (CBT) vs after wait list; adjusted means (no SD) not
+    used. n 24/24, 48 randomised. One of 3 readings took the next row
+    (Interference) -> table_shift. Verified from the PDF (text is Tesseract
+    OCR, broken font).
+
+
 
 
