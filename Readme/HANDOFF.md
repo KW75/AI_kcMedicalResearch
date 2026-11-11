@@ -48,9 +48,9 @@ so those catches happen at session open, not mid-work.
 
 | Component      | Status |
 |----------------|--------|
-| Tests          | 1137 passed, 10 deselected on v2.10-sr-screening (Session 38); main 1064 (ef66b9f) (`python -m pytest -m "not live" --tb=short -q`) |
+| Tests          | 1140 passed, 10 deselected on v2.10-sr-screening (Session 38); main 1064 (ef66b9f) (`python -m pytest -m "not live" --tb=short -q`) |
 | Branch         | main = ef66b9f (PR #7 merged 2026-11-10: F7 truth fixture sr_truth.yaml + scripts/sr_score_run.py). Work on v2.10-sr-screening, PR #8 open: shared paper text (b3d804c), prisma_criteria write-if-changed (afd90a3), RoB2 overall rule (3e3785e), RoB2 Methods/Results text (908f889, 306d838), registration lines to RoB2 (Session 38). Branches v2.6-ocr-editor, v2.5-major-updates, v2.7-sr-fixes, v2.8-sr-review-gate, v2.9-sr-fixture deleted |
-| CI             | green on PR #8 at 306d838 (1133 passed, both jobs). Last confirmed on main: bcd42d9 (2026-11-09, 1027, both jobs). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
+| CI             | green on PR #8 at de15a59 (1137 passed, both jobs). Last confirmed on main: bcd42d9 (2026-11-09, 1027, both jobs). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
 | Deploy         | None: CLI only, local first. Render service deleted 2026-10-27; Streamlit UI and Render files removed in Session 33. UptimeRobot monitor for the old Render URL: not yet confirmed paused/deleted (user, outside the repo) |
 | Writing mode   | one-pass (write + edit + review in one call); tracks Topic 800 / Article 3,500 / Report 500 / Synopsis 1,500; on main since fa4edb9; tested on gemma4:e4b; terminal menus only |
 | OCR mode       | `--mode ocr`, launcher menu 8. Reads PDF / image / .txt / .docx; .doc refused with a message. Records in `reports/ocr/<header>/`, SUMMARY / SYNOPSIS in `output/ocr/`. Ollama by default; Qwen / OpenAI only behind the cloud gate; groq / deepseek / anthropic refused. Broken-font PDFs: text layer with [?], AI fills symbols only, document-wide vote per font code. [?] left varies run to run (Ang 2010, gemma4:e4b: 19 in s36_check, 7 in s36_vote; vote fills checked against Table 2) |
@@ -2131,4 +2131,18 @@ Expected: a clean tree in sync with origin, the top commit is this handoff, and 
   adds lines matching NCT/ISRCTN/clinicaltrials.gov if not already sent
   (max 500 chars). A bare "registered" does not match. Added: Ang 1,
   Karlsson 3, McCrae 1; Jensen and Lami have none. +4 tests, 1137 passed.
+- de15a59 pushed: registration lines sent to RoB2. PR #8 CI green, 1137
+  passed, both jobs.
+- Scorer saves its report: scripts/sr_score_run.py also writes
+  <run folder>/score.txt (same text as the screen, UTF-8 no BOM, LF; replaced
+  on rerun; nothing written when the folder is not a run). The screen ends
+  with "[SCORE] saved <path>" (not in the file). +3 tests in
+  tests/test_sr_score_run.py. 20261111_081840 scored: Ang n 17/15 vs truth
+  15/13 (WRONG, POOLED), Jensen not pooled (mean/SD missing), Lami and McCrae
+  ALL MATCH via study_overrides, Karlsson not hand-checked.
+- assets/ is back on purpose: desktop shortcut icons (icon_AI_kcMedicalResearch,
+  icon_input, icon_output, icon_reports; .ico for Windows, .png for Mac).
+  tests/test_no_streamlit.py no longer lists icon_AI_kcMedicalResearch.ico
+  as deleted; logo_AI_kcMedicalResearch.png stays on the list. 1140 passed.
+  Icons go in a separate commit after a size check (the 3 .ico are 4.3 MB each).
 

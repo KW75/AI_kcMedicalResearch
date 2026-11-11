@@ -145,3 +145,42 @@ def test_correct_run_exits_zero(sc, truth, tmp_path):
     ])
     results = sc.score_run_folder(folder, truth)
     assert sc.exit_code(results) == 0
+
+
+
+# Session 38: the score is also saved as <run folder>/score.txt (it used to
+# only print to the screen). Same text as the screen, replaced on every
+# rerun, nothing written when the folder is not a run.
+
+def _score(sc, folder, capsys):
+    code = sc.main([str(folder), "--truth", str(TRUTH)])
+    return code, capsys.readouterr().out
+
+
+def test_score_is_saved_as_score_txt_in_run_folder(sc, tmp_path, capsys):
+    folder = _run_folder(tmp_path, [_row("Lami", "28", "36", "7.35", "2.08", "7.4", "1.29")])
+    _, out = _score(sc, folder, capsys)
+    path = folder / "score.txt"
+    assert path.exists(), "score.txt not written to the run folder"
+    saved = path.read_text(encoding="utf-8")
+    assert not path.read_bytes().startswith(b"\xef\xbb\xbf"), "score.txt has a BOM"
+    assert saved.startswith("[SCORE] ")
+    assert "Lami" in saved
+    assert out == saved + f"[SCORE] saved {path}\n"
+
+
+def test_rescore_replaces_score_txt(sc, tmp_path, capsys):
+    folder = _run_folder(tmp_path, [_row("Lami", "28", "36", "7.35", "2.08", "7.4", "1.29")])
+    _score(sc, folder, capsys)
+    first = (folder / "score.txt").read_text(encoding="utf-8")
+    _score(sc, folder, capsys)
+    second = (folder / "score.txt").read_text(encoding="utf-8")
+    assert second == first
+    assert second.count("[SCORE] ") == 1, "rerun appended instead of replacing"
+
+
+def test_not_a_run_folder_writes_no_score_txt(sc, tmp_path, capsys):
+    code, out = _score(sc, tmp_path, capsys)   # empty folder, no data/results csv
+    assert code == 2
+    assert out.startswith("[SCORE] ")
+    assert not (tmp_path / "score.txt").exists()

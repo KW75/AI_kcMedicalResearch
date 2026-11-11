@@ -10,6 +10,7 @@ pooled, after study_overrides) and compares each study with
 tests/fixtures/sr_truth.yaml. Exit 1 if any hand-checked study was POOLED
 with a wrong or missing value; 0 otherwise; 2 if the folder is not a run.
 A MATCH means "equals the reviewer's reading" for these papers only.
+The report is also saved as <run>/score.txt (replaced on every rerun).
 """
 import argparse
 import csv
@@ -180,8 +181,14 @@ def main(argv=None):
     except FileNotFoundError as e:
         print(f"[SCORE] {e}")
         return 2
-    print(f"[SCORE] {folder.name} vs {Path(a.truth).name} (tolerance {truth['tolerance']})")
-    print(format_report(results))
+    text = (f"[SCORE] {folder.name} vs {Path(a.truth).name} (tolerance {truth['tolerance']})\n"
+            + format_report(results) + "\n")
+    print(text, end="")
+    # Session 38: also keep the score with the run (UTF-8, no BOM, LF);
+    # a rerun replaces the file.
+    path = folder / "score.txt"
+    path.write_bytes(text.encode("utf-8"))
+    print(f"[SCORE] saved {path}")
     return exit_code(results)
 
 

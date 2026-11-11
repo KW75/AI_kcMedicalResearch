@@ -15,7 +15,8 @@ GONE = [
     ".streamlit/config.toml",
     ".streamlit/secrets.toml.example",
     "assets/logo_AI_kcMedicalResearch.png",
-    "assets/icon_AI_kcMedicalResearch.ico",
+    # icon_AI_kcMedicalResearch.ico is back on purpose (Session 38): assets/
+    # holds desktop shortcut icons (ico for Windows, png for Mac).
     "render.yaml",
     "requirements-render.txt",
     "scripts/windows/AI_kcMedicalResearch_UI.bat",
