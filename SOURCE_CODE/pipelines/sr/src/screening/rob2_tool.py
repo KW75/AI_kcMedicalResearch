@@ -36,9 +36,10 @@ RULES (RoB 2):
   questionnaires, diaries) the PARTICIPANT is the outcome assessor.
   A blinded researcher handing out or scoring questionnaires
   does NOT make the assessment blinded.
-  If participants knew their allocated arm (usual in psychological trials),
-  judge "Some concerns", or "High" if that knowledge was likely to influence
-  their answers. Judge "Low" only if participants were unaware of their arm.
+  If participants knew their allocated arm (usual in psychological trials)
+  and the outcome is subjective (pain, mood, symptoms), judge "High"
+  (signalling questions 4.3 Yes, 4.4 Yes, 4.5 Probably yes).
+  Judge "Low" only if participants were unaware of their arm.
 - In the outcome_measurement justification, name the outcome assessed and who assessed it.
 """
 

@@ -103,3 +103,13 @@ def test_main_passes_review_outcome_to_rob2():
     i = s.index("RoB2Assessor(")
     call = s[i:s.index(")", s.index("provider", i))]
     assert "outcome" in call, "main.py does not pass the PICO outcome to RoB2Assessor"
+
+def test_domain4_rule_is_high_outright_for_unblinded_self_report():
+    """Session 38 (7j): reviewer decision - self-reported subjective outcome with
+    participants aware of their arm -> High (4.3 Yes, 4.4 Yes, 4.5 Probably yes).
+    Run 20261111_171313 split Some concerns/High by model wording (Jensen High,
+    Ang/Karlsson/McCrae Some concerns with the same reasoning)."""
+    p = rt.rob2_prompt("Pain intensity at post intervention")
+    assert 'judge "High"' in p
+    assert "4.5 Probably yes" in p
+    assert 'or "High" if' not in p, "old Some concerns/High split still in the rule"

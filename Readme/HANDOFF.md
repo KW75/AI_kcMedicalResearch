@@ -48,9 +48,9 @@ so those catches happen at session open, not mid-work.
 
 | Component      | Status |
 |----------------|--------|
-| Tests | 1156 passed, 10 deselected on v2.10-sr-screening (Session 38); main 1064 (ef66b9f) (python -m pytest -m "not live" --tb=short -q) |
+| Tests | 1157 passed, 10 deselected on v2.10-sr-screening (Session 38); main 1064 (ef66b9f) (python -m pytest -m "not live" --tb=short -q) |
 | Branch         | main = ef66b9f (PR #7 merged 2026-11-10: F7 truth fixture sr_truth.yaml + scripts/sr_score_run.py). Work on v2.10-sr-screening, PR #8 open: shared paper text (b3d804c), prisma_criteria write-if-changed (afd90a3), RoB2 overall rule (3e3785e), RoB2 Methods/Results text (908f889, 306d838), registration lines to RoB2 (Session 38). Branches v2.6-ocr-editor, v2.5-major-updates, v2.7-sr-fixes, v2.8-sr-review-gate, v2.9-sr-fixture deleted |
-| CI             | green on PR #8 at b0b4ab9 (1149 passed, both jobs). Last confirmed on main: bcd42d9 (2026-11-09, 1027, both jobs). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
+| CI | green on PR #8 at 46fbd9b (1156 passed, both jobs). Last confirmed on main: bcd42d9 (2026-11-09, 1027, both jobs). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
 | Deploy         | None: CLI only, local first. Render service deleted 2026-10-27; Streamlit UI and Render files removed in Session 33. UptimeRobot monitor for the old Render URL: not yet confirmed paused/deleted (user, outside the repo) |
 | Writing mode   | one-pass (write + edit + review in one call); tracks Topic 800 / Article 3,500 / Report 500 / Synopsis 1,500; on main since fa4edb9; tested on gemma4:e4b; terminal menus only |
 | OCR mode       | `--mode ocr`, launcher menu 8. Reads PDF / image / .txt / .docx; .doc refused with a message. Records in `reports/ocr/<header>/`, SUMMARY / SYNOPSIS in `output/ocr/`. Ollama by default; Qwen / OpenAI only behind the cloud gate; groq / deepseek / anthropic refused. Broken-font PDFs: text layer with [?], AI fills symbols only, document-wide vote per font code. [?] left varies run to run (Ang 2010, gemma4:e4b: 19 in s36_check, 7 in s36_vote; vote fills checked against Table 2) |
@@ -170,10 +170,11 @@ SR (do 4 before 5 and 6)
     ["Non-RCT", "Animal studies"] for every review; sr main.py reads them
     (lines 544, 886) into screening and reports. Wrong for paediatric or
     non-RCT reviews; derive from the PICO (population, study_design).
-7j. Some concerns vs High not applied consistently: Ang, Karlsson, McCrae say
-    knowledge likely influenced pain yet judge Some concerns; Jensen (same
-    design) High. Reviewer decision: High outright or Some concerns outright,
-    then change one line in _ROB2_RULES (tests pin only shared phrases).
+7j. Done (Session 38): reviewer decision High outright - subjective
+    participant-reported outcome with participants aware of their arm ->
+    High (4.3 Yes, 4.4 Yes, 4.5 Probably yes); 1 test. Run 20261111_175754:
+    outcome_measurement and OVERALL High for all five (model overall still
+    Some concerns; domain rule applies). State the rule in the review methods.
 7k. Ang: RoB2 judged the NFR pain rating (P=0.8), pooled values are Table 2
     Week 6 pain (-20.2 vs -14.9). Check the row in the PDF; consider passing
     the extracted outcome name to RoB2.
@@ -183,6 +184,13 @@ SR (do 4 before 5 and 6)
     leaking into Domain 2; Jensen same three changes (not inspected).
     missing_data numbers still wrong: Lami UMC 11/41 (about 5), McCrae
     9/7/5 withdrew (Figure 1: 12/7/9). Consider N RoB2 runs + vote.
+7m. Run 20261111_175754 pooled 3: Ang skipped (table_shift on means; the
+    Ns-only override does not clear the review gate, which needs all four
+    mean/SD fields). Fix: override Ang means/SDs (-20.2 (23.9) vs -14.9
+    (16.4), Table 2 Week 6) after 7k names the row. Scorer SUMMARY should
+    print the pooled count (pooled 4 -> 3 was invisible). Jensen means
+    45.6/45.6 no_majority; Lami AI means 5.8/6.9 this run.
+
 Writing
 8. Read input through the OCR reader so .docx tables reach the AI; a read
    error must be a [SKIP] message, not "[Could not read <name>]" sent as
@@ -2241,3 +2249,6 @@ Expected: a clean tree in sync with origin, the top commit is this handoff, and 
   Run 20261111_171313: outcome_measurement off Low for all five, Jensen
   overall High by the domain rule (model said Some concerns). Lami AI means
   3.2/4.1 (3.8/5.2 in 121950, 4.2/5.8 in 161320; truth 7.35/7.4).
+- 46fbd9b pushed; PR #8 CI green, 1156 passed, both jobs. 7j High outright:
+  1 test, 1157 passed. Run 20261111_175754: Domain 4 and overall High for
+  all five, no other domain changed vs 171313; Ang not pooled -> 7m.
