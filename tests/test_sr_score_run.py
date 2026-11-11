@@ -184,3 +184,57 @@ def test_not_a_run_folder_writes_no_score_txt(sc, tmp_path, capsys):
     assert code == 2
     assert out.startswith("[SCORE] ")
     assert not (tmp_path / "score.txt").exists()
+
+
+
+# Session 38 (7f): an override hides what the AI extracted. The AI's own value
+# survives in extracted_data.csv override_fields as "field(old->new)"; the
+# scorer shows it as separate "AI alone" lines and a separate count. The
+# pooled result and the exit code do not change.
+
+LAMI_ROW = ("Lami", "28", "36", "7.35", "2.08", "7.4", "1.29")
+LAMI_OVR = ("n_intervention(38->28); n_control(41->36); mean_intervention(3.8->7.35); "
+            "sd_intervention(2.1->2.08); mean_control(5.2->7.4); sd_control(2.3->1.29)")
+
+
+def _report(sc, truth, folder):
+    results = sc.score_run_folder(folder, truth)
+    return results, sc.format_report(results)
+
+
+def test_override_shows_ai_values_scored_against_truth(sc, truth, tmp_path):
+    folder = _run_folder(tmp_path, [_row(*LAMI_ROW)], overrides={"Lami": LAMI_OVR})
+    _, text = _report(sc, truth, folder)
+    assert "Lami       POOLED     ALL MATCH" in text          # review result unchanged
+    assert "AI alone: n_intervention WRONG (AI 38, truth 28)" in text
+    assert "AI alone: mean_control WRONG (AI 5.2, truth 7.4)" in text
+
+
+def test_absent_ai_value_is_missing_and_untouched_fields_count_as_ai(sc, truth, tmp_path):
+    folder = _run_folder(tmp_path, [_row(*LAMI_ROW)],
+                         overrides={"Lami": "first_author; year; sd_intervention(absent->2.08)"})
+    _, text = _report(sc, truth, folder)
+    assert "AI alone: sd_intervention MISSING (AI empty, truth 2.08)" in text
+    assert "AI alone: n_intervention" not in text             # not overridden = AI's own value
+
+
+def test_summary_counts_ai_alone_and_exit_code_unchanged(sc, truth, tmp_path):
+    folder = _run_folder(tmp_path, [_row(*LAMI_ROW)], overrides={"Lami": LAMI_OVR})
+    results, text = _report(sc, truth, folder)
+    assert "SUMMARY: 1 checked, 1 fully correct, 0 wrong or missing AND POOLED." in text
+    assert "AI alone: 1 checked, 0 fully correct" in text
+    assert sc.exit_code(results) == 0
+
+
+def test_ai_values_that_match_show_all_match(sc, truth, tmp_path):
+    folder = _run_folder(tmp_path, [_row(*LAMI_ROW)],
+                         overrides={"Lami": "n_intervention(28.0->28)"})
+    _, text = _report(sc, truth, folder)
+    assert "AI alone: ALL MATCH" in text
+    assert "AI alone: 1 checked, 1 fully correct" in text
+
+
+def test_no_override_prints_no_ai_lines(sc, truth, tmp_path):
+    folder = _run_folder(tmp_path, [_row(*LAMI_ROW)])
+    _, text = _report(sc, truth, folder)
+    assert "AI alone" not in text

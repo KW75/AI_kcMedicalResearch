@@ -48,7 +48,7 @@ so those catches happen at session open, not mid-work.
 
 | Component      | Status |
 |----------------|--------|
-| Tests          | 1144 passed, 10 deselected on v2.10-sr-screening (Session 38); main 1064 (ef66b9f) (`python -m pytest -m "not live" --tb=short -q`) |
+| Tests          | 1149 passed, 10 deselected on v2.10-sr-screening (Session 38); main 1064 (ef66b9f) (`python -m pytest -m "not live" --tb=short -q`) |
 | Branch         | main = ef66b9f (PR #7 merged 2026-11-10: F7 truth fixture sr_truth.yaml + scripts/sr_score_run.py). Work on v2.10-sr-screening, PR #8 open: shared paper text (b3d804c), prisma_criteria write-if-changed (afd90a3), RoB2 overall rule (3e3785e), RoB2 Methods/Results text (908f889, 306d838), registration lines to RoB2 (Session 38). Branches v2.6-ocr-editor, v2.5-major-updates, v2.7-sr-fixes, v2.8-sr-review-gate, v2.9-sr-fixture deleted |
 | CI             | green on PR #8 at 5907fae (1144 passed, both jobs). Last confirmed on main: bcd42d9 (2026-11-09, 1027, both jobs). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
 | Deploy         | None: CLI only, local first. Render service deleted 2026-10-27; Streamlit UI and Render files removed in Session 33. UptimeRobot monitor for the old Render URL: not yet confirmed paused/deleted (user, outside the repo) |
@@ -151,15 +151,10 @@ SR (do 4 before 5 and 6)
     the review's outcome/timepoint and put it in study_overrides.yaml with a
     source-page note; add Ang n (truth 15/13). Jensen n also varies (25/18
     vs 19/15), not pooled.
-7f. Score the AI separately from the overrides. Overridden values replace
-    both nested and flat columns in extracted_data.csv; the AI's own value
-    survives only in override_fields ("field(old->new)") and nondet_detail.
-    sr_score_run.py ignores both, so Lami/McCrae show ALL MATCH while the AI
-    was wrong (121950: Lami AI 38/41, 3.8 (2.1) vs 5.2 (2.3), truth 28/36,
-    7.35 (2.08) vs 7.4 (1.29); McCrae AI 37/37, means 47.14/52.67, no SD).
-    Add an "AI value" line per overridden study and a separate AI-accuracy
-    count in SUMMARY; test first. Then the Karlsson override (7e) costs no
-    accuracy information. Unit tests do not read study_overrides.yaml.
+7f. Done (Session 38): scorer adds "AI alone:" lines for overridden studies
+    (AI value = number before "->" in override_fields, "absent" = MISSING,
+    untouched fields count as the AI's value) and an "AI alone: N checked,
+    K fully correct" SUMMARY line; exit code still follows the pooled values.
 
 Writing
 8. Read input through the OCR reader so .docx tables reach the AI; a read
@@ -2200,3 +2195,10 @@ Expected: a clean tree in sync with origin, the top commit is this handoff, and 
   traced in override_note); the AI accuracy check was circular for Lami/McCrae
   -> 7f. test_extraction_regression_fixtures.py comment "Lami means stable,
   only Ns drift" is outdated (121950: means no_majority 3.8/none/3.2).
+- 7f done: sr_score_run.py scores the AI's own values for overridden studies
+  (_ai_overrides reads override_fields). Run 20261111_121950: AI alone 4
+  checked, 0 fully correct. Lami AI N 38/41 vs 28/36, means 3.8/5.2 vs
+  7.35/7.4 (sd_intervention 2.1 within tolerance of 2.08); McCrae AI N 37/37
+  vs 57/28, means 47.14/52.67 vs 46.86/52.38, both SDs missing. Pooled
+  SUMMARY and exit code unchanged. +5 tests, 1149 passed.
+

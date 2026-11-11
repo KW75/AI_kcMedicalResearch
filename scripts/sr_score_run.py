@@ -11,9 +11,12 @@ tests/fixtures/sr_truth.yaml. Exit 1 if any hand-checked study was POOLED
 with a wrong or missing value; 0 otherwise; 2 if the folder is not a run.
 A MATCH means "equals the reviewer's reading" for these papers only.
 The report is also saved as <run>/score.txt (replaced on every rerun).
+Overridden studies also get "AI alone" lines: the AI's own values (from
+override_fields "field(old->new)") scored against the truth.
 """
 import argparse
 import csv
+import re
 import sys
 from pathlib import Path
 
@@ -105,17 +108,47 @@ def _overridden_authors(folder):
     return names
 
 
+# Session 38 (7f): "n_intervention(38->28)" -> the AI said 38. "absent" = empty.
+_OVR_RE = re.compile(r"(\w+)\(([^()]*?)->([^()]*?)\)")
+
+
+def _ai_overrides(folder):
+    """{author casefold: {field: AI value or None}} from override_fields."""
+    ext = Path(folder) / "data" / "extracted" / "extracted_data.csv"
+    if not ext.exists():
+        return {}
+    out = {}
+    with open(ext, newline="", encoding="utf-8-sig") as f:
+        for r in csv.DictReader(f):
+            vals = {field: _num(old)
+                    for field, old, _new in _OVR_RE.findall(str(r.get("override_fields") or ""))
+                    if field in FIELDS}
+            if vals:
+                a = r.get("study_metadata.first_author") or r.get("first_author") or ""
+                out[a.strip().casefold()] = vals
+    return out
+
+
 def score_run_folder(folder, truth):
     res = Path(folder) / "data" / "results" / "meta_analysis_results.csv"
     if not res.exists():
         raise FileNotFoundError(f"{res} not found - is this an SR run folder?")
     overridden = _overridden_authors(folder)
+    ai_values = _ai_overrides(folder)
     with open(res, newline="", encoding="utf-8-sig") as f:
         rows = list(csv.DictReader(f))
     results = []
     for row in rows:
         r = score_row(row, truth)
-        r["override"] = str(row.get("first_author") or "").strip().casefold() in overridden
+        key = str(row.get("first_author") or "").strip().casefold()
+        r["override"] = key in overridden
+        if key in ai_values and r["status"] == "scored":
+            # Same row with the overridden fields put back to what the AI said;
+            # fields the override did not touch are the AI's own values already.
+            ai_row = dict(row)
+            for f, v in ai_values[key].items():
+                ai_row[f] = "" if v is None else v
+            r["ai"] = score_row(ai_row, truth)
         results.append(r)
     return results
 
@@ -147,6 +180,11 @@ def format_report(results):
         if r.get("override"):
             lines.append(pad + "values from study_overrides.yaml (manual override) - "
                                "this scores the reviewer, not the model")
+        ai = r.get("ai")
+        if ai:
+            ai_bad = [f"{f} {s} (AI {_fmt(ai['values'][f][0])}, truth {_fmt(ai['values'][f][1])})"
+                      for f, s in ai["fields"].items() if s != "MATCH"]
+            lines.extend(pad + "AI alone: " + b for b in (ai_bad or ["ALL MATCH"]))            
         if not r["included_in_meta"] and r.get("skip_reason"):
             lines.append(pad + "skip_reason: " + r["skip_reason"])
     checked = [r for r in results if r["status"] == "scored"]
@@ -158,6 +196,11 @@ def format_report(results):
     if bad_pooled:
         lines.append("The pooled estimate uses values that differ from the "
                      "hand-checked truth: " + ", ".join(r["author"] for r in bad_pooled))
+    if any(r.get("ai") for r in results):
+        ai_all = [r.get("ai") or r for r in checked]
+        ai_ok = [a for a in ai_all if _fully_correct(a)]
+        lines.append(f"AI alone: {len(ai_all)} checked, {len(ai_ok)} fully correct "
+                     "(overridden fields scored with the AI's own value).")        
     return "\n".join(lines)
 
 
