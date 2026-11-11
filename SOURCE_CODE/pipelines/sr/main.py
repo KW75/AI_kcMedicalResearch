@@ -615,6 +615,7 @@ def main():
     rob = RoB2Assessor(
         model    = args.model,
         provider = args.provider,
+        outcome  = cfg.get("pico", {}).get("outcome"),
     ).assess_batch(included)
 
     for _r in rob:

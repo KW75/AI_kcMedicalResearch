@@ -27,6 +27,32 @@ Assess the attached RCT across five domains. Return ONLY valid JSON:
  "justifications":{"randomisation":"<text>","deviations":"<text>",
                    "missing_data":"<text>","outcome_measurement":"<text>",
                    "reported_result":"<text>"}}"""
+# Session 38 (7c): ROB2_PROMPT was only a JSON template, with no Domain 4 rule
+# and no review outcome. Runs 20261111_121950 and 20261111_161320 rated all 5
+# studies outcome_measurement Low, although pain is self-reported.
+_ROB2_RULES = """
+RULES (RoB 2):
+- Domain 4 (outcome_measurement): for participant-reported outcomes (pain,
+  questionnaires, diaries) the PARTICIPANT is the outcome assessor.
+  A blinded researcher handing out or scoring questionnaires
+  does NOT make the assessment blinded.
+  If participants knew their allocated arm (usual in psychological trials),
+  judge "Some concerns", or "High" if that knowledge was likely to influence
+  their answers. Judge "Low" only if participants were unaware of their arm.
+- In the outcome_measurement justification, name the outcome assessed and who assessed it.
+"""
+
+
+def rob2_prompt(outcome=None):
+    """ROB2_PROMPT + Domain 4 rule + which outcome Domains 4 and 5 are judged for."""
+    o = str(outcome).strip() if outcome else ""
+    if o:
+        scope = (f"Judge Domains 4 and 5 for this review outcome only: {o}. "
+                 "Do not judge them for other outcomes the paper reports.")
+    else:
+        scope = ("Judge Domains 4 and 5 for the trial's primary outcome "
+                 "and name it in the justification.")
+    return f"{ROB2_PROMPT}\n{_ROB2_RULES}- {scope}\n"
 
 
 def _openai_compat_creds(provider: str, api_key: Optional[str] = None):
@@ -94,7 +120,7 @@ def apply_rob2_overall(result: dict) -> dict:
 
 
 class RoB2Assessor:
-    def __init__(self, model="qwen-plus-latest", provider="qwen", api_key: Optional[str] = None):
+    def __init__(self, model="qwen-plus-latest", provider="qwen", api_key=None, outcome=None):
         # NOTE: default matches providers.py's QWEN_MODEL default (text
         # model). The previous default ("qwen3.7-plus") didn't match
         # anything in providers.py's model registry. assess_by_pdf_path()
@@ -106,6 +132,7 @@ class RoB2Assessor:
         # direct construction (tests, scripts) that omit model.
         self.provider = provider.lower()
         self.model    = model
+        self.outcome = outcome  # Session 38 (7c): PICO outcome for Domains 4/5
         if self.provider == "anthropic":
             self.client = anthropic.Anthropic(
                 api_key=api_key or os.environ["ANTHROPIC_API_KEY"])
@@ -127,7 +154,7 @@ class RoB2Assessor:
                 messages=[{"role": "user", "content": [
                     {"type": "document", "source": {"type": "file", "file_id": file_id},
                      "cache_control": {"type": "ephemeral"}},
-                    {"type": "text", "text": ROB2_PROMPT}
+                    {"type": "text", "text": rob2_prompt(self.outcome)}
                 ]}],
                 betas=[BETA_HEADER])
             raw = resp.content[0].text.strip()
@@ -279,7 +306,7 @@ class RoB2Assessor:
                 fallback_chars=MAX_ROB2_CHARS)
             logger.info(f"[ROB2 TEXT] {filename}: {_sec_note}")
 
-            raw = self._call_with_text(pdf_text, ROB2_PROMPT)
+            raw = self._call_with_text(pdf_text, rob2_prompt(self.outcome))
             from ..utils.json_utils import extract_json
             r = extract_json(raw)
             r.update({"file_id": None, "filename": filename, "error": None})

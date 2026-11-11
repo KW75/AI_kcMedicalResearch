@@ -48,7 +48,7 @@ so those catches happen at session open, not mid-work.
 
 | Component      | Status |
 |----------------|--------|
-| Tests          | 1149 passed, 10 deselected on v2.10-sr-screening (Session 38); main 1064 (ef66b9f) (`python -m pytest -m "not live" --tb=short -q`) |
+| Tests | 1156 passed, 10 deselected on v2.10-sr-screening (Session 38); main 1064 (ef66b9f) (python -m pytest -m "not live" --tb=short -q) |
 | Branch         | main = ef66b9f (PR #7 merged 2026-11-10: F7 truth fixture sr_truth.yaml + scripts/sr_score_run.py). Work on v2.10-sr-screening, PR #8 open: shared paper text (b3d804c), prisma_criteria write-if-changed (afd90a3), RoB2 overall rule (3e3785e), RoB2 Methods/Results text (908f889, 306d838), registration lines to RoB2 (Session 38). Branches v2.6-ocr-editor, v2.5-major-updates, v2.7-sr-fixes, v2.8-sr-review-gate, v2.9-sr-fixture deleted |
 | CI             | green on PR #8 at b0b4ab9 (1149 passed, both jobs). Last confirmed on main: bcd42d9 (2026-11-09, 1027, both jobs). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
 | Deploy         | None: CLI only, local first. Render service deleted 2026-10-27; Streamlit UI and Render files removed in Session 33. UptimeRobot monitor for the old Render URL: not yet confirmed paused/deleted (user, outside the repo) |
@@ -129,18 +129,15 @@ SR (do 4 before 5 and 6)
     rob2_tool.py log line "prompt uses first 6000" - fix when touched.
 7b. scripts/sr_score_run.py: also save the score to reports/sr/<run_id>/score.txt
     (UTF-8, no BOM; written by the script, not by PowerShell redirection).
-7c. RoB2 prompt: outcome_measurement came back Low for self-reported outcomes
-    with unblinded participants (McCrae, Lami in 20261111_081840); Cochrane
-    guidance gives Some concerns or High there. Jensen reported_result still
-    cites the "excerpt". Study label "Ang 2008" (2010 paper; no year in the
-    first 1500 chars) - the label comes from the model, note only.
-    Run 20261111_121950 (whole text) is the prompt evidence: registration now
-    cited (Ang, Karlsson, McCrae), McCrae ITT seen, no "abstract/excerpt".
-    Still wrong: outcome_measurement Low for self-reported outcomes with
-    participants aware of their group (Karlsson says so itself; McCrae, Lami
-    also Low) - RoB 2 gives Some concerns or High there. McCrae missing_data
-    "9/7/5 withdrew" mixes "did not receive intervention" (9/7/0) with a WLC 5
-    not found in the Figure 1 text (post 27/30/28 of 39/37/37).
+7c. Done (Session 38): rob2_prompt(outcome) adds a Domain 4 rule (for
+    self-reported outcomes the participant is the assessor; a blinded person
+    handing out questionnaires is not blinded assessment; Some concerns, or
+    High if knowledge likely influenced answers) and judges Domains 4/5 for
+    the PICO outcome; main.py passes cfg pico outcome; 7 tests in
+    tests/test_sr_rob2_prompt.py. Run 20261111_171313 vs 161320:
+    outcome_measurement Low -> Some concerns (Ang, Karlsson, Lami, McCrae),
+    Low -> High (Jensen); all five name pain and the participant as assessor.
+    Score unchanged: 5 checked, 4 fully correct, 0 wrong AND POOLED.
 7d. Done: run 20261111_121950 (see Session 38 log).
 7e. Done (Session 38): Karlsson override (Table 2 p6, MPI-1 Pain severity,
     crude 3.88 (1.05) vs 3.67 (0.75), n 24/24, checked in the PDF) and Ang Ns
@@ -158,7 +155,34 @@ SR (do 4 before 5 and 6)
     post-treatment values. Cochrane Handbook 10.5.2: do not mix change and
     final values in an SMD. Reviewer decision: use Ang's Week 6 final values,
     or switch to MD/sensitivity analysis.
-
+7h. Move the fibromyalgia trial set out of the app defaults to
+    reference/sr_cbt_fibromyalgia/ (prisma_criteria.yaml, pico_sample.json,
+    study_overrides.yaml, README with citations, git-ignored pdfs/); default
+    prisma_criteria.yaml becomes a placeholder template that refuses to run;
+    default study_overrides.yaml comments only; update
+    test_sr_comparator_criteria.py and test_gitignore_input.py; reference run
+    must match 20261111_161320.
+    The launcher writes prisma_criteria.yaml from pico_data
+    (SOURCE_CODE\main.py lines 1502-1504, write_criteria_if_changed), so a
+    placeholder template only guards runs started without the launcher.
+7i. SOURCE_CODE\main.py lines 1498-1499 (launcher) hard-code
+    inclusion_criteria ["RCT", "Adult participants"] and exclusion_criteria
+    ["Non-RCT", "Animal studies"] for every review; sr main.py reads them
+    (lines 544, 886) into screening and reports. Wrong for paediatric or
+    non-RCT reviews; derive from the PICO (population, study_design).
+7j. Some concerns vs High not applied consistently: Ang, Karlsson, McCrae say
+    knowledge likely influenced pain yet judge Some concerns; Jensen (same
+    design) High. Reviewer decision: High outright or Some concerns outright,
+    then change one line in _ROB2_RULES (tests pin only shared phrases).
+7k. Ang: RoB2 judged the NFR pain rating (P=0.8), pooled values are Table 2
+    Week 6 pain (-20.2 vs -14.9). Check the row in the PDF; consider passing
+    the extracted outcome name to RoB2.
+7l. RoB2 variation outside Domain 4 (171313): Ang randomisation -> Low
+    (says balanced; 161320 cited NSAID 76% vs 26%, P=0.01; no method given),
+    missing_data -> Low, deviations -> Some concerns with Domain 4 reasoning
+    leaking into Domain 2; Jensen same three changes (not inspected).
+    missing_data numbers still wrong: Lami UMC 11/41 (about 5), McCrae
+    9/7/5 withdrew (Figure 1: 12/7/9). Consider N RoB2 runs + vote.
 Writing
 8. Read input through the OCR reader so .docx tables reach the AI; a read
    error must be a [SKIP] message, not "[Could not read <name>]" sent as
@@ -2213,4 +2237,7 @@ Expected: a clean tree in sync with origin, the top commit is this handoff, and 
   to five. Run 20261111_161320: 4 pooled; SUMMARY 5 checked, 4 fully correct,
   0 wrong AND POOLED; AI alone 5 checked, 1 fully correct (Karlsson). Lami AI
   means 4.2/5.8 this run (3.8/5.2 in 121950), truth 7.35/7.4.
-
+- 7c prompt fix: Domain 4 rule + PICO outcome to RoB2; 7 tests, 1156 passed.
+  Run 20261111_171313: outcome_measurement off Low for all five, Jensen
+  overall High by the domain rule (model said Some concerns). Lami AI means
+  3.2/4.1 (3.8/5.2 in 121950, 4.2/5.8 in 161320; truth 7.35/7.4).
