@@ -95,7 +95,9 @@ def test_structured_abstract_does_not_replace_full_sections(ps, abstract):
 @pytest.mark.parametrize("heading", [
     "METHODS", "Methods", "Method", "Materials and methods",
     "Patients and Methods", "MATERIALS AND METHODS",
-    "2. Methods", "2 Methods", "Methods."])
+    "2. Methods", "2 Methods", "Methods.",
+    # Session 38 real paper (Jensen, fMRI): reversed order
+    "2. Methods and material", "Methods and materials", "METHODS AND MATERIALS"])
 def test_methods_heading_variants(ps, heading):
     out, note = _pick(ps, _paper(methods_heading=heading))
     assert "sealed opaque envelopes" in out
@@ -179,3 +181,12 @@ def test_rob2_logs_when_no_methods_heading(rob2, caplog):
     assert sent[0].endswith("...[truncated]")
     assert any("[ROB2 TEXT]" in r.getMessage() and "no Methods heading" in r.getMessage()
                for r in caplog.records)
+
+
+# 7. Default limit fits the largest real paper (Session 38 check)
+def test_default_section_limit_fits_largest_real_paper():
+    """McCrae (zsy234): start 1500 + Methods 26298 + Results 20181 = 47979.
+    At 20000 the half split dropped every 'drop' mention and the
+    intention-to-treat text (Karlsson, Lami, McCrae)."""
+    from pipelines.sr.src.screening import rob2_tool
+    assert rob2_tool.MAX_ROB2_SECTION_CHARS >= 48000

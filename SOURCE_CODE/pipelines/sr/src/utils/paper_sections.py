@@ -24,9 +24,11 @@ SKIP = "\n...[skipped to Methods]\n"
 
 _NUM = r"(?:\d+(?:\.\d+)*\.?\s+)?"      # "2 ", "2. ", "2.1 "
 _TAIL = r"\s*\.?\s*$"                   # optional stray dot
+_WHO = r"(?:materials?|patients?|subjects?|participants?)"
 METHODS_RE = re.compile(
     r"^\s*" + _NUM
-    + r"(?:(?:materials?|patients?|subjects?|participants?)\s+and\s+)?methods?"
+    + r"(?:" + _WHO + r"\s+and\s+)?methods?"
+    + r"(?:\s+and\s+" + _WHO + r")?"     # Session 38: "Methods and material" (Jensen)
     + _TAIL, re.I)
 RESULTS_RE = re.compile(r"^\s*" + _NUM + r"results?" + _TAIL, re.I)
 END_RE = re.compile(
@@ -53,7 +55,7 @@ def _cut(s, n):
     return s if len(s) <= n else s[:n] + TRUNC
 
 
-def rob2_text(text, limit=20000, fallback_chars=6000):
+def rob2_text(text, limit=50000, fallback_chars=6000):
     """Return (text to send, note for the log)."""
     text = text or ""
     methods = _headings(text, METHODS_RE)

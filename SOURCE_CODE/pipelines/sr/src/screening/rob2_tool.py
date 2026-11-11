@@ -12,7 +12,7 @@ BETA_HEADER = "files-api-2025-04-14"
 # 6000-char first rung) anyway.
 MAX_ROB2_PAGES = 12    # pages considered, both extraction paths
 MAX_ROB2_CHARS = 6000  # total chars passed to the RoB2 prompt
-MAX_ROB2_SECTION_CHARS = 20000  # Methods + Results sent to the RoB2 prompt (Session 38); MAX_ROB2_CHARS stays the page-reading budget
+MAX_ROB2_SECTION_CHARS = 50000  # Methods + Results sent to the RoB2 prompt (Session 38: 20000 cut ITT/dropout text; McCrae needs ~48000, ~12k tokens); MAX_ROB2_CHARS stays the page-reading budget
 
 ROB2_PROMPT = """You are a Cochrane methodologist applying RoB 2.0.
 Assess the attached RCT across five domains. Return ONLY valid JSON:
