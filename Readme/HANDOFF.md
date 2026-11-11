@@ -48,7 +48,7 @@ so those catches happen at session open, not mid-work.
 
 | Component      | Status |
 |----------------|--------|
-| Tests          | 1140 passed, 10 deselected on v2.10-sr-screening (Session 38); main 1064 (ef66b9f) (`python -m pytest -m "not live" --tb=short -q`) |
+| Tests          | 1144 passed, 10 deselected on v2.10-sr-screening (Session 38); main 1064 (ef66b9f) (`python -m pytest -m "not live" --tb=short -q`) |
 | Branch         | main = ef66b9f (PR #7 merged 2026-11-10: F7 truth fixture sr_truth.yaml + scripts/sr_score_run.py). Work on v2.10-sr-screening, PR #8 open: shared paper text (b3d804c), prisma_criteria write-if-changed (afd90a3), RoB2 overall rule (3e3785e), RoB2 Methods/Results text (908f889, 306d838), registration lines to RoB2 (Session 38). Branches v2.6-ocr-editor, v2.5-major-updates, v2.7-sr-fixes, v2.8-sr-review-gate, v2.9-sr-fixture deleted |
 | CI             | green on PR #8 at 222e779 (1140 passed, both jobs). Last confirmed on main: bcd42d9 (2026-11-09, 1027, both jobs). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
 | Deploy         | None: CLI only, local first. Render service deleted 2026-10-27; Streamlit UI and Render files removed in Session 33. UptimeRobot monitor for the old Render URL: not yet confirmed paused/deleted (user, outside the repo) |
@@ -134,12 +134,16 @@ SR (do 4 before 5 and 6)
     guidance gives Some concerns or High there. Jensen reported_result still
     cites the "excerpt". Study label "Ang 2008" (2010 paper; no year in the
     first 1500 chars) - the label comes from the model, note only.
-    Run 20261111_114651: registration lines reach RoB2 but are not used
-    (Ang does not mention NCT00965601; Karlsson says "trial registration not
-    mentioned"). McCrae says "no mention of ITT" although Methods line 662
-    says intention to treat (sent). Lami "ITT is implied (completers only)"
-    contradicts itself. McCrae attrition uses follow-up counts (Figure 1 text:
-    post 27/30/28, follow-up 24/27/23 of 39/37/37); WLC 13 vs 14.
+    Run 20261111_114651 findings are NOT prompt evidence: _call_with_text cut
+    every RoB2 text to 6000 chars (see Session 38 log), so registration lines,
+    McCrae's ITT line 662 and Results never reached the model. Judge the
+    prompt only after rerun 7d. McCrae Figure 1 text: post 27/30/28,
+    follow-up 24/27/23 of 39/37/37 (model said 13 lost in WLC; text gives 14).
+7d. RoB2 rerun with the whole text (after the [6000, 3000] fix): console.txt
+    should show [ROB2 SEND] attempt 1: 15297 / 30545 / 27919 / 28670 / 48125
+    chars. Compare with 20261111_114651 (s38_compare.py) and check: Ang and
+    Karlsson registration, McCrae ITT (line 662), Lami ITT wording,
+    outcome_measurement for McCrae and Lami. Then decide 7c.
 
 Writing
 8. Read input through the OCR reader so .docx tables reach the AI; a read
@@ -2155,5 +2159,14 @@ Expected: a clean tree in sync with origin, the top commit is this handoff, and 
   (+3), Lami 28670, McCrae 48125 (+1). All 25 domain labels and 5 overall
   the same as 20261111_081840 (all Some concerns). Score unchanged. The model
   ignores sent registration and ITT lines -> 7c (prompt).
-
-
+- 75915e0 pushed (HANDOFF rerun findings).
+- Correction: RoB2 never saw more than 6000 chars. _call_with_text cut every
+  text with [6000, 3000] (only the empty-answer retry needs a shorter text).
+  The [ROB2 TEXT] "sent N" counts were what rob2_text built, not what the
+  model got; the wiring tests captured text before the cut, so they passed.
+  Runs 20261111_081840 and 20261111_114651 therefore saw abstract + about the
+  first 4500 chars of Methods only. Fixed: first try sends the whole text,
+  the retry after an empty answer is cut to MAX_ROB2_CHARS; new log line
+  [ROB2 SEND] attempt n: X of Y chars. tests/test_sr_rob2_send.py (4) checks
+  the text at client.chat.completions.create. Comment at rob2_tool.py top
+  updated. 1144 passed.

@@ -6,12 +6,13 @@ import anthropic
 logger      = logging.getLogger(__name__)
 BETA_HEADER = "files-api-2025-04-14"
 
-# RoB 2.0 needs methods/randomisation/flow detail, which is front-loaded.
-# Both the text path and the OCR fallback share one budget; anything past
-# it would be cut by the prompt truncation (and _call_with_text's own
-# 6000-char first rung) anyway.
+# Session 38: the model gets rob2_text's pick (start + Methods + Results +
+# registration lines, up to MAX_ROB2_SECTION_CHARS). MAX_ROB2_PAGES and
+# MAX_ROB2_CHARS are the page-reading budget when no shared text is given;
+# MAX_ROB2_CHARS is also the no-Methods fallback and the cut on the retry
+# after an empty answer.
 MAX_ROB2_PAGES = 12    # pages considered, both extraction paths
-MAX_ROB2_CHARS = 6000  # total chars passed to the RoB2 prompt
+MAX_ROB2_CHARS = 6000  # page-reading budget; no-Methods fallback; retry cut
 MAX_ROB2_SECTION_CHARS = 50000  # Methods + Results sent to the RoB2 prompt (Session 38: 20000 cut ITT/dropout text; McCrae needs ~48000, ~12k tokens); MAX_ROB2_CHARS stays the page-reading budget
 
 ROB2_PROMPT = """You are a Cochrane methodologist applying RoB 2.0.
@@ -157,8 +158,13 @@ class RoB2Assessor:
 
     def _call_with_text(self, pdf_text: str, prompt: str) -> str:
         """Send PDF text via OpenAI-compatible API with retry on empty response."""
-        for attempt, max_chars in enumerate([6000, 3000]):
-            truncated = pdf_text[:max_chars] if len(pdf_text) > max_chars else pdf_text
+        # Session 38: first try sends the whole text (rob2_text already limits
+        # it to MAX_ROB2_SECTION_CHARS); only the retry after an empty answer
+        # is cut to MAX_ROB2_CHARS. Was [6000, 3000]: the model saw 6000 max.
+        for attempt, max_chars in enumerate([len(pdf_text), MAX_ROB2_CHARS]):
+            truncated = pdf_text[:max_chars]
+            logger.info("[ROB2 SEND] attempt %d: %d of %d chars to the model",
+                        attempt + 1, len(truncated), len(pdf_text))
             full = f"{prompt}\n\n--- ARTICLE TEXT ---\n{truncated}\n--- END ---"
             resp = self.client.chat.completions.create(
                 model=self.model,
