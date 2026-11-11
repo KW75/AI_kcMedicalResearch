@@ -48,9 +48,9 @@ so those catches happen at session open, not mid-work.
 
 | Component      | Status |
 |----------------|--------|
-| Tests          | 1133 passed, 10 deselected on v2.10-sr-screening (Session 38); main 1064 (ef66b9f) (`python -m pytest -m "not live" --tb=short -q`) |
-| Branch         | main = ef66b9f (PR #7 merged 2026-11-10: F7 truth fixture sr_truth.yaml + scripts/sr_score_run.py). Work on v2.10-sr-screening, PR #8 open: shared paper text (b3d804c), prisma_criteria write-if-changed (afd90a3), RoB2 overall rule (3e3785e), RoB2 Methods/Results text (Session 38). Branches v2.6-ocr-editor, v2.5-major-updates, v2.7-sr-fixes, v2.8-sr-review-gate, v2.9-sr-fixture deleted |
-| CI             | green on PR #8 at 908f889 (1129 passed, both jobs). Last confirmed on main: bcd42d9 (2026-11-09, 1027, both jobs). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
+| Tests          | 1137 passed, 10 deselected on v2.10-sr-screening (Session 38); main 1064 (ef66b9f) (`python -m pytest -m "not live" --tb=short -q`) |
+| Branch         | main = ef66b9f (PR #7 merged 2026-11-10: F7 truth fixture sr_truth.yaml + scripts/sr_score_run.py). Work on v2.10-sr-screening, PR #8 open: shared paper text (b3d804c), prisma_criteria write-if-changed (afd90a3), RoB2 overall rule (3e3785e), RoB2 Methods/Results text (908f889, 306d838), registration lines to RoB2 (Session 38). Branches v2.6-ocr-editor, v2.5-major-updates, v2.7-sr-fixes, v2.8-sr-review-gate, v2.9-sr-fixture deleted |
+| CI             | green on PR #8 at 306d838 (1133 passed, both jobs). Last confirmed on main: bcd42d9 (2026-11-09, 1027, both jobs). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
 | Deploy         | None: CLI only, local first. Render service deleted 2026-10-27; Streamlit UI and Render files removed in Session 33. UptimeRobot monitor for the old Render URL: not yet confirmed paused/deleted (user, outside the repo) |
 | Writing mode   | one-pass (write + edit + review in one call); tracks Topic 800 / Article 3,500 / Report 500 / Synopsis 1,500; on main since fa4edb9; tested on gemma4:e4b; terminal menus only |
 | OCR mode       | `--mode ocr`, launcher menu 8. Reads PDF / image / .txt / .docx; .doc refused with a message. Records in `reports/ocr/<header>/`, SUMMARY / SYNOPSIS in `output/ocr/`. Ollama by default; Qwen / OpenAI only behind the cloud gate; groq / deepseek / anthropic refused. Broken-font PDFs: text layer with [?], AI fills symbols only, document-wide vote per font code. [?] left varies run to run (Ang 2010, gemma4:e4b: 19 in s36_check, 7 in s36_vote; vote fills checked against Table 2) |
@@ -125,13 +125,19 @@ SR (do 4 before 5 and 6)
 7. Session 28 priorities: vote `outcome_selected` / `timepoint_selected`;
    Ang outcome change S26 -> S27 (`Readme/evidence/s26_issue11/`);
    decoder `!`-for-space gap (low).
-7a. RoB2 rerun with the section picker (Session 38): compare with Session 37
-    runs 20261110_234448 / 20261111_001942 (McCrae missing data should now see
-    27/30/28; Lami missing-data judgement vs its Discussion line 1897 on
-    intention-to-treat, which is not sent). Old route log line in rob2_tool.py
-    ("prompt uses first 6000") is stale; fix when touched.
+7a. RoB2 rerun after the registration fix; compare with 20261111_081840
+    (python $env:TEMP\s38_compare.py 20261111_081840 <new>). Ang and Karlsson
+    should no longer say "no registration". McCrae missing_data: the model now
+    says 15/39, 10/37, 13/37 lost; check by hand against Figure 1 (27/30/28
+    completers = 12/7/9 lost). Lami ITT is only in Discussion line 1897 (not
+    sent). Stale rob2_tool.py log line "prompt uses first 6000": fix when touched.
 7b. scripts/sr_score_run.py: also save the score to reports/sr/<run_id>/score.txt
     (UTF-8, no BOM; written by the script, not by PowerShell redirection).
+7c. RoB2 prompt: outcome_measurement came back Low for self-reported outcomes
+    with unblinded participants (McCrae, Lami in 20261111_081840); Cochrane
+    guidance gives Some concerns or High there. Jensen reported_result still
+    cites the "excerpt". Study label "Ang 2008" (2010 paper; no year in the
+    first 1500 chars) - the label comes from the model, note only.
 
 Writing
 8. Read input through the OCR reader so .docx tables reach the AI; a read
@@ -2113,4 +2119,16 @@ Expected: a clean tree in sync with origin, the top commit is this handoff, and 
 - Tests: +4 (3 reversed heading variants, default limit >= 48000; 4 failed
   before the code). Suite: 1129 -> 1133 passed.
 - Not yet verified: RoB2 rerun on the real papers (Next work 7a).
+- 306d838 pushed: "Methods and material(s)" headings, limit 50000; PR #8 CI
+  green, 1133 passed, both jobs.
+- Rerun 20261111_081840 (console.txt in the run folder): [ROB2 TEXT] counts
+  match the read-only check (Ang 15236, Jensen 30545, Karlsson 27753,
+  Lami 28670, McCrae 48005). All overall stay Some concerns. Methods-based
+  answers improved (Karlsson randomisation Low: ranuni + sealed opaque
+  envelopes; Jensen outcome Low: blinded assessor). Weak spots in 7a/7c.
+- Registration IDs did not reach RoB2: Ang NCT00965601 (abstract, past the
+  1500-char start), Karlsson NCTO1004458 (letter O) + end matter. rob2_text now
+  adds lines matching NCT/ISRCTN/clinicaltrials.gov if not already sent
+  (max 500 chars). A bare "registered" does not match. Added: Ang 1,
+  Karlsson 3, McCrae 1; Jensen and Lami have none. +4 tests, 1137 passed.
 

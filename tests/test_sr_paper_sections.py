@@ -190,3 +190,42 @@ def test_default_section_limit_fits_largest_real_paper():
     intention-to-treat text (Karlsson, Lami, McCrae)."""
     from pipelines.sr.src.screening import rob2_tool
     assert rob2_tool.MAX_ROB2_SECTION_CHARS >= 48000
+
+# 8. Registration lines outside the sent sections (Session 38 rerun
+#    20261111_081840: Ang NCT00965601 and Karlsson NCT01004458 no longer seen)
+def _with(text, before, insert):
+    assert before in text
+    return text.replace(before, insert + before, 1)
+
+
+def test_registration_line_before_methods_is_sent(ps):
+    base, _ = _pick(ps, _paper())
+    text = _with(_paper(), "--- page 2 ---",
+                 "ClinicalTrials.gov identifier: NCT00965601.\n")
+    out, note = _pick(ps, text)
+    assert "NCT00965601" in out
+    assert len(out) < len(base) + 200      # the line only, not the Introduction
+    assert "registration" in note
+
+
+def test_registration_in_end_matter_and_letter_o_are_sent(ps):
+    text = _with(_paper(), "References\n",
+                 "The trial is registered with Clinicaltrials.gov:\nNCTO1004458.\n")
+    out, _ = _pick(ps, text)
+    assert "registered with Clinicaltrials.gov:" in out
+    assert "NCTO1004458" in out
+    assert "referencesbody" not in out
+
+
+def test_registered_without_registry_is_not_sent(ps):
+    text = _with(_paper(), "References\n",
+                 "Scored by a registered polysomnographic technologist.\n")
+    out, _ = _pick(ps, text)
+    assert "polysomnographic technologist" not in out
+
+
+def test_registration_already_in_methods_is_not_repeated(ps):
+    text = _with(_paper(), "Results\n",
+                 "This trial is registered at www.clinicaltrials.gov (NCT02001077).\n")
+    out, _ = _pick(ps, text)
+    assert out.count("NCT02001077") == 1

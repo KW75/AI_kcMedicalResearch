@@ -6,14 +6,23 @@ after the first 6000 characters. This module sends:
   start of the paper (title + abstract, up to START_CHARS)
   + the Methods section
   + the Results section
+  + lines naming a trial registry that are not already in that text
 within one limit. No Methods heading -> the old behaviour (first
 fallback_chars), never a failure.
 
 A heading is a line on its own: "Methods", "METHODS", "2. Methods",
 "Methods." (Tesseract stray dot), "Materials and methods",
-"Patients and methods". A structured-abstract label such as
-"Methods: 60 women..." is not a heading. If Methods appears more than
-once (abstract with own-line headings), the longest Methods span wins.
+"Patients and methods", "Methods and material". A structured-abstract
+label such as "Methods: 60 women..." is not a heading. If Methods appears
+more than once (abstract with own-line headings), the longest Methods
+span wins.
+
+Registration lines (Session 38 rerun 20261111_081840): Ang's NCT00965601
+and Karlsson's NCT01004458 sit in the abstract after START_CHARS or in end
+matter, so RoB2 said "no trial registration". A line counts only if it has
+a registry ID (NCT + 8 digits, zero or letter O as Tesseract reads it;
+ISRCTN) or the registry name clinicaltrials.gov. The word "registered"
+alone does not count ("registered polysomnographic technologist").
 Stdlib only.
 """
 import re
@@ -21,6 +30,8 @@ import re
 START_CHARS = 1500
 TRUNC = "\n...[truncated]"
 SKIP = "\n...[skipped to Methods]\n"
+REG_SEP = "\n...[registration]\n"
+REG_MAX_CHARS = 500
 
 _NUM = r"(?:\d+(?:\.\d+)*\.?\s+)?"      # "2 ", "2. ", "2.1 "
 _TAIL = r"\s*\.?\s*$"                   # optional stray dot
@@ -35,6 +46,7 @@ END_RE = re.compile(
     r"^\s*" + _NUM
     + r"(?:discussion|conclusions?|references|bibliography|acknowledge?ments?)"
     + _TAIL, re.I)
+REG_RE = re.compile(r"NCT\s?[0O]\d{7}|ISRCTN\s?\d+|clinicaltrials\.gov", re.I)
 
 
 def _headings(text, pattern):
@@ -55,15 +67,33 @@ def _cut(s, n):
     return s if len(s) <= n else s[:n] + TRUNC
 
 
+def _add_registration(text, out):
+    """Append registry lines of text that out does not already contain."""
+    picked, total = [], 0
+    for line in text.split("\n"):
+        s = line.strip()
+        if not s or not REG_RE.search(s) or s in out or s in picked:
+            continue
+        if total + len(s) + 1 > REG_MAX_CHARS:
+            break
+        picked.append(s)
+        total += len(s) + 1
+    if not picked:
+        return out, 0
+    return out + REG_SEP + "\n".join(picked), len(picked)
+
+
 def rob2_text(text, limit=50000, fallback_chars=6000):
     """Return (text to send, note for the log)."""
     text = text or ""
     methods = _headings(text, METHODS_RE)
     if not methods:
         note = f"no Methods heading found, using first {fallback_chars} chars"
-        if len(text) <= fallback_chars:
-            return text, note
-        return text[:fallback_chars] + TRUNC, note
+        out = text if len(text) <= fallback_chars else text[:fallback_chars] + TRUNC
+        out, n_reg = _add_registration(text, out)
+        if n_reg:
+            note += f"; registration lines added: {n_reg}"
+        return out, note
 
     results = _headings(text, RESULTS_RE)
     ends = _headings(text, END_RE)
@@ -102,11 +132,14 @@ def rob2_text(text, limit=50000, fallback_chars=6000):
     out = (start + sep if start else "") + _cut(meth, meth_n)
     if res:
         out += "\n" + _cut(res, res_n)
+    out, n_reg = _add_registration(text, out)
 
     if res:
         note = f"Methods {len(meth)} + Results {len(res)} chars"
     else:
         note = (f"Methods {len(meth)} chars, no Results heading "
                 f"(Methods runs to the next end heading)")
+    if n_reg:
+        note += f"; registration lines added: {n_reg}"
     note += f"; sent {len(out)} of {len(text)} chars"
     return out, note
