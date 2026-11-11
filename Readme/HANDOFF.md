@@ -44,13 +44,14 @@ so those catches happen at session open, not mid-work.
 
 ---
 
-## Current State (Session 36, v2.6.0 on main, 2026-11-09)
+## Current State (Session 38, v2.6.0 on main, 2026-11-11)
 
 | Component      | Status |
 |----------------|--------|
 | Tests | 1193 passed, 10 deselected on v2.10-sr-screening (Session 38); main 1064 (ef66b9f) (python -m pytest -m "not live" --tb=short -q) |
-| Branch         | main = ef66b9f (PR #7 merged 2026-11-10: F7 truth fixture sr_truth.yaml + scripts/sr_score_run.py). Work on v2.10-sr-screening, PR #8 open: shared paper text (b3d804c), prisma_criteria write-if-changed (afd90a3), RoB2 overall rule (3e3785e), RoB2 Methods/Results text (908f889, 306d838), registration lines to RoB2 (Session 38); Session 38: Karlsson/Ang overrides (cf75209), RoB2 Domain 4 self-report rule (46fbd9b), Domain 4 High outright (e4e97b8), Ang excluded by reviewer + not-pooled report section (a56dc55), plain report reasons + POOLED line (0bf59dc), fibromyalgia set moved to reference/ (7h, this commit). Branches v2.6-ocr-editor, v2.5-major-updates, v2.7-sr-fixes, v2.8-sr-review-gate, v2.9-sr-fixture deleted |
-| CI | green on PR #8 at a56dc55 (1164 passed, both jobs). Last confirmed on main: bcd42d9 (2026-11-09, 1027, both jobs). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
+| Branch         | main = ef66b9f (PR #7 merged 2026-11-10: F7 truth fixture sr_truth.yaml + scripts/sr_score_run.py). Work on v2.10-sr-screening, PR #8 open: shared paper text (b3d804c), prisma_criteria write-if-changed (afd90a3), RoB2 overall rule (3e3785e), RoB2 Methods/Results text (908f889, 306d838), registration lines to RoB2 (Session 38); Session 38: Karlsson/Ang overrides (cf75209), RoB2 Domain 4 self-report rule (46fbd9b), Domain 4 High outright (e4e97b8), Ang excluded by reviewer + not-pooled report section (a56dc55), plain report reasons + POOLED line (0bf59dc), fibromyalgia set moved to reference/ (7h, b32f4c4), REVIEWER_GUIDE rewrite + readme_sr_pipeline.txt (docs, this commit). Branches v2.6-ocr-editor, v2.5-major-updates, v2.7-sr-fixes, v2.8-sr-review-gate, v2.9-sr-fixture deleted |
+| CI | green on PR #8 at b32f4c4 (1193 passed, both jobs, 2026-11-11). Last confirmed on main: bcd42d9 (2026-11-09, 1027, both jobs). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
+| SR docs        | Readme/readme_sr_pipeline.txt = for users: how the SR pipeline works and how to use it. docs/sr/REVIEWER_GUIDE.md = for reviewers: what to check by hand, documented failures, limitations, methods statement (rewritten Session 38; section numbers 2.2, 3.1, 3.5, 5, 6 are cited by code/tests/README, keep them). README.md = the app. Update the SR docs when SR behaviour changes |
 | Deploy         | None: CLI only, local first. Render service deleted 2026-10-27; Streamlit UI and Render files removed in Session 33. UptimeRobot monitor for the old Render URL: not yet confirmed paused/deleted (user, outside the repo) |
 | Writing mode   | one-pass (write + edit + review in one call); tracks Topic 800 / Article 3,500 / Report 500 / Synopsis 1,500; on main since fa4edb9; tested on gemma4:e4b; terminal menus only |
 | OCR mode       | `--mode ocr`, launcher menu 8. Reads PDF / image / .txt / .docx; .doc refused with a message. Records in `reports/ocr/<header>/`, SUMMARY / SYNOPSIS in `output/ocr/`. Ollama by default; Qwen / OpenAI only behind the cloud gate; groq / deepseek / anthropic refused. Broken-font PDFs: text layer with [?], AI fills symbols only, document-wide vote per font code. [?] left varies run to run (Ang 2010, gemma4:e4b: 19 in s36_check, 7 in s36_vote; vote fills checked against Table 2) |
@@ -73,162 +74,110 @@ Issue numbers below match `README.md` > Known Issues.
 
 ## Next work (start here)
 
-Updated at Session 37 open (2026-11-09). PR #4 is merged (bcd42d9). Items
-closed in Session 36 are removed; the Session 36 log keeps the evidence.
-This list is the only place to tick items off.
+Updated at Session 38 close (2026-11-11). Done items are removed; the
+Session 38 log keeps the evidence. This list is the only place to tick
+items off. Old item IDs (7i, 7n, ...) in brackets for tracing.
 
-1. One-file run (decided Session 37): no SUMMARY. reports/ocr/<header>/
-   keeps the raw text layer with every [?] as extracted, plus FILL_DEBUG.
-   output/ocr/ gets only <name>_<date>_TEXT.docx and .md: the full text,
-   page by page, with each [?] the document-wide vote confirms replaced by
-   its symbol; [?] without a majority stay as [?]. Single-vote fills: see
-   the Session 37 log (option A = stay [?], option B = fill + yellow).
-   Several files: SYNOPSIS as now, plus each file's filled text in
-   reports/ocr/<header>/. Replaces the open choices "list single-vote fills
-   in the record" and "code-fence the record .md".
-2. Tesseract as a second reader for [?] left after the AI fill and vote.
-   Design and Ang evidence in the Session 36 log (trust alone only for minus;
-   add `—` to `_SAME_SIGN`; fill per [?]; expected 7 -> 2 on s36_vote).
-   Lookup: TESSERACT_CMD -> PATH -> install folders (incl. Mac Homebrew) -> skip.
-3. Leftovers from s36_check / s36_vote: "decrease of −10.2" double negative;
-   nested bullets shown as `- *   CBT:` in SUMMARY .docx; "AI answers for refused
-   lines" prints when the file holds only vote lines; convert LaTeX in fill
-   answers (`$\pm$`) before `_accept`. "Week 6 to Week 12" heading can return
-   despite KEEP_RULES: not fixable in code; user checks time spans.
+SR - review content
+1. Criteria in the PICO step (old 7i): SOURCE_CODE\main.py lines 1498-1499
+   hard-code inclusion ["RCT", "Adult participants"] / exclusion
+   ["Non-RCT", "Animal studies"]; sr main.py reads them (lines 544, 886).
+   Let the doctor see and edit them in the PICO step (defaults from
+   population / study_design). Update readme_sr_pipeline.txt section 1 and
+   REVIEWER_GUIDE section 0-less intro if behaviour changes.
+2. 7h leftovers: copy run 20261111_190839 into
+   reference/sr_cbt_fibromyalgia/reports/ (README cites it); full journal
+   citations in the reference README; rename the misspelt "ouput" folder to
+   "output" (check .gitignore and tests/test_sr_reference_set.py paths);
+   consider renaming pico_sample.json (it is search output, not a PICO).
+3. Jensen override: Table 3 p7 posttreatment weekly pain VAS 49 (19) CBT vs
+   59 (26) control. N randomised 25/18 (p1, Fig 1 p3); the per-arm N behind
+   Table 3 is not in the text layer: confirm in the PDF before setting
+   checked: true. The AI's 45.6 is the mean age (p2).
+4. Report cosmetics (old 7n, 7f+): (a) Word report (report_generator.py)
+   lacks the not-pooled section; (b) scorer prints "values from
+   study_overrides.yaml" for Ang, which is excluded and has no values;
+   (c) HTML "4 of 5 use values entered by a reviewer" counts an
+   exclusion-only entry; (d) "[SENSITIVITY] no needs-review studies"
+   although Jensen is needs-review; (e) print "AI alone: ALL MATCH" for
+   confirm-only overrides (Karlsson).
+5. SR LaTeX check: grep SR outputs (CSV, HTML, docx text, console) for stray
+   $...$; if found, reuse strip_latex() (OCR mode).
+6. Run-to-run variation (old 7l): RoB2 outside Domain 4 (randomisation,
+   missing_data, deviations); missing-data numbers wrong (Lami UMC 11/41 vs
+   about 5; McCrae 9/7/5 vs Figure 1 12/7/9); Jensen means 45.6/45.6
+   no_majority; Lami AI means drift. Consider N RoB2 runs + vote.
+   Stale log text "(prompt uses first 6000)" in rob2_tool.py ~290: check
+   which path it belongs to when touched.
+7. Screening reads only the first MAX_SCREEN_CHARS = 6000
+   (relevance_screener.py line 222). Decide whether screening uses
+   paper_sections like RoB2 does.
 
-SR (do 4 before 5 and 6)
-4. DONE in code (Session 37): SR model from one rule,
-   `providers.sr_default_model` (qwen -> QWEN_VISION_MODEL = qwen3-vl-plus).
-   Used by main._sr_default_model, sr/main.resolve_model, DataExtractor,
-   HybridTableExtractor (model=None) and nondet_probe.py (--model None).
-   Hard-coded qwen-vl-plus removed; .env.example / README now say
-   qwen3-vl-plus (pinned by tests/test_qwen_vision_model.py).
-   Still to do: baseline SR run on qwen3-vl-plus, checked against the PDFs
-   (earlier verified results came from the old model); re-run the
-   nondet probe on the new model before REVIEWER_GUIDE §6 claims anything
-   about its determinism.
-5. Broken text layers in all 5 SR papers: route SR text paths through the OCR
-   reader (see Session 37 log). Until then, text-based screening and RoB2 for
-   CBT-women and zsy234 are UNVERIFIED. Also check how relevance_screener.py
-   behaves when tesseract.exe is not on PATH.
-   Manual [?] correction (decided Session 37): run 1 carries on and warns
-   "[?] left: N" per paper, writing the reader's text to an editable
-   reports/sr/text/<paper>.md (with a hash of the PDF). Run 2 reads the
-   corrected file if the PDF hash still matches (log "[CORRECTED TEXT]",
-   otherwise warn and ignore it) and writes a run-1 vs run-2 comparison of
-   screening, RoB2 domains and text_fallback values. Vision extraction reads
-   page images, so corrections don't reach it; use study_overrides.yaml.
-   The source-quote check must use the same corrected text.
-   HybridTableExtractor is built only by tests (no pipeline caller):
-   decide whether to wire it in or remove it.
-6. Allow Ollama vision models for SR (Session 35 log, TODO SR item 3).
-7. Session 28 priorities: vote `outcome_selected` / `timepoint_selected`;
-   Ang outcome change S26 -> S27 (`Readme/evidence/s26_issue11/`);
-   decoder `!`-for-space gap (low).
-7a. Done in Session 38 (run 20261111_114651, see log). Left over: stale
-    rob2_tool.py log line "prompt uses first 6000" - fix when touched.
-7b. scripts/sr_score_run.py: also save the score to reports/sr/<run_id>/score.txt
-    (UTF-8, no BOM; written by the script, not by PowerShell redirection).
-7c. Done (Session 38): rob2_prompt(outcome) adds a Domain 4 rule (for
-    self-reported outcomes the participant is the assessor; a blinded person
-    handing out questionnaires is not blinded assessment; Some concerns, or
-    High if knowledge likely influenced answers) and judges Domains 4/5 for
-    the PICO outcome; main.py passes cfg pico outcome; 7 tests in
-    tests/test_sr_rob2_prompt.py. Run 20261111_171313 vs 161320:
-    outcome_measurement Low -> Some concerns (Ang, Karlsson, Lami, McCrae),
-    Low -> High (Jensen); all five name pain and the participant as assessor.
-    Score unchanged: 5 checked, 4 fully correct, 0 wrong AND POOLED.
-7d. Done: run 20261111_121950 (see Session 38 log).
-7e. Done (Session 38): Karlsson override (Table 2 p6, MPI-1 Pain severity,
-    crude 3.88 (1.05) vs 3.67 (0.75), n 24/24, checked in the PDF) and Ang Ns
-    only (Table 2 Week 6 n 15/13, not randomised 17/15). Karlsson now
-    checked: true in sr_truth.yaml. Run 20261111_161320 pools 4 again.
-    Jensen n still varies (25/18 vs 19/15), not pooled.
-7f. Done (Session 38): scorer adds "AI alone:" lines for overridden studies
-    (AI value = number before "->" in override_fields, "absent" = MISSING,
-    untouched fields count as the AI's value) and an "AI alone: N checked,
-    K fully correct" SUMMARY line; exit code still follows the pooled values.
-7f+. Cosmetic: a study whose override only confirms the AI values
-    (Karlsson, all "confirmed") gets no "AI alone:" line, although it
-    counts in the AI-alone SUMMARY. Print "AI alone: ALL MATCH" there too.
-7g. Ang contributes Week 6 change scores; the other studies give
-    post-treatment values. Cochrane Handbook 10.5.2: do not mix change and
-    final values in an SMD. Reviewer decision: use Ang's Week 6 final values,
-    or switch to MD/sensitivity analysis.
-7h. Done (Session 38): fibromyalgia trial set moved out of the app defaults to
-    reference/sr_cbt_fibromyalgia/ (README, prisma_criteria.yaml,
-    pico_sample.json, study_overrides.yaml tracked; input/ PDFs, reports/,
-    output/ local only, git-ignored). Config prisma_criteria.yaml is a sample
-    with <...> placeholders; pipelines/sr/main.py stops (SystemExit) while any
-    remain (criteria_file.placeholder_fields); the launcher still overwrites it
-    from the PICO step. input/sr/study_overrides.yaml is a comments-only
-    template (loads 0, no warning). input/sr/pico_sample.json is search output,
-    now git-ignored. 16 tests (10 in tests/test_sr_reference_set.py, 6
-    gitignore cases); test_sr_comparator_criteria.py reads the reference copies.
-    Open: copy run 20261111_190839 into reference reports/ (README cites it);
-    full journal citations in the README; pico_sample.json name is misleading.
-7i. SOURCE_CODE\main.py lines 1498-1499 (launcher) hard-code
-    inclusion_criteria ["RCT", "Adult participants"] and exclusion_criteria
-    ["Non-RCT", "Animal studies"] for every review; sr main.py reads them
-    (lines 544, 886) into screening and reports. Wrong for paediatric or
-    non-RCT reviews; derive from the PICO (population, study_design).
-7j. Done (Session 38): reviewer decision High outright - subjective
-    participant-reported outcome with participants aware of their arm ->
-    High (4.3 Yes, 4.4 Yes, 4.5 Probably yes); 1 test. Run 20261111_175754:
-    outcome_measurement and OVERALL High for all five (model overall still
-    Some concerns; domain rule applies). State the rule in the review methods.
-7k. Done (Session 38): Ang Table 2 values (-20.2 +/- 23.9 vs -14.9 +/- 16.4,
-    n 15/13) are the NFR pain rating (lab stimulus pain, Table 2 footnote),
-    not pain intensity. FIQ pain only as Week 6 change (-0.2 +/- 1.8 vs
-    -0.3 +/- 1.6, lines 366-368), no final values, no N. Reviewer option B:
-    Ang excluded from the SMD via new study_overrides.yaml key
-    exclude_from_meta (reason -> skip_reason "excluded by reviewer: ...",
-    no effect size, not in [SENSITIVITY], [EXCLUDED] log line). HTML/PDF
-    report has a new section "Studies included in the review but not in the
-    meta-analysis" (n of N pooled, reason, Reviewer/Automatic; PRISMA 2020
-    item 13a). sr_truth.yaml Ang checked: false (old values kept, NFR row).
-    RoB2 judges the PICO outcome (pain) since 7c. 7 tests in
-    tests/test_sr_reviewer_exclusion.py; 3 score tests adjusted.
-    Run 20261111_190839: pooled 3 (Karlsson, Lami, McCrae); Ang Reviewer,
-    Jensen Automatic; SUMMARY 4 checked, 3 fully correct, 0 wrong AND POOLED.
-7l. RoB2 variation outside Domain 4 (171313): Ang randomisation -> Low
-    (says balanced; 161320 cited NSAID 76% vs 26%, P=0.01; no method given),
-    missing_data -> Low, deviations -> Some concerns with Domain 4 reasoning
-    leaking into Domain 2; Jensen same three changes (not inspected).
-    missing_data numbers still wrong: Lami UMC 11/41 (about 5), McCrae
-    9/7/5 withdrew (Figure 1: 12/7/9). Consider N RoB2 runs + vote.
-7m. Done (Session 38): Ang part superseded by 7k (excluded, not
-    overridden). Score report prints a line after SUMMARY: "POOLED: n of N
-    studies (names); not pooled: names", counting every row incl. studies with
-    no truth entry; SUMMARY text and exit code unchanged; 2 tests (baseline
-    test now reads only the offenders line). Run 20261111_190839: POOLED: 3
-    of 5 studies (Karlsson, Lami, McCrae); not pooled: Ang, Jensen. Still
-    open: Jensen means 45.6/45.6 no_majority (see 7l).
-7n. Open (cosmetic, from run 20261111_190839): (a) Word report
-    (report_generator.py) lacks the not-pooled section; (b) scorer prints
-    "values from study_overrides.yaml" for Ang, which is excluded and has no
-    values; (c) HTML "4 of 5 use values entered by a reviewer" counts an
-    exclusion-only entry; (d) "[SENSITIVITY] no needs-review studies" although
-    Jensen is needs-review (no g to compare). (e) Done (Session 38): report
-    Reason cell uses plain_skip_reason() in html_report.py - needs-review text
-    names the fields that disagreed ("The AI read different values on
-    repeated readings (intervention mean, control mean). Not confirmed by a
-    reviewer."), table_shift = "neighbouring table row", outcome_match=False
-    prefix reworded, "; also:" -> "Also:". Statistical reasons (insufficient
-    mean/SD/N, df, pooled SD zero, missing CI) stay verbatim (reviewer choice:
-    doctors want the exact reason). CSV, console and score.txt keep the raw
-    skip_reason. 11 tests in tests/test_sr_reviewer_exclusion.py.
+SR - extraction checks
+8. F8: source quote vs field (arm label in the quote = group label; Ns in
+   the quote = extracted N). Ang N 17/15 vs quote 15/13; McCrae control
+   quote is the CBT-P row.
+9. F6: every extracted number must appear in the paper text; [?] next to a
+   number = unverifiable (not trusted, not rejected). Watch Tesseract stray
+   dots ("15. March").
+10. Wire paper_text into extraction: decide images only / text only / both.
+    Overrides and corrected text must agree with what F6/F8 check.
+
+SR - report
+11. [SENSITIVITY] estimate and waiting-list subgroup (Jensen, Karlsson,
+    McCrae vs Ang, Lami) in the Word/HTML report and forest plot; warn when
+    a subgroup has < 3 studies.
+
+SR - local-first (after 1-11)
+12. Ollama vision for SR (Session 35 TODO SR item 3):
+    a. Launcher: remove ollama from BLOCKED_FOR_SR (scripts/launcher.py
+       line 198, checked at 487 and 532); allow only when
+       ollama_models.model_capabilities lists "vision" (as OCR does).
+    b. data_extractor.py: add ollama to vision_providers (lines 219-228)
+       via OLLAMA_URL/v1 after checking image parts work there, or use
+       call_ollama_provider(images=...). rob2_tool.py reads OLLAMA_URL,
+       the rest of the app OLLAMA_HOST: settle one name.
+    c. providers.py line 77: ollama vision=False for the whole provider;
+       decide per model.
+    d. OLLAMA_CONTEXT (default 32768) must fit 5 page images per call.
+    e. No local vision model: offer cloud only after a typed "y";
+       DeepSeek stays blocked.
+    f. Verify only: hard-coded qwen-vl-plus was removed in Session 37.
+       Grep SOURCE_CODE and scripts for 'qwen-vl-plus'; expect tests and
+       comments only.
+    g. Test: gemma4:e4b on the reference set, N=3, field by field vs
+       qwen3-vl-plus and the PDFs (sr_score_run.py "AI alone" lines).
+
+SR - carried
+13. Baseline SR run on qwen3-vl-plus checked against the PDFs; rerun the
+    nondet probe before REVIEWER_GUIDE section 6 claims anything about it.
+14. Corrected paper text: paper_text.py caches input/sr/paper_text/<name>.txt
+    and reruns reuse it. Still open: a PDF hash so a replaced PDF with the
+    same name does not reuse stale text; "[?] left: N" per paper; run-1 vs
+    run-2 comparison. Check Tesseract-missing behaviour in
+    relevance_screener.py. HybridTableExtractor (built only by tests): wire
+    in or remove. Text-based screening/RoB2 for CBT-women and zsy234
+    UNVERIFIED until checked.
+15. Session 28 priorities: vote outcome_selected / timepoint_selected;
+    Ang outcome change S26 -> S27 (Readme/evidence/s26_issue11/); decoder
+    !-for-space gap (low).
+
+OCR
+16. One-file run without SUMMARY (Session 37 decision; single-vote fills:
+    see Session 37 log); Tesseract as second reader for [?] left (Session
+    36 log); leftovers: "decrease of -10.2" double negative, nested bullets
+    in SUMMARY .docx, "AI answers for refused lines" message, LaTeX in fill
+    answers before _accept.
 
 Writing
-8. Read input through the OCR reader so .docx tables reach the AI; a read
-   error must be a [SKIP] message, not "[Could not read <name>]" sent as
-   document text; `--report` path (main.py ~985-998) and `list_input_names`
-   still skip .doc silently.
+17. Read input through the OCR reader so .docx tables reach the AI; a read
+    error must be a [SKIP] message; `--report` path (main.py ~985-998) and
+    `list_input_names` still skip .doc silently.
 
 Other
-9. Menu 7 Data Analysis: design questions first.
-10. UptimeRobot monitor for the deleted Render URL: confirm paused/deleted (user).
-
+18. Menu 7 Data Analysis: design questions first.
+19. Outside the repo: confirm the UptimeRobot monitor for the old Render
+    URL is paused or deleted (user).
 
 ---
 
@@ -2287,3 +2236,21 @@ Expected: a clean tree in sync with origin, the top commit is this handoff, and 
 - 46fbd9b pushed; PR #8 CI green, 1156 passed, both jobs. 7j High outright:
   1 test, 1157 passed. Run 20261111_175754: Domain 4 and overall High for
   all five, no other domain changed vs 171313; Ang not pooled -> 7m.
+- PR #8 CI green at b32f4c4: 1193 passed, both jobs.
+- Docs (Session 38 close): Readme/readme_sr_pipeline.txt added (user guide:
+  how the SR pipeline works and how to use it). docs/sr/REVIEWER_GUIDE.md
+  rewritten for reviewers (kept, not deleted: cited by 2 tests, 5 console
+  messages, 6 README lines and flashcard-help.html). Section numbers 2.2,
+  3.1, 3.5, 5, 6 kept; 2.2 still numbers 5 branches (doc-sync test passes).
+  Updated: McCrae pooled from reviewer values (Table 3 p9, arms combined),
+  Tesseract instead of the offset decoder, qwen3-vl-plus, review gate,
+  exclude_from_meta, RoB2 checks (new 3.6), change vs final values, new
+  2.3 (errors seen in the worked example).
+- Checked against code at close: screening cuts at MAX_SCREEN_CHARS = 6000
+  (relevance_screener.py 222); RoB2 sends Methods + Results up to 50,000
+  chars (MAX_ROB2_SECTION_CHARS), first 6000 if no Methods heading, retry
+  cut to 6000 - readme section 5 corrected to say so; sr_score_run.py
+  writes score.txt itself (line 242-243, UTF-8 no BOM) -> old 7b done.
+- 7g superseded by 7k (Ang excluded, so change-vs-final mixing does not
+  arise). Next work renumbered 1-19 in plan order.
+- Suite unchanged: 1193 passed, 10 deselected (docs only).
