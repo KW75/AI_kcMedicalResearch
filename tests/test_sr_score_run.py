@@ -135,7 +135,7 @@ def test_baseline_run_flags_wrong_pooled_studies(sc, truth, tmp_path):
     assert "WRONG" in report
     # Session 38: Karlsson hand-checked (values match); Ang unchecked (7k, NFR row).
     assert "4 checked" in report and "1 fully correct" in report
-    offenders = report.split("differ from the hand-checked truth:")[-1]
+    offenders = report.split("differ from the hand-checked truth:")[-1].split("\n")[0]
     assert "Karlsson" not in offenders and "Ang" not in offenders
     assert sc.exit_code(results) == 1
 
@@ -252,3 +252,29 @@ def test_no_override_prints_no_ai_lines(sc, truth, tmp_path):
     folder = _run_folder(tmp_path, [_row(*LAMI_ROW)])
     _, text = _report(sc, truth, folder)
     assert "AI alone" not in text
+
+# --- Session 38 (7m): the score report prints the pooled count, so a drop
+# (175754 pooled 4 -> 3) is visible. Separate line; SUMMARY and exit code unchanged.
+def test_report_prints_pooled_count_and_names(sc, truth, tmp_path):
+    folder = _run_folder(tmp_path, [
+        _row("Ang", "17", "15", "-20.2", "23.9", "-14.9", "16.4",
+             included="False", skip="excluded by reviewer: NFR row"),
+        _row("Jensen", "19", "15", "", "", "", "",
+             included="False", skip="insufficient mean/SD/N to derive effect size"),
+        _row("Karlsson", "24", "24", "3.88", "1.05", "3.67", "0.75"),
+        _row("Lami", "28", "36", "7.35", "2.08", "7.4", "1.29"),
+        _row("McCrae", "57", "28", "46.86", "24.06", "52.38", "24.04"),
+    ])
+    report = sc.format_report(sc.score_run_folder(folder, truth))
+    assert "POOLED: 3 of 5 studies (Karlsson, Lami, McCrae); not pooled: Ang, Jensen" in report
+
+
+def test_report_pooled_count_includes_unknown_and_zero(sc, truth, tmp_path):
+    folder = _run_folder(tmp_path, [
+        _row("Nobody", "1", "1", "1", "1", "1", "1",
+             included="False", skip="pooled SD is zero"),
+        _row("Jensen", "19", "15", "", "", "", "",
+             included="False", skip="insufficient mean/SD/N to derive effect size"),
+    ])
+    report = sc.format_report(sc.score_run_folder(folder, truth))
+    assert "POOLED: 0 of 2 studies; not pooled: Nobody, Jensen" in report

@@ -48,9 +48,9 @@ so those catches happen at session open, not mid-work.
 
 | Component      | Status |
 |----------------|--------|
-| Tests | 1164 passed, 10 deselected on v2.10-sr-screening (Session 38); main 1064 (ef66b9f) (python -m pytest -m "not live" --tb=short -q) |
+| Tests | 1177 passed, 10 deselected on v2.10-sr-screening (Session 38); main 1064 (ef66b9f) (python -m pytest -m "not live" --tb=short -q) |
 | Branch         | main = ef66b9f (PR #7 merged 2026-11-10: F7 truth fixture sr_truth.yaml + scripts/sr_score_run.py). Work on v2.10-sr-screening, PR #8 open: shared paper text (b3d804c), prisma_criteria write-if-changed (afd90a3), RoB2 overall rule (3e3785e), RoB2 Methods/Results text (908f889, 306d838), registration lines to RoB2 (Session 38). Branches v2.6-ocr-editor, v2.5-major-updates, v2.7-sr-fixes, v2.8-sr-review-gate, v2.9-sr-fixture deleted |
-| CI | green on PR #8 at e4e97b8 (1157 passed, both jobs). Last confirmed on main: bcd42d9 (2026-11-09, 1027, both jobs). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
+| CI | green on PR #8 at a56dc55 (1164 passed, both jobs). Last confirmed on main: bcd42d9 (2026-11-09, 1027, both jobs). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
 | Deploy         | None: CLI only, local first. Render service deleted 2026-10-27; Streamlit UI and Render files removed in Session 33. UptimeRobot monitor for the old Render URL: not yet confirmed paused/deleted (user, outside the repo) |
 | Writing mode   | one-pass (write + edit + review in one call); tracks Topic 800 / Article 3,500 / Report 500 / Synopsis 1,500; on main since fa4edb9; tested on gemma4:e4b; terminal menus only |
 | OCR mode       | `--mode ocr`, launcher menu 8. Reads PDF / image / .txt / .docx; .doc refused with a message. Records in `reports/ocr/<header>/`, SUMMARY / SYNOPSIS in `output/ocr/`. Ollama by default; Qwen / OpenAI only behind the cloud gate; groq / deepseek / anthropic refused. Broken-font PDFs: text layer with [?], AI fills symbols only, document-wide vote per font code. [?] left varies run to run (Ang 2010, gemma4:e4b: 19 in s36_check, 7 in s36_vote; vote fills checked against Table 2) |
@@ -195,19 +195,27 @@ SR (do 4 before 5 and 6)
     leaking into Domain 2; Jensen same three changes (not inspected).
     missing_data numbers still wrong: Lami UMC 11/41 (about 5), McCrae
     9/7/5 withdrew (Figure 1: 12/7/9). Consider N RoB2 runs + vote.
-7m. Superseded by 7k (Session 38): Ang is excluded by the reviewer, not
-    overridden (Table 2 is the NFR row, so no means/SDs to enter). Still
-    open: scorer SUMMARY should print the pooled count (175754 dropped 4 -> 3
-    invisibly; the HTML report now shows "n of N studies pooled"). Jensen
-    means 45.6/45.6 no_majority.
+7m. Done (Session 38): Ang part superseded by 7k (excluded, not
+    overridden). Score report prints a line after SUMMARY: "POOLED: n of N
+    studies (names); not pooled: names", counting every row incl. studies with
+    no truth entry; SUMMARY text and exit code unchanged; 2 tests (baseline
+    test now reads only the offenders line). Run 20261111_190839: POOLED: 3
+    of 5 studies (Karlsson, Lami, McCrae); not pooled: Ang, Jensen. Still
+    open: Jensen means 45.6/45.6 no_majority (see 7l).
 7n. Open (cosmetic, from run 20261111_190839): (a) Word report
     (report_generator.py) lacks the not-pooled section; (b) scorer prints
     "values from study_overrides.yaml" for Ang, which is excluded and has no
     values; (c) HTML "4 of 5 use values entered by a reviewer" counts an
     exclusion-only entry; (d) "[SENSITIVITY] no needs-review studies" although
-    Jensen is needs-review (no g to compare); (e) Jensen reason in the report
-    shows internal instructions (study_overrides.yaml path) - needs plain
-    wording for doctors.
+    Jensen is needs-review (no g to compare). (e) Done (Session 38): report
+    Reason cell uses plain_skip_reason() in html_report.py - needs-review text
+    names the fields that disagreed ("The AI read different values on
+    repeated readings (intervention mean, control mean). Not confirmed by a
+    reviewer."), table_shift = "neighbouring table row", outcome_match=False
+    prefix reworded, "; also:" -> "Also:". Statistical reasons (insufficient
+    mean/SD/N, df, pooled SD zero, missing CI) stay verbatim (reviewer choice:
+    doctors want the exact reason). CSV, console and score.txt keep the raw
+    skip_reason. 11 tests in tests/test_sr_reviewer_exclusion.py.
 
 Writing
 8. Read input through the OCR reader so .docx tables reach the AI; a read
@@ -2250,6 +2258,9 @@ Expected: a clean tree in sync with origin, the top commit is this handoff, and 
   only Ns drift" is outdated (121950: means no_majority 3.8/none/3.2).
 - 7k: Ang excluded by the reviewer (exclude_from_meta), reason shown in the
   report; run 20261111_190839 pools 3. CI green at e4e97b8 (1157). 1164 passed.
+- 7n(e) + 7m: report Reason cell reworded (plain_skip_reason, statistical
+  reasons verbatim); score report prints "POOLED: n of N studies". CI green
+  at a56dc55 (1164). 1177 passed.
 - 7f done: sr_score_run.py scores the AI's own values for overridden studies
   (_ai_overrides reads override_fields). Run 20261111_121950: AI alone 4
   checked, 0 fully correct. Lami AI N 38/41 vs 28/36, means 3.8/5.2 vs

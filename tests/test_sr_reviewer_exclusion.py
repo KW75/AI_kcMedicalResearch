@@ -95,3 +95,84 @@ def test_reports_accept_meta_audit_and_template_has_section():
     for gen in (hr.HTMLReportGenerator.generate, pr.PDFReportGenerator.generate):
         assert "meta_audit" in inspect.signature(gen).parameters
     assert "{not_pooled_html}" in hr.HTML_TEMPLATE
+
+# --- Session 38 (7n e): report wording for the not-pooled table.
+# Statistical reasons stay verbatim (exact for technical readers); only
+# pipeline-internal text (file paths, flag names, code syntax) is reworded.
+# The CSV/console keep the technical skip_reason unchanged.
+import pytest
+
+_REVIEW_TAIL = (" - verify against the PDF, or enter the values in "
+                "input/sr/study_overrides.yaml with a source-page note")
+NEEDS_REVIEW = ("needs review: runs disagree (mean_intervention:no_majority|"
+                "mean_control:no_majority)" + _REVIEW_TAIL)
+TABLE_SHIFT = "needs review: runs disagree (table_shift)" + _REVIEW_TAIL
+INSUFFICIENT = "insufficient mean/SD/N to derive effect size"
+TECH_WORDS = ("study_overrides", "no_majority", "table_shift", "needs review", "; also:")
+
+
+def test_plain_reason_needs_review_names_fields_hides_internal_text():
+    out = hr.plain_skip_reason(NEEDS_REVIEW)
+    assert "repeated readings" in out
+    assert "intervention mean" in out and "control mean" in out
+    for w in TECH_WORDS:
+        assert w not in out
+
+
+def test_plain_reason_table_shift():
+    out = hr.plain_skip_reason(TABLE_SHIFT)
+    assert "neighbouring table row" in out
+    for w in TECH_WORDS:
+        assert w not in out
+
+
+def test_plain_reason_combined_keeps_statistical_part_exact():
+    out = hr.plain_skip_reason(f"{NEEDS_REVIEW}; also: {INSUFFICIENT}")
+    assert "repeated readings" in out
+    assert f"Also: {INSUFFICIENT}" in out
+    for w in TECH_WORDS:
+        assert w not in out
+
+
+def test_plain_reason_reviewer_text_kept():
+    out = hr.plain_skip_reason(f"excluded by reviewer: {REASON}")
+    assert out == f"Excluded by the reviewer: {REASON}"
+
+
+@pytest.mark.parametrize("raw", [
+    INSUFFICIENT,
+    "missing effect_estimate/CI (no raw-mean fallback for OR/RR)",
+    "insufficient df for Hedges g",
+    "pooled SD is zero",
+])
+def test_plain_reason_statistical_messages_verbatim(raw):
+    assert hr.plain_skip_reason(raw) == raw
+
+
+def test_plain_reason_outcome_mismatch_keeps_rationale():
+    out = hr.plain_skip_reason("outcome_match=False: measures anxiety, not pain")
+    assert out == "Outcome does not match the review outcome: measures anxiety, not pain"
+
+
+def test_plain_reason_unknown_unchanged_and_empty():
+    assert hr.plain_skip_reason("some new reason") == "some new reason"
+    assert hr.plain_skip_reason(None) == "no reason recorded"
+    assert hr.plain_skip_reason("") == "no reason recorded"
+
+
+def test_report_shows_plain_reason_and_keeps_decided_by():
+    rows = [
+        {"first_author": "Ang", "year": 2010, "included_in_meta": False,
+         "skip_reason": f"excluded by reviewer: {REASON}"},
+        {"first_author": "Jensen", "year": 2012, "included_in_meta": False,
+         "skip_reason": f"{NEEDS_REVIEW}; also: {INSUFFICIENT}"},
+        {"first_author": "Karlsson", "year": 2015, "included_in_meta": True,
+         "skip_reason": None},
+    ]
+    html = hr.HTMLReportGenerator()._not_pooled_html(rows)
+    assert "1 of 3 studies pooled" in html
+    assert "Reviewer" in html and "Automatic" in html
+    assert "repeated readings" in html and INSUFFICIENT in html
+    for w in ("study_overrides", "no_majority", "needs review"):
+        assert w not in html
+

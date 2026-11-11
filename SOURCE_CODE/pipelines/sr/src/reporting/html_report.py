@@ -112,6 +112,57 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 <div class="footer">SR Automation Pipeline &middot; PRISMA 2020 &middot; {generated_date} &middot; All outputs require human verification.</div>
 </body></html>"""
 
+# Session 38 (7n e): wording for the not-pooled table in the report.
+# Statistical reasons stay verbatim (exact for technical readers); only
+# pipeline-internal text (file paths, flag names, code syntax) is reworded.
+# The CSV and console keep the raw skip_reason.
+_FIELD_WORDS = {
+    "mean_intervention": "intervention mean",
+    "sd_intervention": "intervention SD",
+    "mean_control": "control mean",
+    "sd_control": "control SD",
+    "n_intervention": "intervention N",
+    "n_control": "control N",
+}
+
+
+def _plain_one(part):
+    part = part.strip()
+    if part.startswith("outcome_match=False:"):
+        return ("Outcome does not match the review outcome: "
+                + part[len("outcome_match=False:"):].strip())
+    if part.startswith("needs review"):
+        head = "needs review: runs disagree ("
+        flags = part[len(head):].split(")", 1)[0] if part.startswith(head) else ""
+        fields, shift = [], False
+        for tok in (t.strip() for t in flags.split("|")):
+            if tok == "table_shift":
+                shift = True
+            elif tok.endswith(":no_majority"):
+                f = tok.split(":", 1)[0]
+                fields.append(_FIELD_WORDS.get(f, f.replace("_", " ")))
+        bits = []
+        if fields:
+            bits.append("the AI read different values on repeated readings ("
+                        + ", ".join(fields) + ")")
+        if shift:
+            bits.append("one of the repeated readings took a neighbouring table row")
+        if not bits:
+            bits.append("the AI read different values on repeated readings")
+        text = "; ".join(bits)
+        return text[0].upper() + text[1:] + ". Not confirmed by a reviewer."
+    return part
+
+
+def plain_skip_reason(reason):
+    """Report wording for a skip_reason (see comment above)."""
+    s = str(reason or "").strip()
+    if not s:
+        return "no reason recorded"
+    if s.startswith("excluded by reviewer:"):
+        return "Excluded by the reviewer: " + s[len("excluded by reviewer:"):].strip()
+    return " Also: ".join(_plain_one(p) for p in s.split("; also: "))
+
 class HTMLReportGenerator:
     def generate(self, title, authors, pico, inclusion_criteria, exclusion_criteria,
                  ma_result, extraction_results, screening_results, rob_results,
@@ -255,7 +306,7 @@ class HTMLReportGenerator:
             reason = str(r.get("skip_reason") or "no reason recorded")
             who = "Reviewer" if reason.startswith("excluded by reviewer") else "Automatic"
             label = f"{r.get('first_author') or r.get('filename', '?')} ({r.get('year', '')})"
-            items.append(f"<tr><td>{self._e(label)}</td><td>{self._e(reason)}</td><td>{who}</td></tr>")
+            items.append(f"<tr><td>{self._e(label)}</td><td>{self._e(plain_skip_reason(reason))}</td><td>{who}</td></tr>")
         return (head + "<table style='margin-top:6px;'><thead><tr><th>Study</th><th>Reason</th>"
                 "<th>Decided by</th></tr></thead><tbody>" + "".join(items) + "</tbody></table></div>")
 

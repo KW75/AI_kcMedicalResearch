@@ -200,7 +200,17 @@ def format_report(results):
         ai_all = [r.get("ai") or r for r in checked]
         ai_ok = [a for a in ai_all if _fully_correct(a)]
         lines.append(f"AI alone: {len(ai_all)} checked, {len(ai_ok)} fully correct "
-                     "(overridden fields scored with the AI's own value).")        
+                     "(overridden fields scored with the AI's own value).") 
+    # Session 38 (7m): pooled count over every row (incl. no truth entry), so a
+    # drop such as 175754 (4 -> 3) is visible. SUMMARY and exit code unchanged.
+    pooled = [r["author"] for r in results if r["included_in_meta"]]
+    left = [r["author"] for r in results if not r["included_in_meta"]]
+    line = f"POOLED: {len(pooled)} of {len(results)} studies"
+    if pooled:
+        line += " (" + ", ".join(pooled) + ")"
+    if left:
+        line += "; not pooled: " + ", ".join(left)
+    lines.append(line)               
     return "\n".join(lines)
 
 
