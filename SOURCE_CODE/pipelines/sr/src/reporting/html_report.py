@@ -102,6 +102,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
       <div class="hc"><div class="hv">{q_display}</div><div class="hl">Cochran Q</div></div>
       <div class="hc"><div class="hv">{q_p_display}</div><div class="hl">Q p-value</div></div>
     </div>
+    {not_pooled_html}
   </div>
   <div class="section" id="fp">
     <div class="sh"><h2>Forest Plot</h2></div>
@@ -115,7 +116,7 @@ class HTMLReportGenerator:
     def generate(self, title, authors, pico, inclusion_criteria, exclusion_criteria,
                  ma_result, extraction_results, screening_results, rob_results,
                  forest_plot_path, effect_measure="OR", model_name="claude-opus-4-7",
-                 output_path="outputs/reports/systematic_review.html") -> str:
+                 output_path="outputs/reports/systematic_review.html", meta_audit=None) -> str:
         out = Path(output_path); out.parent.mkdir(parents=True, exist_ok=True)
         html = HTML_TEMPLATE.format(
             title=self._e(title),
@@ -133,6 +134,7 @@ class HTMLReportGenerator:
             screening_rows=self._screening_rows(screening_results),
             extraction_rows=self._extraction_rows(extraction_results),
             overrides_html=self._overrides_html(extraction_results),
+            not_pooled_html=self._not_pooled_html(meta_audit),
             rob_rows=self._rob_rows(rob_results or []),
             ci_lower_display=f"{ma_result.get('ci_lower',0):.3f}",
             ci_upper_display=f"{ma_result.get('ci_upper',0):.3f}",
@@ -236,6 +238,26 @@ class HTMLReportGenerator:
                 "from the source PDF (input/sr/study_overrides.yaml), not values extracted by the model. "
                 "Report them as manually extracted.<ul style='margin:6px 0 0 18px;'>"
                 + "".join(items) + "</ul></div>")
+
+    def _not_pooled_html(self, meta_audit):
+        """Session 38 (7k): every study left out of the pooled estimate, with its
+        reason (PRISMA 2020 item 13a). Reviewer decision vs automatic skip."""
+        rows = [r for r in (meta_audit or []) if isinstance(r, dict)]
+        if not rows:
+            return ""
+        out = [r for r in rows if not r.get("included_in_meta")]
+        head = ("<div class='wb' style='margin-top:14px;'><strong>Studies included in the review "
+                f"but not in the meta-analysis.</strong> {len(rows) - len(out)} of {len(rows)} studies pooled.")
+        if not out:
+            return head + " None left out.</div>"
+        items = []
+        for r in out:
+            reason = str(r.get("skip_reason") or "no reason recorded")
+            who = "Reviewer" if reason.startswith("excluded by reviewer") else "Automatic"
+            label = f"{r.get('first_author') or r.get('filename', '?')} ({r.get('year', '')})"
+            items.append(f"<tr><td>{self._e(label)}</td><td>{self._e(reason)}</td><td>{who}</td></tr>")
+        return (head + "<table style='margin-top:6px;'><thead><tr><th>Study</th><th>Reason</th>"
+                "<th>Decided by</th></tr></thead><tbody>" + "".join(items) + "</tbody></table></div>")
 
     def _rob_rows(self,results):
         if not results:

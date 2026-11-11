@@ -65,10 +65,10 @@ def _run_folder(tmp_path, rows, overrides=None):
     return tmp_path
 
 
-def test_truth_file_has_five_checked_studies(truth):
+def test_truth_file_has_four_checked_studies(truth):
     # Session 38: Karlsson hand-checked (Table 2 p6, MPI-1 Pain severity).
     checked = sorted(a for a, s in truth["studies"].items() if s["checked"])
-    assert checked == ["Ang", "Jensen", "Karlsson", "Lami", "McCrae"]
+    assert checked == ["Jensen", "Karlsson", "Lami", "McCrae"] 
 
 
 def test_exact_values_match(sc, truth):
@@ -87,7 +87,12 @@ def test_within_tolerance_matches_and_outside_is_wrong(sc, truth):
 
 
 def test_ang_wrong_n_is_caught_while_means_match(sc, truth):
-    r = sc.score_row(_row("Ang", "17", "15", "-20.2", "23.9", "-14.9", "16.4"), truth)
+    # Session 38 (7k): Ang is unchecked now (NFR row, excluded by the reviewer);
+    # mark a copy checked so the "wrong N, matching means" path stays covered.
+    import copy
+    t = copy.deepcopy(truth)
+    t["studies"]["Ang"]["checked"] = True
+    r = sc.score_row(_row("Ang", "17", "15", "-20.2", "23.9", "-14.9", "16.4"), t)
     assert r["fields"]["n_intervention"] == "WRONG"
     assert r["fields"]["n_control"] == "WRONG"
     assert r["fields"]["mean_intervention"] == "MATCH"
@@ -128,9 +133,10 @@ def test_baseline_run_flags_wrong_pooled_studies(sc, truth, tmp_path):
     assert by["McCrae"]["included_in_meta"] is False
     report = sc.format_report(results)
     assert "WRONG" in report
-    # Session 38: Karlsson hand-checked; its baseline values match the truth.
-    assert "5 checked" in report and "1 fully correct" in report
-    assert "Karlsson" not in report.split("differ from the hand-checked truth:")[-1]
+    # Session 38: Karlsson hand-checked (values match); Ang unchecked (7k, NFR row).
+    assert "4 checked" in report and "1 fully correct" in report
+    offenders = report.split("differ from the hand-checked truth:")[-1]
+    assert "Karlsson" not in offenders and "Ang" not in offenders
     assert sc.exit_code(results) == 1
 
 

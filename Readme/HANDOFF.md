@@ -48,9 +48,9 @@ so those catches happen at session open, not mid-work.
 
 | Component      | Status |
 |----------------|--------|
-| Tests | 1157 passed, 10 deselected on v2.10-sr-screening (Session 38); main 1064 (ef66b9f) (python -m pytest -m "not live" --tb=short -q) |
+| Tests | 1164 passed, 10 deselected on v2.10-sr-screening (Session 38); main 1064 (ef66b9f) (python -m pytest -m "not live" --tb=short -q) |
 | Branch         | main = ef66b9f (PR #7 merged 2026-11-10: F7 truth fixture sr_truth.yaml + scripts/sr_score_run.py). Work on v2.10-sr-screening, PR #8 open: shared paper text (b3d804c), prisma_criteria write-if-changed (afd90a3), RoB2 overall rule (3e3785e), RoB2 Methods/Results text (908f889, 306d838), registration lines to RoB2 (Session 38). Branches v2.6-ocr-editor, v2.5-major-updates, v2.7-sr-fixes, v2.8-sr-review-gate, v2.9-sr-fixture deleted |
-| CI | green on PR #8 at 46fbd9b (1156 passed, both jobs). Last confirmed on main: bcd42d9 (2026-11-09, 1027, both jobs). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
+| CI | green on PR #8 at e4e97b8 (1157 passed, both jobs). Last confirmed on main: bcd42d9 (2026-11-09, 1027, both jobs). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
 | Deploy         | None: CLI only, local first. Render service deleted 2026-10-27; Streamlit UI and Render files removed in Session 33. UptimeRobot monitor for the old Render URL: not yet confirmed paused/deleted (user, outside the repo) |
 | Writing mode   | one-pass (write + edit + review in one call); tracks Topic 800 / Article 3,500 / Report 500 / Synopsis 1,500; on main since fa4edb9; tested on gemma4:e4b; terminal menus only |
 | OCR mode       | `--mode ocr`, launcher menu 8. Reads PDF / image / .txt / .docx; .doc refused with a message. Records in `reports/ocr/<header>/`, SUMMARY / SYNOPSIS in `output/ocr/`. Ollama by default; Qwen / OpenAI only behind the cloud gate; groq / deepseek / anthropic refused. Broken-font PDFs: text layer with [?], AI fills symbols only, document-wide vote per font code. [?] left varies run to run (Ang 2010, gemma4:e4b: 19 in s36_check, 7 in s36_vote; vote fills checked against Table 2) |
@@ -175,21 +175,39 @@ SR (do 4 before 5 and 6)
     High (4.3 Yes, 4.4 Yes, 4.5 Probably yes); 1 test. Run 20261111_175754:
     outcome_measurement and OVERALL High for all five (model overall still
     Some concerns; domain rule applies). State the rule in the review methods.
-7k. Ang: RoB2 judged the NFR pain rating (P=0.8), pooled values are Table 2
-    Week 6 pain (-20.2 vs -14.9). Check the row in the PDF; consider passing
-    the extracted outcome name to RoB2.
+7k. Done (Session 38): Ang Table 2 values (-20.2 +/- 23.9 vs -14.9 +/- 16.4,
+    n 15/13) are the NFR pain rating (lab stimulus pain, Table 2 footnote),
+    not pain intensity. FIQ pain only as Week 6 change (-0.2 +/- 1.8 vs
+    -0.3 +/- 1.6, lines 366-368), no final values, no N. Reviewer option B:
+    Ang excluded from the SMD via new study_overrides.yaml key
+    exclude_from_meta (reason -> skip_reason "excluded by reviewer: ...",
+    no effect size, not in [SENSITIVITY], [EXCLUDED] log line). HTML/PDF
+    report has a new section "Studies included in the review but not in the
+    meta-analysis" (n of N pooled, reason, Reviewer/Automatic; PRISMA 2020
+    item 13a). sr_truth.yaml Ang checked: false (old values kept, NFR row).
+    RoB2 judges the PICO outcome (pain) since 7c. 7 tests in
+    tests/test_sr_reviewer_exclusion.py; 3 score tests adjusted.
+    Run 20261111_190839: pooled 3 (Karlsson, Lami, McCrae); Ang Reviewer,
+    Jensen Automatic; SUMMARY 4 checked, 3 fully correct, 0 wrong AND POOLED.
 7l. RoB2 variation outside Domain 4 (171313): Ang randomisation -> Low
     (says balanced; 161320 cited NSAID 76% vs 26%, P=0.01; no method given),
     missing_data -> Low, deviations -> Some concerns with Domain 4 reasoning
     leaking into Domain 2; Jensen same three changes (not inspected).
     missing_data numbers still wrong: Lami UMC 11/41 (about 5), McCrae
     9/7/5 withdrew (Figure 1: 12/7/9). Consider N RoB2 runs + vote.
-7m. Run 20261111_175754 pooled 3: Ang skipped (table_shift on means; the
-    Ns-only override does not clear the review gate, which needs all four
-    mean/SD fields). Fix: override Ang means/SDs (-20.2 (23.9) vs -14.9
-    (16.4), Table 2 Week 6) after 7k names the row. Scorer SUMMARY should
-    print the pooled count (pooled 4 -> 3 was invisible). Jensen means
-    45.6/45.6 no_majority; Lami AI means 5.8/6.9 this run.
+7m. Superseded by 7k (Session 38): Ang is excluded by the reviewer, not
+    overridden (Table 2 is the NFR row, so no means/SDs to enter). Still
+    open: scorer SUMMARY should print the pooled count (175754 dropped 4 -> 3
+    invisibly; the HTML report now shows "n of N studies pooled"). Jensen
+    means 45.6/45.6 no_majority.
+7n. Open (cosmetic, from run 20261111_190839): (a) Word report
+    (report_generator.py) lacks the not-pooled section; (b) scorer prints
+    "values from study_overrides.yaml" for Ang, which is excluded and has no
+    values; (c) HTML "4 of 5 use values entered by a reviewer" counts an
+    exclusion-only entry; (d) "[SENSITIVITY] no needs-review studies" although
+    Jensen is needs-review (no g to compare); (e) Jensen reason in the report
+    shows internal instructions (study_overrides.yaml path) - needs plain
+    wording for doctors.
 
 Writing
 8. Read input through the OCR reader so .docx tables reach the AI; a read
@@ -2230,6 +2248,8 @@ Expected: a clean tree in sync with origin, the top commit is this handoff, and 
   traced in override_note); the AI accuracy check was circular for Lami/McCrae
   -> 7f. test_extraction_regression_fixtures.py comment "Lami means stable,
   only Ns drift" is outdated (121950: means no_majority 3.8/none/3.2).
+- 7k: Ang excluded by the reviewer (exclude_from_meta), reason shown in the
+  report; run 20261111_190839 pools 3. CI green at e4e97b8 (1157). 1164 passed.
 - 7f done: sr_score_run.py scores the AI's own values for overridden studies
   (_ai_overrides reads override_fields). Run 20261111_121950: AI alone 4
   checked, 0 fully correct. Lami AI N 38/41 vs 28/36, means 3.8/5.2 vs

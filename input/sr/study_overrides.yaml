@@ -37,13 +37,15 @@ zsy234.pdf:
 "Arthritis Care Research - 2010 - Ang - Cognitive behavioral therapy attenuates nociceptive responding in patients with-1.pdf":
   first_author: Ang
   year: 2010
-  n_intervention: 15
-  n_control: 13
+  exclude_from_meta: "clinical pain (FIQ pain) reported only as Week 6 change scores; Table 2 values are the NFR pain rating"
   note: >-
-    Ns = Week 6 change Ns printed in Table 2 (CBT 15, UC 13), not randomised
-    17/15 (text lines 254-255); 4 did not complete, 1+1 refused follow-up,
-    1+1 NFR too painful (lines 255-258). Means/SDs left to the AI.
-    Verified from the PDF.
+    Not pooled (reviewer decision, Session 38, option B). Table 2 (-20.2 +/- 23.9
+    vs -14.9 +/- 16.4, n 15/13) is the NFR pain rating (0-100 at the reflex
+    threshold, Table 2 footnote), i.e. lab stimulus pain, not pain intensity.
+    FIQ pain (0-10) is given only as Week 6 change -0.2 +/- 1.8 vs -0.3 +/- 1.6
+    (text lines 366-368), with no final values and no N; mixing change and final
+    values in an SMD is advised against (Cochrane Handbook 10.5.2). Described
+    narratively. Verified from the PDF.
 
 "Cognitive behaviour therapy in women with fibromyalgia_ A randomized clinical trial - 1-s2.0-S1877886015000567-main.pdf":
   first_author: Karlsson

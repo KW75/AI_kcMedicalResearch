@@ -8,8 +8,9 @@ tolerance: 0.1
 studies:
   Ang:
     year: 2010
-    checked: true
-    source: "Table 2, Week 6 change, pain mean +/- SD; Ns from the same row"
+    checked: false
+    note: "Excluded from the meta-analysis by the reviewer (exclude_from_meta). Values below are the NFR pain rating, not pain intensity; kept for history, not scored."
+    source: "Table 2, Week 6 change, NFR pain rating (0-100) mean +/- SD; Ns from the same row"
     comparator_type: active          # usual care
     mean_intervention: -20.2
     sd_intervention: 23.9

@@ -193,3 +193,12 @@ def write_results(path: Path, meta_rows: list[dict]) -> None:
         "nondet_flag", "nondet_runs",   # #11; rendered via nondet_flag_to_cell
     ]
     _write_csv(path, meta_rows, fields)
+
+
+def reviewer_exclusion_reason(result):
+    """Session 38 (7k): skip_reason for a study the reviewer excluded via
+    study_overrides.yaml exclude_from_meta, or None."""
+    if not isinstance(result, dict):
+        return None
+    reason = str(result.get("reviewer_exclusion") or "").strip()
+    return f"excluded by reviewer: {reason}" if reason else None

@@ -25,7 +25,8 @@ from .src.utils.project_layout import SRProjectLayout
 from .src.utils.audit_logger import (
     write_screens, write_extracts, write_rob2, write_results,
     nondet_flag_to_cell, nondet_cell_is_mandatory, NONDET_CELL_UNANIMOUS,
-    review_skip_reason,
+    review_skip_reason, reviewer_exclusion_reason
+
 )
 
 
@@ -695,6 +696,15 @@ def main():
         }       
         # F4 gate (Session 37): runs disagreed -> not in the primary pool unless
         # a reviewer overrode every flagged field; still pooled in [SENSITIVITY].
+        # Session 38 (7k): reviewer excluded this study from the meta-analysis
+        # (exclude_from_meta in study_overrides.yaml). Reason goes to
+        # skip_reason and the report; no effect size, not in [SENSITIVITY].
+        _excl = reviewer_exclusion_reason(r)
+        if _excl:
+            audit_row["skip_reason"] = _excl
+            meta_audit.append(audit_row)
+            logger.warning(f"[EXCLUDED] {audit_row['first_author']} ({audit_row['year']}): {_excl}")
+            continue
         _review = review_skip_reason(audit_row["nondet_flag"],
                                      audit_row["override_fields"])
         if not _review and nondet_cell_is_mandatory(audit_row["nondet_flag"]):
@@ -908,6 +918,7 @@ def main():
         extraction_results = er,
         screening_results  = sr,
         rob_results        = rob,
+        meta_audit         = meta_audit,
         forest_plot_path   = fp,
         effect_measure     = args.effect_measure,
         model_name         = args.model,
