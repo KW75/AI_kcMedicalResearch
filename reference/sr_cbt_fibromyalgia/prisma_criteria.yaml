@@ -1,0 +1,15 @@
+review_title: Effect of Cognitive-Behavioral Therapy on Pain
+effect_measure: SMD
+pico:
+  population: Adults with fibromyalgia
+  intervention: Cognitive-Behavioral Therapy
+  comparator: Placebo, active comparator, or waiting list (waiting list reported as a subgroup)
+  outcome: Pain intensity at post intervention
+pubmed_query_cleaned: Adults with fibromyalgia AND Cognitive-Behavioral Therapy AND
+  Pain intensity AND randomized controlled trial[pt]
+inclusion_criteria:
+- RCT
+- Adult participants
+exclusion_criteria:
+- Non-RCT
+- Animal studies

@@ -12,8 +12,8 @@ from pathlib import Path
 import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
-YAML_PATH = ROOT / "SOURCE_CODE" / "pipelines" / "sr" / "config" / "prisma_criteria.yaml"
-PICO_PATH = ROOT / "input" / "sr" / "pico_sample.json"
+YAML_PATH = ROOT / "reference" / "sr_cbt_fibromyalgia" / "prisma_criteria.yaml"
+PICO_PATH = ROOT / "reference" / "sr_cbt_fibromyalgia" / "pico_sample.json"
 
 
 def _find_key(obj, key):

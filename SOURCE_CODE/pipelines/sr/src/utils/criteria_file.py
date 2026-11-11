@@ -36,3 +36,15 @@ def write_criteria_if_changed(path, cfg: dict) -> bool:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(_dump(cfg).encode("utf-8"))   # UTF-8, no BOM
     return True
+
+def placeholder_fields(cfg):
+    """Session 38 (7h): fields still holding a <...> placeholder from the sample config."""
+    def _ph(v):
+        return isinstance(v, str) and v.strip().startswith("<") and v.strip().endswith(">")
+    if not isinstance(cfg, dict):
+        return []
+    found = [k for k in ("review_title", "effect_measure") if _ph(cfg.get(k))]
+    pico = cfg.get("pico") if isinstance(cfg.get("pico"), dict) else {}
+    found += [f"pico.{k}" for k in ("population", "intervention", "comparator", "outcome")
+              if _ph(pico.get(k))]
+    return found

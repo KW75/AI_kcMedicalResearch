@@ -1,0 +1,68 @@
+# Reviewer-verified corrections, keyed by PDF filename.
+#
+# Metadata fields (first_author, year, doi, study, study_id) fill in only
+# when extraction left them blank.
+#
+# Numeric fields (n_intervention, n_control, mean_*, sd_*) REPLACE whatever
+# the extractor produced. Use them only for values you have read yourself
+# from the source table, and always record where they came from in `note`.
+#
+# Every applied override appears in extracted_data.csv under
+# override_fields / override_note.
+
+"s10608-017-9875-4.pdf":
+  first_author: Lami
+  year: 2018
+  n_intervention: 28
+  n_control: 36
+  mean_intervention: 7.35
+  sd_intervention: 2.08
+  mean_control: 7.40
+  sd_control: 1.29
+  note: >-
+    Table 4, post-intervention CBT-P vs UMC. Ns are post-intervention
+    (28/36), not baseline (34/41). Verified from PDF pages 12-13.
+
+zsy234.pdf:
+  first_author: McCrae
+  year: 2019
+  n_intervention: 57
+  n_control: 28
+  mean_intervention: 46.86
+  sd_intervention: 24.06
+  mean_control: 52.38
+  sd_control: 24.04
+  note: "Multi-arm trial (CBT-I, CBT-P, WLC). CBT-I and CBT-P combined into one intervention arm (Cochrane Handbook 23.3.4): CBT-I 47.01 (24.79) n 27, CBT-P 46.72 (23.81) n 30. Control WLC 52.38 (24.04) n 28. Morning pain VAS 0-100, post-treatment, mixed-model means, Table 3 p9. N = completed post-treatment (Figure 1). Evening pain in Table 3 not used. Waiting-list subgroup."
+
+"Arthritis Care Research - 2010 - Ang - Cognitive behavioral therapy attenuates nociceptive responding in patients with-1.pdf":
+  first_author: Ang
+  year: 2010
+  exclude_from_meta: "clinical pain (FIQ pain) reported only as Week 6 change scores; Table 2 values are the NFR pain rating"
+  note: >-
+    Not pooled (reviewer decision, Session 38, option B). Table 2 (-20.2 +/- 23.9
+    vs -14.9 +/- 16.4, n 15/13) is the NFR pain rating (0-100 at the reflex
+    threshold, Table 2 footnote), i.e. lab stimulus pain, not pain intensity.
+    FIQ pain (0-10) is given only as Week 6 change -0.2 +/- 1.8 vs -0.3 +/- 1.6
+    (text lines 366-368), with no final values and no N; mixing change and final
+    values in an SMD is advised against (Cochrane Handbook 10.5.2). Described
+    narratively. Verified from the PDF.
+
+"Cognitive behaviour therapy in women with fibromyalgia_ A randomized clinical trial - 1-s2.0-S1877886015000567-main.pdf":
+  first_author: Karlsson
+  year: 2015
+  n_intervention: 24
+  n_control: 24
+  mean_intervention: 3.88
+  sd_intervention: 1.05
+  mean_control: 3.67
+  sd_control: 0.75
+  note: >-
+    Table 2 p6, MPI-1 Pain severity (tertiary outcome), crude mean (SD)
+    after treatment (CBT) vs after wait list; adjusted means (no SD) not
+    used. n 24/24, 48 randomised. One of 3 readings took the next row
+    (Interference) -> table_shift. Verified from the PDF (text is Tesseract
+    OCR, broken font).
+
+
+
+

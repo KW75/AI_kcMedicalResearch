@@ -48,8 +48,8 @@ so those catches happen at session open, not mid-work.
 
 | Component      | Status |
 |----------------|--------|
-| Tests | 1177 passed, 10 deselected on v2.10-sr-screening (Session 38); main 1064 (ef66b9f) (python -m pytest -m "not live" --tb=short -q) |
-| Branch         | main = ef66b9f (PR #7 merged 2026-11-10: F7 truth fixture sr_truth.yaml + scripts/sr_score_run.py). Work on v2.10-sr-screening, PR #8 open: shared paper text (b3d804c), prisma_criteria write-if-changed (afd90a3), RoB2 overall rule (3e3785e), RoB2 Methods/Results text (908f889, 306d838), registration lines to RoB2 (Session 38). Branches v2.6-ocr-editor, v2.5-major-updates, v2.7-sr-fixes, v2.8-sr-review-gate, v2.9-sr-fixture deleted |
+| Tests | 1193 passed, 10 deselected on v2.10-sr-screening (Session 38); main 1064 (ef66b9f) (python -m pytest -m "not live" --tb=short -q) |
+| Branch         | main = ef66b9f (PR #7 merged 2026-11-10: F7 truth fixture sr_truth.yaml + scripts/sr_score_run.py). Work on v2.10-sr-screening, PR #8 open: shared paper text (b3d804c), prisma_criteria write-if-changed (afd90a3), RoB2 overall rule (3e3785e), RoB2 Methods/Results text (908f889, 306d838), registration lines to RoB2 (Session 38); Session 38: Karlsson/Ang overrides (cf75209), RoB2 Domain 4 self-report rule (46fbd9b), Domain 4 High outright (e4e97b8), Ang excluded by reviewer + not-pooled report section (a56dc55), plain report reasons + POOLED line (0bf59dc), fibromyalgia set moved to reference/ (7h, this commit). Branches v2.6-ocr-editor, v2.5-major-updates, v2.7-sr-fixes, v2.8-sr-review-gate, v2.9-sr-fixture deleted |
 | CI | green on PR #8 at a56dc55 (1164 passed, both jobs). Last confirmed on main: bcd42d9 (2026-11-09, 1027, both jobs). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
 | Deploy         | None: CLI only, local first. Render service deleted 2026-10-27; Streamlit UI and Render files removed in Session 33. UptimeRobot monitor for the old Render URL: not yet confirmed paused/deleted (user, outside the repo) |
 | Writing mode   | one-pass (write + edit + review in one call); tracks Topic 800 / Article 3,500 / Report 500 / Synopsis 1,500; on main since fa4edb9; tested on gemma4:e4b; terminal menus only |
@@ -155,16 +155,18 @@ SR (do 4 before 5 and 6)
     post-treatment values. Cochrane Handbook 10.5.2: do not mix change and
     final values in an SMD. Reviewer decision: use Ang's Week 6 final values,
     or switch to MD/sensitivity analysis.
-7h. Move the fibromyalgia trial set out of the app defaults to
-    reference/sr_cbt_fibromyalgia/ (prisma_criteria.yaml, pico_sample.json,
-    study_overrides.yaml, README with citations, git-ignored pdfs/); default
-    prisma_criteria.yaml becomes a placeholder template that refuses to run;
-    default study_overrides.yaml comments only; update
-    test_sr_comparator_criteria.py and test_gitignore_input.py; reference run
-    must match 20261111_161320.
-    The launcher writes prisma_criteria.yaml from pico_data
-    (SOURCE_CODE\main.py lines 1502-1504, write_criteria_if_changed), so a
-    placeholder template only guards runs started without the launcher.
+7h. Done (Session 38): fibromyalgia trial set moved out of the app defaults to
+    reference/sr_cbt_fibromyalgia/ (README, prisma_criteria.yaml,
+    pico_sample.json, study_overrides.yaml tracked; input/ PDFs, reports/,
+    output/ local only, git-ignored). Config prisma_criteria.yaml is a sample
+    with <...> placeholders; pipelines/sr/main.py stops (SystemExit) while any
+    remain (criteria_file.placeholder_fields); the launcher still overwrites it
+    from the PICO step. input/sr/study_overrides.yaml is a comments-only
+    template (loads 0, no warning). input/sr/pico_sample.json is search output,
+    now git-ignored. 16 tests (10 in tests/test_sr_reference_set.py, 6
+    gitignore cases); test_sr_comparator_criteria.py reads the reference copies.
+    Open: copy run 20261111_190839 into reference reports/ (README cites it);
+    full journal citations in the README; pico_sample.json name is misleading.
 7i. SOURCE_CODE\main.py lines 1498-1499 (launcher) hard-code
     inclusion_criteria ["RCT", "Adult participants"] and exclusion_criteria
     ["Non-RCT", "Animal studies"] for every review; sr main.py reads them
@@ -2261,6 +2263,8 @@ Expected: a clean tree in sync with origin, the top commit is this handoff, and 
 - 7n(e) + 7m: report Reason cell reworded (plain_skip_reason, statistical
   reasons verbatim); score report prints "POOLED: n of N studies". CI green
   at a56dc55 (1164). 1177 passed.
+- 7h: fibromyalgia set moved to reference/sr_cbt_fibromyalgia/; sample config
+  with <...> placeholders stops a direct run; empty overrides template. 1193 passed.
 - 7f done: sr_score_run.py scores the AI's own values for overridden studies
   (_ai_overrides reads override_fields). Run 20261111_121950: AI alone 4
   checked, 0 fully correct. Lami AI N 38/41 vs 28/36, means 3.8/5.2 vs

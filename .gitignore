@@ -16,7 +16,6 @@ input/*
 !input/sr/
 input/sr/*
 !input/sr/study_overrides.yaml
-!input/sr/pico_sample.json
 debug/
 patch_main.py
 dist/
@@ -31,3 +30,9 @@ sr_*.log
 *.py.bak
 *.py.bak[0-9]
 run_*.log
+# Session 38 (7h): fibromyalgia example set; PDFs and paper_text stay local
+reference/sr_cbt_fibromyalgia/*
+!reference/sr_cbt_fibromyalgia/README.md
+!reference/sr_cbt_fibromyalgia/prisma_criteria.yaml
+!reference/sr_cbt_fibromyalgia/pico_sample.json
+!reference/sr_cbt_fibromyalgia/study_overrides.yaml

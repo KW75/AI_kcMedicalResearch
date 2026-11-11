@@ -22,6 +22,7 @@ from .src.visualization.forest_plot import ForestPlotGenerator
 from .src.reporting.report_generator import ReportGenerator
 from .src.reporting.pdf_report import PDFReportGenerator
 from .src.utils.project_layout import SRProjectLayout
+from .src.utils.criteria_file import placeholder_fields
 from .src.utils.audit_logger import (
     write_screens, write_extracts, write_rob2, write_results,
     nondet_flag_to_cell, nondet_cell_is_mandatory, NONDET_CELL_UNANIMOUS,
@@ -458,6 +459,13 @@ def main():
     logger.info(f"Provider {args.provider} / model {args.model}")
 
     cfg = load_config(args.config)
+
+        # Session 38 (7h): the sample config has <...> placeholders; stop until replaced.
+    _ph = placeholder_fields(cfg)
+    if _ph:
+        raise SystemExit(
+            "prisma_criteria.yaml still has <...> placeholders in: "
+            + ", ".join(_ph) + ". Enter the PICO in the launcher, or edit the file.")
 
     #  Effect measure resolution: CLI > yaml > fallback OR
     VALID = ("OR", "RR", "MD", "SMD")
