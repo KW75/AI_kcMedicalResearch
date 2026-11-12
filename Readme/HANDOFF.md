@@ -50,7 +50,7 @@ so those catches happen at session open, not mid-work.
 |----------------|--------|
 | Tests | 1205 passed, 10 deselected on v2.10-sr-screening (Session 38); main 1064 (ef66b9f) (python -m pytest -m "not live" --tb=short -q) |
 | Branch         | main = ef66b9f (PR #7 merged 2026-11-10: F7 truth fixture sr_truth.yaml + scripts/sr_score_run.py). Work on v2.10-sr-screening, PR #8 open: shared paper text (b3d804c), prisma_criteria write-if-changed (afd90a3), RoB2 overall rule (3e3785e), RoB2 Methods/Results text (908f889, 306d838), registration lines to RoB2 (Session 38); Session 38: Karlsson/Ang overrides (cf75209), RoB2 Domain 4 self-report rule (46fbd9b), Domain 4 High outright (e4e97b8), Ang excluded by reviewer + not-pooled report section (a56dc55), plain report reasons + POOLED line (0bf59dc), fibromyalgia set moved to reference/ (7h, b32f4c4), REVIEWER_GUIDE rewrite + readme_sr_pipeline.txt (docs, this commit). Branches v2.6-ocr-editor, v2.5-major-updates, v2.7-sr-fixes, v2.8-sr-review-gate, v2.9-sr-fixture deleted |
-| CI | green on PR #8 at b32f4c4 (1193 passed, both jobs, 2026-11-11). Last confirmed on main: bcd42d9 (2026-11-09, 1027, both jobs). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
+| CI | green on PR #8 at 90ff43d (1205 passed, both jobs, 2026-11-12). Last confirmed on main: bcd42d9 (2026-11-09, 1027, both jobs). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
 | SR docs        | Readme/readme_sr_pipeline.txt = for users: how the SR pipeline works and how to use it. docs/sr/REVIEWER_GUIDE.md = for reviewers: what to check by hand, documented failures, limitations, methods statement (rewritten Session 38; section numbers 2.2, 3.1, 3.5, 5, 6 are cited by code/tests/README, keep them). README.md = the app. Update the SR docs when SR behaviour changes |
 | Deploy         | None: CLI only, local first. Render service deleted 2026-10-27; Streamlit UI and Render files removed in Session 33. UptimeRobot monitor for the old Render URL: not yet confirmed paused/deleted (user, outside the repo) |
 | Writing mode   | one-pass (write + edit + review in one call); tracks Topic 800 / Article 3,500 / Report 500 / Synopsis 1,500; on main since fa4edb9; tested on gemma4:e4b; terminal menus only |
@@ -88,11 +88,25 @@ SR - review content
    Exclude_WaitList saves "Usual care or attention placebo" (create and
    modify). tests/test_sr_pico_criteria.py (12). Docs: readme sections 1
    and 3, REVIEWER_GUIDE 4.1.
-2. 7h leftovers: copy run 20261111_190839 into
-   reference/sr_cbt_fibromyalgia/reports/ (README cites it); full journal
-   citations in the reference README; rename the misspelt "ouput" folder to
-   "output" (check .gitignore and tests/test_sr_reference_set.py paths);
-   consider renaming pico_sample.json (it is search output, not a PICO).
+2. DONE (2026-11-12): 7h leftovers. Run 20261111_190839 had been copied
+   into a misspelt folder "referemces/" (this was the "ouput" mix-up; the
+   output folder name was already correct); moved to
+   reference/sr_cbt_fibromyalgia/reports/20261111_190839 (complete: console,
+   score, CSVs, report; "Loaded 4 study override(s)", pooled SMD -0.042
+   [-0.327, 0.242], I2 0%, k=3). Duplicate top-level output/ deleted. Also
+   kept locally: 20261111_175754 (before Ang excluded) and 20261112_161648
+   (no overrides: Ang + Karlsson pooled, SMD 0.030). Reference README: full
+   citations (Lami = 2018;42:63-79, online 2017), three runs described,
+   old comparator wording noted, restore steps. pico_sample.json name kept
+   (README says it is search output; renaming touches .gitignore/tests).
+2a. Launcher and the tracked sample prisma_criteria.yaml: every launcher
+   SR session rewrites SOURCE_CODE/pipelines/sr/config/prisma_criteria.yaml
+   (tracked sample with <...> placeholders), so git status shows it as
+   changed and tests/test_sr_reference_set.py fails until git restore.
+   A session with empty P/I/O wrote empty fields; empty fields are not
+   <...> placeholders, so a direct run is not stopped. Fix: write the
+   run's criteria to an untracked file (or the run folder) and refuse
+   empty P/I/O in _create_pico.
 3. Jensen override: Table 3 p7 posttreatment weekly pain VAS 49 (19) CBT vs
    59 (26) control. N randomised 25/18 (p1, Fig 1 p3); the per-arm N behind
    Table 3 is not in the text layer: confirm in the PDF before setting
