@@ -38,13 +38,23 @@ def write_criteria_if_changed(path, cfg: dict) -> bool:
     return True
 
 def placeholder_fields(cfg):
-    """Session 38 (7h): fields still holding a <...> placeholder from the sample config."""
+    """Fields that stop a run: a <...> placeholder from the sample config
+    (Session 38, 7h), or an empty population/intervention/outcome (item 2a)."""
     def _ph(v):
         return isinstance(v, str) and v.strip().startswith("<") and v.strip().endswith(">")
+
+    def _empty(v):
+        return v is None or (isinstance(v, str) and not v.strip())
+
     if not isinstance(cfg, dict):
         return []
     found = [k for k in ("review_title", "effect_measure") if _ph(cfg.get(k))]
-    pico = cfg.get("pico") if isinstance(cfg.get("pico"), dict) else {}
-    found += [f"pico.{k}" for k in ("population", "intervention", "comparator", "outcome")
-              if _ph(pico.get(k))]
+    pico = cfg.get("pico")
+    if not isinstance(pico, dict):
+        return found
+    for k in ("population", "intervention", "comparator", "outcome"):
+        v = pico.get(k)
+        if _ph(v) or (k != "comparator" and _empty(v)):
+            found.append(f"pico.{k}")
     return found
+

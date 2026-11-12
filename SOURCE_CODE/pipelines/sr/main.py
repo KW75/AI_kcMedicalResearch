@@ -464,7 +464,7 @@ def main():
     _ph = placeholder_fields(cfg)
     if _ph:
         raise SystemExit(
-            "prisma_criteria.yaml still has <...> placeholders in: "
+            "prisma_criteria.yaml still has <...> placeholders or empty fields in: "
             + ", ".join(_ph) + ". Enter the PICO in the launcher, or edit the file.")
 
     #  Effect measure resolution: CLI > yaml > fallback OR
