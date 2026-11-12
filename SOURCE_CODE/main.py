@@ -1499,7 +1499,7 @@ def run_sr_launcher(provider: str = "", model: str = "") -> None:
             print(f"\n   - Run criteria written to input/sr/{run_config.name}")
         else:
             print(f"\n   - Run criteria unchanged (input/sr/{run_config.name})")
-        print(f"     PubMed query: {cfg_yaml.get('pubmed_query_cleaned', 'n/a')}")
+        print(f"     PubMed query: {cfg_yaml.get('pubmed_query_cleaned') or 'n/a'}")
         print(f"     Comparator:   {cfg_yaml['pico']['comparator'] or 'n/a'}")
         print(f"     Inclusion:    {'; '.join(inclusion)}")
         print(f"     Exclusion:    {'; '.join(exclusion)}")
@@ -1685,7 +1685,7 @@ def _create_pico() -> dict:
     print("        Exclude_WaitList: type this to exclude waiting-list trials.")
     comparator = _resolve_comparator(
         input(f"    Comparator   (C) [{DEFAULT_COMPARATOR}]: "), DEFAULT_COMPARATOR)
-    outcome = _ask_required("Outcome (O)")
+    outcome = _ask_required("Outcome      (O)")
 
     print("\n  Inclusion / exclusion criteria (separate with ';'):")
     inclusion = _ask_criteria("Inclusion criteria", DEFAULT_INCLUSION)
