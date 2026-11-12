@@ -927,6 +927,7 @@ def main():
         screening_results  = sr,
         forest_plot_path   = fp,
         effect_measure     = args.effect_measure,
+        meta_audit         = meta_audit,
         output_path        = docx_path)
 
     pdf_paths = PDFReportGenerator().generate(

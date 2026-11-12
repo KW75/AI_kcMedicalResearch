@@ -2,6 +2,7 @@ import logging
 from pathlib import Path
 logger = logging.getLogger(__name__)
 from .override_summary import override_changed_values, override_confirmed_only, study_label
+from .html_report import plain_skip_reason
 
 try:
     from docx import Document
@@ -14,7 +15,8 @@ except ImportError:
 class ReportGenerator:
     def generate(self, title, authors, pico, ma_result, extraction_results,
                  screening_results, forest_plot_path, effect_measure="OR",
-                 output_path="outputs/reports/systematic_review.docx"):
+                 output_path="outputs/reports/systematic_review.docx",
+                 meta_audit=None):
         if not _OK:
             logger.error("python-docx required."); return
         doc = Document()
@@ -63,6 +65,21 @@ class ReportGenerator:
             f"(95% CI {ma_result.get('ci_lower',0):.3f}-{ma_result.get('ci_upper',0):.3f}; "
             f"p={ma_result.get('p_value',0):.4f}). "
             f"I\u00b2={ma_result.get('I2',0):.1f}%.")
+        # Session 39 (item 4a): same not-pooled list as the HTML report
+        # (html_report.py _not_pooled_html); reasons reworded by the same
+        # plain_skip_reason(). PRISMA 2020 item 13a.
+        _ma_rows = [r for r in (meta_audit or []) if isinstance(r, dict)]
+        if _ma_rows:
+            _out = [r for r in _ma_rows if not r.get("included_in_meta")]
+            doc.add_heading("Studies included in the review but not in the meta-analysis", 2)
+            doc.add_paragraph(f"{len(_ma_rows) - len(_out)} of {len(_ma_rows)} studies pooled."
+                              + ("" if _out else " None left out."))
+            for r in _out:
+                reason = str(r.get("skip_reason") or "no reason recorded")
+                who = "Reviewer" if reason.startswith("excluded by reviewer") else "Automatic"
+                label = f"{r.get('first_author') or r.get('filename', '?')} ({r.get('year', '')})"
+                doc.add_paragraph(f"{label}: {plain_skip_reason(reason)} [{who}]",
+                                  style="List Bullet")
         if forest_plot_path and Path(forest_plot_path).exists():
             doc.add_heading("Forest Plot",2)
             doc.add_picture(forest_plot_path, width=Inches(6.0))

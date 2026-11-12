@@ -117,3 +117,48 @@ def test_docx_counts_only_studies_with_changed_values(tmp_path):
 
 def test_docx_no_section_for_exclude_only(tmp_path):
     assert "Reviewer-entered data" not in _docx_text([ANG, KARLSSON], tmp_path)
+
+
+# --- Session 39 (item 4a): the Word report lists studies not in the
+# meta-analysis, like the HTML report (_not_pooled_html).
+from pathlib import Path
+
+META_AUDIT = [
+    {"first_author": "Ang", "year": 2010, "included_in_meta": False,
+     "skip_reason": "excluded by reviewer: NFR pain rating, not pain intensity"},
+    {"first_author": "Jensen", "year": 2012, "included_in_meta": False,
+     "skip_reason": "insufficient mean/SD/N"},
+    {"first_author": "Lami", "year": 2018, "included_in_meta": True, "skip_reason": None},
+]
+
+
+def _docx_text_meta(meta_audit, tmp_path):
+    out = tmp_path / "m.docx"
+    ReportGenerator().generate(title="T", authors="", pico=PICO, ma_result=MA,
+                               extraction_results=[], screening_results=[],
+                               forest_plot_path=None, effect_measure="SMD",
+                               output_path=str(out), meta_audit=meta_audit)
+    return "\n".join(p.text for p in docx.Document(str(out)).paragraphs)
+
+
+def test_docx_lists_studies_not_pooled(tmp_path):
+    t = _docx_text_meta(META_AUDIT, tmp_path)
+    assert "Studies included in the review but not in the meta-analysis" in t
+    assert "1 of 3 studies pooled." in t
+    assert "Ang (2010):" in t and "[Reviewer]" in t
+    assert "Jensen (2012):" in t and "[Automatic]" in t
+    assert "Lami (2018):" not in t
+
+
+def test_docx_not_pooled_none_left_out_and_absent_without_audit(tmp_path):
+    t = _docx_text_meta([META_AUDIT[2]], tmp_path)
+    assert "1 of 1 studies pooled. None left out." in t
+    t2 = _docx_text_meta(None, tmp_path)
+    assert "but not in the meta-analysis" not in t2
+
+
+def test_main_passes_meta_audit_to_word_report():
+    root = Path(__file__).resolve().parents[1]
+    src = (root / "SOURCE_CODE" / "pipelines" / "sr" / "main.py").read_text(encoding="utf-8")
+    call = src[src.index("ReportGenerator().generate("):src.index("PDFReportGenerator().generate(")]
+    assert "meta_audit" in call
