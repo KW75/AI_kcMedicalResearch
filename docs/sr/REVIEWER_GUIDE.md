@@ -11,7 +11,7 @@ This guide covers what the pipeline cannot verify, what a reviewer must check
 by hand, and how to decide whether an RCT belongs in the meta-analysis.
 
 Worked example: CBT for fibromyalgia pain, 5 RCTs,
-`reference/sr_cbt_fibromyalgia/README.md`.
+`Readme/readme_sr_pipeline.txt` section 1.
 
 ---
 

@@ -36,7 +36,6 @@ def test_user_data_in_input_is_ignored(rel_path):
 
 @pytest.mark.parametrize("rel_path", [
     "input/sr/study_overrides.yaml",
-    "reference/sr_cbt_fibromyalgia/README.md",
     "reference/sr_cbt_fibromyalgia/prisma_criteria.yaml",
     "reference/sr_cbt_fibromyalgia/pico_sample.json",
     "reference/sr_cbt_fibromyalgia/study_overrides.yaml",

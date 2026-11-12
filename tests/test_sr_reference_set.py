@@ -57,7 +57,7 @@ def test_input_overrides_is_an_empty_template():
 
 
 @pytest.mark.parametrize("name", [
-    "README.md", "prisma_criteria.yaml", "pico_sample.json", "study_overrides.yaml",
+    "prisma_criteria.yaml", "pico_sample.json", "study_overrides.yaml",
 ])
 def test_reference_set_files_exist(name):
     assert (REF / name).is_file()

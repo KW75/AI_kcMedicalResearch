@@ -7,10 +7,12 @@ number that reaches the pooled result is either agreed by repeated AI
 readings or entered by a reviewer from the PDF, and the report says which.
 
 1. BEFORE A RUN
-- Enter the PICO in the launcher. The launcher writes
-  SOURCE_CODE/pipelines/sr/config/prisma_criteria.yaml from it (only if it
-  changed). The default file is a sample with <...> placeholders; a direct
-  run stops until they are replaced.
+- Enter the PICO in the launcher. For each run it writes
+  input/sr/prisma_criteria.yaml (internal, not in Git) and passes it to the
+  pipeline. After a successful run the PICO JSON is copied to
+  reports/sr/<run_id>/; copy it back into input/sr to reuse it. A direct
+  run without --config uses the sample in pipelines/sr/config, which stops
+  on its <...> placeholders or an empty Population/Intervention/Outcome.
 - Comparator (C): enter ONE comparator, never "A vs B". Press Enter for the
   default "Usual care, attention placebo or waiting list (pooled)": all
   inactive controls pooled into one result (the usual approach). Type
@@ -19,12 +21,28 @@ readings or entered by a reviewer from the PDF, and the report says which.
   a separate run. A waiting-list subgroup is not yet in the report (open).
 - Inclusion/exclusion criteria are asked after the Outcome, separated by
   ';' (defaults: RCT; Adult participants / Non-RCT; Animal studies - Enter
-  keeps them). They are saved in input/sr/pico_<timestamp>.json, written to
-  prisma_criteria.yaml, and can be changed later with "Modify this PICO?".
+  keeps them). They are saved in input/sr/pico_<timestamp>.json.
+- Choosing a saved PICO shows every item again with its value in [ ]:
+  Enter keeps it, typing replaces it. A new pico_<timestamp>.json is saved
+  only if something changed. Population, Intervention and Outcome are
+  required.
 - Put the trial PDFs in input/sr. Papers never go into Git.
 - input/sr/study_overrides.yaml starts empty (comments only). See section 7.
-- Worked example (CBT for fibromyalgia pain, 5 trials):
-  reference/sr_cbt_fibromyalgia/README.md.
+- Worked example (CBT for fibromyalgia pain, 5 trials): files in
+  reference/sr_cbt_fibromyalgia (prisma_criteria.yaml, study_overrides.yaml,
+  pico_sample.json; the 5 PDFs and saved runs are local only, not in Git).
+  Reference run 20261111_190839: 3 of 5 studies pooled (Karlsson g=0.226,
+  Lami g=-0.029, McCrae g=-0.227); pooled SMD -0.042 [-0.327, 0.242],
+  I2 = 0.0% (k=3). Not pooled: Ang (Reviewer: Table 2 is the NFR pain
+  rating; FIQ pain only as Week 6 change scores) and Jensen (Automatic:
+  repeated AI readings disagreed).
+  To rerun: copy reference/sr_cbt_fibromyalgia/input/*.pdf and its
+  study_overrides.yaml into input/sr (the log must say "Loaded 4 study
+  override(s)"), then run the pipeline with --config
+  reference/sr_cbt_fibromyalgia/prisma_criteria.yaml (old comparator
+  wording; a new launcher PICO may screen differently). Afterwards:
+  git restore input/sr/study_overrides.yaml, and move the PDFs out.
+  Full citations: git show b274d24:reference/sr_cbt_fibromyalgia/README.md
 
 2. READING THE PAPERS (shared text, paper_text.py)
 Each PDF is read once and saved as input/sr/paper_text/<name>.txt; reruns
