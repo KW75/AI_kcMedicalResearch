@@ -269,6 +269,14 @@ Include a trial in the meta-analysis when **all** hold:
 4. Analysed N per arm is reported or derivable for that timepoint.
 5. The comparison is between-group, not within-group.
 
+**Which comparator matches the PICO.** The launcher default pools usual
+care, attention placebo and waiting list into one result. If the doctor
+typed `Exclude_WaitList`, the PICO comparator is "Usual care or attention
+placebo": a waiting-list-only trial then fails item 1. Check that the
+screener did not let one through, and record "No eligible comparator arm".
+A trial whose only control is an active treatment (e.g. exercise, drugs)
+fails item 1 under either choice; that comparison needs a separate run.
+
 ### 4.2 Exclude — and the reason to record
 
 | Situation | Reason to record |

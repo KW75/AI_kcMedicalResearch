@@ -1485,8 +1485,9 @@ def run_sr_launcher(provider: str = "", model: str = "") -> None:
     # -- Step 3: Update prisma_criteria.yaml with PICO data -----------------
     cfg_yaml: dict = {}
     if pico_data:
+        inclusion, exclusion = _criteria_from_pico(pico_data)
         cfg_yaml = {
-            "review_title":       pico_data.get("topic", pico_data.get("topic", "Systematic Review")),
+            "review_title":       pico_data.get("topic", "Systematic Review"),
             "effect_measure":     pico_data.get("effect_measure", "SMD"),
             "pico": {
                 "population":     pico_data.get("population", ""),
@@ -1495,10 +1496,10 @@ def run_sr_launcher(provider: str = "", model: str = "") -> None:
                 "outcome":        pico_data.get("outcome", ""),
             },
             "pubmed_query_cleaned": pico_data.get("pubmed_query_cleaned", ""),
-            "inclusion_criteria": ["RCT", "Adult participants"],
-            "exclusion_criteria": ["Non-RCT", "Animal studies"],
+            "inclusion_criteria": inclusion,
+            "exclusion_criteria": exclusion,
         }
-        
+
         prisma_path = SOURCE_CODE_DIR / "pipelines" / "sr" / "config" / "prisma_criteria.yaml"
         from pipelines.sr.src.utils.criteria_file import write_criteria_if_changed
         if write_criteria_if_changed(prisma_path, cfg_yaml):
@@ -1506,6 +1507,9 @@ def run_sr_launcher(provider: str = "", model: str = "") -> None:
         else:
             print(f"\n   - prisma_criteria.yaml unchanged (same PICO)")
         print(f"     PubMed query: {cfg_yaml.get('pubmed_query_cleaned', 'n/a')}")
+        print(f"     Comparator:   {cfg_yaml['pico']['comparator'] or 'n/a'}")
+        print(f"     Inclusion:    {'; '.join(inclusion)}")
+        print(f"     Exclusion:    {'; '.join(exclusion)}")
     else:
         print("\n  [i] Using existing prisma_criteria.yaml")
 
@@ -1589,18 +1593,67 @@ def run_sr_launcher(provider: str = "", model: str = "") -> None:
 
 
 
+# PICO defaults (Session 39). Comparator: inactive controls are pooled and
+# Comparator: inactive controls pooled (the usual approach); the doctor can type
+# "Usual care or attention placebo" to leave out waiting-list trials.
+# comparison (Cochrane Handbook ch. 3). Criteria are shown and editable.
+DEFAULT_COMPARATOR = "Usual care, attention placebo or waiting list (pooled)"
+EXCLUDE_WAITLIST_KEYWORD = "exclude_waitlist"
+EXCLUDE_WAITLIST_COMPARATOR = "Usual care or attention placebo"
+
+def _resolve_comparator(typed, current: str) -> str:
+    """Enter keeps current; the Exclude_WaitList keyword (any case) becomes plain
+    text the screening AI understands; anything else is used as typed."""
+    text = (typed or "").strip()
+    if text.lower() == EXCLUDE_WAITLIST_KEYWORD:
+        return EXCLUDE_WAITLIST_COMPARATOR
+    return text or current
+
+DEFAULT_INCLUSION = ["RCT", "Adult participants"]
+DEFAULT_EXCLUSION = ["Non-RCT", "Animal studies"]
+
+
+def _split_criteria(text) -> list:
+    """Split on ';' (a criterion may contain commas); drop blanks."""
+    if isinstance(text, (list, tuple)):
+        return [str(t).strip() for t in text if str(t).strip()]
+    return [part.strip() for part in str(text or "").split(";") if part.strip()]
+
+
+def _criteria_from_pico(pico_data: dict) -> tuple:
+    """Inclusion/exclusion lists from a PICO dict; defaults if missing (old files)."""
+    inclusion = _split_criteria(pico_data.get("inclusion_criteria")) or list(DEFAULT_INCLUSION)
+    exclusion = _split_criteria(pico_data.get("exclusion_criteria")) or list(DEFAULT_EXCLUSION)
+    return inclusion, exclusion
+
+
+def _ask_criteria(label: str, current: list) -> list:
+    """Show the current list; Enter keeps it, typed text (';'-separated) replaces it."""
+    typed = input(f"    {label} [{'; '.join(current)}]: ").strip()
+    return _split_criteria(typed) or list(current)
+
+
 def _create_pico() -> dict:
     """Interactive PICO creation."""
     print("\n  Enter PICO components for your systematic review:")
-    print("  (Press Enter to skip any field)")
-    
+    print("  (Press Enter to skip a field; where a default is shown in [ ], Enter keeps it)")
+
     population = input("    Population   (P): ").strip()
     intervention = input("    Intervention (I): ").strip()
-    comparator = input("    Comparator   (C): ").strip()
+    print("    Comparator: press Enter for the default, or type Exclude_WaitList.")
+    print("        Default: usual care, attention placebo and waiting list pooled")
+    print("                 into one result (the usual approach).")
+    print("        Exclude_WaitList: type this to exclude waiting-list trials.")
+    comparator = _resolve_comparator(
+        input(f"    Comparator   (C) [{DEFAULT_COMPARATOR}]: "), DEFAULT_COMPARATOR)
     outcome = input("    Outcome      (O): ").strip()
-    
+
+    print("\n  Inclusion / exclusion criteria (separate with ';'):")
+    inclusion = _ask_criteria("Inclusion criteria", DEFAULT_INCLUSION)
+    exclusion = _ask_criteria("Exclusion criteria", DEFAULT_EXCLUSION)
+
     topic = f"Effect of {intervention} on {outcome}" if intervention and outcome else "Systematic Review"
-    
+
     pico_data = {
         "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "topic": topic,
@@ -1608,37 +1661,48 @@ def _create_pico() -> dict:
         "intervention": intervention,
         "comparator": comparator,
         "outcome": outcome,
+        "inclusion_criteria": inclusion,
+        "exclusion_criteria": exclusion,
         "study_design": "RCT",
         "effect_measure": "SMD",
         "source_mode": "manual_sr",
         "pubmed_query_raw": f"{population} AND {intervention} AND {outcome}" if all([population, intervention, outcome]) else "",
         "pubmed_query_cleaned": "",
     }
-    
+
     return pico_data
 
 
 def _modify_pico(pico_data: dict) -> dict:
     """Allow user to modify existing PICO."""
     print("\n  Modify PICO components (press Enter to keep current value):")
-    
+
     fields = [
         ("population", "Population   (P)"),
         ("intervention", "Intervention (I)"),
         ("comparator", "Comparator   (C)"),
         ("outcome", "Outcome      (O)"),
     ]
-    
+
     for key, label in fields:
         current = pico_data.get(key, "")
+        if key == "comparator" and not current:
+            current = DEFAULT_COMPARATOR
         new_val = input(f"    {label} [{current}]: ").strip()
-        if new_val:
-            pico_data[key] = new_val
-    
+        if key == "comparator":
+            pico_data[key] = _resolve_comparator(new_val, current)
+        else:
+            pico_data[key] = new_val or current
+
+    inclusion, exclusion = _criteria_from_pico(pico_data)
+    print("\n  Inclusion / exclusion criteria (separate with ';'; Enter keeps):")
+    pico_data["inclusion_criteria"] = _ask_criteria("Inclusion criteria", inclusion)
+    pico_data["exclusion_criteria"] = _ask_criteria("Exclusion criteria", exclusion)
+
     # Update topic if intervention or outcome changed
     if pico_data.get("intervention") and pico_data.get("outcome"):
         pico_data["topic"] = f"Effect of {pico_data['intervention']} on {pico_data['outcome']}"
-    
+
     return pico_data
 
 

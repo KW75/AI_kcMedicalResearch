@@ -10,8 +10,17 @@ readings or entered by a reviewer from the PDF, and the report says which.
 - Enter the PICO in the launcher. The launcher writes
   SOURCE_CODE/pipelines/sr/config/prisma_criteria.yaml from it (only if it
   changed). The default file is a sample with <...> placeholders; a direct
-  run stops until they are replaced. Inclusion/exclusion criteria are still
-  hard-coded in the launcher (RCT, adults / non-RCT, animal) - open item 7i.
+  run stops until they are replaced.
+- Comparator (C): enter ONE comparator, never "A vs B". Press Enter for the
+  default "Usual care, attention placebo or waiting list (pooled)": all
+  inactive controls pooled into one result (the usual approach). Type
+  Exclude_WaitList to leave out waiting-list trials (saved as "Usual care
+  or attention placebo"). An active comparator (e.g. exercise, drugs) needs
+  a separate run. A waiting-list subgroup is not yet in the report (open).
+- Inclusion/exclusion criteria are asked after the Outcome, separated by
+  ';' (defaults: RCT; Adult participants / Non-RCT; Animal studies - Enter
+  keeps them). They are saved in input/sr/pico_<timestamp>.json, written to
+  prisma_criteria.yaml, and can be changed later with "Modify this PICO?".
 - Put the trial PDFs in input/sr. Papers never go into Git.
 - input/sr/study_overrides.yaml starts empty (comments only). See section 7.
 - Worked example (CBT for fibromyalgia pain, 5 trials):
@@ -40,8 +49,8 @@ summaries; the paper text itself is never altered. The SR pipeline does
 not run strip_latex - check SR outputs for stray $...$ (open item).
 
 3. SCREENING
-The AI judges each paper against the PICO and inclusion criteria (RCT,
-comparator: placebo, active comparator or waiting list as a subgroup).
+The AI judges each paper against the PICO (including the comparator chosen
+in section 1) and the inclusion/exclusion criteria from the PICO step.
 Planned: rule checks first, 3-reading vote, split vote = NEEDS REVIEW
 (never automatic exclusion), exclusion quote checked against the text.
 

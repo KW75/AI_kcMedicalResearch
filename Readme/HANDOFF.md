@@ -48,7 +48,7 @@ so those catches happen at session open, not mid-work.
 
 | Component      | Status |
 |----------------|--------|
-| Tests | 1193 passed, 10 deselected on v2.10-sr-screening (Session 38); main 1064 (ef66b9f) (python -m pytest -m "not live" --tb=short -q) |
+| Tests | 1205 passed, 10 deselected on v2.10-sr-screening (Session 38); main 1064 (ef66b9f) (python -m pytest -m "not live" --tb=short -q) |
 | Branch         | main = ef66b9f (PR #7 merged 2026-11-10: F7 truth fixture sr_truth.yaml + scripts/sr_score_run.py). Work on v2.10-sr-screening, PR #8 open: shared paper text (b3d804c), prisma_criteria write-if-changed (afd90a3), RoB2 overall rule (3e3785e), RoB2 Methods/Results text (908f889, 306d838), registration lines to RoB2 (Session 38); Session 38: Karlsson/Ang overrides (cf75209), RoB2 Domain 4 self-report rule (46fbd9b), Domain 4 High outright (e4e97b8), Ang excluded by reviewer + not-pooled report section (a56dc55), plain report reasons + POOLED line (0bf59dc), fibromyalgia set moved to reference/ (7h, b32f4c4), REVIEWER_GUIDE rewrite + readme_sr_pipeline.txt (docs, this commit). Branches v2.6-ocr-editor, v2.5-major-updates, v2.7-sr-fixes, v2.8-sr-review-gate, v2.9-sr-fixture deleted |
 | CI | green on PR #8 at b32f4c4 (1193 passed, both jobs, 2026-11-11). Last confirmed on main: bcd42d9 (2026-11-09, 1027, both jobs). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
 | SR docs        | Readme/readme_sr_pipeline.txt = for users: how the SR pipeline works and how to use it. docs/sr/REVIEWER_GUIDE.md = for reviewers: what to check by hand, documented failures, limitations, methods statement (rewritten Session 38; section numbers 2.2, 3.1, 3.5, 5, 6 are cited by code/tests/README, keep them). README.md = the app. Update the SR docs when SR behaviour changes |
@@ -79,12 +79,15 @@ Session 38 log keeps the evidence. This list is the only place to tick
 items off. Old item IDs (7i, 7n, ...) in brackets for tracing.
 
 SR - review content
-1. Criteria in the PICO step (old 7i): SOURCE_CODE\main.py lines 1498-1499
-   hard-code inclusion ["RCT", "Adult participants"] / exclusion
-   ["Non-RCT", "Animal studies"]; sr main.py reads them (lines 544, 886).
-   Let the doctor see and edit them in the PICO step (defaults from
-   population / study_design). Update readme_sr_pipeline.txt section 1 and
-   REVIEWER_GUIDE section 0-less intro if behaviour changes.
+1. DONE (2026-11-12): criteria in the PICO step (old 7i). _create_pico /
+   _modify_pico ask inclusion/exclusion after the Outcome (';'-separated;
+   defaults RCT; Adult participants / Non-RCT; Animal studies; Enter keeps),
+   saved in pico_<timestamp>.json, written to prisma_criteria.yaml via
+   _criteria_from_pico (hard-coded lists removed). Comparator default
+   "Usual care, attention placebo or waiting list (pooled)"; typing
+   Exclude_WaitList saves "Usual care or attention placebo" (create and
+   modify). tests/test_sr_pico_criteria.py (12). Docs: readme sections 1
+   and 3, REVIEWER_GUIDE 4.1.
 2. 7h leftovers: copy run 20261111_190839 into
    reference/sr_cbt_fibromyalgia/reports/ (README cites it); full journal
    citations in the reference README; rename the misspelt "ouput" folder to
@@ -124,9 +127,13 @@ SR - extraction checks
     Overrides and corrected text must agree with what F6/F8 check.
 
 SR - report
-11. [SENSITIVITY] estimate and waiting-list subgroup (Jensen, Karlsson,
-    McCrae vs Ang, Lami) in the Word/HTML report and forest plot; warn when
-    a subgroup has < 3 studies.
+11. Waiting-list subgroup + sensitivity analysis in the Word/HTML report and
+    forest plot: subgroup by control type (waiting list: Jensen, Karlsson,
+    McCrae vs usual care / attention placebo: Ang, Lami) and an estimate
+    excluding waiting-list trials; warn when a subgroup has < 3 studies.
+    Leaving waiting-list trials out of the whole run already works
+    (Exclude_WaitList at C, or exclude_from_meta). The current [SENSITIVITY]
+    line is a different check; do not confuse the two.
 
 SR - local-first (after 1-11)
 12. Ollama vision for SR (Session 35 TODO SR item 3):
