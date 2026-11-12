@@ -50,7 +50,7 @@ so those catches happen at session open, not mid-work.
 |----------------|--------|
 | Tests | 1225 passed, 10 deselected on v2.10-sr-screening (Session 39); main 1064 (ef66b9f) (python -m pytest -m "not live" --tb=short -q) |
 | Branch         | main = ef66b9f (PR #7 merged 2026-11-10: F7 truth fixture sr_truth.yaml + scripts/sr_score_run.py). Work on v2.10-sr-screening, PR #8 open: shared paper text (b3d804c), prisma_criteria write-if-changed (afd90a3), RoB2 overall rule (3e3785e), RoB2 Methods/Results text (908f889, 306d838), registration lines to RoB2 (Session 38); Session 38: Karlsson/Ang overrides (cf75209), RoB2 Domain 4 self-report rule (46fbd9b), Domain 4 High outright (e4e97b8), Ang excluded by reviewer + not-pooled report section (a56dc55), plain report reasons + POOLED line (0bf59dc), fibromyalgia set moved to reference/ (7h, b32f4c4), REVIEWER_GUIDE rewrite + readme_sr_pipeline.txt (docs, this commit). Branches v2.6-ocr-editor, v2.5-major-updates, v2.7-sr-fixes, v2.8-sr-review-gate, v2.9-sr-fixture deleted |
-| CI | green on PR #8 at 13a3a86 (1217, both jobs, 57 warnings). Last confirmed on main: bcd42d9 (2026-11-09, 1027, both jobs). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
+| CI | green on PR #8 at 083539e (1225 passed, 10 deselected, both jobs, 57 warnings). Last confirmed on main: bcd42d9 (2026-11-09, 1027, both jobs). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
 | SR docs        | Readme/readme_sr_pipeline.txt = for users: how the SR pipeline works and how to use it. docs/sr/REVIEWER_GUIDE.md = for reviewers: what to check by hand, documented failures, limitations, methods statement (rewritten Session 38; section numbers 2.2, 3.1, 3.5, 5, 6 are cited by code/tests/README, keep them). README.md = the app. Update the SR docs when SR behaviour changes |
 | Deploy         | None: CLI only, local first. Render service deleted 2026-10-27; Streamlit UI and Render files removed in Session 33. UptimeRobot monitor for the old Render URL: not yet confirmed paused/deleted (user, outside the repo) |
 | Writing mode   | one-pass (write + edit + review in one call); tracks Topic 800 / Article 3,500 / Report 500 / Synopsis 1,500; on main since fa4edb9; tested on gemma4:e4b; terminal menus only |
@@ -129,8 +129,8 @@ SR - review content
    values, (e) "AI alone" for confirm-only entries. Open:
    (a) Word report (report_generator.py) lacks the not-pooled section
    (HTML: _not_pooled_html, html_report.py);
-   (d) "[SENSITIVITY] no needs-review studies" although Jensen is
-   needs-review (pipelines/sr/main.py ~152; rows built ~654-722).
+   (d) DONE (Session 39): not a bug; [SENSITIVITY] now names studies
+   released by override (Jensen).
 5. SR LaTeX check: grep SR outputs (CSV, HTML, docx text, console) for stray
    $...$; if found, reuse strip_latex() (OCR mode).
 6. Run-to-run variation (old 7l): RoB2 outside Domain 4 (randomisation,
@@ -2321,6 +2321,11 @@ Expected: a clean tree in sync with origin, the top commit is this handoff, and 
   old report_generator.py (git stash). Suite 1217 -> 1225. Commit 434e771.
 - CI on 13a3a86: green, 1217 passed, both jobs; 57 warnings (44 before;
   unpinned versions, not investigated).
-
-
-
+- Item 4 (d): not a bug. "[SENSITIVITY] no needs-review studies" was
+  correct: Jensen passes the F4 gate because its override covers every
+  flagged field ([AGREEMENT]), so it is pooled, not held back. Now
+  [SENSITIVITY] names such studies: "Runs disagreed on Jensen (2012), but
+  a reviewer overrode every flagged field, so it is not held back".
+  main.py: resolved_by_override list, resolved= parameter. Tests +3
+  (tests/test_sr_review_gate.py). Suite 1225 -> 1228.
+- CI on 083539e: green, 1225 passed, both jobs, 57 warnings.

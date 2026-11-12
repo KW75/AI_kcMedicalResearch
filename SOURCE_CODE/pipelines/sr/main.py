@@ -141,13 +141,22 @@ def _row_has_extracted_value(row: dict) -> bool:
     return False
 
 
-def _log_review_sensitivity(rows, review_rows, effect_measure):
+def _log_review_sensitivity(rows, review_rows, effect_measure, resolved=None):
     """F4 comparison (Session 37): pool primary + needs-review studies.
 
     The primary estimate excludes studies whose N runs disagreed. This
     second estimate puts them back so the reviewer sees how much they move
     the result. Comparison only - never the reported estimate.
+    Session 39 (item 4d): resolved = studies whose runs disagreed but a
+    reviewer overrode every flagged field ([AGREEMENT]). They are not held
+    back, so they are named here instead of silently missing.
     """
+    if resolved:
+        n = len(resolved)
+        logger.info(
+            f"[SENSITIVITY] Runs disagreed on {', '.join(str(s) for s in resolved)}, "
+            f"but a reviewer overrode every flagged field, so "
+            f"{'it is' if n == 1 else 'they are'} not held back (see [AGREEMENT]).")
     if not review_rows:
         logger.info("[SENSITIVITY] no needs-review studies - nothing to compare.")
         return None
@@ -652,6 +661,7 @@ def main():
     rows      = []
     meta_audit= []
     review_rows = []   # F4: gated studies, pooled only in [SENSITIVITY]
+    resolved_by_override = []   # Session 39 (4d): disagreed, all flagged fields overridden
     for r in er:
         m  = r.get("study_metadata",  {})
         po = r.get("primary_outcome", {})
@@ -720,6 +730,8 @@ def main():
                 f"[AGREEMENT] {m.get('first_author','?')}: runs disagreed but "
                 f"every flagged field was overridden in study_overrides.yaml "
                 f"- pooled with reviewer values.")
+            # Session 39 (item 4d): named in [SENSITIVITY].
+            resolved_by_override.append(f"{m.get('first_author','?')} ({m.get('year','')})")
 
         try:
             if po.get("outcome_match") is False:
@@ -825,7 +837,8 @@ def main():
     write_results(layout.results_csv, meta_audit)
 
     _log_stage4_summary(meta_audit, er, args.effect_measure)
-    _log_review_sensitivity(rows, review_rows, args.effect_measure)
+    _log_review_sensitivity(rows, review_rows, args.effect_measure,
+                            resolved=resolved_by_override)
 
     # ---------------------------------------------------------------------
     # [OUTCOME/TIMEPOINT] provenance surfacing (#22 / #51).
