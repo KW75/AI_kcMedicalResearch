@@ -65,4 +65,19 @@ def test_reference_set_files_exist(name):
 
 def test_reference_overrides_keep_the_reviewer_entries():
     authors = {e.get("first_author") for e in _load(REF / "study_overrides.yaml").values()}
-    assert {"Ang", "Karlsson", "Lami", "McCrae"} <= authors
+    assert {"Ang", "Jensen", "Karlsson", "Lami", "McCrae"} <= authors
+
+
+def test_reference_override_jensen_values():
+    """Item 3 (Session 39): Jensen Table 3 p7, N = completed treatment."""
+    from pathlib import Path
+    import yaml
+    path = (Path(__file__).resolve().parents[1] / "reference"
+            / "sr_cbt_fibromyalgia" / "study_overrides.yaml")
+    data = yaml.safe_load(path.read_text(encoding="utf-8"))
+    entry = next(v for v in data.values() if v.get("first_author") == "Jensen")
+    assert (entry["n_intervention"], entry["n_control"]) == (19, 15)
+    assert (entry["mean_intervention"], entry["sd_intervention"]) == (49, 19)
+    assert (entry["mean_control"], entry["sd_control"]) == (59, 26)
+    assert "exclude_from_meta" not in entry
+

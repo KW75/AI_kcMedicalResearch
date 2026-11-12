@@ -62,6 +62,22 @@ zsy234.pdf:
     used. n 24/24, 48 randomised. One of 3 readings took the next row
     (Interference) -> table_shift. Verified from the PDF (text is Tesseract
     OCR, broken font).
+    
+"Cognitive Behavioral Therapy increases pain-evoked activation of the prefrontal cortex in patients with fibromyalgeia (1).pdf":
+  first_author: Jensen
+  year: 2012
+  n_intervention: 19
+  n_control: 15
+  mean_intervention: 49
+  sd_intervention: 19
+  mean_control: 59
+  sd_control: 26
+  note: >-
+    Table 3 p7, weekly FM pain VAS 0-100, posttreatment, mean (SD): CBT
+    49 (19) vs waiting list 59 (26). N = completed treatment 19/15
+    (Fig 1 p3); 25/18 randomised. The AI's 45.6 is the mean age (p2), not
+    pain. Waiting-list subgroup. Verified from the PDF.
+
 
 
 
