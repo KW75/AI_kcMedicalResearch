@@ -48,7 +48,7 @@ so those catches happen at session open, not mid-work.
 
 | Component      | Status |
 |----------------|--------|
-| Tests | 1214 passed, 10 deselected on v2.10-sr-screening (Session 38); main 1064 (ef66b9f) (python -m pytest -m "not live" --tb=short -q) |
+| Tests | 1215 passed, 10 deselected on v2.10-sr-screening (Session 38); main 1064 (ef66b9f) (python -m pytest -m "not live" --tb=short -q) |
 | Branch         | main = ef66b9f (PR #7 merged 2026-11-10: F7 truth fixture sr_truth.yaml + scripts/sr_score_run.py). Work on v2.10-sr-screening, PR #8 open: shared paper text (b3d804c), prisma_criteria write-if-changed (afd90a3), RoB2 overall rule (3e3785e), RoB2 Methods/Results text (908f889, 306d838), registration lines to RoB2 (Session 38); Session 38: Karlsson/Ang overrides (cf75209), RoB2 Domain 4 self-report rule (46fbd9b), Domain 4 High outright (e4e97b8), Ang excluded by reviewer + not-pooled report section (a56dc55), plain report reasons + POOLED line (0bf59dc), fibromyalgia set moved to reference/ (7h, b32f4c4), REVIEWER_GUIDE rewrite + readme_sr_pipeline.txt (docs, this commit). Branches v2.6-ocr-editor, v2.5-major-updates, v2.7-sr-fixes, v2.8-sr-review-gate, v2.9-sr-fixture deleted |
 | CI | green on PR #8 at a7e4f2c (1214 passed). Last confirmed on main: bcd42d9 (2026-11-09, 1027, both jobs). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
 | SR docs        | Readme/readme_sr_pipeline.txt = for users: how the SR pipeline works and how to use it. docs/sr/REVIEWER_GUIDE.md = for reviewers: what to check by hand, documented failures, limitations, methods statement (rewritten Session 38; section numbers 2.2, 3.1, 3.5, 5, 6 are cited by code/tests/README, keep them). README.md = the app. Update the SR docs when SR behaviour changes |
@@ -113,10 +113,17 @@ SR - review content
     overrides): same result as 20261111_190839 (Karlsson 0.226, Lami
     -0.029, McCrae -0.227; SMD -0.042 [-0.327, 0.242], I2 0%, k=3). Open
     cosmetic: the [OUTCOME/TIMEPOINT] log block prints twice.
-3. Jensen override: Table 3 p7 posttreatment weekly pain VAS 49 (19) CBT vs
-   59 (26) control. N randomised 25/18 (p1, Fig 1 p3); the per-arm N behind
-   Table 3 is not in the text layer: confirm in the PDF before setting
-   checked: true. The AI's 45.6 is the mean age (p2).
+3. DONE (2026-11-12): Jensen override in
+   reference/sr_cbt_fibromyalgia/study_overrides.yaml (Table 3 p7, weekly
+   FM pain VAS 0-100 posttreatment, 49 (19) CBT vs 59 (26) waiting list;
+   brackets confirmed SD; N = completed treatment 19/15 (Fig 1 p3; 25/18
+   randomised)). Test test_reference_override_jensen_values. Commit
+   e7b7b85. Run 20261112_222233 (launcher, saved PICO reused, "Loaded 5
+   study override(s)"): Jensen g=-0.437 [-1.106, 0.232]; pooled SMD
+   -0.103 [-0.365, 0.159], I2 0%, k=4; Ang excluded. New reference run
+   (local only: reference/sr_cbt_fibromyalgia/reports/20261112_222233; no
+   console.txt). OPEN: sr_truth.yaml / sr_score_run.py use Jensen N 25/18
+   (randomised; see line ~1975, ~2230); align with 19/15 or document why.
 4. Report cosmetics (old 7n, 7f+): (a) Word report (report_generator.py)
    lacks the not-pooled section; (b) scorer prints "values from
    study_overrides.yaml" for Ang, which is excluded and has no values;

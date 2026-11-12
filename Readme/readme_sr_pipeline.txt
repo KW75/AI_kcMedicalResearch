@@ -31,11 +31,13 @@ readings or entered by a reviewer from the PDF, and the report says which.
 - Worked example (CBT for fibromyalgia pain, 5 trials): files in
   reference/sr_cbt_fibromyalgia (prisma_criteria.yaml, study_overrides.yaml,
   pico_sample.json; the 5 PDFs and saved runs are local only, not in Git).
-  Reference run 20261111_190839: 3 of 5 studies pooled (Karlsson g=0.226,
-  Lami g=-0.029, McCrae g=-0.227); pooled SMD -0.042 [-0.327, 0.242],
-  I2 = 0.0% (k=3). Not pooled: Ang (Reviewer: Table 2 is the NFR pain
-  rating; FIQ pain only as Week 6 change scores) and Jensen (Automatic:
-  repeated AI readings disagreed).
+  Reference run 20261112_222233: 4 of 5 studies pooled (Jensen g=-0.437,
+  Karlsson g=0.226, Lami g=-0.029, McCrae g=-0.227); pooled SMD -0.103
+  [-0.365, 0.159], I2 = 0.0% (k=4). Not pooled: Ang (Reviewer: Table 2 is
+  the NFR pain rating; FIQ pain only as Week 6 change scores). Jensen values
+  were entered by the reviewer (Table 3 p7; N = completed treatment 19/15).
+  The earlier run 20261111_190839 (before the Jensen override) pooled 3:
+  SMD -0.042 [-0.327, 0.242].
   To rerun: copy reference/sr_cbt_fibromyalgia/input/*.pdf and its
   study_overrides.yaml into input/sr (the log must say "Loaded 4 study
   override(s)"), then run the pipeline with --config
