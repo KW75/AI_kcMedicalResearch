@@ -81,3 +81,39 @@ def test_html_escapes_note(tmp_path):
     h = _html_text([row], tmp_path)
     assert "SD &lt;b&gt;check&lt;/b&gt; &amp; verify" in h
     assert "<b>check</b>" not in h
+
+    
+# --- Session 39 (item 4c): count only entries that changed a value ("old->new").
+ANG = {"filename": "ang.pdf",
+       "study_metadata": {"first_author": "Ang", "year": 2010},
+       "participants": {"n_intervention": 15, "n_control": 13},
+       "primary_outcome": {"name": "NFR pain rating"},
+       "override_fields": "first_author; exclude_from_meta",
+       "override_note": "Not pooled (reviewer decision)."}
+KARLSSON_CONFIRMED = {"filename": "karlsson.pdf",
+                      "study_metadata": {"first_author": "Karlsson", "year": 2015},
+                      "participants": {"n_intervention": 24, "n_control": 24},
+                      "primary_outcome": {"name": "Pain"},
+                      "override_fields": "n_intervention(confirmed 24); n_control(confirmed 24)"}
+
+
+def test_html_counts_only_studies_with_changed_values(tmp_path):
+    h = _html_text([MCCRAE, LAMI, ANG, KARLSSON_CONFIRMED], tmp_path)
+    assert "2 of 4 extracted studies use values entered by a reviewer" in h
+    section = h.split("Reviewer-entered data", 1)[1].split("</div>", 1)[0]
+    assert "Ang (2010)" not in section
+    assert "Karlsson (2015)" in section and "confirmed" in section
+
+
+def test_html_no_section_for_exclude_only(tmp_path):
+    assert "Reviewer-entered data" not in _html_text([ANG, KARLSSON], tmp_path)
+
+def test_docx_counts_only_studies_with_changed_values(tmp_path):
+    t = _docx_text([MCCRAE, LAMI, ANG, KARLSSON_CONFIRMED], tmp_path)
+    assert "2 of 4 extracted studies use values entered by a reviewer" in t
+    assert "Ang (2010):" not in t
+    assert "first_author; exclude_from_meta" not in t
+    assert "Karlsson (2015)" in t and "confirmed" in t
+
+def test_docx_no_section_for_exclude_only(tmp_path):
+    assert "Reviewer-entered data" not in _docx_text([ANG, KARLSSON], tmp_path)

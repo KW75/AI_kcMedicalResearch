@@ -1,5 +1,7 @@
 import base64, datetime
 from pathlib import Path
+from .override_summary import override_changed_values, override_confirmed_only, study_label
+
 
 HTML_TEMPLATE = """<!DOCTYPE html>
 <html lang="en">
@@ -163,6 +165,17 @@ def plain_skip_reason(reason):
         return "Excluded by the reviewer: " + s[len("excluded by reviewer:"):].strip()
     return " Also: ".join(_plain_one(p) for p in s.split("; also: "))
 
+def _override_changed_values(override_fields) -> bool:
+    """Session 39 (item 4c): True if StudyOverrides.apply recorded a changed
+    value ("field(old->new)" or "field(absent->v)")."""
+    return "->" in str(override_fields or "")
+
+
+def _override_confirmed_only(override_fields) -> bool:
+    """True if the reviewer only confirmed values ("field(confirmed v)")."""
+    s = str(override_fields or "")
+    return "(confirmed " in s and "->" not in s
+
 class HTMLReportGenerator:
     def generate(self, title, authors, pico, inclusion_criteria, exclusion_criteria,
                  ma_result, extraction_results, screening_results, rob_results,
@@ -271,24 +284,32 @@ class HTMLReportGenerator:
         return "\n".join(rows)
 
     def _overrides_html(self, results):
-        """Session 37: list studies whose values were entered by a reviewer."""
-        ov = [r for r in (results or [])
-              if isinstance(r, dict) and (r.get("override_fields") or r.get("override_note"))]
-        if not ov:
+        """Session 37: list studies whose values were entered by a reviewer.
+        Session 39 (item 4c): count only entries that changed a value; exclude-only
+        entries (Ang) are in the not-pooled section; confirm-only entries are named
+        separately."""
+        rows = [r for r in (results or []) if isinstance(r, dict)]
+        ov = [r for r in rows if override_changed_values(r.get("override_fields"))]
+        conf = [r for r in rows if override_confirmed_only(r.get("override_fields"))]
+        if not ov and not conf:
             return ""
-        items = []
-        for r in ov:
-            m = r.get("study_metadata") or {}
-            label = f"{m.get('first_author') or r.get('filename', '?')} ({m.get('year', '')})"
-            note = f" {self._e(r['override_note'])}" if r.get("override_note") else ""
-            fields = (f" <span style='color:#6b7280;'>Fields: {self._e(r['override_fields'])}</span>"
-                      if r.get("override_fields") else "")
-            items.append(f"<li><strong>{self._e(label)}</strong>:{note}{fields}</li>")
-        return ("<div class='wb' style='margin-top:14px;'><strong>Reviewer-entered data.</strong> "
-                f"{len(ov)} of {len(results)} extracted studies use values entered by a reviewer "
-                "from the source PDF (input/sr/study_overrides.yaml), not values extracted by the model. "
-                "Report them as manually extracted.<ul style='margin:6px 0 0 18px;'>"
-                + "".join(items) + "</ul></div>")
+        html = "<div class='wb' style='margin-top:14px;'><strong>Reviewer-entered data.</strong> "
+        if ov:
+            items = []
+            for r in ov:
+                note = f" {self._e(r['override_note'])}" if r.get("override_note") else ""
+                fields = (f" <span style='color:#6b7280;'>Fields: {self._e(r['override_fields'])}</span>"
+                          if r.get("override_fields") else "")
+                items.append(f"<li><strong>{self._e(study_label(r))}</strong>:{note}{fields}</li>")
+            html += (f"{len(ov)} of {len(results)} extracted studies use values entered by a reviewer "
+                     "from the source PDF (input/sr/study_overrides.yaml), not values extracted by the model. "
+                     "Report them as manually extracted.<ul style='margin:6px 0 0 18px;'>"
+                     + "".join(items) + "</ul>")
+        if conf:
+            html += ("<p style='margin:6px 0 0 0;'>Checked by a reviewer against the PDF, values "
+                     "unchanged (confirmed): " + self._e(", ".join(study_label(r) for r in conf)) + ".</p>")
+        return html + "</div>"
+
 
     def _not_pooled_html(self, meta_audit):
         """Session 38 (7k): every study left out of the pooled estimate, with its

@@ -281,3 +281,64 @@ def test_report_pooled_count_includes_unknown_and_zero(sc, truth, tmp_path):
     ])
     report = sc.format_report(sc.score_run_folder(folder, truth))
     assert "POOLED: 0 of 2 studies; not pooled: Nobody, Jensen" in report
+
+# --- Session 39 (item 4b/4e): exclude-only (Ang) and confirm-only entries in
+# override_fields are not "values from study_overrides.yaml". Confirmed fields
+# are the AI's own values, so a confirm-only study gets "AI alone" lines too.
+ANG_OVR = "first_author; exclude_from_meta"
+KARLSSON_ROW = ("Karlsson", "24", "24", "3.88", "1.05", "3.67", "0.75")
+KARLSSON_OVR = ("first_author; year; n_intervention(confirmed 24); n_control(confirmed 24); "
+                "mean_intervention(4.05->3.88); sd_intervention(0.85->1.05); "
+                "mean_control(3.43->3.67); sd_control(0.82->0.75)")
+KARLSSON_ALL_CONFIRMED = (
+    "first_author; year; n_intervention(confirmed 24); n_control(confirmed 24); "
+    "mean_intervention(confirmed 3.88); sd_intervention(confirmed 1.05); "
+    "mean_control(confirmed 3.67); sd_control(confirmed 0.75)")
+JENSEN_OVR = ("n_intervention(25->19); n_control(18->15); mean_intervention(45.6->49); "
+              "sd_intervention(absent->19); mean_control(45.6->59); sd_control(absent->26)")
+
+
+def test_parse_override_fields_real_strings(sc):
+    assert sc.parse_override_fields(ANG_OVR) == ({}, {})
+    changed, confirmed = sc.parse_override_fields(KARLSSON_OVR)
+    assert confirmed == {"n_intervention": 24, "n_control": 24}
+    assert set(changed) == {"mean_intervention", "sd_intervention",
+                            "mean_control", "sd_control"}
+    assert changed["mean_intervention"] == 4.05
+    changed, confirmed = sc.parse_override_fields(JENSEN_OVR)
+    assert confirmed == {} and changed["sd_intervention"] is None
+
+
+def test_exclude_only_override_prints_no_values_line(sc, truth, tmp_path):
+    folder = _run_folder(
+        tmp_path, [_row("Ang", "15", "13", "-20.2", "23.9", "-14.9", "16.4",
+                        included="False", skip="excluded by reviewer")],
+        overrides={"Ang": ANG_OVR})
+    results, text = _report(sc, truth, folder)
+    assert results[0]["override"] is False
+    assert "values from study_overrides.yaml" not in text
+    assert "AI alone" not in text
+    assert "skip_reason: excluded by reviewer" in text
+
+
+def test_confirm_only_override_shows_ai_alone_all_match(sc, truth, tmp_path):
+    folder = _run_folder(tmp_path, [_row(*KARLSSON_ROW)],
+                         overrides={"Karlsson": KARLSSON_ALL_CONFIRMED})
+    results, text = _report(sc, truth, folder)
+    assert results[0]["override"] is False
+    assert results[0]["confirmed_only"] is True
+    assert "values from study_overrides.yaml" not in text
+    assert "reviewer confirmed the AI's values" in text
+    assert "AI alone: ALL MATCH" in text
+    assert "AI alone: 1 checked, 1 fully correct" in text
+
+
+def test_real_karlsson_override_unchanged(sc, truth, tmp_path):
+    # Guard: confirmed Ns + changed means/SDs (run 20261112_222233).
+    folder = _run_folder(tmp_path, [_row(*KARLSSON_ROW)],
+                         overrides={"Karlsson": KARLSSON_OVR})
+    results, text = _report(sc, truth, folder)
+    assert results[0]["override"] is True
+    assert "values from study_overrides.yaml" in text
+    assert "AI alone: mean_intervention WRONG (AI 4.05, truth 3.88)" in text
+    assert "AI alone: n_intervention" not in text   # confirmed = the AI was right

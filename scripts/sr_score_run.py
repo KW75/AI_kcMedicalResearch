@@ -12,7 +12,8 @@ with a wrong or missing value; 0 otherwise; 2 if the folder is not a run.
 A MATCH means "equals the reviewer's reading" for these papers only.
 The report is also saved as <run>/score.txt (replaced on every rerun).
 Overridden studies also get "AI alone" lines: the AI's own values (from
-override_fields "field(old->new)") scored against the truth.
+override_fields "field(old->new)" and "field(confirmed v)") scored against
+the truth. Exclude-only entries (first_author; exclude_from_meta) get none.
 """
 import argparse
 import csv
@@ -95,37 +96,62 @@ def score_row(row, truth):
     return out
 
 
-def _overridden_authors(folder):
-    ext = Path(folder) / "data" / "extracted" / "extracted_data.csv"
-    if not ext.exists():
-        return set()
-    names = set()
-    with open(ext, newline="", encoding="utf-8-sig") as f:
-        for r in csv.DictReader(f):
-            if str(r.get("override_fields") or "").strip():
-                a = r.get("study_metadata.first_author") or r.get("first_author") or ""
-                names.add(a.strip().casefold())
-    return names
-
-
 # Session 38 (7f): "n_intervention(38->28)" -> the AI said 38. "absent" = empty.
 _OVR_RE = re.compile(r"(\w+)\(([^()]*?)->([^()]*?)\)")
+# Session 39 (item 4e): "n_intervention(confirmed 24)" -> the AI said 24, reviewer agreed.
+_CONF_RE = re.compile(r"(\w+)\(confirmed ([^()]*?)\)")
 
 
-def _ai_overrides(folder):
-    """{author casefold: {field: AI value or None}} from override_fields."""
+def _override_entries(folder):
+    """{author casefold: override_fields string} from extracted_data.csv."""
     ext = Path(folder) / "data" / "extracted" / "extracted_data.csv"
     if not ext.exists():
         return {}
     out = {}
     with open(ext, newline="", encoding="utf-8-sig") as f:
         for r in csv.DictReader(f):
-            vals = {field: _num(old)
-                    for field, old, _new in _OVR_RE.findall(str(r.get("override_fields") or ""))
-                    if field in FIELDS}
-            if vals:
+            s = str(r.get("override_fields") or "").strip()
+            if s:
                 a = r.get("study_metadata.first_author") or r.get("first_author") or ""
-                out[a.strip().casefold()] = vals
+                out[a.strip().casefold()] = s
+    return out
+
+
+def parse_override_fields(s):
+    """Split StudyOverrides.apply's override_fields for the six FIELDS into
+    ({field: AI value or None} changed, {field: value} confirmed). Bare names
+    (first_author, year, exclude_from_meta) are neither."""
+    s = str(s or "")
+    changed = {f: _num(old) for f, old, _new in _OVR_RE.findall(s) if f in FIELDS}
+    confirmed = {f: _num(v) for f, v in _CONF_RE.findall(s) if f in FIELDS}
+    return changed, confirmed
+
+
+def _overridden_authors(folder):
+    """Authors whose override CHANGED at least one of the six FIELDS.
+    Exclude-only (Ang) and confirm-only entries are not 'values from overrides'."""
+    return {a for a, s in _override_entries(folder).items()
+            if parse_override_fields(s)[0]}
+
+
+def _confirmed_only_authors(folder):
+    out = set()
+    for a, s in _override_entries(folder).items():
+        changed, confirmed = parse_override_fields(s)
+        if confirmed and not changed:
+            out.add(a)
+    return out
+
+
+def _ai_overrides(folder):
+    """{author casefold: {field: AI value or None}}. Changed fields give the
+    AI's old value; confirmed fields give the confirmed value (= the AI's)."""
+    out = {}
+    for a, s in _override_entries(folder).items():
+        changed, confirmed = parse_override_fields(s)
+        vals = {**confirmed, **changed}
+        if vals:
+            out[a] = vals
     return out
 
 
@@ -134,6 +160,7 @@ def score_run_folder(folder, truth):
     if not res.exists():
         raise FileNotFoundError(f"{res} not found - is this an SR run folder?")
     overridden = _overridden_authors(folder)
+    confirmed_only = _confirmed_only_authors(folder)
     ai_values = _ai_overrides(folder)
     with open(res, newline="", encoding="utf-8-sig") as f:
         rows = list(csv.DictReader(f))
@@ -142,6 +169,7 @@ def score_run_folder(folder, truth):
         r = score_row(row, truth)
         key = str(row.get("first_author") or "").strip().casefold()
         r["override"] = key in overridden
+        r["confirmed_only"] = key in confirmed_only
         if key in ai_values and r["status"] == "scored":
             # Same row with the overridden fields put back to what the AI said;
             # fields the override did not touch are the AI's own values already.
@@ -180,6 +208,9 @@ def format_report(results):
         if r.get("override"):
             lines.append(pad + "values from study_overrides.yaml (manual override) - "
                                "this scores the reviewer, not the model")
+        elif r.get("confirmed_only"):
+            lines.append(pad + "reviewer confirmed the AI's values (study_overrides.yaml) - "
+                               "values are the model's, checked by the reviewer")
         ai = r.get("ai")
         if ai:
             ai_bad = [f"{f} {s} (AI {_fmt(ai['values'][f][0])}, truth {_fmt(ai['values'][f][1])})"
