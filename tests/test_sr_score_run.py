@@ -100,9 +100,12 @@ def test_ang_wrong_n_is_caught_while_means_match(sc, truth):
 
 
 def test_empty_cell_is_missing(sc, truth):
+    # Session 39: truth Jensen N is 19/15 (completed treatment), so N matches;
+    # the WRONG path stays covered by the Ang 17/15 test above.
     r = sc.score_row(_row("Jensen", "19", "15", "", "", "", ""), truth)
     assert r["fields"]["mean_intervention"] == "MISSING"
-    assert r["fields"]["n_intervention"] == "WRONG"
+    assert r["fields"]["n_intervention"] == "MATCH"
+    assert r["fields"]["n_control"] == "MATCH"
 
 
 def test_unchecked_and_unknown_studies_are_not_scored(sc, truth):

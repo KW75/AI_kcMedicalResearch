@@ -3,6 +3,9 @@
 # Used by scripts/sr_score_run.py to score a real SR run against the truth.
 # Primary outcome: pain intensity, post-intervention. Keyed by first author.
 # checked: false = reported by the scorer but not scored.
+# N = N analysed at the reported timepoint (the N behind the mean/SD), not
+# randomised N. Must match reference/sr_cbt_fibromyalgia/study_overrides.yaml
+# (tests/test_sr_truth_override_sync.py).
 tolerance: 0.1
 
 studies:
@@ -28,9 +31,9 @@ studies:
     sd_intervention: 19
     mean_control: 59
     sd_control: 26
-    n_intervention: 25
-    n_control: 18
-    n_status: provisional            # randomised N (p1); N behind Table 3 not stated
+    n_intervention: 19
+    n_control: 15
+    n_status: inferred               # completed treatment (Fig 1 p3) = posttreatment Table 3; 25/18 randomised (p1); Table 3 N not stated in text
 
   Lami:
     year: 2018
