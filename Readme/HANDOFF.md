@@ -124,13 +124,13 @@ SR - review content
    (local only: reference/sr_cbt_fibromyalgia/reports/20261112_222233; no
    console.txt). DONE (Session 39): truth Jensen N 19/15 (inferred), matches the
    override; pinned by tests/test_sr_truth_override_sync.py; align with 19/15 or document why.
-4. Report cosmetics (old 7n, 7f+): (a) Word report (report_generator.py)
-   lacks the not-pooled section; (b) scorer prints "values from
-   study_overrides.yaml" for Ang, which is excluded and has no values;
-   (c) HTML "4 of 5 use values entered by a reviewer" counts an
-   exclusion-only entry; (d) "[SENSITIVITY] no needs-review studies"
-   although Jensen is needs-review; (e) print "AI alone: ALL MATCH" for
-   confirm-only overrides (Karlsson).
+4. Report cosmetics (old 7n, 7f+). DONE (Session 39, 434e771): (b) scorer
+   line for exclude-only entries, (c) HTML and Word count only changed
+   values, (e) "AI alone" for confirm-only entries. Open:
+   (a) Word report (report_generator.py) lacks the not-pooled section
+   (HTML: _not_pooled_html, html_report.py);
+   (d) "[SENSITIVITY] no needs-review studies" although Jensen is
+   needs-review (pipelines/sr/main.py ~152; rows built ~654-722).
 5. SR LaTeX check: grep SR outputs (CSV, HTML, docx text, console) for stray
    $...$; if found, reuse strip_latex() (OCR mode).
 6. Run-to-run variation (old 7l): RoB2 outside Domain 4 (randomisation,
@@ -2303,3 +2303,41 @@ Expected: a clean tree in sync with origin, the top commit is this handoff, and 
   path still covered by the Ang 17/15 test). Regression fixture comments
   no longer call 25/18 "reviewer-verified". The scorer never reads
   n_status (it compares FIELDS only). Suite: 1215 -> 1217 passed.
+- Item 4 (b)(c)(e): override_fields entries have three shapes
+  (study_overrides.py): field(old->v) / field(absent->v) = changed,
+  field(confirmed v) = reviewer agreed with the AI, bare names
+  (first_author, year, exclude_from_meta) = no value. Only a changed
+  value now counts as reviewer-entered data.
+  Scorer (sr_score_run.py): parse_override_fields(); exclude-only (Ang)
+  no longer prints "values from study_overrides.yaml"; confirmed fields
+  are the AI's own values, so a confirm-only study gets "AI alone" lines
+  and "reviewer confirmed the AI's values". Real run 20261112_222233:
+  only Ang's line changed.
+  Reports: new pipelines/sr/src/reporting/override_summary.py used by
+  html_report.py and report_generator.py (same rule, counts cannot
+  differ). Run 20261112_222233 would have said 5 of 5; now 4 of 5.
+  Confirm-only studies named separately. Tests +8 (test_sr_score_run.py
+  4, test_sr_report_overrides.py 4); Word tests confirmed failing on the
+  old report_generator.py (git stash). Suite 1217 -> 1225. Commit 434e771.
+- CI on 13a3a86: green, 1217 passed, both jobs; 57 warnings (44 before;
+  unpinned versions, not investigated).
+- Item 4 (b)(c)(e): override_fields entries have three shapes
+  (study_overrides.py): field(old->v) / field(absent->v) = changed,
+  field(confirmed v) = reviewer agreed with the AI, bare names
+  (first_author, year, exclude_from_meta) = no value. Only a changed
+  value now counts as reviewer-entered data.
+  Scorer (sr_score_run.py): parse_override_fields(); exclude-only (Ang)
+  no longer prints "values from study_overrides.yaml"; confirmed fields
+  are the AI's own values, so a confirm-only study gets "AI alone" lines
+  and "reviewer confirmed the AI's values". Real run 20261112_222233:
+  only Ang's line changed.
+  Reports: new pipelines/sr/src/reporting/override_summary.py used by
+  html_report.py and report_generator.py (same rule, counts cannot
+  differ). Run 20261112_222233 would have said 5 of 5; now 4 of 5.
+  Confirm-only studies named separately. Tests +8 (test_sr_score_run.py
+  4, test_sr_report_overrides.py 4); Word tests confirmed failing on the
+  old report_generator.py (git stash). Suite 1217 -> 1225. Commit 434e771.
+- CI on 13a3a86: green, 1217 passed, both jobs; 57 warnings (44 before;
+  unpinned versions, not investigated).
+
+
