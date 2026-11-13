@@ -20,7 +20,7 @@ from .src.extraction.data_extractor import DataExtractor
 from .src.analysis.meta_analysis import MetaAnalyzer
 from .src.visualization.forest_plot import ForestPlotGenerator
 from .src.reporting.report_generator import ReportGenerator
-from .src.reporting.pdf_report import PDFReportGenerator
+from .src.reporting.pdf_report import PDFReportGenerator, pdf_summary_line
 from .src.utils.project_layout import SRProjectLayout
 from .src.utils.criteria_file import placeholder_fields
 from .src.utils.audit_logger import (
@@ -954,7 +954,11 @@ def main():
     logger.info(f"  Project  -> {layout.project}")
     logger.info(f"  DOCX     -> {layout.docx}")
     logger.info(f"  HTML     -> {pdf_paths.get('html', 'N/A')}")
-    logger.info(f"  PDF      -> {pdf_paths.get('pdf',  'N/A')}")
+    _pdf_line = pdf_summary_line(pdf_paths)
+    if pdf_paths.get("pdf"):
+        logger.info(f"  {_pdf_line}")
+    else:
+        logger.warning(f"  {_pdf_line}")
     logger.info(f"  Plot     -> {fp}")
     logger.info(f"  Screens  -> {layout.screens_csv}")
     logger.info(f"  Extracts -> {layout.extracted_csv}")

@@ -48,7 +48,7 @@ so those catches happen at session open, not mid-work.
 
 | Component      | Status |
 |----------------|--------|
-| Tests | 1231 passed, 10 deselected on v2.10-sr-screening (Session 39); main 1064 (ef66b9f) (python -m pytest -m "not live" --tb=short -q) |
+| Tests | 1235 passed, 10 deselected on v2.10-sr-screening (Session 39); main 1064 (ef66b9f) (python -m pytest -m "not live" --tb=short -q) |
 | Branch         | main = ef66b9f (PR #7 merged 2026-11-10: F7 truth fixture sr_truth.yaml + scripts/sr_score_run.py). Work on v2.10-sr-screening, PR #8 open: shared paper text (b3d804c), prisma_criteria write-if-changed (afd90a3), RoB2 overall rule (3e3785e), RoB2 Methods/Results text (908f889, 306d838), registration lines to RoB2 (Session 38); Session 38: Karlsson/Ang overrides (cf75209), RoB2 Domain 4 self-report rule (46fbd9b), Domain 4 High outright (e4e97b8), Ang excluded by reviewer + not-pooled report section (a56dc55), plain report reasons + POOLED line (0bf59dc), fibromyalgia set moved to reference/ (7h, b32f4c4), REVIEWER_GUIDE rewrite + readme_sr_pipeline.txt (docs, this commit). Branches v2.6-ocr-editor, v2.5-major-updates, v2.7-sr-fixes, v2.8-sr-review-gate, v2.9-sr-fixture deleted |
 | CI | green on PR #8 at ccc6e86 (1231 passed, 10 deselected, 57 warnings). Last confirmed on main: bcd42d9 (2026-11-09, 1027, both jobs). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
 | SR docs        | Readme/readme_sr_pipeline.txt = for users: how the SR pipeline works and how to use it. docs/sr/REVIEWER_GUIDE.md = for reviewers: what to check by hand, documented failures, limitations, methods statement (rewritten Session 38; section numbers 2.2, 3.1, 3.5, 5, 6 are cited by code/tests/README, keep them). README.md = the app. Update the SR docs when SR behaviour changes |
@@ -127,7 +127,7 @@ SR - review content
 4. DONE (Session 39): report cosmetics (old 7n, 7f+) a-e; see Session 39 log.
 5. SR LaTeX check: DONE (Session 39), no code change - no stray $...$ in
    run 20261112_222233 outputs. Console not checked (no log saved).
-   Open: no pipeline-made PDF report in the run folder (see Session 39 log).
+   PDF: WeasyPrint not installed (HTML-only, by decision); summary now says why.
 6. Run-to-run variation (old 7l): RoB2 outside Domain 4 (randomisation,
    missing_data, deviations); missing-data numbers wrong (Lami UMC 11/41 vs
    about 5; McCrae 9/7/5 vs Figure 1 12/7/9); Jensen means 45.6/45.6
@@ -2343,3 +2343,12 @@ Expected: a clean tree in sync with origin, the top commit is this handoff, and 
   PDF report in the run folder although main.py calls
   PDFReportGenerator().generate( - where does it write, or did it fail?
 - CI on ccc6e86: green, 1231 passed, 10 deselected, both jobs, 57 warnings.
+- PDF report (open question from item 5): run 20261112_222233 had no PDF
+  because WeasyPrint is not installed in .venv (ModuleNotFoundError),
+  although pipelines/sr/requirements.txt lists weasyprint>=62.0.
+  PDFReportGenerator fell back to HTML-only mode; the run summary printed
+  only "PDF -> None" and the warning was lost (no log saved). Fix:
+  result["pdf_error"] for both failure paths, pdf_summary_line() in
+  pdf_report.py; main.py summary now warns "PDF -> NOT WRITTEN (<reason>)".
+  Reviewer decision: no real PDF needed (HTML + DOCX), WeasyPrint stays
+  uninstalled. tests/test_sr_pdf_report_status.py (4). Suite 1231->1235.

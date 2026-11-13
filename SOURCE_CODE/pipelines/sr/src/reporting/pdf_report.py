@@ -17,11 +17,13 @@ table{font-size:8pt;}
 
 class PDFReportGenerator:
     def __init__(self):
+        self._err=None
         try:
             from weasyprint import HTML as WH, CSS
             self._HTML=WH; self._CSS=CSS; self._ok=True
         except Exception as e:
-            logger.warning(f"WeasyPrint unavailable ({type(e).__name__}: {e}). HTML-only mode.")
+            self._err=f"WeasyPrint unavailable ({type(e).__name__}: {e})"
+            logger.warning(f"{self._err}. HTML-only mode.")
             self._ok=False
 
     def generate(self, title, authors, pico, inclusion_criteria, exclusion_criteria,
@@ -41,7 +43,8 @@ class PDFReportGenerator:
             model_name=model_name,output_path=html_path or tmp,meta_audit=meta_audit)
         result={}
         if also_save_html: result["html"]=rendered; logger.info(f"HTML: {rendered}")
-        if not self._ok: result["pdf"]=None; return result
+        if not self._ok:
+            result["pdf"]=None; result["pdf_error"]=self._err; return result
         pdf=Path(output_path); pdf.parent.mkdir(parents=True,exist_ok=True)
         try:
             self._HTML(filename=rendered).write_pdf(
@@ -49,5 +52,16 @@ class PDFReportGenerator:
                 optimize_images=True,jpeg_quality=90)
             result["pdf"]=str(pdf.resolve()); logger.info(f"PDF: {result['pdf']}")
         except Exception as e:
-            logger.error(f"WeasyPrint render failed: {e}"); result["pdf"]=None
+            result["pdf"]=None
+            result["pdf_error"]=f"WeasyPrint render failed ({type(e).__name__}: {e})"
+            logger.error(result["pdf_error"])
         return result
+
+
+def pdf_summary_line(result):
+    """Session 39: run-summary line for the PDF; a missing PDF always states why."""
+    result = result or {}
+    if result.get("pdf"):
+        return f"PDF      -> {result['pdf']}"
+    reason = result.get("pdf_error") or "no reason recorded"
+    return f"PDF      -> NOT WRITTEN ({reason}); HTML and DOCX reports are not affected"
