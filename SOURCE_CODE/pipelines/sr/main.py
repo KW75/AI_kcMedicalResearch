@@ -922,6 +922,19 @@ def main():
         ma_result      = ma,
         effect_measure = args.effect_measure,
         output_path    = fp)
+    # Session 39 (item 11c): second figure grouped by control type;
+    # forest_plot.png above is unchanged. A drawing error must not stop
+    # the run (paid stages are done) -> warn, no figure.
+    try:
+        fp_sg = ForestPlotGenerator().generate_subgroups(
+            ma_result      = ma,
+            subgroups      = subgroups,
+            effect_measure = args.effect_measure,
+            output_path    = str(layout.figures / "forest_plot_subgroups.png"))
+    except Exception as _e:
+        logger.warning(f"[SUBGROUP] forest plot by control type not drawn "
+                       f"({type(_e).__name__}: {_e})")
+        fp_sg = None
 
     # Stage 6: Reports
     logger.info("=== STAGE 6: Reports ===")
@@ -942,6 +955,7 @@ def main():
         effect_measure     = args.effect_measure,
         meta_audit         = meta_audit,
         subgroups          = subgroups,
+        subgroup_plot_path = fp_sg,
         output_path        = docx_path)
 
     pdf_paths = PDFReportGenerator().generate(
@@ -956,6 +970,7 @@ def main():
         rob_results        = rob,
         meta_audit         = meta_audit,
         subgroups          = subgroups,
+        subgroup_plot_path = fp_sg,
         forest_plot_path   = fp,
         effect_measure     = args.effect_measure,
         model_name         = args.model,

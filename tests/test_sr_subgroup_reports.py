@@ -80,4 +80,6 @@ def test_pdf_and_main_pass_subgroups():
     assert re.search(r"subgroups\s*=\s*None", pdf)
     assert re.search(r"subgroups\s*=\s*subgroups", pdf)
     main = (SR / "main.py").read_text(encoding="utf-8")
-    assert len(re.findall(r"subgroups\s*=\s*subgroups", main)) == 2
+    # 2 report calls + generate_subgroups() in Stage 5 (item 11c)
+    assert len(re.findall(r"subgroups\s*=\s*subgroups", main)) == 3
+

@@ -182,7 +182,7 @@ class HTMLReportGenerator:
     def generate(self, title, authors, pico, inclusion_criteria, exclusion_criteria,
                  ma_result, extraction_results, screening_results, rob_results,
                  forest_plot_path, effect_measure="OR", model_name="claude-opus-4-7",
-                 output_path="outputs/reports/systematic_review.html", meta_audit=None, subgroups=None) -> str:
+                 output_path="outputs/reports/systematic_review.html", meta_audit=None, subgroups=None, subgroup_plot_path=None) -> str:
         out = Path(output_path); out.parent.mkdir(parents=True, exist_ok=True)
         html = HTML_TEMPLATE.format(
             title=self._e(title),
@@ -201,7 +201,7 @@ class HTMLReportGenerator:
             extraction_rows=self._extraction_rows(extraction_results),
             overrides_html=self._overrides_html(extraction_results),
             not_pooled_html=self._not_pooled_html(meta_audit),
-            subgroups_html=self._subgroups_html(subgroups, effect_measure),
+            subgroups_html=self._subgroups_html(subgroups, effect_measure, subgroup_plot_path),
             rob_rows=self._rob_rows(rob_results or []),
             ci_lower_display=f"{ma_result.get('ci_lower',0):.3f}",
             ci_upper_display=f"{ma_result.get('ci_upper',0):.3f}",
@@ -313,7 +313,7 @@ class HTMLReportGenerator:
                      "unchanged (confirmed): " + self._e(", ".join(study_label(r) for r in conf)) + ".</p>")
         return html + "</div>"
 
-    def _subgroups_html(self, subgroups, effect_measure):
+    def _subgroups_html(self, subgroups, effect_measure, plot_path=None):
         # Session 39 (item 11): same rows as the Word report
         # (subgroups.subgroup_report_lines). No subgroups -> no section.
         lines = subgroup_report_lines(subgroups, effect_measure)
@@ -323,11 +323,19 @@ class HTMLReportGenerator:
             f"<tr><td>{self._e(g)}</td><td>{self._e(s)}</td>"
             f"<td>{self._e(est) or '-'}</td><td>{self._e(n)}</td></tr>"
             for g, s, est, n in lines)
+        img = ""
+        if plot_path and Path(plot_path).exists():
+            import base64
+            b64 = base64.b64encode(Path(plot_path).read_bytes()).decode("ascii")
+            img = (f'<p><img src="data:image/png;base64,{b64}" '
+                   f'alt="Forest plot by control type" style="max-width:100%;"></p>'
+                   f"<p><em>Figure 2. Forest plot by control type "
+                   f"(exploratory).</em></p>")
         return (f"<h3>Subgroups by control type</h3>"
                 f"<p>{self._e(SUBGROUP_INTRO)}</p>"
                 f"<table><thead><tr><th>Group</th><th>Studies</th>"
                 f"<th>Estimate</th><th>Note</th></tr></thead>"
-                f"<tbody>{body}</tbody></table>")
+                f"<tbody>{body}</tbody></table>" + img)
 
 
     def _not_pooled_html(self, meta_audit):

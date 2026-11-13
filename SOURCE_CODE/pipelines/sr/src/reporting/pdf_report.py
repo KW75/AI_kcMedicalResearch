@@ -30,7 +30,7 @@ class PDFReportGenerator:
                  ma_result, extraction_results, screening_results, rob_results,
                  forest_plot_path, effect_measure="OR", model_name="claude-opus-4-7",
                  output_path="outputs/reports/systematic_review.pdf",
-                 also_save_html=True, meta_audit=None, subgroups=None) -> dict:
+                 also_save_html=True, meta_audit=None, subgroups=None, subgroup_plot_path=None) -> dict:
         gen      = HTMLReportGenerator()
         html_path= str(Path(output_path).with_suffix(".html")) if also_save_html else None
         with tempfile.NamedTemporaryFile(suffix=".html",mode="w",encoding="utf-8",delete=False) as t:
@@ -40,7 +40,7 @@ class PDFReportGenerator:
             ma_result=ma_result,extraction_results=extraction_results,
             screening_results=screening_results,rob_results=rob_results,
             forest_plot_path=forest_plot_path,effect_measure=effect_measure,
-            model_name=model_name,output_path=html_path or tmp,meta_audit=meta_audit, subgroups=subgroups)
+            model_name=model_name,output_path=html_path or tmp,meta_audit=meta_audit, subgroups=subgroups, subgroup_plot_path=subgroup_plot_path)
         result={}
         if also_save_html: result["html"]=rendered; logger.info(f"HTML: {rendered}")
         if not self._ok:

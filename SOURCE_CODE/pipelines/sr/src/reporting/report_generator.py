@@ -17,7 +17,7 @@ class ReportGenerator:
     def generate(self, title, authors, pico, ma_result, extraction_results,
                  screening_results, forest_plot_path, effect_measure="OR",
                  output_path="outputs/reports/systematic_review.docx",
-                 meta_audit=None, subgroups=None):
+                 meta_audit=None, subgroups=None, subgroup_plot_path=None):
         if not _OK:
             logger.error("python-docx required."); return
         doc = Document()
@@ -92,6 +92,8 @@ class ReportGenerator:
                                          f"{_est}." if _est else "",
                                          _note) if x),
                     style="List Bullet")
+            if subgroup_plot_path and Path(subgroup_plot_path).exists():
+                doc.add_picture(subgroup_plot_path, width=Inches(6.0))
         if forest_plot_path and Path(forest_plot_path).exists():
             doc.add_heading("Forest Plot",2)
             doc.add_picture(forest_plot_path, width=Inches(6.0))

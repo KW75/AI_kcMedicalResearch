@@ -48,9 +48,9 @@ so those catches happen at session open, not mid-work.
 
 | Component      | Status |
 |----------------|--------|
-| Tests | 1265 passed, 10 deselected on v2.10-sr-screening (Session 39); main 1064 (ef66b9f) (python -m pytest -m "not live" --tb=short -q) |
+| Tests | 1271 passed, 10 deselected on v2.10-sr-screening (Session 39); main 1064 (ef66b9f) (python -m pytest -m "not live" --tb=short -q) |
 | Branch         | main = ef66b9f (PR #7 merged 2026-11-10: F7 truth fixture sr_truth.yaml + scripts/sr_score_run.py). Work on v2.10-sr-screening, PR #8 open: shared paper text (b3d804c), prisma_criteria write-if-changed (afd90a3), RoB2 overall rule (3e3785e), RoB2 Methods/Results text (908f889, 306d838), registration lines to RoB2 (Session 38); Session 38: Karlsson/Ang overrides (cf75209), RoB2 Domain 4 self-report rule (46fbd9b), Domain 4 High outright (e4e97b8), Ang excluded by reviewer + not-pooled report section (a56dc55), plain report reasons + POOLED line (0bf59dc), fibromyalgia set moved to reference/ (7h, b32f4c4), REVIEWER_GUIDE rewrite + readme_sr_pipeline.txt (docs, this commit). Branches v2.6-ocr-editor, v2.5-major-updates, v2.7-sr-fixes, v2.8-sr-review-gate, v2.9-sr-fixture deleted |
-| CI | green on PR #8 at 776b3d9 (1265 passed, 10 deselected, 57 warnings). Last confirmed on main: bcd42d9 (2026-11-09, 1027, both jobs). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
+| CI | green on PR #8 at 2c76ba5 (1265 passed, 10 deselected, 57 warnings). Last confirmed on main: bcd42d9 (2026-11-09, 1027, both jobs). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
 | SR docs        | Readme/readme_sr_pipeline.txt = for users: how the SR pipeline works and how to use it. docs/sr/REVIEWER_GUIDE.md = for reviewers: what to check by hand, documented failures, limitations, methods statement (rewritten Session 38; section numbers 2.2, 3.1, 3.5, 5, 6 are cited by code/tests/README, keep them). README.md = the app. Update the SR docs when SR behaviour changes |
 | Deploy         | None: CLI only, local first. Render service deleted 2026-10-27; Streamlit UI and Render files removed in Session 33. UptimeRobot monitor for the old Render URL: not yet confirmed paused/deleted (user, outside the repo) |
 | Writing mode   | one-pass (write + edit + review in one call); tracks Topic 800 / Article 3,500 / Report 500 / Synopsis 1,500; on main since fa4edb9; tested on gemma4:e4b; terminal menus only |
@@ -148,9 +148,9 @@ SR - extraction checks
 SR - report
 11. Control-type subgroups: 11a (subgroups by control type) and 11b
     (estimate excluding waiting-list trials) DONE (Session 39, see log).
-    11d REVIEWER_GUIDE section 5.2 DONE. Open: 11c forest plot grouped
-    by control type; 11e check the
-    [SUBGROUP] lines and report section on the next real run.
+    11c forest plot by control type and 11d REVIEWER_GUIDE section 5.2
+    DONE. Open: 11e check the [SUBGROUP] lines, the report section and
+    forest_plot_subgroups.png on the next real run.
 
 SR - local-first (after 1-11)
 12. Ollama vision for SR (Session 35 TODO SR item 3):
@@ -2445,3 +2445,20 @@ Expected: a clean tree in sync with origin, the top commit is this handoff, and 
   allowed values, unclassified, bare name, exploratory, not [SENSITIVITY]).
   Docs only; suite unchanged at 1265.
 - CI on 776b3d9: green, 1265 passed, 10 deselected, both jobs, 57 warnings.
+- Item 11c: second figure forest_plot_subgroups.png
+  (ForestPlotGenerator.generate_subgroups in forest_plot.py); the main
+  forest_plot.png is unchanged. Studies grouped by control type (matched
+  by name to subgroup_summary), orange diamond per pooled subgroup, note
+  text when not pooled, red overall diamond. Drawn in main.py Stage 5
+  inside try/except (a drawing error warns, the run continues). Shown in
+  the "Subgroups by control type" section of the Word and HTML reports
+  (HTML embeds it as base64, "Figure 2"). No subgroups -> no figure.
+  tests/test_sr_subgroup_forest.py (6), including the first real drawing
+  test of the main forest plot. Suite 1271.
+  Caught during the work: an edit dropped also_save_html=True from
+  PDFReportGenerator.generate; main.py passes it, so the next run would
+  have crashed at Stage 6. Only test_sr_pdf_report_status.py caught it.
+  The Stage 6 calls in main.py are checked by text-matching tests only,
+  not by a real call (possible later test: call the three generate()
+  methods with main.py's exact keyword set).
+- CI on 2c76ba5: green, 1265 passed, 10 deselected, both jobs, 57 warnings.
