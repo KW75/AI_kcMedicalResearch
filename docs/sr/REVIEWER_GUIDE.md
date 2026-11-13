@@ -102,6 +102,12 @@ patterns, checked per arm:
    (`−20.2` matches `-20.2`); see `_number_in_text` in `data_extractor.py`.
    Thousands separators can still miss (`1234` vs `1,234`). Treat a mismatch
    as a review prompt, not proof of a wrong number.
+   Since Session 39 (F8) the same branch also checks the arm's N: if the
+   quote contains whole numbers that could be Ns (not decimals, ranges such
+   as 0-100, mean (SD) cells, or numbers after Week/Month), the extracted N
+   must be one of them. Example: Ang 2010, quote "Week 6 change 15 13 ...",
+   extracted N 17/15 -> "intervention N (17) does not appear in its own
+   source quote (quote has 13, 15)".
 3. **SE label in an SD quote.** `SE`, `SEM` or `standard error` appears in a
    quote used for an SD field. This catches most of the McCrae signature on
    paths that don't run the separate text-line SD/SE tripwire (§6).

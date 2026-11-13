@@ -1167,8 +1167,48 @@ class DataExtractor:
         return False
 
 
+    # Session 39 (F8): candidate Ns in a source quote. Not counted: decimals,
+    # percentages, mean (SD) cells, "m ± sd" pairs, ranges (0-100), numbers
+    # glued to letters/hyphens (SF-36, T2), numbers after Week/Month/Day.
+    _N_CELL = re.compile(r"[-+\u2212]?\d+(?:[.,]\d+)?\s*\(\s*[-+\u2212]?\d+(?:[.,]\d+)?\s*\)")
+    _N_PM = re.compile(r"[-+\u2212]?\d+(?:[.,]\d+)?\s*(?:\u00b1|\+/-)\s*\d+(?:[.,]\d+)?")
+    _N_RANGE = re.compile(r"\d+ ?[-\u2013\u2014\u2212] ?\d+")
+    _N_INT = re.compile(r"(?<![A-Za-z\d.,\-])\d+(?!\d|[.,]\d)(?!\s*%)")
+    _N_TIME_BEFORE = re.compile(r"(?i)\b(?:weeks?|wk|months?|days?|years?|sessions?|visits?)\s*$")
 
+    @classmethod
+    def _quote_n_candidates(cls, quote, exclude=()):
+        q = str(quote or "")
+        for rx in (cls._N_CELL, cls._N_PM, cls._N_RANGE):
+            q = rx.sub(" ", q)
+        skip = set()
+        for v in exclude:
+            try:
+                skip.add(float(v))
+            except (TypeError, ValueError):
+                pass
+        out = set()
+        for m in cls._N_INT.finditer(q):
+            v = int(m.group(0))
+            if not 2 <= v <= 1500 or float(v) in skip:
+                continue
+            if cls._N_TIME_BEFORE.search(q[:m.start()]):
+                continue
+            out.add(v)
+        return sorted(out)
 
+    @staticmethod
+    def _arm_n(result, primary, arm):
+        part = result.get("participants")
+        for src in (part if isinstance(part, dict) else {}, primary, result):
+            v = src.get(f"n_{arm}")
+            if v in (None, ""):
+                continue
+            try:
+                return int(float(v))
+            except (TypeError, ValueError):
+                return None
+        return None
 
     def _flag_suspect_source_quotes(self, result: dict,
                                     source_text: str = None) -> dict:
@@ -1198,6 +1238,16 @@ class DataExtractor:
                         f"{arm} {label} ({value}) does not appear in its own "
                         f"source quote - the quote does not support this number")
 
+            
+            # Session 39 (F8): branch 2 also binds the arm's N to its quote.
+            n_val = self._arm_n(result, primary, arm)
+            if n_val is not None:
+                cands = self._quote_n_candidates(quote, exclude=(mean, sd))
+                if cands and n_val not in cands:
+                    warnings_found.append(
+                        f"{arm} N ({n_val}) does not appear in its own source "
+                        f"quote (quote has {', '.join(map(str, cands))}) - "
+                        f"check the analysed N for this arm (F8)")
             if sd is not None and self._SE_MARKER.search(quote):
                 warnings_found.append(
                     f"{arm} SD ({sd}) was quoted from text containing "
