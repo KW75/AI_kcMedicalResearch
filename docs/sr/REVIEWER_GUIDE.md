@@ -389,6 +389,40 @@ RoB 2 read the paper text independently.
 
 ---
 
+### 5.2 Control type for subgroups (`comparator_type`, Session 39)
+
+The report has a section "Subgroups by control type" (waiting list / usual
+care / attention placebo) and an estimate excluding waiting-list trials. The
+run log shows the same results as `[SUBGROUP]` lines. Each pooled study's
+control type comes from your entry if you made one, otherwise from the
+control-group label the model extracted (for example `WLC` or `Wait-list
+group` becomes waiting list, and `UC` or `Usual Medical Care (UMC)` becomes
+usual care). The log line for each study says which source was used
+(`from reviewer` or `from label`).
+
+To set it yourself, add one line inside the study's existing entry in
+`study_overrides.yaml`, at the same indentation as `note`:
+
+```yaml
+    comparator_type: waiting_list
+```
+
+The allowed values are `waiting_list`, `usual_care` and `attention_placebo`.
+Any other value (for example the typo `waitlist`) does not silently become a
+guess: the study is listed as **unclassified**, with the message "not
+recognised", and is left out of every subgroup. The same happens when you made
+no entry and the label matches no known pattern. Set `comparator_type` for
+every unclassified study before reporting subgroups. A misspelt key (for
+example `comparator:`) is ignored, and the run log says "unknown fields".
+
+`comparator_type` changes no numbers. Like `exclude_from_meta`, it is shown in
+`override_fields` as a bare name and is not counted as reviewer-entered data.
+Only pooled studies are grouped, so a study you excluded with
+`exclude_from_meta` is in no subgroup. A group with 1 study is not pooled. A
+group with 2 studies is pooled, with a caution note. Subgroup results are
+exploratory, so report them as such. This is not the `[SENSITIVITY]` line,
+which compares the estimate with and without needs-review studies.
+
 ## 6. Known limitations
 
 | Limitation | Impact | Mitigation |
