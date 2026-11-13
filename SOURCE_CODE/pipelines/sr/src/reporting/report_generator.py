@@ -3,6 +3,7 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 from .override_summary import override_changed_values, override_confirmed_only, study_label
 from .html_report import plain_skip_reason
+from ..analysis.subgroups import subgroup_report_lines, SUBGROUP_INTRO
 
 try:
     from docx import Document
@@ -16,7 +17,7 @@ class ReportGenerator:
     def generate(self, title, authors, pico, ma_result, extraction_results,
                  screening_results, forest_plot_path, effect_measure="OR",
                  output_path="outputs/reports/systematic_review.docx",
-                 meta_audit=None):
+                 meta_audit=None, subgroups=None):
         if not _OK:
             logger.error("python-docx required."); return
         doc = Document()
@@ -80,6 +81,17 @@ class ReportGenerator:
                 label = f"{r.get('first_author') or r.get('filename', '?')} ({r.get('year', '')})"
                 doc.add_paragraph(f"{label}: {plain_skip_reason(reason)} [{who}]",
                                   style="List Bullet")
+        # Session 39 (item 11): same rows as the HTML report.
+        _sg = subgroup_report_lines(subgroups, effect_measure)
+        if _sg:
+            doc.add_heading("Subgroups by control type", 2)
+            doc.add_paragraph(SUBGROUP_INTRO)
+            for _g, _s, _est, _note in _sg:
+                doc.add_paragraph(
+                    " ".join(x for x in (f"{_g}: {_s}.",
+                                         f"{_est}." if _est else "",
+                                         _note) if x),
+                    style="List Bullet")
         if forest_plot_path and Path(forest_plot_path).exists():
             doc.add_heading("Forest Plot",2)
             doc.add_picture(forest_plot_path, width=Inches(6.0))

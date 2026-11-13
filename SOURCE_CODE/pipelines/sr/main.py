@@ -19,6 +19,7 @@ from .src.screening.rob2_tool import RoB2Assessor
 from .src.extraction.data_extractor import DataExtractor
 from .src.analysis.meta_analysis import MetaAnalyzer
 from .src.visualization.forest_plot import ForestPlotGenerator
+from .src.analysis.subgroups import classify_comparator, subgroup_summary, subgroup_log_lines
 from .src.reporting.report_generator import ReportGenerator
 from .src.reporting.pdf_report import PDFReportGenerator, pdf_summary_line
 from .src.utils.project_layout import SRProjectLayout
@@ -798,6 +799,8 @@ def main():
             author_label = f"{m.get('first_author','?')} ({m.get('year','')})"
             plausibility_flag = _check_plausibility(
                 args.effect_measure, float(est), author_label)
+            
+            _ctype, _csrc = classify_comparator(r)
 
             _row = {
                 "study"               : author_label,
@@ -812,6 +815,8 @@ def main():
                 "sd_intervention"     : po.get("sd_intervention"),
                 "mean_control"        : po.get("mean_control"),
                 "sd_control"          : po.get("sd_control"),
+                "comparator_type"     : _ctype,
+                "comparator_source"   : _csrc,
             }
             audit_row.update({
                 "hedges_g"          : float(est),
@@ -902,6 +907,14 @@ def main():
             f"block above and screening_log.csv. The estimate may be "
             f"biased by their absence.")
 
+    # Session 39 (item 11): subgroups by control type + estimate excluding
+    # waiting-list trials. Not the [SENSITIVITY] check (needs-review studies).
+    subgroups = subgroup_summary(
+        rows, lambda members: MetaAnalyzer().run(
+            data=pd.DataFrame(members), effect_measure=args.effect_measure))
+    for _line in subgroup_log_lines(subgroups, args.effect_measure, rows):
+        logger.info(_line)
+
     # Stage 5: Forest Plot
     logger.info("=== STAGE 5: Forest Plot ===")
     fp = str(layout.figures / "forest_plot.png")
@@ -928,6 +941,7 @@ def main():
         forest_plot_path   = fp,
         effect_measure     = args.effect_measure,
         meta_audit         = meta_audit,
+        subgroups          = subgroups,
         output_path        = docx_path)
 
     pdf_paths = PDFReportGenerator().generate(
@@ -941,6 +955,7 @@ def main():
         screening_results  = sr,
         rob_results        = rob,
         meta_audit         = meta_audit,
+        subgroups          = subgroups,
         forest_plot_path   = fp,
         effect_measure     = args.effect_measure,
         model_name         = args.model,

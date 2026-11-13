@@ -1,6 +1,7 @@
 import base64, datetime
 from pathlib import Path
 from .override_summary import override_changed_values, override_confirmed_only, study_label
+from ..analysis.subgroups import subgroup_report_lines, SUBGROUP_INTRO
 
 
 HTML_TEMPLATE = """<!DOCTYPE html>
@@ -105,6 +106,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
       <div class="hc"><div class="hv">{q_p_display}</div><div class="hl">Q p-value</div></div>
     </div>
     {not_pooled_html}
+    {subgroups_html}
   </div>
   <div class="section" id="fp">
     <div class="sh"><h2>Forest Plot</h2></div>
@@ -180,7 +182,7 @@ class HTMLReportGenerator:
     def generate(self, title, authors, pico, inclusion_criteria, exclusion_criteria,
                  ma_result, extraction_results, screening_results, rob_results,
                  forest_plot_path, effect_measure="OR", model_name="claude-opus-4-7",
-                 output_path="outputs/reports/systematic_review.html", meta_audit=None) -> str:
+                 output_path="outputs/reports/systematic_review.html", meta_audit=None, subgroups=None) -> str:
         out = Path(output_path); out.parent.mkdir(parents=True, exist_ok=True)
         html = HTML_TEMPLATE.format(
             title=self._e(title),
@@ -199,6 +201,7 @@ class HTMLReportGenerator:
             extraction_rows=self._extraction_rows(extraction_results),
             overrides_html=self._overrides_html(extraction_results),
             not_pooled_html=self._not_pooled_html(meta_audit),
+            subgroups_html=self._subgroups_html(subgroups, effect_measure),
             rob_rows=self._rob_rows(rob_results or []),
             ci_lower_display=f"{ma_result.get('ci_lower',0):.3f}",
             ci_upper_display=f"{ma_result.get('ci_upper',0):.3f}",
@@ -309,6 +312,22 @@ class HTMLReportGenerator:
             html += ("<p style='margin:6px 0 0 0;'>Checked by a reviewer against the PDF, values "
                      "unchanged (confirmed): " + self._e(", ".join(study_label(r) for r in conf)) + ".</p>")
         return html + "</div>"
+
+    def _subgroups_html(self, subgroups, effect_measure):
+        # Session 39 (item 11): same rows as the Word report
+        # (subgroups.subgroup_report_lines). No subgroups -> no section.
+        lines = subgroup_report_lines(subgroups, effect_measure)
+        if not lines:
+            return ""
+        body = "".join(
+            f"<tr><td>{self._e(g)}</td><td>{self._e(s)}</td>"
+            f"<td>{self._e(est) or '-'}</td><td>{self._e(n)}</td></tr>"
+            for g, s, est, n in lines)
+        return (f"<h3>Subgroups by control type</h3>"
+                f"<p>{self._e(SUBGROUP_INTRO)}</p>"
+                f"<table><thead><tr><th>Group</th><th>Studies</th>"
+                f"<th>Estimate</th><th>Note</th></tr></thead>"
+                f"<tbody>{body}</tbody></table>")
 
 
     def _not_pooled_html(self, meta_audit):

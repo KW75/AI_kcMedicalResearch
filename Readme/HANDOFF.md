@@ -48,9 +48,9 @@ so those catches happen at session open, not mid-work.
 
 | Component      | Status |
 |----------------|--------|
-| Tests | 1248 passed, 10 deselected on v2.10-sr-screening (Session 39); main 1064 (ef66b9f) (python -m pytest -m "not live" --tb=short -q) |
+| Tests | 1265 passed, 10 deselected on v2.10-sr-screening (Session 39); main 1064 (ef66b9f) (python -m pytest -m "not live" --tb=short -q) |
 | Branch         | main = ef66b9f (PR #7 merged 2026-11-10: F7 truth fixture sr_truth.yaml + scripts/sr_score_run.py). Work on v2.10-sr-screening, PR #8 open: shared paper text (b3d804c), prisma_criteria write-if-changed (afd90a3), RoB2 overall rule (3e3785e), RoB2 Methods/Results text (908f889, 306d838), registration lines to RoB2 (Session 38); Session 38: Karlsson/Ang overrides (cf75209), RoB2 Domain 4 self-report rule (46fbd9b), Domain 4 High outright (e4e97b8), Ang excluded by reviewer + not-pooled report section (a56dc55), plain report reasons + POOLED line (0bf59dc), fibromyalgia set moved to reference/ (7h, b32f4c4), REVIEWER_GUIDE rewrite + readme_sr_pipeline.txt (docs, this commit). Branches v2.6-ocr-editor, v2.5-major-updates, v2.7-sr-fixes, v2.8-sr-review-gate, v2.9-sr-fixture deleted |
-| CI | green on PR #8 at 3355f73 (1243 passed, 10 deselected, 57 warnings). Last confirmed on main: bcd42d9 (2026-11-09, 1027, both jobs). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
+| CI | green on PR #8 at f9551e7 (1248 passed, 10 deselected, 57 warnings). Last confirmed on main: bcd42d9 (2026-11-09, 1027, both jobs). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
 | SR docs        | Readme/readme_sr_pipeline.txt = for users: how the SR pipeline works and how to use it. docs/sr/REVIEWER_GUIDE.md = for reviewers: what to check by hand, documented failures, limitations, methods statement (rewritten Session 38; section numbers 2.2, 3.1, 3.5, 5, 6 are cited by code/tests/README, keep them). README.md = the app. Update the SR docs when SR behaviour changes |
 | Deploy         | None: CLI only, local first. Render service deleted 2026-10-27; Streamlit UI and Render files removed in Session 33. UptimeRobot monitor for the old Render URL: not yet confirmed paused/deleted (user, outside the repo) |
 | Writing mode   | one-pass (write + edit + review in one call); tracks Topic 800 / Article 3,500 / Report 500 / Synopsis 1,500; on main since fa4edb9; tested on gemma4:e4b; terminal menus only |
@@ -146,13 +146,11 @@ SR - extraction checks
     (branch 5). See Session 39 log.
 
 SR - report
-11. Waiting-list subgroup + sensitivity analysis in the Word/HTML report and
-    forest plot: subgroup by control type (waiting list: Jensen, Karlsson,
-    McCrae vs usual care / attention placebo: Ang, Lami) and an estimate
-    excluding waiting-list trials; warn when a subgroup has < 3 studies.
-    Leaving waiting-list trials out of the whole run already works
-    (Exclude_WaitList at C, or exclude_from_meta). The current [SENSITIVITY]
-    line is a different check; do not confuse the two.
+11. Control-type subgroups: 11a (subgroups by control type) and 11b
+    (estimate excluding waiting-list trials) DONE (Session 39, see log).
+    Open: 11c forest plot grouped by control type; 11d document
+    comparator_type in docs/sr/REVIEWER_GUIDE.md; 11e check the
+    [SUBGROUP] lines and report section on the next real run.
 
 SR - local-first (after 1-11)
 12. Ollama vision for SR (Session 35 TODO SR item 3):
@@ -2424,3 +2422,22 @@ Expected: a clean tree in sync with origin, the top commit is this handoff, and 
   input (images vs text) not changed; options B/C need paid live runs.
   tests/test_sr_quote_vs_paper.py (5 tests). Suite 1248.
 - CI on 3355f73: green, 1243 passed, 10 deselected, both jobs, 57 warnings.
+- Item 11 (control-type subgroups, option C): new src/analysis/subgroups.py.
+  Control type = reviewer's comparator_type in study_overrides.yaml
+  (waiting_list / usual_care / attention_placebo; now in ALLOWED_FIELDS,
+  bare name in override_fields so it is not counted as reviewer-entered
+  data), else the extracted control_group label (WL/WLC/wait-list ->
+  waiting list; UC/UMC/usual/TAU -> usual care; attention/placebo/sham).
+  Unknown label or unrecognised reviewer value -> unclassified: listed by
+  name, never pooled. Pooled rows only (Ang is excluded by the reviewer, so
+  it is not in any subgroup). k = 1 -> "1 study - not pooled"; k = 2 ->
+  pooled with "< 3" caution; pooling errors are reported, not raised.
+  Plus an estimate excluding waiting-list trials. main.py logs [SUBGROUP]
+  lines (not [SENSITIVITY]); Word and HTML reports get "Subgroups by
+  control type" from the shared subgroup_report_lines(). Expected on run
+  20261112_222233 data: waiting list k=3 (Jensen, Karlsson, McCrae)
+  pooled; usual care k=1 (Lami) and excluding-WL k=1 not pooled; all
+  classified from label. NOT yet seen in a real run (needs a paid run).
+  Tests: test_sr_subgroup_comparator.py (8), test_sr_subgroup_wiring.py
+  (4), test_sr_subgroup_reports.py (5). Suite 1265.
+- CI on f9551e7: green, 1248 passed, 10 deselected, both jobs, 57 warnings.
