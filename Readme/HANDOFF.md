@@ -48,9 +48,9 @@ so those catches happen at session open, not mid-work.
 
 | Component      | Status |
 |----------------|--------|
-| Tests | 1243 passed, 10 deselected on v2.10-sr-screening (Session 39); main 1064 (ef66b9f) (python -m pytest -m "not live" --tb=short -q) |
+| Tests | 1248 passed, 10 deselected on v2.10-sr-screening (Session 39); main 1064 (ef66b9f) (python -m pytest -m "not live" --tb=short -q) |
 | Branch         | main = ef66b9f (PR #7 merged 2026-11-10: F7 truth fixture sr_truth.yaml + scripts/sr_score_run.py). Work on v2.10-sr-screening, PR #8 open: shared paper text (b3d804c), prisma_criteria write-if-changed (afd90a3), RoB2 overall rule (3e3785e), RoB2 Methods/Results text (908f889, 306d838), registration lines to RoB2 (Session 38); Session 38: Karlsson/Ang overrides (cf75209), RoB2 Domain 4 self-report rule (46fbd9b), Domain 4 High outright (e4e97b8), Ang excluded by reviewer + not-pooled report section (a56dc55), plain report reasons + POOLED line (0bf59dc), fibromyalgia set moved to reference/ (7h, b32f4c4), REVIEWER_GUIDE rewrite + readme_sr_pipeline.txt (docs, this commit). Branches v2.6-ocr-editor, v2.5-major-updates, v2.7-sr-fixes, v2.8-sr-review-gate, v2.9-sr-fixture deleted |
-| CI | green on PR #8 at 13af67d (1243 passed, 10 deselected, 57 warnings). Last confirmed on main: bcd42d9 (2026-11-09, 1027, both jobs). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
+| CI | green on PR #8 at 3355f73 (1243 passed, 10 deselected, 57 warnings). Last confirmed on main: bcd42d9 (2026-11-09, 1027, both jobs). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
 | SR docs        | Readme/readme_sr_pipeline.txt = for users: how the SR pipeline works and how to use it. docs/sr/REVIEWER_GUIDE.md = for reviewers: what to check by hand, documented failures, limitations, methods statement (rewritten Session 38; section numbers 2.2, 3.1, 3.5, 5, 6 are cited by code/tests/README, keep them). README.md = the app. Update the SR docs when SR behaviour changes |
 | Deploy         | None: CLI only, local first. Render service deleted 2026-10-27; Streamlit UI and Render files removed in Session 33. UptimeRobot monitor for the old Render URL: not yet confirmed paused/deleted (user, outside the repo) |
 | Writing mode   | one-pass (write + edit + review in one call); tracks Topic 800 / Article 3,500 / Report 500 / Synopsis 1,500; on main since fa4edb9; tested on gemma4:e4b; terminal menus only |
@@ -141,8 +141,9 @@ SR - extraction checks
    item 10).
 9. F6: NOT BUILT (Session 39) - whole-paper number check caught 1 of 22
    wrong values, 2 false alarms; quote-vs-paper check moved to item 10.
-10. Wire paper_text into extraction: decide images only / text only / both.
-    Overrides and corrected text must agree with what F6/F8 check.
+10. Wire paper_text into extraction: DONE (Session 39, option A) - images
+    stay the extraction input; paper_text goes to the quote check only
+    (branch 5). See Session 39 log.
 
 SR - report
 11. Waiting-list subgroup + sensitivity analysis in the Word/HTML report and
@@ -2409,3 +2410,17 @@ Expected: a clean tree in sync with origin, the top commit is this handoff, and 
   catches errors. Moved to item 10: with paper_text wired into extraction,
   branch 5 (verbatim_mismatch) can check quotes against the paper (today
   source_text=None, data_extractor.py ~2137).
+- Item 10 (paper_text into the quote check, option A): extract_batch passes
+  r["paper_text"] to extract_by_pdf_path and _extract_anthropic; branch 5
+  (verbatim_mismatch) now runs on image runs with source_text = paper_text
+  (was None, so never checked). New _quote_in_source(): tolerant token match
+  (ignores case, punctuation, whitespace, [?], stray dots), plus numseq for
+  table rows only (>= 4 numbers and numbers >= words; numbers in order within
+  40 tokens, for tables stored out of order, e.g. Ang Table 2). Sentences
+  never use numseq: a paraphrase that keeps the numbers still warns.
+  Run 20261112_222233: warns Lami x2 (made-up "mean = 4.2 (SD = 2.1)"
+  quotes) and Jensen control (override covers it); no false alarms (exact
+  matching had flagged Ang x2, McCrae x2). Branch count stays 5. Extraction
+  input (images vs text) not changed; options B/C need paid live runs.
+  tests/test_sr_quote_vs_paper.py (5 tests). Suite 1248.
+- CI on 3355f73: green, 1243 passed, 10 deselected, both jobs, 57 warnings.

@@ -127,6 +127,7 @@ patterns, checked per arm:
    text the extractor worked from. This runs only on paths that have raw text
    (the qwen text-fallback path), not on pure-vision or Anthropic paths. A
    missing branch-5 result means the check could not run, not that it passed.
+  Since Session 39 (item 10) this check also runs on image extractions, against the shared paper text (input/sr/paper_text/). Matching ignores case, punctuation and OCR marks; a table row whose numbers appear in the same order nearby also counts as found. A reworded sentence still warns.
 
 On the McCrae extract above the flag fired four times per re-extraction
 (branch 3 and the multi-timepoint part of branch 4, on both arms).
