@@ -240,7 +240,11 @@ pipeline is built around one rule:
 3.9 Subgroups by control type
   What: studies are grouped by comparator - waiting list, usual care,
   attention placebo - and each group is pooled separately, plus an estimate
-  excluding waiting-list trials. A second forest plot shows the groups.
+  excluding waiting-list trials. A second forest plot has two panels: top,
+  all pooled studies with the overall estimate; bottom, the same studies with
+  waiting-list trials taken off. A trial whose only control is a waiting list
+  has no comparator left, so it is listed in grey with no effect (its control
+  is never set to 0); the bottom estimate pools the rest.
   Why: waiting-list controls usually make a therapy look better than usual
   care does, so pooling them together can overstate the effect.
   How the control type is decided: the reviewer's entry (comparator_type)
@@ -283,7 +287,8 @@ pipeline is built around one rule:
     - screening, extraction and RoB 2 tables (CSV)
     - meta-analysis results per study, with included / not included and the
       reason (CSV)
-    - forest plot and forest plot by control type (PNG)
+    - forest plot, and forest plot of all pooled studies vs excluding
+      waiting-list trials (PNG)
     - Word and HTML reports: PICO and criteria, PRISMA counts, extraction
       table, reviewer-entered data, studies not pooled with reasons, pooled
       result, subgroups, risk of bias, forest plots
