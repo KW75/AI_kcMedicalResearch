@@ -50,7 +50,7 @@ so those catches happen at session open, not mid-work.
 |----------------|--------|
 | Tests | 1276 passed, 10 deselected on v2.10-sr-screening (Session 39); main 1064 (ef66b9f) (python -m pytest -m "not live" --tb=short -q) |
 | Branch         | main = ef66b9f (PR #7 merged 2026-11-10: F7 truth fixture sr_truth.yaml + scripts/sr_score_run.py). Work on v2.10-sr-screening, PR #8 open: shared paper text (b3d804c), prisma_criteria write-if-changed (afd90a3), RoB2 overall rule (3e3785e), RoB2 Methods/Results text (908f889, 306d838), registration lines to RoB2 (Session 38); Session 38: Karlsson/Ang overrides (cf75209), RoB2 Domain 4 self-report rule (46fbd9b), Domain 4 High outright (e4e97b8), Ang excluded by reviewer + not-pooled report section (a56dc55), plain report reasons + POOLED line (0bf59dc), fibromyalgia set moved to reference/ (7h, b32f4c4), REVIEWER_GUIDE rewrite + readme_sr_pipeline.txt (docs, this commit). Branches v2.6-ocr-editor, v2.5-major-updates, v2.7-sr-fixes, v2.8-sr-review-gate, v2.9-sr-fixture deleted |
-| CI | green on PR #8 at dde4cd8 (1271 passed, 10 deselected, 57 warnings). Last confirmed on main: bcd42d9 (2026-11-09, 1027, both jobs). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
+| CI | green on PR #8 at green on PR #8 at 05e55b7 (1276 passed, 10 deselected, 57 warnings). Last confirmed on main: bcd42d9 (2026-11-09, 1027, both jobs). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
 | SR docs        | Readme/readme_sr_pipeline.txt = for users: how the SR pipeline works and how to use it. docs/sr/REVIEWER_GUIDE.md = for reviewers: what to check by hand, documented failures, limitations, methods statement (rewritten Session 38; section numbers 2.2, 3.1, 3.5, 5, 6 are cited by code/tests/README, keep them). README.md = the app. Update the SR docs when SR behaviour changes |
 | Deploy         | None: CLI only, local first. Render service deleted 2026-10-27; Streamlit UI and Render files removed in Session 33. UptimeRobot monitor for the old Render URL: not yet confirmed paused/deleted (user, outside the repo) |
 | Writing mode   | one-pass (write + edit + review in one call); tracks Topic 800 / Article 3,500 / Report 500 / Synopsis 1,500; on main since fa4edb9; tested on gemma4:e4b; terminal menus only |
@@ -2469,3 +2469,33 @@ Expected: a clean tree in sync with origin, the top commit is this handoff, and 
   A keyword dropped from a signature, or a new main.py keyword without a
   fake value, now fails directly. Suite 1276.
 - CI on dde4cd8: green, 1271 passed, 10 deselected, both jobs, 57 warnings.
+- Readme/readme_sr_pipeline.txt rewritten: now explains the pipeline logic
+  and the reasons behind each method (protocol, shared text, screening,
+  repeated extraction, code checks, overrides, pooling gate, statistics,
+  subgroups, RoB 2, audit), the accuracy evidence (truth file + scorer) and
+  a comparison with a general cloud chat. User how-to belongs in
+  Readme/flashcard-help.html, not in this file.
+- CI on 05e55b7: green, 1276 passed, 10 deselected, both jobs, 57 warnings.
+
+## Next session - start here (end of Session 39)
+Branch v2.10-sr-screening, PR #8, suite 1276 passed, 10 deselected.
+Session 39 closed items 4-11 (11e open). Job list, in order:
+1. PR #8: decide whether to merge v2.10-sr-screening into main (main is
+   ef66b9f, 1064 tests). Check CI on the PR head first.
+2. Help page: move user how-to (starting a run, PICO prompts, overrides
+   file location, reading the output folder) into
+   Readme/flashcard-help.html; its footer is stale (v2.4.6, 401 tests,
+   "DeepSeek default") - fix in its own commit.
+3. 11e (needs a paid run): check [SUBGROUP] lines, the report section and
+   forest_plot_subgroups.png. Expected on 20261112_222233 data: waiting
+   list k=3 pooled; usual care k=1 and excluding-WL k=1 not pooled; Ang in
+   no subgroup. Also confirm the item 10 quote check warns Lami x2 and
+   Jensen control only, then rescore with scripts/sr_score_run.py.
+4. Item 12: Ollama vision for SR (scripts/launcher.py BLOCKED_FOR_SR line
+   198, checked at 487 and 532; allow only when
+   ollama_models.model_capabilities lists "vision"). Start read-only.
+5. Item 13: rerun the nondet probe before REVIEWER_GUIDE section 6 claims
+   anything about run-to-run agreement.
+6. Small: relevance_screener.py line 225 prompt label says "first 8 pages"
+   but the cut is 6000 characters; launcher still hard-codes inclusion
+   [RCT, Adult participants] / exclusion [Non-RCT, Animal studies].
