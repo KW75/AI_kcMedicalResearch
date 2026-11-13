@@ -286,13 +286,11 @@ class RoB2Assessor:
                                 if _total >= MAX_ROB2_CHARS:
                                     break
                         pdf_text = "\n\n".join(ocr_chunks).strip()
-                        _note = (
-                            f" (prompt uses first {MAX_ROB2_CHARS})"
-                            if len(pdf_text) > MAX_ROB2_CHARS else ""
-                        )
+                        # Session 39 (6a): note about a 6000-char cut removed;
+                        # the [ROB2 TEXT] line below logs what is sent.
                         logger.info(
                             f"OCR extracted {len(pdf_text)} chars from "
-                            f"{_pages_ocred} page(s) of {filename}{_note}"
+                            f"{_pages_ocred} page(s) of {filename}"
                         )
                     except Exception as ocr_err:
                         logger.warning(f"OCR failed for {filename}: {ocr_err}")
