@@ -50,7 +50,7 @@ so those catches happen at session open, not mid-work.
 |----------------|--------|
 | Tests | 1237 passed, 10 deselected on v2.10-sr-screening (Session 39); main 1064 (ef66b9f) (python -m pytest -m "not live" --tb=short -q) |
 | Branch         | main = ef66b9f (PR #7 merged 2026-11-10: F7 truth fixture sr_truth.yaml + scripts/sr_score_run.py). Work on v2.10-sr-screening, PR #8 open: shared paper text (b3d804c), prisma_criteria write-if-changed (afd90a3), RoB2 overall rule (3e3785e), RoB2 Methods/Results text (908f889, 306d838), registration lines to RoB2 (Session 38); Session 38: Karlsson/Ang overrides (cf75209), RoB2 Domain 4 self-report rule (46fbd9b), Domain 4 High outright (e4e97b8), Ang excluded by reviewer + not-pooled report section (a56dc55), plain report reasons + POOLED line (0bf59dc), fibromyalgia set moved to reference/ (7h, b32f4c4), REVIEWER_GUIDE rewrite + readme_sr_pipeline.txt (docs, this commit). Branches v2.6-ocr-editor, v2.5-major-updates, v2.7-sr-fixes, v2.8-sr-review-gate, v2.9-sr-fixture deleted |
-| CI | green on PR #8 at 858273e (1235 passed, 10 deselected, 57 warnings). Last confirmed on main: bcd42d9 (2026-11-09, 1027, both jobs). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
+| CI | green on PR #8 at 9cd6dfc (1237 passed, 10 deselected, 57 warnings). Last confirmed on main: bcd42d9 (2026-11-09, 1027, both jobs). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
 | SR docs        | Readme/readme_sr_pipeline.txt = for users: how the SR pipeline works and how to use it. docs/sr/REVIEWER_GUIDE.md = for reviewers: what to check by hand, documented failures, limitations, methods statement (rewritten Session 38; section numbers 2.2, 3.1, 3.5, 5, 6 are cited by code/tests/README, keep them). README.md = the app. Update the SR docs when SR behaviour changes |
 | Deploy         | None: CLI only, local first. Render service deleted 2026-10-27; Streamlit UI and Render files removed in Session 33. UptimeRobot monitor for the old Render URL: not yet confirmed paused/deleted (user, outside the repo) |
 | Writing mode   | one-pass (write + edit + review in one call); tracks Topic 800 / Article 3,500 / Report 500 / Synopsis 1,500; on main since fa4edb9; tested on gemma4:e4b; terminal menus only |
@@ -128,11 +128,10 @@ SR - review content
 5. SR LaTeX check: DONE (Session 39), no code change - no stray $...$ in
    run 20261112_222233 outputs. Console not checked (no log saved).
    PDF: WeasyPrint not installed (HTML-only, by decision); summary now says why.
-6. Run-to-run variation (old 7l): RoB2 outside Domain 4 (randomisation,
-   missing_data, deviations); missing-data numbers wrong (Lami UMC 11/41 vs
-   about 5; McCrae 9/7/5 vs Figure 1 12/7/9); Jensen means 45.6/45.6
-   no_majority; Lami AI means drift. Consider N RoB2 runs + vote.
-   Stale RoB2 log text: DONE (Session 39, 6a).
+6. Run-to-run variation (old 7l): DONE (Session 39), no code change -
+   1 of 30 RoB2 cells varied over 4 runs, overall never; no vote.
+   RoB2 dropout numbers can be wrong (flow-diagram arm order lost):
+   reviewer checks them (see Session 39 log). Stale log text: DONE (6a).
 7. Screening reads only the first MAX_SCREEN_CHARS = 6000
    (relevance_screener.py line 222). Decide whether screening uses
    paper_sections like RoB2 does.
@@ -2356,3 +2355,20 @@ Expected: a clean tree in sync with origin, the top commit is this handoff, and 
   "(prompt uses first 6000)" - stale since Session 38 (prompt = Methods +
   Results via rob2_text, up to 50000; [ROB2 TEXT] logs what is sent).
   tests/test_sr_rob2_log_text.py (2). Suite 1235->1237.
+- CI on 9cd6dfc: green, 1237 passed, 10 deselected, both jobs, 57 warnings.
+- Item 6 b/c/d (RoB2 run-to-run): DONE, no code change. 4 runs
+  (20261111_175754, 20261111_190839, 20261112_161648, 20261112_222233),
+  5 studies x 6 cells: 1 of 30 differed (Lami missing_data Some concerns in
+  161648, High in the others); overall High for all 5 in every run
+  (outcome_measurement High everywhere). The 11 Nov runs predate the
+  Session 38 RoB2 text change. Decision: no N-run vote (N x RoB2 cost for
+  one cell, overall unchanged).
+  6b: the flow-diagram lines ARE in the text sent to RoB2 (checked with
+  rob2_text on input/sr/paper_text). McCrae: sent "Completed post-treatment
+  (n=27/30/28)", but the model quoted "Did not receive intervention
+  (n=9/7/0)" and gave WLC 5. Lami: 5 and 11 put in the wrong arms
+  (analysed 28/27/36 imply 6/11/5). Flattened flow-diagram columns lose
+  the arm order; this is a model reading error, not a text-selection bug.
+  A reviewer must check dropout numbers in RoB2 justifications.
+  6d (Jensen 45.6 no_majority, Lami mean drift): extraction; already kept
+  out by the F4 gate and fixed by overrides; no further action.
