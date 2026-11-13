@@ -328,9 +328,9 @@ class HTMLReportGenerator:
             import base64
             b64 = base64.b64encode(Path(plot_path).read_bytes()).decode("ascii")
             img = (f'<p><img src="data:image/png;base64,{b64}" '
-                   f'alt="Forest plot by control type" style="max-width:100%;"></p>'
-                   f"<p><em>Figure 2. Forest plot by control type "
-                   f"(exploratory).</em></p>")
+                   f'alt="Forest plot: all pooled studies and excluding waiting-list trials" style="max-width:100%;"></p>'
+                   f"<p><em>Figure 2. Forest plot: all pooled studies and excluding "
+                   f"waiting-list trials (sensitivity analysis).</em></p>")
         return (f"<h3>Subgroups by control type</h3>"
                 f"<p>{self._e(SUBGROUP_INTRO)}</p>"
                 f"<table><thead><tr><th>Group</th><th>Studies</th>"

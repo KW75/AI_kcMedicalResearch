@@ -922,7 +922,8 @@ def main():
         ma_result      = ma,
         effect_measure = args.effect_measure,
         output_path    = fp)
-    # Session 39 (item 11c): second figure grouped by control type;
+    # Session 40: second figure, two panels - all pooled studies on top,
+    # the same studies excluding waiting-list trials below (build_panels).
     # forest_plot.png above is unchanged. A drawing error must not stop
     # the run (paid stages are done) -> warn, no figure.
     try:
@@ -932,8 +933,8 @@ def main():
             effect_measure = args.effect_measure,
             output_path    = str(layout.figures / "forest_plot_subgroups.png"))
     except Exception as _e:
-        logger.warning(f"[SUBGROUP] forest plot by control type not drawn "
-                       f"({type(_e).__name__}: {_e})")
+        logger.warning(f"[SUBGROUP] forest plot (all pooled / excluding "
+                       f"waiting-list) not drawn ({type(_e).__name__}: {_e})")
         fp_sg = None
 
     # Stage 6: Reports

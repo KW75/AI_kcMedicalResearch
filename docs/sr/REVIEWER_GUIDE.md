@@ -447,6 +447,19 @@ group with 2 studies is pooled, with a caution note. Subgroup results are
 exploratory, so report them as such. This is not the `[SENSITIVITY]` line,
 which compares the estimate with and without needs-review studies.
 
+The second forest plot (`forest_plot_subgroups.png`, Figure 2 in the HTML
+report; Session 40) has two panels. The top panel shows all pooled studies
+with the overall estimate. The bottom panel, "Excluding waiting-list
+trials", lists the same studies in the same order. A study whose only
+control is a waiting list has no other comparator, so it is shown in grey
+with "wait-list control only - not in this estimate" and no effect; an
+unclassified study is greyed the same way ("control type unknown"). A
+missing control is never set to 0. The bottom estimate pools only the
+remaining studies (with 1 study it is not pooled). For each waiting-list
+trial, check that the selected timepoint is the end of the waiting period,
+before the waiting-list group received the intervention; a later follow-up
+compares two treated groups.
+
 ## 6. Known limitations
 
 | Limitation | Impact | Mitigation |

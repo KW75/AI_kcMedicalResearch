@@ -48,7 +48,7 @@ so those catches happen at session open, not mid-work.
 
 | Component      | Status |
 |----------------|--------|
-| Tests | 1276 passed, 10 deselected on v2.10-sr-screening (Session 39); main 1064 (ef66b9f) (python -m pytest -m "not live" --tb=short -q) |
+| Tests | 1282 passed, 10 deselected on v2.10-sr-screening (Session 40); main 1064 (ef66b9f) (python -m pytest -m "not live" --tb=short -q) |
 | Branch         | main = ef66b9f (PR #7 merged 2026-11-10: F7 truth fixture sr_truth.yaml + scripts/sr_score_run.py). Work on v2.10-sr-screening, PR #8 open: shared paper text (b3d804c), prisma_criteria write-if-changed (afd90a3), RoB2 overall rule (3e3785e), RoB2 Methods/Results text (908f889, 306d838), registration lines to RoB2 (Session 38); Session 38: Karlsson/Ang overrides (cf75209), RoB2 Domain 4 self-report rule (46fbd9b), Domain 4 High outright (e4e97b8), Ang excluded by reviewer + not-pooled report section (a56dc55), plain report reasons + POOLED line (0bf59dc), fibromyalgia set moved to reference/ (7h, b32f4c4), REVIEWER_GUIDE rewrite + readme_sr_pipeline.txt (docs, this commit). Branches v2.6-ocr-editor, v2.5-major-updates, v2.7-sr-fixes, v2.8-sr-review-gate, v2.9-sr-fixture deleted |
 | CI | green on PR #8 at green on PR #8 at 05e55b7 (1276 passed, 10 deselected, 57 warnings). Last confirmed on main: bcd42d9 (2026-11-09, 1027, both jobs). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
 | SR docs        | Readme/readme_sr_pipeline.txt = how the SR pipeline works and why (logic, rationale, accuracy evidence, Appendix A worked example); no how-to. How-to = Readme/flashcard-help.html. study_overrides.yaml fields and format = REVIEWER_GUIDE section 5.
@@ -2509,3 +2509,49 @@ Session 39 closed items 4-11 (11e open). Job list, in order:
   field list) moved into REVIEWER_GUIDE section 5, with comparator_type
   added. The "AI alone 1 of 4" line now names the run (0 of 4 in
   20261112_222233).
+
+## Session 40 - 2026-11-14 - branch v2.10-sr-screening
+
+- Figure 2 (forest_plot_subgroups.png) redesigned at the user's request.
+  Before: one block per control type, then the overall diamond; the
+  "Excluding waiting-list trials" entry was never drawn. Now two panels:
+  top = all pooled studies + overall estimate; bottom = the same studies in
+  the same order with waiting-list trials taken off. A study whose only
+  control is a waiting list has no comparator left: grey row, "wait-list
+  control only - not in this estimate", no effect. Unclassified studies are
+  greyed the same way ("control type unknown"). The bottom estimate is the
+  existing subgroup_summary sensitivity entry (k=1 -> "1 study - not
+  pooled").
+- Decided (user, option A): a missing wait-list arm is NEVER filled in as 0.
+  Setting the control mean to 0 turns the SMD into CBT score / SD (Jensen
+  would go from g=-0.437 to about +2.2, calculated from Table 3). A wait-list
+  arm is a measured arm (natural course), not zero.
+- Code: forest_plot.py - new module-level build_panels(ma_result,
+  subgroups) (what each panel shows, draws nothing); generate_subgroups
+  rewritten to draw it. subgroups.py unchanged. html_report.py Figure 2
+  alt text + caption: "Forest plot: all pooled studies and excluding
+  waiting-list trials (sensitivity analysis)". The section heading and table
+  "Subgroups by control type" are unchanged (they still group by control
+  type). pipelines/sr/main.py: comment and [SUBGROUP] warning text.
+- Tests: tests/test_sr_subgroup_forest.py +6 (two panels, order, wait-list
+  rows have no effect, k=1 not pooled, k=2 pooled, unknown control marked);
+  the caption test updated (failed first on the old caption).
+  Suite 1276 -> 1282 passed, 10 deselected. Figure checked by eye from the
+  test data (user: "looks good").
+- Docs: REVIEWER_GUIDE 5.2 new paragraph (how to read Figure 2; check that
+  each waiting-list trial's timepoint is the end of the waiting period);
+  Readme_sr_pipeline.txt 3.9 and output list; README line 7.
+- Changes to "Next session - start here":
+  - Job 1 (PR #8 merge): held until this commit's CI is green. CI on
+    a225885 (two docs commits after 05e55b7) was never confirmed.
+  - Job 3 (11e): the expected figure is now two panels. On 20261112_222233
+    data: top k=4 (Jensen, Karlsson, Lami, McCrae) with an overall diamond;
+    bottom k=1 (Lami only), "1 study - not pooled", the other three grey.
+    Also check that the Karlsson and McCrae timepoints are posttreatment
+    (end of waiting period), as Jensen's is.
+- New item (not built): trials with several control arms (e.g. CBT vs
+  wait-list vs usual care) should keep CBT vs the non-wait-list arm in the
+  bottom panel. Needs per-arm extraction (one control arm is stored per
+  study today); goes with item 8's arm-list check.
+- Working preference (user): open files with `code -g <full path>:<line>`
+  and say "select lines N-M"; no keystroke recipes.
