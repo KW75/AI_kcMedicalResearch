@@ -51,7 +51,8 @@ so those catches happen at session open, not mid-work.
 | Tests | 1276 passed, 10 deselected on v2.10-sr-screening (Session 39); main 1064 (ef66b9f) (python -m pytest -m "not live" --tb=short -q) |
 | Branch         | main = ef66b9f (PR #7 merged 2026-11-10: F7 truth fixture sr_truth.yaml + scripts/sr_score_run.py). Work on v2.10-sr-screening, PR #8 open: shared paper text (b3d804c), prisma_criteria write-if-changed (afd90a3), RoB2 overall rule (3e3785e), RoB2 Methods/Results text (908f889, 306d838), registration lines to RoB2 (Session 38); Session 38: Karlsson/Ang overrides (cf75209), RoB2 Domain 4 self-report rule (46fbd9b), Domain 4 High outright (e4e97b8), Ang excluded by reviewer + not-pooled report section (a56dc55), plain report reasons + POOLED line (0bf59dc), fibromyalgia set moved to reference/ (7h, b32f4c4), REVIEWER_GUIDE rewrite + readme_sr_pipeline.txt (docs, this commit). Branches v2.6-ocr-editor, v2.5-major-updates, v2.7-sr-fixes, v2.8-sr-review-gate, v2.9-sr-fixture deleted |
 | CI | green on PR #8 at green on PR #8 at 05e55b7 (1276 passed, 10 deselected, 57 warnings). Last confirmed on main: bcd42d9 (2026-11-09, 1027, both jobs). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
-| SR docs        | Readme/readme_sr_pipeline.txt = for users: how the SR pipeline works and how to use it. docs/sr/REVIEWER_GUIDE.md = for reviewers: what to check by hand, documented failures, limitations, methods statement (rewritten Session 38; section numbers 2.2, 3.1, 3.5, 5, 6 are cited by code/tests/README, keep them). README.md = the app. Update the SR docs when SR behaviour changes |
+| SR docs        | Readme/readme_sr_pipeline.txt = how the SR pipeline works and why (logic, rationale, accuracy evidence, Appendix A worked example); no how-to. How-to = Readme/flashcard-help.html. study_overrides.yaml fields and format = REVIEWER_GUIDE section 5.
+ docs/sr/REVIEWER_GUIDE.md = for reviewers: what to check by hand, documented failures, limitations, methods statement (rewritten Session 38; section numbers 2.2, 3.1, 3.5, 5, 6 are cited by code/tests/README, keep them). README.md = the app. Update the SR docs when SR behaviour changes |
 | Deploy         | None: CLI only, local first. Render service deleted 2026-10-27; Streamlit UI and Render files removed in Session 33. UptimeRobot monitor for the old Render URL: not yet confirmed paused/deleted (user, outside the repo) |
 | Writing mode   | one-pass (write + edit + review in one call); tracks Topic 800 / Article 3,500 / Report 500 / Synopsis 1,500; on main since fa4edb9; tested on gemma4:e4b; terminal menus only |
 | OCR mode       | `--mode ocr`, launcher menu 8. Reads PDF / image / .txt / .docx; .doc refused with a message. Records in `reports/ocr/<header>/`, SUMMARY / SYNOPSIS in `output/ocr/`. Ollama by default; Qwen / OpenAI only behind the cloud gate; groq / deepseek / anthropic refused. Broken-font PDFs: text layer with [?], AI fills symbols only, document-wide vote per font code. [?] left varies run to run (Ang 2010, gemma4:e4b: 19 in s36_check, 7 in s36_vote; vote fills checked against Table 2) |
@@ -107,7 +108,7 @@ SR - review content
     required; empty P/I/O also stop a direct run (placeholder_fields).
     PICO JSON copied to reports/sr/<run_id>/ after a successful run.
     tests/test_sr_launcher_config.py (11). Reference README removed; its
-    content is in Readme/readme_sr_pipeline.txt section 1 (old version:
+    content is in Readme/readme_sr_pipeline.txt Appendix A (old version:
     git show b274d24:reference/sr_cbt_fibromyalgia/README.md).
     Verified by launcher run 20261112_210735 (new comparator default, 4
     overrides): same result as 20261111_190839 (Karlsson 0.226, Lami
@@ -2486,6 +2487,9 @@ Session 39 closed items 4-11 (11e open). Job list, in order:
    file location, reading the output folder) into
    Readme/flashcard-help.html; its footer is stale (v2.4.6, 401 tests,
    "DeepSeek default") - fix in its own commit.
+   Old user-guide text to move: git show 05e55b7:Readme/readme_sr_pipeline.txt
+   (section 1 = launcher PICO, comparator, Exclude_WaitList, criteria,
+   rerunning the worked example; sections 2-6 how-to details).
 3. 11e (needs a paid run): check [SUBGROUP] lines, the report section and
    forest_plot_subgroups.png. Expected on 20261112_222233 data: waiting
    list k=3 pooled; usual care k=1 and excluding-WL k=1 not pooled; Ang in
@@ -2499,3 +2503,9 @@ Session 39 closed items 4-11 (11e open). Job list, in order:
 6. Small: relevance_screener.py line 225 prompt label says "first 8 pages"
    but the cut is 6000 characters; launcher still hard-codes inclusion
    [RCT, Adult participants] / exclusion [Non-RCT, Animal studies].
+- SR doc references fixed after the readme rewrite: REVIEWER_GUIDE cited old
+  readme sections 1, 2, 5, 7, 8. Now Appendix A (worked example, rewritten
+  as results), 3.2, 3.10, 4. Old section 7 (study_overrides.yaml when/how,
+  field list) moved into REVIEWER_GUIDE section 5, with comparator_type
+  added. The "AI alone 1 of 4" line now names the run (0 of 4 in
+  20261112_222233).

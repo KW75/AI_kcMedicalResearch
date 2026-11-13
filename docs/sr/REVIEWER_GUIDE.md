@@ -6,12 +6,13 @@ the numbered bold items in 2.2; it must equal the extractor's branch count. -->
 
 **Read this before using any output from this pipeline in a systematic review.**
 
-How the pipeline works and how to run it: `Readme/readme_sr_pipeline.txt`.
+How the pipeline works and why: `Readme/readme_sr_pipeline.txt`. How to run
+it: the Help page (`Readme/flashcard-help.html`).
 This guide covers what the pipeline cannot verify, what a reviewer must check
 by hand, and how to decide whether an RCT belongs in the meta-analysis.
 
 Worked example: CBT for fibromyalgia pain, 5 RCTs,
-`Readme/readme_sr_pipeline.txt` section 1.
+`Readme/readme_sr_pipeline.txt` Appendix A.
 
 ---
 
@@ -153,8 +154,9 @@ that the value is correct. Item 3.1 remains mandatory.
   differed from the CONSORT flow).
 
 The vote measures stability, not correctness: readings can agree on the
-wrong row. On the worked example the AI alone was fully correct for 1 of 4
-checked studies (readme_sr_pipeline.txt section 8).
+wrong row. On the worked example the AI alone was fully correct for at most
+1 checked study in any run (0 of 4 in reference run 20261112_222233;
+readme_sr_pipeline.txt section 4).
 
 ---
 
@@ -254,7 +256,7 @@ shows the raw values.
 - Check Domains 1–3 and 5 by hand: judgements outside Domain 4 vary between
   runs (randomisation, deviations, missing data).
 - Check missing-data counts against the CONSORT flow diagram.
-- Overall is the program's rule (readme_sr_pipeline.txt section 5), not the
+- Overall is the program's rule (readme_sr_pipeline.txt section 3.10), not the
   model's; `overall_model` shows where they differ.
 - RoB 2 reads the paper text, not `study_overrides.yaml`; it is unaffected by
   reviewer-entered values.
@@ -343,9 +345,31 @@ for the current `run_id`; if not, a worker crashed and the run is incomplete.
 
 ## 5. Using `study_overrides.yaml`
 
-When to add an entry, the field list and the format:
-`Readme/readme_sr_pipeline.txt` section 7. Full example:
-`reference/sr_cbt_fibromyalgia/study_overrides.yaml`. A short example:
+When to add an entry (always after checking the PDF):
+
+- the report lists a study as not pooled because the readings disagreed;
+- a value is wrong (wrong row, wrong timepoint, randomised instead of analysed N);
+- arms must be combined (multi-arm trial: Cochrane Handbook 23.3.4);
+- a study must be kept out of the meta-analysis (`exclude_from_meta`);
+- the control type must be set for subgroups (`comparator_type`, section 5.2).
+
+How:
+
+- Key = the exact PDF file name in `input/sr`, in quotes.
+- Fields: `first_author`, `year`, `n_intervention`, `n_control`,
+  `mean_intervention`, `sd_intervention`, `mean_control`, `sd_control`,
+  `note`, `exclude_from_meta`, `comparator_type`. Unknown fields are ignored
+  with a warning in the run log.
+- Enter only what you checked; partial entries are allowed. Numbers replace
+  the AI values; author and year are filled in only if missing.
+- To clear the review gate, enter ALL flagged fields (`table_shift` needs all
+  four means/SDs).
+- `note`: table, page, row and timepoint, e.g. "Table 2 p6, MPI-1 Pain
+  severity, post-treatment, crude mean (SD). Verified from the PDF."
+- `exclude_from_meta: "one-line reason"` is shown in the report as a
+  Reviewer decision.
+
+Full example: `reference/sr_cbt_fibromyalgia/study_overrides.yaml`. A short example:
 
     "s10608-017-9875-4.pdf":
       first_author: Lami
@@ -429,7 +453,7 @@ which compares the estimate with and without needs-review studies.
 |---|---|---|
 | Extraction is non-deterministic | Same PDF gives different values across runs. Measured in Session 26 on the earlier model (qwen-vl-plus ignored `seed`, not deterministic at `temperature=0`); not yet re-measured on qwen3-vl-plus | 3 readings + vote; review gate on `no_majority` / `table_shift` (§3.5); overrides for checked studies |
 | Agreement is not correctness | Readings can agree on the wrong row, arm or outcome (§2.3) | Item 3.1 for every included study |
-| Broken font codes in PDFs | Text layer garbled | Shared text re-reads those pages with Tesseract (readme_sr_pipeline.txt section 2). Tesseract may add stray dots; without Tesseract `[?]` stay |
+| Broken font codes in PDFs | Text layer garbled | Shared text re-reads those pages with Tesseract (readme_sr_pipeline.txt section 3.2). Tesseract may add stray dots; without Tesseract `[?]` stay |
 | Extraction does not use the shared text | Corrections in `input/sr/paper_text/` do not reach extraction | Use `study_overrides.yaml` |
 | Screening sees the first 6000 characters | Eligibility details later in the paper are not seen | Check UNCERTAIN and EXCLUDE decisions with the full paper |
 | RoB 2 text depends on finding a Methods heading | Methods + Results (up to 50,000 characters) are sent; if no Methods heading is found, only the first 6000 characters. The retry after an empty answer is also cut to 6000 | Check the `[ROB2 SEND]` line in the console log; if it shows about 6000 characters, check the RoB 2 judgements against the full paper |

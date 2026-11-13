@@ -27,6 +27,8 @@ Contents
   4. How accuracy is measured, and what the numbers show
   5. Compared with asking a general cloud chat to "do a systematic review"
   6. Honest limitations
+  Appendix A. Worked example: CBT for fibromyalgia pain, 5 RCTs
+
 
 
 ------------------------------------------------------------------------------
@@ -384,3 +386,61 @@ pipeline is built around one rule:
   For the full list of checks a reviewer must make before reporting any
   result, see docs/sr/REVIEWER_GUIDE.md, sections 3 and 6.
 ==============================================================================
+
+------------------------------------------------------------------------------
+Appendix A. Worked example: CBT for fibromyalgia pain, 5 RCTs
+------------------------------------------------------------------------------
+
+Question: in adults with fibromyalgia, does cognitive behavioural therapy
+reduce pain intensity after treatment, compared with an inactive control
+(usual care, attention placebo or waiting list)?
+Trials: Ang 2010, Jensen 2012, Karlsson 2015, Lami 2018, McCrae 2019.
+Files: reference/sr_cbt_fibromyalgia (prisma_criteria.yaml,
+study_overrides.yaml, pico_sample.json). The PDFs and saved runs are local
+only, not in Git. Full citations:
+git show b274d24:reference/sr_cbt_fibromyalgia/README.md
+
+What happened at each step (reference run 20261112_222233):
+
+  Screening   5 of 5 INCLUDE; identical decisions in 4 separate runs.
+
+  Extraction  The model alone got 0 of 4 hand-checked studies fully right.
+              The errors were found by the checks in section 3.5 or by the
+              pooling gate (3.7), and corrected by the reviewer from the PDF:
+    Ang       NOT POOLED (reviewer decision). Table 2 is the NFR pain rating
+              (pain from a laboratory stimulus), not pain intensity; FIQ pain
+              is given only as week-6 change scores, which should not be
+              mixed with final values (Cochrane Handbook 10.5.2). Described
+              narratively.
+    Jensen    The model's "45.6" for both arms was the mean age. Reviewer
+              values: Table 3 p7, pain VAS 49 (19) vs 59 (26); N = completed
+              treatment 19/15 (the N behind the posttreatment table), not
+              randomised 25/18.
+    Karlsson  Table 2 p6, MPI-1 pain severity, crude mean (SD). One of three
+              readings took the next table row (table_shift).
+    Lami      Table 4, post-intervention; N 28/36 (post-intervention, not
+              baseline). The model's quotes "mean = 4.2 (SD = 2.1)" do not
+              exist in the paper (now caught by check 5).
+    McCrae    Three arms (CBT-I, CBT-P, waiting list). CBT-I and CBT-P were
+              combined into one intervention arm (Cochrane Handbook 23.3.4).
+
+  Result      4 of 5 pooled. Hedges g: Jensen -0.437, Karlsson 0.226,
+              Lami -0.029, McCrae -0.227. Pooled SMD -0.103
+              [-0.365, 0.159], I2 = 0.0%, k = 4. The 95% CI includes zero.
+
+  The gate at work: the earlier run 20261111_190839, made before the
+  reviewer had verified Jensen, pooled only 3 studies (SMD -0.042
+  [-0.327, 0.242]). Jensen's readings disagreed, so it stayed out until a
+  human entered values checked against the PDF.
+
+  Accuracy    Scored against the hand-checked truth file (section 4):
+              4 checked, 4 fully correct, 0 pooled with a wrong value.
+
+  RoB 2       Overall High for all 5 trials, the same in 4 runs.
+
+  Subgroups   Added after this run (Session 39), not yet seen in a run.
+              Expected on these data: waiting list (Jensen, Karlsson,
+              McCrae) k = 3, pooled; usual care (Lami) k = 1, not pooled;
+              Ang in no group (not pooled).
+
+How to rerun the example: see the Help page (Readme/flashcard-help.html).
