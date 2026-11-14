@@ -2936,3 +2936,15 @@ Session 39 closed items 4-11 (11e open). Job list, in order:
   - Not yet run live: the next reference run should show 0 pooled and quote_not_found in skip_reason.
   - New tests/test_sr_quote_gate.py (15); suite 1382 -> 1397, 10 deselected.
   - DO NOT MERGE v2.11-sr-local yet. PR #9 stays a draft.
+
+- Session 41 quote gate live check (2026-11-14):
+  - Run 20261114_224231: gemma4:e4b, N=3, OLLAMA_TEMPERATURE 0.3 (logged), same 5 PDFs, pico_20261112_210735.json, 0 overrides, code a1f0f12, ~24 min, no cloud/OOM.
+  - Gate passes live: POOLED 0 of 5; scorer 4 checked, 0 fully correct, 0 wrong AND pooled; Stage 4 aborted (< 2 usable studies).
+  - McCrae proves the gate: only flag sd_control:majority (not mandatory), all 6 values wrong; skipped only by quote_not_found - without the gate it would have been pooled.
+  - Jensen, Karlsson, Lami: runs-disagree reason plus quote_not_found, joined with "; also:".
+  - Karlsson this run: mean_control 48.8 again (truth 3.67), table_shift + mixed_runs; Ns 24/24 correct.
+  - Ang: quotes found verbatim (no quote_not_found) but control mean -8.9 / SD 25.3 not in their own quote; kept out only by table_shift. Gap: "does not appear in its own source quote" does not trip the gate.
+  - Screening 5 INCLUDE / 0 EXCLUDE (third run in a row).
+  - Bug c seen again: "Skip study:" log lines do not name the study.
+  - Next (pick one, test first): reviewer-override proof (Karlsson 3.88/1.05/3.67/0.75 in study_overrides.yaml); gate on number-not-in-quote; empty-text gap; bugs a-c.
+  - DO NOT MERGE v2.11-sr-local yet. PR #9 stays a draft.
