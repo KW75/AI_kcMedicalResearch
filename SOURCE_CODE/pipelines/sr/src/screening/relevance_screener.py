@@ -286,8 +286,17 @@ class RelevanceScreener:
             _last_err = None
             for _attempt in range(1, 4):
                 try:
-                    with _ur.urlopen(req, timeout=120) as resp:
-                        data = _json.loads(resp.read())
+                    if self.provider == "ollama":
+                        # Session 40 (commit 3a): native /api/generate with
+                        # num_ctx from OLLAMA_CONTEXT; the /v1 route set none
+                        # and could cut the article text silently.
+                        import providers  # lazy, like data_extractor.py
+                        _text = providers.call_ollama_provider(
+                            full_prompt, model=self.model, max_tokens=1024)
+                        data = {"choices": [{"message": {"content": _text}}]}
+                    else:
+                        with _ur.urlopen(req, timeout=120) as resp:
+                            data = _json.loads(resp.read())
                     break
                 except _ue.HTTPError as http_err:
                     body = http_err.read().decode("utf-8", errors="replace")
@@ -299,6 +308,9 @@ class RelevanceScreener:
                 except (_ue.URLError, _hc.HTTPException,
                         ConnectionError, TimeoutError, OSError) as net_err:
                     _last_err = net_err
+                except RuntimeError as ollama_err:
+                    # Ollama (commit 3a): empty answer or not reachable -> retry
+                    _last_err = ollama_err
                 if _attempt < 3:
                     logger.warning(
                         f"Screening call attempt {_attempt}/3 failed for "

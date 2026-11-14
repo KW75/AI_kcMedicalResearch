@@ -71,7 +71,7 @@ def _openai_compat_creds(provider: str, api_key: Optional[str] = None):
     if provider == "openai":
         return api_key or os.environ["OPENAI_API_KEY"], None
     if provider == "ollama":
-        base = os.environ.get("OLLAMA_URL", "http://localhost:11434") + "/v1"
+        base = os.environ.get("OLLAMA_HOST", "http://localhost:11434").rstrip("/") + "/v1"
         return "ollama", base
     raise ValueError(f"Unknown provider: {provider}")
 
@@ -137,6 +137,10 @@ class RoB2Assessor:
         if self.provider == "anthropic":
             self.client = anthropic.Anthropic(
                 api_key=api_key or os.environ["ANTHROPIC_API_KEY"])
+        elif self.provider == "ollama":
+            # Session 40 (commit 3a): text calls go to
+            # providers.call_ollama_provider; no OpenAI-style client.
+            self.client = None
         else:
             from openai import OpenAI
             _key, _base = _openai_compat_creds(self.provider, api_key)
@@ -170,6 +174,10 @@ class RoB2Assessor:
 
     def _call_with_images(self, base64_images: list, prompt: str) -> str:
         """Send PDF pages as base64 images via OpenAI-compatible vision API."""
+        if self.provider == "ollama":
+            raise RuntimeError(
+                "RoB2 image call is not wired for Ollama (RoB2 reads text "
+                "only; use _call_with_text).")
         content = [{"type": "text", "text": prompt}]
         for img in base64_images[:5]:
             content.append({
@@ -194,13 +202,28 @@ class RoB2Assessor:
             logger.info("[ROB2 SEND] attempt %d: %d of %d chars to the model",
                         attempt + 1, len(truncated), len(pdf_text))
             full = f"{prompt}\n\n--- ARTICLE TEXT ---\n{truncated}\n--- END ---"
-            resp = self.client.chat.completions.create(
-                model=self.model,
-                messages=[{"role": "user", "content": full}],
-                max_tokens=2048,
-                extra_body={"enable_thinking": False},
-            )
-            content = resp.choices[0].message.content
+            if self.provider == "ollama":
+                # Session 40 (commit 3a): native /api/generate with num_ctx
+                # from OLLAMA_CONTEXT; the /v1 route set none and could cut
+                # a long RoB2 prompt silently. call_ollama_provider raises on
+                # an empty answer: treat that as empty so the shorter retry
+                # below still happens. Any other error goes up as before.
+                import providers  # lazy, like data_extractor.py
+                try:
+                    content = providers.call_ollama_provider(
+                        full, model=self.model, max_tokens=2048)
+                except RuntimeError as e:
+                    if "empty response" not in str(e).lower():
+                        raise
+                    content = ""
+            else:
+                resp = self.client.chat.completions.create(
+                    model=self.model,
+                    messages=[{"role": "user", "content": full}],
+                    max_tokens=2048,
+                    extra_body={"enable_thinking": False},
+                )
+                content = resp.choices[0].message.content
             if content and content.strip():
                 return content.strip()
             if attempt == 0:

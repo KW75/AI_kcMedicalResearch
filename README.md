@@ -4,7 +4,7 @@ A multi-mode AI assistant for medical research, critical appraisal, systematic r
 
 
     Version: 2.6.0
-    Tests: 1315 passed, 10 deselected
+    Tests: 1324 passed, 10 deselected
            (reproduce with `python -m pytest -m "not live" --tb=short -q`)
     CI: GitHub Actions - Green
     GitHub: https://github.com/KW75/AI_kcMedicalResearch
@@ -360,6 +360,8 @@ On branch:
 
 Noted, not fixed:
 - rob2_tool.py reads `OLLAMA_URL`; the rest of the app reads `OLLAMA_HOST`.
+  FIXED (Session 40, v2.11): rob2_tool.py reads `OLLAMA_HOST` too; SR
+  screening and RoB2 on Ollama go through call_ollama_provider (num_ctx set).
 - An Ollama SR run screens locally, then fails at extraction (no vision).
   FIXED (Session 40, v2.11): SR extraction runs on Ollama; a model without
   'vision' stops the run before any AI call.

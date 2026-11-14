@@ -48,7 +48,7 @@ so those catches happen at session open, not mid-work.
 
 | Component      | Status |
 |----------------|--------|
-| Tests | 1315 passed, 10 deselected on v2.11-sr-local (Session 40); main 1282 (8a8a42e, PR #8 merged) (python -m pytest -m "not live" --tb=short -q) |
+| Tests | 1324 passed, 10 deselected on v2.11-sr-local (Session 40); main 1282 (8a8a42e, PR #8 merged) (python -m pytest -m "not live" --tb=short -q) |
 | Branch         | main = ef66b9f (PR #7 merged 2026-11-10: F7 truth fixture sr_truth.yaml + scripts/sr_score_run.py). Work on v2.10-sr-screening, PR #8 open: shared paper text (b3d804c), prisma_criteria write-if-changed (afd90a3), RoB2 overall rule (3e3785e), RoB2 Methods/Results text (908f889, 306d838), registration lines to RoB2 (Session 38); Session 38: Karlsson/Ang overrides (cf75209), RoB2 Domain 4 self-report rule (46fbd9b), Domain 4 High outright (e4e97b8), Ang excluded by reviewer + not-pooled report section (a56dc55), plain report reasons + POOLED line (0bf59dc), fibromyalgia set moved to reference/ (7h, b32f4c4), REVIEWER_GUIDE rewrite + readme_sr_pipeline.txt (docs, this commit). Branches v2.6-ocr-editor, v2.5-major-updates, v2.7-sr-fixes, v2.8-sr-review-gate, v2.9-sr-fixture deleted |
 | CI | green on PR #8 at green on PR #8 at 05e55b7 (1276 passed, 10 deselected, 57 warnings). Last confirmed on main: bcd42d9 (2026-11-09, 1027, both jobs). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
 | SR docs        | Readme/readme_sr_pipeline.txt = how the SR pipeline works and why (logic, rationale, accuracy evidence, Appendix A worked example); no how-to. How-to = Readme/flashcard-help.html. study_overrides.yaml fields and format = REVIEWER_GUIDE section 5.
@@ -2655,3 +2655,30 @@ Session 39 closed items 4-11 (11e open). Job list, in order:
     a later cleanup commit.
   - Item 12g still required before local SR is called usable: gemma4:e4b on
     the reference set, N=3, field by field vs qwen3-vl-plus and the PDFs.
+- Commit 3a (item 12): SR screening and RoB2 on local Ollama.
+  - relevance_screener.py: for ollama, screen_by_pdf_path calls
+    providers.call_ollama_provider (max_tokens 1024, num_ctx from
+    OLLAMA_CONTEXT) inside the existing 3-try loop; a RuntimeError from
+    Ollama (empty answer or not reachable) counts as a failed try.
+    Cloud providers unchanged.
+  - rob2_tool.py: for ollama self.client = None; _call_with_text calls
+    call_ollama_provider (max_tokens 2048). An "empty response" error is
+    treated as an empty answer, so the retry cut to MAX_ROB2_CHARS (6000)
+    still runs; other errors go up unchanged. _call_with_images refuses
+    ollama (it is never called). _openai_compat_creds reads OLLAMA_HOST;
+    OLLAMA_URL is no longer read anywhere - set OLLAMA_HOST instead.
+  - Tests: tests/test_sr_ollama_text_stages.py (9; call_ollama_provider
+    faked, urlopen and openai.OpenAI blocked, no network). Suite 1315 -> 1324.
+  - Closes the commit 2 gap "Screening and RoB2 on Ollama still go through
+    the OpenAI-style /v1 URL".
+  - Difference to know: on Ollama, screening retries "not reachable" 3 times
+    (waits 2 s + 4 s) before the paper becomes UNCERTAIN; RoB2 does not
+    retry it and the error goes up at once.
+  - Still open (commit 3b): cloud offer (qwen/openai, [CLOUD] + consent)
+    when no local vision model is pulled; vision check in a direct run of
+    pipelines/sr/main.py --provider ollama.
+  - Cleanup commit (with _extract_anthropic and the Stage 1 anthropic
+    upload): RelevanceScreener.__init__ still defaults to
+    provider="anthropic", model="claude-opus-4-7" and always builds an
+    Anthropic client.
+  - DO NOT MERGE v2.11-sr-local yet; item 12g still required.
