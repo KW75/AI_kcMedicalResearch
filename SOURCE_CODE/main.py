@@ -1371,7 +1371,7 @@ def _sr_default_model(provider: str) -> str:
     return sr_default_model(provider)
 
 
-def run_sr_launcher(provider: str = "", model: str = "") -> None:
+def run_sr_launcher(provider: str = "", model: str = "", confirm=None) -> None:
     """Run the SR automation pipeline (CLI mode)."""
     import shutil
     import subprocess as _sp
@@ -1545,7 +1545,14 @@ def run_sr_launcher(provider: str = "", model: str = "") -> None:
         _verr = sr_ollama_vision_error(_model)
         if _verr:
             print("\n" + _verr)
-            return
+            # Session 40 (commit 3b): offer qwen/openai like OCR, only when
+            # SR picked the model itself (a typed --model gets no offer).
+            _cloud = None if model else sr_offer_cloud(confirm)
+            if _cloud is None:
+                return
+            _provider = _cloud
+            _model = _sr_default_model(_provider)
+            print(f"[SR] Using {_provider} / {_model} (cloud, confirmed).")
 
 
     # -- Step 5: run sr/main.py (as a module so relative imports resolve) -----
@@ -2465,21 +2472,41 @@ SR_DEFAULT_PROVIDER = "ollama"
 
 
 def sr_ollama_vision_error(model: str, caps_fn=None, host=None) -> str | None:
-    """SR on Ollama needs a model whose /api/show lists 'vision' (as OCR).
-    Returns a message if it cannot read images or is not pulled, else None."""
-    if caps_fn is None:
-        import ollama_models
-        caps_fn = ollama_models.model_capabilities
-    try:
-        caps = caps_fn(host, model)
-    except Exception:
-        caps = set()
-    if "vision" in caps:
+    """SR on Ollama needs a vision model (as OCR). The check lives in
+    ollama_models.sr_vision_error so the direct run of pipelines/sr/main.py
+    uses the same one (Session 40, commit 3b)."""
+    import ollama_models
+    return ollama_models.sr_vision_error(model, caps_fn=caps_fn, host=host)
+
+
+# Cloud providers SR can offer when no local vision model is usable: same as
+# OCR (pipelines/ocr/cli.py CLOUD_KEYS; a test keeps them equal).
+SR_CLOUD_KEYS = {"qwen": "DASHSCOPE_API_KEY", "openai": "OPENAI_API_KEY"}
+
+
+def sr_offer_cloud(confirm, input_fn=input, log=print) -> str | None:
+    """Local model cannot read page images: offer qwen/openai (API key set),
+    like OCR. Needs a consent function; returns the provider, or None = SR
+    not run (no key, no consent function, Enter, wrong number, no 'y')."""
+    choices = [p for p, k in SR_CLOUD_KEYS.items() if os.getenv(k, "").strip()]
+    if not confirm or not choices:
         return None
-    return (f"SR: Ollama model {model} cannot read page images (no 'vision' "
-            "capability) or is not pulled. Run: ollama pull gemma4:e4b, or set "
-            "OLLAMA_MODEL to a vision model, or use --provider qwen or openai "
-            "(cloud).")
+    log("A cloud AI can read the pages instead, but page images and the "
+        "text of your papers will leave this machine.")
+    for i, p in enumerate(choices, start=1):
+        log(f"  {i}. {p}")
+    answer = input_fn("Cloud provider number (Enter = cancel): ").strip()
+    if not answer:
+        log("Cancelled. SR not run.")
+        return None
+    if not answer.isdigit() or not 1 <= int(answer) <= len(choices):
+        log("Not a valid number. SR not run.")
+        return None
+    provider = choices[int(answer) - 1]
+    if not confirm(provider):
+        log("Cloud not confirmed. SR not run.")
+        return None
+    return provider
 
 
 def sr_provider_error(mode: str, provider: str | None) -> str | None:
@@ -2594,6 +2621,8 @@ def run_cli(args: argparse.Namespace) -> None:
         run_sr_launcher(
             provider=args.provider,
             model=args.model,
+            confirm=lambda p: confirm_data_destinations(
+                "sr", p, confirm_cloud=args.confirm_cloud),
         )
     elif args.mode == "rct_search":
         run_rct_search_pipeline(

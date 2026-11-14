@@ -4,7 +4,7 @@ A multi-mode AI assistant for medical research, critical appraisal, systematic r
 
 
     Version: 2.6.0
-    Tests: 1324 passed, 10 deselected
+    Tests: 1336 passed, 10 deselected
            (reproduce with `python -m pytest -m "not live" --tb=short -q`)
     CI: GitHub Actions - Green
     GitHub: https://github.com/KW75/AI_kcMedicalResearch
@@ -365,6 +365,8 @@ Noted, not fixed:
 - An Ollama SR run screens locally, then fails at extraction (no vision).
   FIXED (Session 40, v2.11): SR extraction runs on Ollama; a model without
   'vision' stops the run before any AI call.
+  Since commit 3b the launcher then offers qwen or openai (API key set,
+  [CLOUD] banner + typed y); a direct run of pipelines/sr/main.py stops.
 - main.call_ai swallows streaming errors (`except Exception: pass`), so an
   Ollama failure waits through two timeouts. Revisit with time limits.
 - RelevanceScreener defaults to provider="anthropic",

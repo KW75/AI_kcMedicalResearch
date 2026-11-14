@@ -386,6 +386,8 @@ pipeline is built around one rule:
   - SR runs on a local Ollama vision model (default gemma4:e4b), or on qwen /
     openai after the cloud warning. Local accuracy is not yet checked against
     the reference set; check every value against the PDF.
+    If the local model cannot read images, the launcher offers qwen / openai
+    (API key set) behind the [CLOUD] banner and a typed y.
   - PDF reports need an extra library; Word and HTML reports are always
     produced.
 

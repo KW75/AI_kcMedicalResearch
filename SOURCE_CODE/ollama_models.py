@@ -96,6 +96,24 @@ def model_capabilities(host: str | None, name: str) -> set[str]:
         return set()
 
 
+def sr_vision_error(model: str, caps_fn=None, host=None) -> str | None:
+    """SR on Ollama needs a model whose /api/show lists 'vision' (as OCR).
+    Returns a message if it cannot read images or is not pulled, else None.
+    Shared by main.run_sr_launcher and a direct run of pipelines/sr/main.py
+    (Session 40, commit 3b)."""
+    caps_fn = caps_fn or model_capabilities
+    try:
+        caps = caps_fn(host, model)
+    except Exception:
+        caps = set()
+    if "vision" in caps:
+        return None
+    return (f"SR: Ollama model {model} cannot read page images (no 'vision' "
+            "capability) or is not pulled. Run: ollama pull gemma4:e4b, or set "
+            "OLLAMA_MODEL to a vision model, or use --provider qwen or openai "
+            "(cloud).")
+
+
 def describe(model: dict, caps: set[str]) -> str:
     """One ASCII line for the launcher's model picker."""
     vision = "yes" if "vision" in caps else "no"

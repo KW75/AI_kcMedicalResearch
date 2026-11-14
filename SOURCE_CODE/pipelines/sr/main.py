@@ -467,6 +467,13 @@ def main():
     args = ap.parse_args()
     args.model = resolve_model(args.provider, args.model)
     logger.info(f"Provider {args.provider} / model {args.model}")
+    # Session 40 (commit 3b): same vision check as the launcher, before any
+    # AI call. The direct run offers no cloud: retype with --provider qwen.
+    if args.provider == "ollama":
+        import ollama_models  # SOURCE_CODE is on sys.path (top of file)
+        _verr = ollama_models.sr_vision_error(args.model)
+        if _verr:
+            raise SystemExit(_verr)
 
     cfg = load_config(args.config)
 
