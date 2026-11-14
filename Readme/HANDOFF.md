@@ -48,7 +48,7 @@ so those catches happen at session open, not mid-work.
 
 | Component      | Status |
 |----------------|--------|
-| Tests | 1371 passed, 10 deselected on v2.11-sr-local (Session 41); main 1282 (8a8a42e, PR #8 merged) (python -m pytest -m "not live" --tb=short -q) |
+| Tests | 1374 passed, 10 deselected on v2.11-sr-local (Session 41); main 1282 (8a8a42e, PR #8 merged) (python -m pytest -m "not live" --tb=short -q) |
 | Branch         | main = ef66b9f (PR #7 merged 2026-11-10: F7 truth fixture sr_truth.yaml + scripts/sr_score_run.py). Work on v2.10-sr-screening, PR #8 open: shared paper text (b3d804c), prisma_criteria write-if-changed (afd90a3), RoB2 overall rule (3e3785e), RoB2 Methods/Results text (908f889, 306d838), registration lines to RoB2 (Session 38); Session 38: Karlsson/Ang overrides (cf75209), RoB2 Domain 4 self-report rule (46fbd9b), Domain 4 High outright (e4e97b8), Ang excluded by reviewer + not-pooled report section (a56dc55), plain report reasons + POOLED line (0bf59dc), fibromyalgia set moved to reference/ (7h, b32f4c4), REVIEWER_GUIDE rewrite + readme_sr_pipeline.txt (docs, this commit). Branches v2.6-ocr-editor, v2.5-major-updates, v2.7-sr-fixes, v2.8-sr-review-gate, v2.9-sr-fixture deleted |
 | CI | green on PR #8 at green on PR #8 at 05e55b7 (1276 passed, 10 deselected, 57 warnings). Last confirmed on main: bcd42d9 (2026-11-09, 1027, both jobs). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
 | SR docs        | Readme/readme_sr_pipeline.txt = how the SR pipeline works and why (logic, rationale, accuracy evidence, Appendix A worked example); no how-to. How-to = Readme/flashcard-help.html. study_overrides.yaml fields and format = REVIEWER_GUIDE section 5.
@@ -2843,4 +2843,21 @@ Session 39 closed items 4-11 (11e open). Job list, in order:
   - Trade-off: a run that left a voted field empty cannot be the single
     run, so a few extra mixed_runs flags are possible (never a wrong pool).
   - Still open: RoB2 label definition, 4c, 4d, option 1.
+  - DO NOT MERGE v2.11-sr-local yet. PR #9 stays a draft.
+
+- Session 41 fix: RoB2 label definition (prompt only).
+  - rob2_tool._ROB2_RULES: new first rule - labels mean RISK OF BIAS, not
+    study quality ("Low" = low risk, "High" = high risk); concealed random
+    allocation with no worrying baseline imbalance -> Domain 1 "Low";
+    result reported as pre-specified -> Domain 5 "Low"; "clearly reported"
+    is never a reason for "High"; the label must match its justification.
+  - Why: rerun 20261114_184026 - gemma4:e4b rated randomisation High for
+    all 5 while describing adequate methods, and reported_result High
+    because results were "clearly reported".
+  - Tests: +3 in tests/test_sr_rob2_prompt.py; suite 1371 -> 1374. They
+    prove the rule is SENT, not that gemma4:e4b obeys it. Verify with a
+    reference rerun: randomisation Low for adequately randomised trials.
+  - Unchanged: Domain 4 self-report rule and apply_rob2_overall (any High
+    -> High), so overall stays High for these self-reported pain trials.
+  - Still open: 4c, 4d, option 1.
   - DO NOT MERGE v2.11-sr-local yet. PR #9 stays a draft.

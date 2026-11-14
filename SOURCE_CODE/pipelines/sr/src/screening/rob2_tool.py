@@ -32,6 +32,13 @@ Assess the attached RCT across five domains. Return ONLY valid JSON:
 # studies outcome_measurement Low, although pain is self-reported.
 _ROB2_RULES = """
 RULES (RoB 2):
+- Labels mean RISK OF BIAS, not study quality: "Low" = low risk (good
+  methods), "High" = high risk (a flaw that could bias the result).
+  Random sequence with concealed allocation (computer or number generator,
+  sealed opaque envelopes) and no worrying baseline imbalance -> Domain 1 "Low".
+  Result reported as in a pre-specified analysis plan -> Domain 5 "Low";
+  "clearly reported" is never a reason for "High".
+  The label must match its justification.
 - Domain 4 (outcome_measurement): for participant-reported outcomes (pain,
   questionnaires, diaries) the PARTICIPANT is the outcome assessor.
   A blinded researcher handing out or scoring questionnaires
