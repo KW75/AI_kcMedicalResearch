@@ -2709,3 +2709,41 @@ Session 39 closed items 4-11 (11e open). Job list, in order:
     run_sr_launcher (main.py ~1514-1538) is dead (run_cli refuses or
     replaces deepseek) and still lists anthropic.
   - DO NOT MERGE v2.11-sr-local yet; item 12g still required.
+
+- Item 12g result (Session 40, 2026-11-14): local SR run 20261114_133303.
+  - Setup: gemma4:e4b, N=3, OLLAMA_TEMPERATURE 0.3, OLLAMA_CONTEXT 64000;
+    same 5 PDFs and PICO (pico_20261112_210735.json) as the qwen baseline
+    20261112_210735 (qwen3-vl-plus); study_overrides.yaml = empty template.
+    13:33-13:48 (15 min), nothing sent to the cloud, no out-of-memory.
+  - Verdict: the local pipeline works end to end, but gemma4:e4b is NOT
+    accurate enough for SR data. AI alone, hand-checked trials fully
+    correct: gemma 0 of 4, qwen 1 of 4 (Karlsson). PR #9 stays a draft.
+  - Per trial (gemma / qwen, AI alone): Jensen screened out / 6 of 6 wrong;
+    Karlsson screened out / ALL MATCH; Lami 6 of 6 wrong (checked by hand,
+    scorer saw "Kim") / 5 of 6 wrong; McCrae 6 of 6 wrong, not pooled /
+    6 of 6 wrong. Ang: change scores -5.4 / -8.9 (reviewer excludes these).
+  - Screening: gemma EXCLUDED Jensen and Karlsson (confidence 1.0) because
+    CBT had no effect on pain. A null result still reports the outcome;
+    in a real review this biases the pooled estimate. qwen: all 5 INCLUDE.
+  - Lami: all 3 runs agreed (unanimous) and were wrong (baseline Ns 34/41,
+    another scale 13.68 / 13.79), so the N=3 vote does not catch a wrong
+    outcome choice. McCrae: n 37/37, SDs about 5 (truth 57/28, SDs ~24).
+  - Every pooled row had a source_quote_warning (tripwire worked).
+  - Bugs found (not fixed):
+    a) The pooled row's author is the model's study_metadata.first_author
+       ("Kim", 2011, likely from the reference list) although the pdf_auto
+       lookup found Lami, 2017, DOI 10.1007/s10608-017-9875-4. A DOI
+       lookup should win. Read data_extractor.py ~2156 and
+       study_overrides.py ~204 first.
+    b) sr_score_run.py matches the exact name: "Dennis C. Ang" is not
+       "Ang", so Ang was not scored. Match on surname.
+    c) The [SAMPLING] log line says temperature=0.0; Ollama really uses
+       OLLAMA_TEMPERATURE (0.3). Known gap from commit 2.
+    d) No code under SOURCE_CODE writes console.txt; the run folder has
+       no log. The baseline's console.txt was not written by the pipeline.
+  - Decide next session (pick before any code change):
+    1) Screening and RoB2 local, extraction on qwen behind the cloud gate.
+    2) Try a larger local vision model on the same reference set.
+    3) Screening prompt rule: a null result still reports the outcome.
+    4) Bug fixes a) to d).
+  - DO NOT MERGE v2.11-sr-local yet (supersedes the 12g line above).
