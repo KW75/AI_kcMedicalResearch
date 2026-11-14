@@ -1434,7 +1434,13 @@ class DataExtractor:
         return x is not None and abs(x - target) <= tol
 
     def _mirror_study_metadata(self, result: dict) -> None:
-        """Copy resolved first_author/year into the nested study_metadata block."""
+        """Copy resolved first_author/year into the nested study_metadata block.
+
+        Session 41 (bug 4a): the resolved top-level value (reviewer override,
+        PDF lookup or paper block) replaces a different model value in
+        study_metadata, which is what the pooled row reads. Rule: reviewer >
+        PDF lookup > model. A replacement is logged as [METADATA].
+        """
         if not isinstance(result, dict):
             return
 
@@ -1443,9 +1449,29 @@ class DataExtractor:
             sm = {}
             result["study_metadata"] = sm
 
+        overridden = str(result.get("override_fields") or "").split("; ")
         for field in ("first_author", "year"):
-            if self._missing_like_value(sm.get(field)) and not self._missing_like_value(result.get(field)):
-                sm[field] = result[field]
+            top = result.get(field)
+            if self._missing_like_value(top):
+                continue
+            old = sm.get(field)
+            if self._missing_like_value(old):
+                sm[field] = top
+            elif not self._same_meta_value(old, top):
+                source = ("study_overrides.yaml" if field in overridden
+                          else result.get("metadata_source") or "resolved value")
+                logger.warning(
+                    "[METADATA] %s: %s %r from the model replaced by %r (%s)",
+                    result.get("filename", "?"), field, old, top, source)
+                sm[field] = top
+
+    @staticmethod
+    def _same_meta_value(a, b) -> bool:
+        """2017, "2017" and 2017.0 are the same; names compare case-insensitively."""
+        try:
+            return float(a) == float(b)
+        except (TypeError, ValueError):
+            return str(a).strip().casefold() == str(b).strip().casefold()
 
     @property
     def _study_overrides(self):
@@ -1483,6 +1509,13 @@ class DataExtractor:
                     result["year"] = paper.get(key)
                     break
 
+        # Session 41 (bug 4a): reviewer overrides first, so a reviewer's
+        # first_author / year fills the field before the PDF lookup does.
+        try:
+            self._study_overrides.apply(result, filename or result.get("filename") or "")
+        except Exception as exc:
+            logger.warning("Study override application failed for %s: %s", filename, exc)
+
         needs_meta = (
             self._missing_like_value(result.get("first_author"))
             or self._missing_like_value(result.get("year"))
@@ -1502,11 +1535,6 @@ class DataExtractor:
                         )
             except Exception as exc:
                 logger.warning("PDF metadata resolution failed for %s: %s", filename, exc)
-
-        try:
-            self._study_overrides.apply(result, filename or result.get("filename") or "")
-        except Exception as exc:
-            logger.warning("Study override application failed for %s: %s", filename, exc)
 
         self._mirror_study_metadata(result)
         return result

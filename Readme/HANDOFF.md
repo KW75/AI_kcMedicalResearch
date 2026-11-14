@@ -48,7 +48,7 @@ so those catches happen at session open, not mid-work.
 
 | Component      | Status |
 |----------------|--------|
-| Tests | 1336 passed, 10 deselected on v2.11-sr-local (Session 40); main 1282 (8a8a42e, PR #8 merged) (python -m pytest -m "not live" --tb=short -q) |
+| Tests | 1354 passed, 10 deselected on v2.11-sr-local (Session 41); main 1282 (8a8a42e, PR #8 merged) (python -m pytest -m "not live" --tb=short -q) |
 | Branch         | main = ef66b9f (PR #7 merged 2026-11-10: F7 truth fixture sr_truth.yaml + scripts/sr_score_run.py). Work on v2.10-sr-screening, PR #8 open: shared paper text (b3d804c), prisma_criteria write-if-changed (afd90a3), RoB2 overall rule (3e3785e), RoB2 Methods/Results text (908f889, 306d838), registration lines to RoB2 (Session 38); Session 38: Karlsson/Ang overrides (cf75209), RoB2 Domain 4 self-report rule (46fbd9b), Domain 4 High outright (e4e97b8), Ang excluded by reviewer + not-pooled report section (a56dc55), plain report reasons + POOLED line (0bf59dc), fibromyalgia set moved to reference/ (7h, b32f4c4), REVIEWER_GUIDE rewrite + readme_sr_pipeline.txt (docs, this commit). Branches v2.6-ocr-editor, v2.5-major-updates, v2.7-sr-fixes, v2.8-sr-review-gate, v2.9-sr-fixture deleted |
 | CI | green on PR #8 at green on PR #8 at 05e55b7 (1276 passed, 10 deselected, 57 warnings). Last confirmed on main: bcd42d9 (2026-11-09, 1027, both jobs). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
 | SR docs        | Readme/readme_sr_pipeline.txt = how the SR pipeline works and why (logic, rationale, accuracy evidence, Appendix A worked example); no how-to. How-to = Readme/flashcard-help.html. study_overrides.yaml fields and format = REVIEWER_GUIDE section 5.
@@ -2747,3 +2747,24 @@ Session 39 closed items 4-11 (11e open). Job list, in order:
     3) Screening prompt rule: a null result still reports the outcome.
     4) Bug fixes a) to d).
   - DO NOT MERGE v2.11-sr-local yet (supersedes the 12g line above).
+
+- Session 41 (2026-11-14, v2.11-sr-local): bug fixes 4a and 4b (12g note).
+  - 4a: first_author / year precedence is now reviewer
+    (study_overrides.yaml) > PDF lookup > model. data_extractor.py:
+    study_overrides.apply runs before the PDF lookup (it fills metadata
+    only when missing, so a reviewer's year used to lose to the lookup);
+    _mirror_study_metadata lets the resolved top-level value replace a
+    different model value in study_metadata (what the pooled row reads),
+    logged as "[METADATA] ... from the model replaced by ...". New
+    _same_meta_value: 2017 = "2017" = 2017.0, names case-insensitive.
+    Trade-off: a wrong pdf_auto author guess now beats the model; the
+    [METADATA] line and metadata_source "pdf_auto (verify)" flag it.
+  - 4b: sr_score_run._find_truth: exact name first, then a whole word
+    equal to one truth surname ("Dennis C. Ang" -> Ang); two matching
+    surnames -> no guess. Re-score of 20261114_133303: Ang found (not
+    hand-checked); "Kim" still unmatched (that CSV predates 4a).
+  - Tests: tests/test_sr_metadata_precedence.py (new, 7) and
+    tests/test_sr_score_run.py (+11). Suite 1336 -> 1354.
+  - Still open: 4c (temperature log line), 4d (no run log), option 3
+    (null-result screening rule), option 1 (extraction on qwen behind
+    the cloud gate). PR #9 stays a draft.

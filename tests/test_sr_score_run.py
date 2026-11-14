@@ -342,3 +342,30 @@ def test_real_karlsson_override_unchanged(sc, truth, tmp_path):
     assert "values from study_overrides.yaml" in text
     assert "AI alone: mean_intervention WRONG (AI 4.05, truth 3.88)" in text
     assert "AI alone: n_intervention" not in text   # confirmed = the AI was right
+
+# --- Session 41 (bug 4b): match on surname, not only the exact name ---------
+# Run 20261114_133303: the model wrote "Dennis C. Ang", truth says "Ang", so
+# Ang was reported as "no truth entry". Whole words only, one match only.
+_SMALL_TRUTH = {"studies": {"Ang": {}, "McCrae": {}, "Lami": {}}}
+
+
+@pytest.mark.parametrize("author, expected", [
+    ("Ang", "Ang"),
+    ("ang", "Ang"),
+    ("Dennis C. Ang", "Ang"),
+    ("Christina S. McCrae", "McCrae"),
+    ("Lami, M. J.", "Lami"),
+])
+def test_find_truth_matches_surname(sc, author, expected):
+    name, entry = sc._find_truth(author, _SMALL_TRUTH)
+    assert name == expected
+    assert entry is _SMALL_TRUTH["studies"][expected]
+
+
+@pytest.mark.parametrize("author", ["Kim", "", None, "C.", "Angela Smith"])
+def test_find_truth_no_wrong_or_partial_match(sc, author):
+    assert sc._find_truth(author, _SMALL_TRUTH) == (None, None)
+
+
+def test_find_truth_two_surnames_is_not_guessed(sc):
+    assert sc._find_truth("Ang Lami", _SMALL_TRUTH) == (None, None)
