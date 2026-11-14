@@ -19,13 +19,16 @@ from .src.screening.rob2_tool import RoB2Assessor
 from .src.extraction.data_extractor import DataExtractor
 from .src.analysis.meta_analysis import MetaAnalyzer
 from .src.visualization.forest_plot import ForestPlotGenerator
+from .src.analysis.subgroups import classify_comparator, subgroup_summary, subgroup_log_lines
 from .src.reporting.report_generator import ReportGenerator
-from .src.reporting.pdf_report import PDFReportGenerator
+from .src.reporting.pdf_report import PDFReportGenerator, pdf_summary_line
 from .src.utils.project_layout import SRProjectLayout
+from .src.utils.criteria_file import placeholder_fields
 from .src.utils.audit_logger import (
     write_screens, write_extracts, write_rob2, write_results,
     nondet_flag_to_cell, nondet_cell_is_mandatory, NONDET_CELL_UNANIMOUS,
-    review_skip_reason,
+    review_skip_reason, reviewer_exclusion_reason
+
 )
 
 
@@ -139,13 +142,22 @@ def _row_has_extracted_value(row: dict) -> bool:
     return False
 
 
-def _log_review_sensitivity(rows, review_rows, effect_measure):
+def _log_review_sensitivity(rows, review_rows, effect_measure, resolved=None):
     """F4 comparison (Session 37): pool primary + needs-review studies.
 
     The primary estimate excludes studies whose N runs disagreed. This
     second estimate puts them back so the reviewer sees how much they move
     the result. Comparison only - never the reported estimate.
+    Session 39 (item 4d): resolved = studies whose runs disagreed but a
+    reviewer overrode every flagged field ([AGREEMENT]). They are not held
+    back, so they are named here instead of silently missing.
     """
+    if resolved:
+        n = len(resolved)
+        logger.info(
+            f"[SENSITIVITY] Runs disagreed on {', '.join(str(s) for s in resolved)}, "
+            f"but a reviewer overrode every flagged field, so "
+            f"{'it is' if n == 1 else 'they are'} not held back (see [AGREEMENT]).")
     if not review_rows:
         logger.info("[SENSITIVITY] no needs-review studies - nothing to compare.")
         return None
@@ -458,6 +470,13 @@ def main():
 
     cfg = load_config(args.config)
 
+        # Session 38 (7h): the sample config has <...> placeholders; stop until replaced.
+    _ph = placeholder_fields(cfg)
+    if _ph:
+        raise SystemExit(
+            "prisma_criteria.yaml still has <...> placeholders or empty fields in: "
+            + ", ".join(_ph) + ". Enter the PICO in the launcher, or edit the file.")
+
     #  Effect measure resolution: CLI > yaml > fallback OR
     VALID = ("OR", "RR", "MD", "SMD")
     yaml_em = cfg.get("effect_measure")
@@ -515,6 +534,30 @@ def main():
 
     # Stage 2: Screening
     logger.info("=== STAGE 2: Screening ===")
+    # Session 37: one shared text per paper (OCR reader; local Tesseract for
+    # scanned and broken-font pages), saved under input/sr/paper_text/ so a
+    # rerun reuses it - including a file the reviewer corrected by hand.
+    # Added after upload_manifest.csv so the text does not land in that CSV.
+    from .src.utils.paper_text import get_paper_text
+    _text_dir = Path(pdf_dir) / "paper_text"
+    _text_dir.mkdir(parents=True, exist_ok=True)
+    for r in recs:
+        if not r.get("pdf_path"):
+            continue
+        try:
+            _pt = get_paper_text(r["pdf_path"], _text_dir)
+        except Exception as _e:
+            logger.warning(
+                f"[PAPER TEXT] {r.get('filename')}: shared text failed ({_e}) "
+                f"- screening/RoB2 read this PDF themselves")
+            continue
+        r["paper_text"] = _pt["text"]
+        logger.info(
+            f"[PAPER TEXT] {r.get('filename')}: {_pt['unknown']} [?] left; "
+            f"scanned pages {_pt['scanned_pages']}; broken-font pages "
+            f"{_pt['broken_font_pages']}; "
+            f"{'reused saved text' if _pt['from_cache'] else 'new text saved'} "
+            f"-> {_pt['path']}")
     sr = RelevanceScreener(
         pico_criteria      = cfg["pico"],
         inclusion_criteria = cfg.get("inclusion_criteria", []),
@@ -591,6 +634,7 @@ def main():
     rob = RoB2Assessor(
         model    = args.model,
         provider = args.provider,
+        outcome  = cfg.get("pico", {}).get("outcome"),
     ).assess_batch(included)
 
     for _r in rob:
@@ -618,6 +662,7 @@ def main():
     rows      = []
     meta_audit= []
     review_rows = []   # F4: gated studies, pooled only in [SENSITIVITY]
+    resolved_by_override = []   # Session 39 (4d): disagreed, all flagged fields overridden
     for r in er:
         m  = r.get("study_metadata",  {})
         po = r.get("primary_outcome", {})
@@ -670,6 +715,15 @@ def main():
         }       
         # F4 gate (Session 37): runs disagreed -> not in the primary pool unless
         # a reviewer overrode every flagged field; still pooled in [SENSITIVITY].
+        # Session 38 (7k): reviewer excluded this study from the meta-analysis
+        # (exclude_from_meta in study_overrides.yaml). Reason goes to
+        # skip_reason and the report; no effect size, not in [SENSITIVITY].
+        _excl = reviewer_exclusion_reason(r)
+        if _excl:
+            audit_row["skip_reason"] = _excl
+            meta_audit.append(audit_row)
+            logger.warning(f"[EXCLUDED] {audit_row['first_author']} ({audit_row['year']}): {_excl}")
+            continue
         _review = review_skip_reason(audit_row["nondet_flag"],
                                      audit_row["override_fields"])
         if not _review and nondet_cell_is_mandatory(audit_row["nondet_flag"]):
@@ -677,6 +731,8 @@ def main():
                 f"[AGREEMENT] {m.get('first_author','?')}: runs disagreed but "
                 f"every flagged field was overridden in study_overrides.yaml "
                 f"- pooled with reviewer values.")
+            # Session 39 (item 4d): named in [SENSITIVITY].
+            resolved_by_override.append(f"{m.get('first_author','?')} ({m.get('year','')})")
 
         try:
             if po.get("outcome_match") is False:
@@ -743,6 +799,8 @@ def main():
             author_label = f"{m.get('first_author','?')} ({m.get('year','')})"
             plausibility_flag = _check_plausibility(
                 args.effect_measure, float(est), author_label)
+            
+            _ctype, _csrc = classify_comparator(r)
 
             _row = {
                 "study"               : author_label,
@@ -757,6 +815,8 @@ def main():
                 "sd_intervention"     : po.get("sd_intervention"),
                 "mean_control"        : po.get("mean_control"),
                 "sd_control"          : po.get("sd_control"),
+                "comparator_type"     : _ctype,
+                "comparator_source"   : _csrc,
             }
             audit_row.update({
                 "hedges_g"          : float(est),
@@ -782,7 +842,8 @@ def main():
     write_results(layout.results_csv, meta_audit)
 
     _log_stage4_summary(meta_audit, er, args.effect_measure)
-    _log_review_sensitivity(rows, review_rows, args.effect_measure)
+    _log_review_sensitivity(rows, review_rows, args.effect_measure,
+                            resolved=resolved_by_override)
 
     # ---------------------------------------------------------------------
     # [OUTCOME/TIMEPOINT] provenance surfacing (#22 / #51).
@@ -846,6 +907,14 @@ def main():
             f"block above and screening_log.csv. The estimate may be "
             f"biased by their absence.")
 
+    # Session 39 (item 11): subgroups by control type + estimate excluding
+    # waiting-list trials. Not the [SENSITIVITY] check (needs-review studies).
+    subgroups = subgroup_summary(
+        rows, lambda members: MetaAnalyzer().run(
+            data=pd.DataFrame(members), effect_measure=args.effect_measure))
+    for _line in subgroup_log_lines(subgroups, args.effect_measure, rows):
+        logger.info(_line)
+
     # Stage 5: Forest Plot
     logger.info("=== STAGE 5: Forest Plot ===")
     fp = str(layout.figures / "forest_plot.png")
@@ -853,6 +922,20 @@ def main():
         ma_result      = ma,
         effect_measure = args.effect_measure,
         output_path    = fp)
+    # Session 40: second figure, two panels - all pooled studies on top,
+    # the same studies excluding waiting-list trials below (build_panels).
+    # forest_plot.png above is unchanged. A drawing error must not stop
+    # the run (paid stages are done) -> warn, no figure.
+    try:
+        fp_sg = ForestPlotGenerator().generate_subgroups(
+            ma_result      = ma,
+            subgroups      = subgroups,
+            effect_measure = args.effect_measure,
+            output_path    = str(layout.figures / "forest_plot_subgroups.png"))
+    except Exception as _e:
+        logger.warning(f"[SUBGROUP] forest plot (all pooled / excluding "
+                       f"waiting-list) not drawn ({type(_e).__name__}: {_e})")
+        fp_sg = None
 
     # Stage 6: Reports
     logger.info("=== STAGE 6: Reports ===")
@@ -871,6 +954,9 @@ def main():
         screening_results  = sr,
         forest_plot_path   = fp,
         effect_measure     = args.effect_measure,
+        meta_audit         = meta_audit,
+        subgroups          = subgroups,
+        subgroup_plot_path = fp_sg,
         output_path        = docx_path)
 
     pdf_paths = PDFReportGenerator().generate(
@@ -883,6 +969,9 @@ def main():
         extraction_results = er,
         screening_results  = sr,
         rob_results        = rob,
+        meta_audit         = meta_audit,
+        subgroups          = subgroups,
+        subgroup_plot_path = fp_sg,
         forest_plot_path   = fp,
         effect_measure     = args.effect_measure,
         model_name         = args.model,
@@ -896,7 +985,11 @@ def main():
     logger.info(f"  Project  -> {layout.project}")
     logger.info(f"  DOCX     -> {layout.docx}")
     logger.info(f"  HTML     -> {pdf_paths.get('html', 'N/A')}")
-    logger.info(f"  PDF      -> {pdf_paths.get('pdf',  'N/A')}")
+    _pdf_line = pdf_summary_line(pdf_paths)
+    if pdf_paths.get("pdf"):
+        logger.info(f"  {_pdf_line}")
+    else:
+        logger.warning(f"  {_pdf_line}")
     logger.info(f"  Plot     -> {fp}")
     logger.info(f"  Screens  -> {layout.screens_csv}")
     logger.info(f"  Extracts -> {layout.extracted_csv}")

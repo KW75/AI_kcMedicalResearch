@@ -1,5 +1,8 @@
 import base64, datetime
 from pathlib import Path
+from .override_summary import override_changed_values, override_confirmed_only, study_label
+from ..analysis.subgroups import subgroup_report_lines, SUBGROUP_INTRO
+
 
 HTML_TEMPLATE = """<!DOCTYPE html>
 <html lang="en">
@@ -84,6 +87,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   <div class="section" id="ex">
     <div class="sh"><h2>Data Extraction</h2></div>
     <div class="tw"><table><thead><tr><th>Study</th><th>Country</th><th>N Int.</th><th>N Con.</th><th>Intervention</th><th>Comparator</th><th>Outcome</th><th>Effect</th><th>95% CI</th><th>p</th><th>DOI</th></tr></thead><tbody>{extraction_rows}</tbody></table></div>
+    {overrides_html}
   </div>
   <div class="section" id="rob">
     <div class="sh"><h2>Risk of Bias &mdash; Cochrane RoB 2.0</h2></div>
@@ -101,6 +105,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
       <div class="hc"><div class="hv">{q_display}</div><div class="hl">Cochran Q</div></div>
       <div class="hc"><div class="hv">{q_p_display}</div><div class="hl">Q p-value</div></div>
     </div>
+    {not_pooled_html}
+    {subgroups_html}
   </div>
   <div class="section" id="fp">
     <div class="sh"><h2>Forest Plot</h2></div>
@@ -110,11 +116,73 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 <div class="footer">SR Automation Pipeline &middot; PRISMA 2020 &middot; {generated_date} &middot; All outputs require human verification.</div>
 </body></html>"""
 
+# Session 38 (7n e): wording for the not-pooled table in the report.
+# Statistical reasons stay verbatim (exact for technical readers); only
+# pipeline-internal text (file paths, flag names, code syntax) is reworded.
+# The CSV and console keep the raw skip_reason.
+_FIELD_WORDS = {
+    "mean_intervention": "intervention mean",
+    "sd_intervention": "intervention SD",
+    "mean_control": "control mean",
+    "sd_control": "control SD",
+    "n_intervention": "intervention N",
+    "n_control": "control N",
+}
+
+
+def _plain_one(part):
+    part = part.strip()
+    if part.startswith("outcome_match=False:"):
+        return ("Outcome does not match the review outcome: "
+                + part[len("outcome_match=False:"):].strip())
+    if part.startswith("needs review"):
+        head = "needs review: runs disagree ("
+        flags = part[len(head):].split(")", 1)[0] if part.startswith(head) else ""
+        fields, shift = [], False
+        for tok in (t.strip() for t in flags.split("|")):
+            if tok == "table_shift":
+                shift = True
+            elif tok.endswith(":no_majority"):
+                f = tok.split(":", 1)[0]
+                fields.append(_FIELD_WORDS.get(f, f.replace("_", " ")))
+        bits = []
+        if fields:
+            bits.append("the AI read different values on repeated readings ("
+                        + ", ".join(fields) + ")")
+        if shift:
+            bits.append("one of the repeated readings took a neighbouring table row")
+        if not bits:
+            bits.append("the AI read different values on repeated readings")
+        text = "; ".join(bits)
+        return text[0].upper() + text[1:] + ". Not confirmed by a reviewer."
+    return part
+
+
+def plain_skip_reason(reason):
+    """Report wording for a skip_reason (see comment above)."""
+    s = str(reason or "").strip()
+    if not s:
+        return "no reason recorded"
+    if s.startswith("excluded by reviewer:"):
+        return "Excluded by the reviewer: " + s[len("excluded by reviewer:"):].strip()
+    return " Also: ".join(_plain_one(p) for p in s.split("; also: "))
+
+def _override_changed_values(override_fields) -> bool:
+    """Session 39 (item 4c): True if StudyOverrides.apply recorded a changed
+    value ("field(old->new)" or "field(absent->v)")."""
+    return "->" in str(override_fields or "")
+
+
+def _override_confirmed_only(override_fields) -> bool:
+    """True if the reviewer only confirmed values ("field(confirmed v)")."""
+    s = str(override_fields or "")
+    return "(confirmed " in s and "->" not in s
+
 class HTMLReportGenerator:
     def generate(self, title, authors, pico, inclusion_criteria, exclusion_criteria,
                  ma_result, extraction_results, screening_results, rob_results,
                  forest_plot_path, effect_measure="OR", model_name="claude-opus-4-7",
-                 output_path="outputs/reports/systematic_review.html") -> str:
+                 output_path="outputs/reports/systematic_review.html", meta_audit=None, subgroups=None, subgroup_plot_path=None) -> str:
         out = Path(output_path); out.parent.mkdir(parents=True, exist_ok=True)
         html = HTML_TEMPLATE.format(
             title=self._e(title),
@@ -131,6 +199,9 @@ class HTMLReportGenerator:
             criteria_html=self._criteria_html(inclusion_criteria,exclusion_criteria),
             screening_rows=self._screening_rows(screening_results),
             extraction_rows=self._extraction_rows(extraction_results),
+            overrides_html=self._overrides_html(extraction_results),
+            not_pooled_html=self._not_pooled_html(meta_audit),
+            subgroups_html=self._subgroups_html(subgroups, effect_measure, subgroup_plot_path),
             rob_rows=self._rob_rows(rob_results or []),
             ci_lower_display=f"{ma_result.get('ci_lower',0):.3f}",
             ci_upper_display=f"{ma_result.get('ci_upper',0):.3f}",
@@ -215,6 +286,78 @@ class HTMLReportGenerator:
                         f"<td>{po.get('p_value','--')}</td><td>{doi_h}</td></tr>")
         return "\n".join(rows)
 
+    def _overrides_html(self, results):
+        """Session 37: list studies whose values were entered by a reviewer.
+        Session 39 (item 4c): count only entries that changed a value; exclude-only
+        entries (Ang) are in the not-pooled section; confirm-only entries are named
+        separately."""
+        rows = [r for r in (results or []) if isinstance(r, dict)]
+        ov = [r for r in rows if override_changed_values(r.get("override_fields"))]
+        conf = [r for r in rows if override_confirmed_only(r.get("override_fields"))]
+        if not ov and not conf:
+            return ""
+        html = "<div class='wb' style='margin-top:14px;'><strong>Reviewer-entered data.</strong> "
+        if ov:
+            items = []
+            for r in ov:
+                note = f" {self._e(r['override_note'])}" if r.get("override_note") else ""
+                fields = (f" <span style='color:#6b7280;'>Fields: {self._e(r['override_fields'])}</span>"
+                          if r.get("override_fields") else "")
+                items.append(f"<li><strong>{self._e(study_label(r))}</strong>:{note}{fields}</li>")
+            html += (f"{len(ov)} of {len(results)} extracted studies use values entered by a reviewer "
+                     "from the source PDF (input/sr/study_overrides.yaml), not values extracted by the model. "
+                     "Report them as manually extracted.<ul style='margin:6px 0 0 18px;'>"
+                     + "".join(items) + "</ul>")
+        if conf:
+            html += ("<p style='margin:6px 0 0 0;'>Checked by a reviewer against the PDF, values "
+                     "unchanged (confirmed): " + self._e(", ".join(study_label(r) for r in conf)) + ".</p>")
+        return html + "</div>"
+
+    def _subgroups_html(self, subgroups, effect_measure, plot_path=None):
+        # Session 39 (item 11): same rows as the Word report
+        # (subgroups.subgroup_report_lines). No subgroups -> no section.
+        lines = subgroup_report_lines(subgroups, effect_measure)
+        if not lines:
+            return ""
+        body = "".join(
+            f"<tr><td>{self._e(g)}</td><td>{self._e(s)}</td>"
+            f"<td>{self._e(est) or '-'}</td><td>{self._e(n)}</td></tr>"
+            for g, s, est, n in lines)
+        img = ""
+        if plot_path and Path(plot_path).exists():
+            import base64
+            b64 = base64.b64encode(Path(plot_path).read_bytes()).decode("ascii")
+            img = (f'<p><img src="data:image/png;base64,{b64}" '
+                   f'alt="Forest plot: all pooled studies and excluding waiting-list trials" style="max-width:100%;"></p>'
+                   f"<p><em>Figure 2. Forest plot: all pooled studies and excluding "
+                   f"waiting-list trials (sensitivity analysis).</em></p>")
+        return (f"<h3>Subgroups by control type</h3>"
+                f"<p>{self._e(SUBGROUP_INTRO)}</p>"
+                f"<table><thead><tr><th>Group</th><th>Studies</th>"
+                f"<th>Estimate</th><th>Note</th></tr></thead>"
+                f"<tbody>{body}</tbody></table>" + img)
+
+
+    def _not_pooled_html(self, meta_audit):
+        """Session 38 (7k): every study left out of the pooled estimate, with its
+        reason (PRISMA 2020 item 13a). Reviewer decision vs automatic skip."""
+        rows = [r for r in (meta_audit or []) if isinstance(r, dict)]
+        if not rows:
+            return ""
+        out = [r for r in rows if not r.get("included_in_meta")]
+        head = ("<div class='wb' style='margin-top:14px;'><strong>Studies included in the review "
+                f"but not in the meta-analysis.</strong> {len(rows) - len(out)} of {len(rows)} studies pooled.")
+        if not out:
+            return head + " None left out.</div>"
+        items = []
+        for r in out:
+            reason = str(r.get("skip_reason") or "no reason recorded")
+            who = "Reviewer" if reason.startswith("excluded by reviewer") else "Automatic"
+            label = f"{r.get('first_author') or r.get('filename', '?')} ({r.get('year', '')})"
+            items.append(f"<tr><td>{self._e(label)}</td><td>{self._e(plain_skip_reason(reason))}</td><td>{who}</td></tr>")
+        return (head + "<table style='margin-top:6px;'><thead><tr><th>Study</th><th>Reason</th>"
+                "<th>Decided by</th></tr></thead><tbody>" + "".join(items) + "</tbody></table></div>")
+
     def _rob_rows(self,results):
         if not results:
             return "<tr><td colspan='7' style='text-align:center;color:#9ca3af;padding:18px;'>RoB 2.0 not available</td></tr>"
@@ -223,6 +366,7 @@ class HTMLReportGenerator:
             if "low"  in j2: return f'<td><span class="rl">Low</span></td>'
             if "some" in j2: return f'<td><span class="rs">Some Concerns</span></td>'
             if "high" in j2: return f'<td><span class="rh">High</span></td>'
+            if "not assessed" in j2: return '<td><span style="color:#6b7280;font-style:italic">Not assessed</span></td>'
             return "<td>--</td>"
         rows=[]
         for r in results:

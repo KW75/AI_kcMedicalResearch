@@ -44,13 +44,15 @@ so those catches happen at session open, not mid-work.
 
 ---
 
-## Current State (Session 36, v2.6.0 on main, 2026-11-09)
+## Current State (Session 38, v2.6.0 on main, 2026-11-11)
 
 | Component      | Status |
 |----------------|--------|
-| Tests          | 1055 passed, 10 deselected on v2.8-sr-review-gate (Session 37); main 1039 (788c89f) (`python -m pytest -m "not live" --tb=short -q`) |
-| Branch         | main = 788c89f (PR #5 merged 2026-11-10: one SR model rule, qwen3-vl-plus, Session 37 docs and SR baseline findings); work continues on v2.8-sr-review-gate (F4 gate checkpoint 892b820 pushed, sensitivity comparison uncommitted). v2.7-sr-fixes deleted 2026-11-10 (local and GitHub). Earlier: PR #4 merged 2026-11-09 as bcd42d9 (v2.6.0, OCR mode; brought in Sessions 33-36: Setup menu, Streamlit/Render removal, Ollama model rule, httpx pin, moved-folder launcher check, SR Anthropic warning, test-local-pins CI job, OCR mode); v2.6-ocr-editor (106c9ef) and v2.5-major-updates (1de797a) deleted 2026-11-09 |
-| CI             | green on main at bcd42d9 (2026-11-09), both jobs: test (requirements-ci.txt, 1027 passed, 44 warnings) and test-local-pins (requirements-local.txt like the launchers, 1027 passed, 57 warnings). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
+| Tests | 1282 passed, 10 deselected on v2.10-sr-screening (Session 40); main 1064 (ef66b9f) (python -m pytest -m "not live" --tb=short -q) |
+| Branch         | main = ef66b9f (PR #7 merged 2026-11-10: F7 truth fixture sr_truth.yaml + scripts/sr_score_run.py). Work on v2.10-sr-screening, PR #8 open: shared paper text (b3d804c), prisma_criteria write-if-changed (afd90a3), RoB2 overall rule (3e3785e), RoB2 Methods/Results text (908f889, 306d838), registration lines to RoB2 (Session 38); Session 38: Karlsson/Ang overrides (cf75209), RoB2 Domain 4 self-report rule (46fbd9b), Domain 4 High outright (e4e97b8), Ang excluded by reviewer + not-pooled report section (a56dc55), plain report reasons + POOLED line (0bf59dc), fibromyalgia set moved to reference/ (7h, b32f4c4), REVIEWER_GUIDE rewrite + readme_sr_pipeline.txt (docs, this commit). Branches v2.6-ocr-editor, v2.5-major-updates, v2.7-sr-fixes, v2.8-sr-review-gate, v2.9-sr-fixture deleted |
+| CI | green on PR #8 at green on PR #8 at 05e55b7 (1276 passed, 10 deselected, 57 warnings). Last confirmed on main: bcd42d9 (2026-11-09, 1027, both jobs). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
+| SR docs        | Readme/readme_sr_pipeline.txt = how the SR pipeline works and why (logic, rationale, accuracy evidence, Appendix A worked example); no how-to. How-to = Readme/flashcard-help.html. study_overrides.yaml fields and format = REVIEWER_GUIDE section 5.
+ docs/sr/REVIEWER_GUIDE.md = for reviewers: what to check by hand, documented failures, limitations, methods statement (rewritten Session 38; section numbers 2.2, 3.1, 3.5, 5, 6 are cited by code/tests/README, keep them). README.md = the app. Update the SR docs when SR behaviour changes |
 | Deploy         | None: CLI only, local first. Render service deleted 2026-10-27; Streamlit UI and Render files removed in Session 33. UptimeRobot monitor for the old Render URL: not yet confirmed paused/deleted (user, outside the repo) |
 | Writing mode   | one-pass (write + edit + review in one call); tracks Topic 800 / Article 3,500 / Report 500 / Synopsis 1,500; on main since fa4edb9; tested on gemma4:e4b; terminal menus only |
 | OCR mode       | `--mode ocr`, launcher menu 8. Reads PDF / image / .txt / .docx; .doc refused with a message. Records in `reports/ocr/<header>/`, SUMMARY / SYNOPSIS in `output/ocr/`. Ollama by default; Qwen / OpenAI only behind the cloud gate; groq / deepseek / anthropic refused. Broken-font PDFs: text layer with [?], AI fills symbols only, document-wide vote per font code. [?] left varies run to run (Ang 2010, gemma4:e4b: 19 in s36_check, 7 in s36_vote; vote fills checked against Table 2) |
@@ -73,69 +75,134 @@ Issue numbers below match `README.md` > Known Issues.
 
 ## Next work (start here)
 
-Updated at Session 37 open (2026-11-09). PR #4 is merged (bcd42d9). Items
-closed in Session 36 are removed; the Session 36 log keeps the evidence.
-This list is the only place to tick items off.
+Updated at Session 38 close (2026-11-11). Done items are removed; the
+Session 38 log keeps the evidence. This list is the only place to tick
+items off. Old item IDs (7i, 7n, ...) in brackets for tracing.
 
-1. One-file run (decided Session 37): no SUMMARY. reports/ocr/<header>/
-   keeps the raw text layer with every [?] as extracted, plus FILL_DEBUG.
-   output/ocr/ gets only <name>_<date>_TEXT.docx and .md: the full text,
-   page by page, with each [?] the document-wide vote confirms replaced by
-   its symbol; [?] without a majority stay as [?]. Single-vote fills: see
-   the Session 37 log (option A = stay [?], option B = fill + yellow).
-   Several files: SYNOPSIS as now, plus each file's filled text in
-   reports/ocr/<header>/. Replaces the open choices "list single-vote fills
-   in the record" and "code-fence the record .md".
-2. Tesseract as a second reader for [?] left after the AI fill and vote.
-   Design and Ang evidence in the Session 36 log (trust alone only for minus;
-   add `—` to `_SAME_SIGN`; fill per [?]; expected 7 -> 2 on s36_vote).
-   Lookup: TESSERACT_CMD -> PATH -> install folders (incl. Mac Homebrew) -> skip.
-3. Leftovers from s36_check / s36_vote: "decrease of −10.2" double negative;
-   nested bullets shown as `- *   CBT:` in SUMMARY .docx; "AI answers for refused
-   lines" prints when the file holds only vote lines; convert LaTeX in fill
-   answers (`$\pm$`) before `_accept`. "Week 6 to Week 12" heading can return
-   despite KEEP_RULES: not fixable in code; user checks time spans.
+SR - review content
+1. DONE (2026-11-12): criteria in the PICO step (old 7i). _create_pico /
+   _modify_pico ask inclusion/exclusion after the Outcome (';'-separated;
+   defaults RCT; Adult participants / Non-RCT; Animal studies; Enter keeps),
+   saved in pico_<timestamp>.json, written to prisma_criteria.yaml via
+   _criteria_from_pico (hard-coded lists removed). Comparator default
+   "Usual care, attention placebo or waiting list (pooled)"; typing
+   Exclude_WaitList saves "Usual care or attention placebo" (create and
+   modify). tests/test_sr_pico_criteria.py (12). Docs: readme sections 1
+   and 3, REVIEWER_GUIDE 4.1.
+2. DONE (2026-11-12): 7h leftovers. Run 20261111_190839 had been copied
+   into a misspelt folder "referemces/" (this was the "ouput" mix-up; the
+   output folder name was already correct); moved to
+   reference/sr_cbt_fibromyalgia/reports/20261111_190839 (complete: console,
+   score, CSVs, report; "Loaded 4 study override(s)", pooled SMD -0.042
+   [-0.327, 0.242], I2 0%, k=3). Duplicate top-level output/ deleted. Also
+   kept locally: 20261111_175754 (before Ang excluded) and 20261112_161648
+   (no overrides: Ang + Karlsson pooled, SMD 0.030). Reference README: full
+   citations (Lami = 2018;42:63-79, online 2017), three runs described,
+   old comparator wording noted, restore steps. pico_sample.json name kept
+   (README says it is search output; renaming touches .gitignore/tests).
+2a. DONE (2026-11-12, 4095e1f): launcher writes the run criteria to
+    input/sr/prisma_criteria.yaml (git-ignored) and passes --config and
+    --run-id; the tracked sample in pipelines/sr/config is never written.
+    A saved PICO is prefilled in the normal P/I/C/O questions (no "Modify
+    this PICO? [y/N]"); new pico_<timestamp>.json only if changed. P/I/O
+    required; empty P/I/O also stop a direct run (placeholder_fields).
+    PICO JSON copied to reports/sr/<run_id>/ after a successful run.
+    tests/test_sr_launcher_config.py (11). Reference README removed; its
+    content is in Readme/readme_sr_pipeline.txt Appendix A (old version:
+    git show b274d24:reference/sr_cbt_fibromyalgia/README.md).
+    Verified by launcher run 20261112_210735 (new comparator default, 4
+    overrides): same result as 20261111_190839 (Karlsson 0.226, Lami
+    -0.029, McCrae -0.227; SMD -0.042 [-0.327, 0.242], I2 0%, k=3). Open
+    cosmetic: the [OUTCOME/TIMEPOINT] log block prints twice.
+3. DONE (2026-11-12): Jensen override in
+   reference/sr_cbt_fibromyalgia/study_overrides.yaml (Table 3 p7, weekly
+   FM pain VAS 0-100 posttreatment, 49 (19) CBT vs 59 (26) waiting list;
+   brackets confirmed SD; N = completed treatment 19/15 (Fig 1 p3; 25/18
+   randomised)). Test test_reference_override_jensen_values. Commit
+   e7b7b85. Run 20261112_222233 (launcher, saved PICO reused, "Loaded 5
+   study override(s)"): Jensen g=-0.437 [-1.106, 0.232]; pooled SMD
+   -0.103 [-0.365, 0.159], I2 0%, k=4; Ang excluded. New reference run
+   (local only: reference/sr_cbt_fibromyalgia/reports/20261112_222233; no
+   console.txt). DONE (Session 39): truth Jensen N 19/15 (inferred), matches the
+   override; pinned by tests/test_sr_truth_override_sync.py.
+4. DONE (Session 39): report cosmetics (old 7n, 7f+) a-e; see Session 39 log.
+5. SR LaTeX check: DONE (Session 39), no code change - no stray $...$ in
+   run 20261112_222233 outputs. Console not checked (no log saved).
+   PDF: WeasyPrint not installed (HTML-only, by decision); summary now says why.
+6. Run-to-run variation (old 7l): DONE (Session 39), no code change -
+   1 of 30 RoB2 cells varied over 4 runs, overall never; no vote.
+   RoB2 dropout numbers can be wrong (flow-diagram arm order lost):
+   reviewer checks them (see Session 39 log). Stale log text: DONE (6a).
+7. Screening 6000 chars: DONE (Session 39), no code change - 20 of 20
+   INCLUDE over 4 runs; kept for cost (see Session 39 log).
 
-SR (do 4 before 5 and 6)
-4. DONE in code (Session 37): SR model from one rule,
-   `providers.sr_default_model` (qwen -> QWEN_VISION_MODEL = qwen3-vl-plus).
-   Used by main._sr_default_model, sr/main.resolve_model, DataExtractor,
-   HybridTableExtractor (model=None) and nondet_probe.py (--model None).
-   Hard-coded qwen-vl-plus removed; .env.example / README now say
-   qwen3-vl-plus (pinned by tests/test_qwen_vision_model.py).
-   Still to do: baseline SR run on qwen3-vl-plus, checked against the PDFs
-   (earlier verified results came from the old model); re-run the
-   nondet probe on the new model before REVIEWER_GUIDE §6 claims anything
-   about its determinism.
-5. Broken text layers in all 5 SR papers: route SR text paths through the OCR
-   reader (see Session 37 log). Until then, text-based screening and RoB2 for
-   CBT-women and zsy234 are UNVERIFIED. Also check how relevance_screener.py
-   behaves when tesseract.exe is not on PATH.
-   Manual [?] correction (decided Session 37): run 1 carries on and warns
-   "[?] left: N" per paper, writing the reader's text to an editable
-   reports/sr/text/<paper>.md (with a hash of the PDF). Run 2 reads the
-   corrected file if the PDF hash still matches (log "[CORRECTED TEXT]",
-   otherwise warn and ignore it) and writes a run-1 vs run-2 comparison of
-   screening, RoB2 domains and text_fallback values. Vision extraction reads
-   page images, so corrections don't reach it; use study_overrides.yaml.
-   The source-quote check must use the same corrected text.
-   HybridTableExtractor is built only by tests (no pipeline caller):
-   decide whether to wire it in or remove it.
-6. Allow Ollama vision models for SR (Session 35 log, TODO SR item 3).
-7. Session 28 priorities: vote `outcome_selected` / `timepoint_selected`;
-   Ang outcome change S26 -> S27 (`Readme/evidence/s26_issue11/`);
-   decoder `!`-for-space gap (low).
+SR - extraction checks
+8. F8: N check DONE (Session 39) - arm N must appear in its quote when the
+   quote has candidate Ns. Open: arm-label check (needs full arm list; with
+   item 10).
+9. F6: NOT BUILT (Session 39) - whole-paper number check caught 1 of 22
+   wrong values, 2 false alarms; quote-vs-paper check moved to item 10.
+10. Wire paper_text into extraction: DONE (Session 39, option A) - images
+    stay the extraction input; paper_text goes to the quote check only
+    (branch 5). See Session 39 log.
+
+SR - report
+11. Control-type subgroups: 11a (subgroups by control type) and 11b
+    (estimate excluding waiting-list trials) DONE (Session 39, see log).
+    11c forest plot by control type and 11d REVIEWER_GUIDE section 5.2
+    DONE. Open: 11e check the [SUBGROUP] lines, the report section and
+    forest_plot_subgroups.png on the next real run.
+
+SR - local-first (after 1-11)
+12. Ollama vision for SR (Session 35 TODO SR item 3):
+    a. Launcher: remove ollama from BLOCKED_FOR_SR (scripts/launcher.py
+       line 198, checked at 487 and 532); allow only when
+       ollama_models.model_capabilities lists "vision" (as OCR does).
+    b. data_extractor.py: add ollama to vision_providers (lines 219-228)
+       via OLLAMA_URL/v1 after checking image parts work there, or use
+       call_ollama_provider(images=...). rob2_tool.py reads OLLAMA_URL,
+       the rest of the app OLLAMA_HOST: settle one name.
+    c. providers.py line 77: ollama vision=False for the whole provider;
+       decide per model.
+    d. OLLAMA_CONTEXT (default 32768) must fit 5 page images per call.
+    e. No local vision model: offer cloud only after a typed "y";
+       DeepSeek stays blocked.
+    f. Verify only: hard-coded qwen-vl-plus was removed in Session 37.
+       Grep SOURCE_CODE and scripts for 'qwen-vl-plus'; expect tests and
+       comments only.
+    g. Test: gemma4:e4b on the reference set, N=3, field by field vs
+       qwen3-vl-plus and the PDFs (sr_score_run.py "AI alone" lines).
+
+SR - carried
+13. Baseline SR run on qwen3-vl-plus checked against the PDFs; rerun the
+    nondet probe before REVIEWER_GUIDE section 6 claims anything about it.
+14. Corrected paper text: paper_text.py caches input/sr/paper_text/<name>.txt
+    and reruns reuse it. Still open: a PDF hash so a replaced PDF with the
+    same name does not reuse stale text; "[?] left: N" per paper; run-1 vs
+    run-2 comparison. Check Tesseract-missing behaviour in
+    relevance_screener.py. HybridTableExtractor (built only by tests): wire
+    in or remove. Text-based screening/RoB2 for CBT-women and zsy234
+    UNVERIFIED until checked.
+15. Session 28 priorities: vote outcome_selected / timepoint_selected;
+    Ang outcome change S26 -> S27 (Readme/evidence/s26_issue11/); decoder
+    !-for-space gap (low).
+
+OCR
+16. One-file run without SUMMARY (Session 37 decision; single-vote fills:
+    see Session 37 log); Tesseract as second reader for [?] left (Session
+    36 log); leftovers: "decrease of -10.2" double negative, nested bullets
+    in SUMMARY .docx, "AI answers for refused lines" message, LaTeX in fill
+    answers before _accept.
 
 Writing
-8. Read input through the OCR reader so .docx tables reach the AI; a read
-   error must be a [SKIP] message, not "[Could not read <name>]" sent as
-   document text; `--report` path (main.py ~985-998) and `list_input_names`
-   still skip .doc silently.
+17. Read input through the OCR reader so .docx tables reach the AI; a read
+    error must be a [SKIP] message; `--report` path (main.py ~985-998) and
+    `list_input_names` still skip .doc silently.
 
 Other
-9. Menu 7 Data Analysis: design questions first.
-10. UptimeRobot monitor for the deleted Render URL: confirm paused/deleted (user).
-
+18. Menu 7 Data Analysis: design questions first.
+19. Outside the repo: confirm the UptimeRobot monitor for the old Render
+    URL is paused or deleted (user).
 
 ---
 
@@ -1971,8 +2038,520 @@ Expected: a clean tree in sync with origin, the top commit is this handoff, and 
   20261110_174457 1/3 (Lami via override), Ang N 17/15 pooled wrong (exit 1).
   Old model's Jensen N 25/18 supports the truth N. 1 Sep run POOLED McCrae with
   SDs 2.36/2.27 on a 0-100 scale (likely SE) - unscored; hand-check McCrae next.
+- Comparator wording (decided Session 37, user): placebo, active comparator, or
+  waiting list; waiting-list trials INCLUDED and reported as a subgroup.
+  Updated on v2.10-sr-screening: SOURCE_CODE/pipelines/sr/config/prisma_criteria.yaml
+  (comparator, nested under a section) and input/sr/pico_sample.json (comparator +
+  formulator_output, 3 places). The old "Placebo or active comparator" could make
+  the screener exclude Jensen, Karlsson, McCrae. Guarded by
+  tests/test_sr_comparator_criteria.py (3 tests). New reviews: comparator is what
+  the doctor types (main.py ~line 1600); a waiting-list hint there is still TODO.
+- Screening/RoB2 plan (Session 37, agreed): screening reads OCR text with [?]
+  filled -> rule checks first (RCT, comparator type: placebo/active/waiting list)
+  -> 3-run AI vote, Ollama first, cloud only behind the warning gate -> split vote
+  or low confidence = NEEDS REVIEW, never exclude -> exclusion reason quote checked
+  against the OCR text -> reviewer-confirmed decisions saved in
+  input/sr/screening_decisions.yaml; reruns reuse them and show what changed.
+  RoB2: same pattern per domain (signalling answers with quotes, 3-run vote,
+  rob2_decisions.yaml; tool proposes, doctor confirms). Then extraction on OCR
+  text with number-in-text and arm-label checks (F6 + F8). NOTE: .gitignore
+  ignores input/sr/* - decision files need a !-exception if they are to be tracked.
+- Shared paper text (Session 37, v2.10-sr-screening): new
+  SOURCE_CODE/pipelines/sr/src/utils/paper_text.py, get_paper_text(pdf, cache_dir)
+  built on pipelines/ocr/reader.py. Text-layer page -> text; few lost symbols ->
+  [?] kept and counted; broken-font page (ratio >= 0.05 AND >= 20 [?]) ->
+  Tesseract; scanned page -> Tesseract; Tesseract missing -> warning, marks kept.
+  Saved as <cache_dir>/<stem>.txt, no BOM; reruns reuse it (manual [?] fixes
+  respected). tests/test_sr_paper_text.py (12 tests). NOT yet wired into
+  screening/RoB2/extraction; no AI fill or Tesseract counter-check of [?] yet.
+  Real-paper trial (no AI, PDF_RENDER_DPI 200): Ang 139 [?], Jensen 46 (mostly
+  copyright signs), Lami 21 (lost "ti" ligature); Karlsson 8670 -> 0 (11 pages
+  Tesseract, 25 s), McCrae 10378 -> 0 (15 pages, 30 s). Broken ratio per page:
+  Ang/Jensen/Lami <= 0.013, Karlsson/McCrae 0.101-0.138 on every page.
+  Finding: the old screener's _try_cmap_offset_decode (#18) "succeeds" on these
+  two (offset +1) but leaves spaces lost and digits WRONG ("Submitted: 15 March,
+  2018" -> "904M]rch+1/07"; Karlsson shift not uniform). Old screener therefore
+  fed wrong numbers to the AI for Karlsson/McCrae; RoB2 had no decode at all.
+  Tesseract got "Submitted: 15. March, 2018" right. Caution for F6/F8: Tesseract
+  adds stray dots ("15. March", "approximately. 4 million") - check before
+  extraction trusts numbers next to dots.
+  Also: screening and RoB2 prompts take only the first 6000 chars
+  (MAX_SCREEN_CHARS, MAX_ROB2_CHARS) - RoB2 likely never sees most of Methods;
+  later step: send Methods/Results sections from the saved text.
+- McCrae 2019 hand-checked (Session 37, user decided option C): multi-arm trial
+  (CBT-I, CBT-P, WLC). CBT-I + CBT-P combined vs WLC (Cochrane Handbook 23.3.4):
+  46.86 (24.06) n 57 vs 52.38 (24.04) n 28; morning pain VAS 0-100,
+  post-treatment, Table 3 p9; N = completed post-treatment (Figure 1); evening
+  pain not used; g about -0.23 (calculated). Both earlier runs were wrong (1 Sep:
+  whole-sample SEs 47.14/52.67; 20261110_174457: CBT-I vs CBT-P, allocated N
+  39/37). Entry in input/sr/study_overrides.yaml; sr_truth.yaml McCrae
+  checked: true (scorer now 4 checked). Commit 58c02d9.
+- Reviewer-entered data in the report (Session 37, user: "mentioned in the
+  report"): report_generator.py (Word, under Methods) and html_report.py (under
+  Data Extraction) list every study with override_fields / override_note, note
+  in full (McCrae arms combined; Lami). Before this it was only in the log and
+  extracted_data.csv. tests/test_sr_report_overrides.py (5 tests).
+- Shared text in screening + RoB2 (Session 37, commit b3d804c): Stage 2 of
+  sr/main.py calls get_paper_text once per PDF, saves input/sr/paper_text/
+  <stem>.txt (git-ignored, hand corrections kept), screener and RoB2 get
+  paper_text= and no longer reopen the PDF. First run 20261110_234448:
+  Karlsson 24 s, McCrae 32 s (Tesseract, all pages broken font). Rerun
+  20261111_001942: all 5 "reused saved text", [?] 139/46/0/21/0, files
+  untouched, 5 INCLUDE. Scorer identical in both runs (no drift on scored
+  fields).
+- Launcher criteria write (commit afd90a3): SOURCE_CODE/main.py Step 3 now
+  calls pipelines/sr/src/utils/criteria_file.write_criteria_if_changed -
+  writes prisma_criteria.yaml only if the parsed content differs, no line
+  wrapping (old yaml.dump wrapped the comparator at 80 chars and left the
+  tree modified after every run). Verified: launcher printed "unchanged
+  (same PICO)", file time and git status unchanged. tests/
+  test_sr_criteria_write.py (7). OPEN: launcher still hard-codes
+  inclusion_criteria [RCT, Adult participants] and exclusion_criteria
+  [Non-RCT, Animal studies]; hand edits to those in the yaml would be
+  overwritten on the next run.
+- RoB2 overall rule (Session 37): rob2_tool.apply_rob2_overall on both
+  paths - any High domain -> High; all 5 Low -> Low; all 5 assessed
+  otherwise -> Some concerns; domains missing and none High -> Not
+  assessed. Model answer kept in new column overall_model. Failed
+  assessment is "Not assessed" (was "High"); html_report shows it in grey,
+  not as a red High badge. Found because Ang had Missing data = High but
+  overall "Some concerns" in runs 20261110_234448 and 20261111_001942.
+  tests/test_sr_rob2_overall.py (9).
+- Findings from runs 20261110_234448 / 20261111_001942 (still open):
+  Ang N 17/15 (truth 15/13) in BOTH runs - consistent extraction error, not
+  drift; quote in the same row says 15 and 13 -> F8. Jensen quotes Table 1
+  baseline (60.5 +/- 4.0), means empty, skipped; flag says unanimous.
+  Lami quote looks invented; McCrae control labelled WLC but quote is the
+  CBT-P row (F8). RoB2 still sees only the first 6000 chars (MAX_ROB2_CHARS):
+  justifications say "in the abstract/excerpt"; McCrae missing data "not
+  reported" though Figure 1 has 27/30/28; McCrae randomisation Low on weak
+  grounds (near-equal groups, registered).
+- Running: desktop start.bat -> launcher -> SR runs
+  "python -m SOURCE_CODE.pipelines.sr.main --pdf-dir input\sr --provider
+  qwen --model qwen3-vl-plus --effect-measure SMD". Plain
+  "python SOURCE_CODE\main.py" starts the CODING pipeline (--mode default).
+  Console capture: Ctrl+A, Enter in the window, paste to
+  reports\sr_run_console.txt (no log file is written to the run folder).
+- NEXT (in order): (1) RoB2 gets Methods/Results sections of the shared
+  text instead of the first 6000 chars (test first); (2) F8 quote-vs-field
+  checks (arm label vs group label, Ns in quote vs extracted N); (3) F6;
+  (4) [SENSITIVITY] and waiting-list subgroup in the report; (5) local-first
+  SR.
 
+## Session 38 - 2026-11-11 - branch v2.10-sr-screening (PR #8)
 
+- RoB2 reads Methods + Results of the shared paper text instead of the first
+  6000 chars (Session 37 NEXT item 1). New stdlib-only
+  pipelines/sr/src/utils/paper_sections.py: rob2_text(text, limit,
+  fallback_chars) -> (text, note). Sends the start of the paper (title +
+  abstract, up to 1500 chars) + Methods + Results, within
+  MAX_ROB2_SECTION_CHARS = 20000. Each section gets half; space one section
+  does not need goes to the other. A heading is a line on its own (METHODS,
+  2. Methods, Methods., Materials/Patients and methods); a structured-abstract
+  label "Methods: ..." is not. Methods found more than once -> longest span
+  wins. No Methods heading -> first MAX_ROB2_CHARS (6000) as before, never a
+  failure. rob2_tool.py logs "[ROB2 TEXT] <file>: <note>" per paper.
+- MAX_ROB2_CHARS = 6000 kept as the page-reading budget (lines 192/251,
+  test_rob2_ocr_stops_when_budget_met). Prompt unchanged: it never said
+  "excerpt" or "abstract"; those words in Session 37 justifications came from
+  the cut text. Screener cut (relevance_screener.py, MAX_SCREEN_CHARS) unchanged.
+- Tests: tests/test_sr_paper_sections.py (23; 21 errored on the missing module
+  and 2 failed on the 6000 cut before the code). Suite: 1106 -> 1129 passed.
+- Committed as 908f889; CI green on PR #8 (1129, both jobs).
+- Real saved texts (input/sr/paper_text/, all 5 papers) checked with a
+  read-only script. Jensen (fMRI) heading "2. Methods and material" was not
+  recognised (fell back to 6000); METHODS_RE now also accepts
+  "Methods and material(s)/patients/subjects/participants". At 20000 the half
+  split dropped every 'drop' mention (McCrae 8/8) and the intention-to-treat
+  text (Karlsson, Lami, McCrae): MAX_ROB2_SECTION_CHARS and the rob2_text
+  default raised to 50000. All 5 papers now send whole Methods + Results
+  (Ang 15236, Jensen 30545, Karlsson 27753, Lami 28670, McCrae 48005 chars;
+  McCrae ~12k tokens). Words still not sent are outside Methods/Results and
+  not RoB2 facts (withdrawal reflex, cited titles, pain behaviour), except
+  Lami line 1897 (Discussion, intention-to-treat): no Limitations section
+  added; checked by hand at the rerun (Next work 7a).
+- Tests: +4 (3 reversed heading variants, default limit >= 48000; 4 failed
+  before the code). Suite: 1129 -> 1133 passed.
+- Not yet verified: RoB2 rerun on the real papers (Next work 7a).
+- 306d838 pushed: "Methods and material(s)" headings, limit 50000; PR #8 CI
+  green, 1133 passed, both jobs.
+- Rerun 20261111_081840 (console.txt in the run folder): [ROB2 TEXT] counts
+  match the read-only check (Ang 15236, Jensen 30545, Karlsson 27753,
+  Lami 28670, McCrae 48005). All overall stay Some concerns. Methods-based
+  answers improved (Karlsson randomisation Low: ranuni + sealed opaque
+  envelopes; Jensen outcome Low: blinded assessor). Weak spots in 7a/7c.
+- Registration IDs did not reach RoB2: Ang NCT00965601 (abstract, past the
+  1500-char start), Karlsson NCTO1004458 (letter O) + end matter. rob2_text now
+  adds lines matching NCT/ISRCTN/clinicaltrials.gov if not already sent
+  (max 500 chars). A bare "registered" does not match. Added: Ang 1,
+  Karlsson 3, McCrae 1; Jensen and Lami have none. +4 tests, 1137 passed.
+- de15a59 pushed: registration lines sent to RoB2. PR #8 CI green, 1137
+  passed, both jobs.
+- Scorer saves its report: scripts/sr_score_run.py also writes
+  <run folder>/score.txt (same text as the screen, UTF-8 no BOM, LF; replaced
+  on rerun; nothing written when the folder is not a run). The screen ends
+  with "[SCORE] saved <path>" (not in the file). +3 tests in
+  tests/test_sr_score_run.py. 20261111_081840 scored: Ang n 17/15 vs truth
+  15/13 (WRONG, POOLED), Jensen not pooled (mean/SD missing), Lami and McCrae
+  ALL MATCH via study_overrides, Karlsson not hand-checked.
+- assets/ is back on purpose: desktop shortcut icons (icon_AI_kcMedicalResearch,
+  icon_input, icon_output, icon_reports; .ico for Windows, .png for Mac).
+  tests/test_no_streamlit.py no longer lists icon_AI_kcMedicalResearch.ico
+  as deleted; logo_AI_kcMedicalResearch.png stays on the list. 1140 passed.
+  Icons committed in 222e779: ico rebuilt from the png (16-256 px), ~0.9 MB
+  instead of 15 MB.
+- c6b188f (score.txt) and 222e779 (icons) pushed; PR #8 CI green at 222e779,
+  1140 passed, both jobs.
+- Rerun 20261111_114651 (console.txt and score.txt in the run folder):
+  [ROB2 TEXT] Ang 15297 (+1 registration line), Jensen 30545, Karlsson 27919
+  (+3), Lami 28670, McCrae 48125 (+1). All 25 domain labels and 5 overall
+  the same as 20261111_081840 (all Some concerns). Score unchanged. The model
+  ignores sent registration and ITT lines -> 7c (prompt).
+- 75915e0 pushed (HANDOFF rerun findings).
+- Correction: RoB2 never saw more than 6000 chars. _call_with_text cut every
+  text with [6000, 3000] (only the empty-answer retry needs a shorter text).
+  The [ROB2 TEXT] "sent N" counts were what rob2_text built, not what the
+  model got; the wiring tests captured text before the cut, so they passed.
+  Runs 20261111_081840 and 20261111_114651 therefore saw abstract + about the
+  first 4500 chars of Methods only. Fixed: first try sends the whole text,
+  the retry after an empty answer is cut to MAX_ROB2_CHARS; new log line
+  [ROB2 SEND] attempt n: X of Y chars. tests/test_sr_rob2_send.py (4) checks
+  the text at client.chat.completions.create. Comment at rob2_tool.py top
+  updated. 1144 passed.
+- 5907fae pushed; PR #8 CI green, 1144 passed, both jobs. Rerun
+  30545 / 27919 / 28670 / 48125 chars, no retry. 7 domain labels changed vs
+  20261111_114651: Ang and Jensen deviations + reported_result -> Low;
+  Karlsson missing_data + outcome_measurement -> Low; Lami missing_data ->
+  High (Methods line 501: per-protocol analysis; completed 34/38/41 of 42),
+  so Lami overall High by the domain rule (model said Some concerns).
+  Registration IDs cited, McCrae ITT seen, label now "Ang 2010". Score:
+  Ang n WRONG as before; Jensen n WRONG 19/15 vs 25/18; Karlsson not pooled
+  (table_shift), so 3 studies pooled instead of 4 -> 7e.
+  superseded: Methods line 501 says per-protocol.
+- Overrides vs validity: the review result stays valid (reviewer-checked, values
+  traced in override_note); the AI accuracy check was circular for Lami/McCrae
+  -> 7f. test_extraction_regression_fixtures.py comment "Lami means stable,
+  only Ns drift" is outdated (121950: means no_majority 3.8/none/3.2).
+- 7k: Ang excluded by the reviewer (exclude_from_meta), reason shown in the
+  report; run 20261111_190839 pools 3. CI green at e4e97b8 (1157). 1164 passed.
+- 7n(e) + 7m: report Reason cell reworded (plain_skip_reason, statistical
+  reasons verbatim); score report prints "POOLED: n of N studies". CI green
+  at a56dc55 (1164). 1177 passed.
+- 7h: fibromyalgia set moved to reference/sr_cbt_fibromyalgia/; sample config
+  with <...> placeholders stops a direct run; empty overrides template. 1193 passed.
+- 7f done: sr_score_run.py scores the AI's own values for overridden studies
+  (_ai_overrides reads override_fields). Run 20261111_121950: AI alone 4
+  checked, 0 fully correct. Lami AI N 38/41 vs 28/36, means 3.8/5.2 vs
+  7.35/7.4 (sd_intervention 2.1 within tolerance of 2.08); McCrae AI N 37/37
+  vs 57/28, means 47.14/52.67 vs 46.86/52.38, both SDs missing. Pooled
+  SUMMARY and exit code unchanged. +5 tests, 1149 passed.
+- b0b4ab9 pushed; PR #8 CI green, 1149 passed, both jobs. 7e: Ang (Ns only)
+  and Karlsson overrides added; Karlsson hand-checked in the PDF (crude mean
+  (SD), adjusted means have no SD; tertiary outcome) and set checked: true in
+  sr_truth.yaml. Two tests relied on Karlsson unchecked:
+  test_unchecked_and_unknown_studies_are_not_scored now marks a copy
+  unchecked; baseline test now 5 checked, 1 fully correct. Count test renamed
+  to five. Run 20261111_161320: 4 pooled; SUMMARY 5 checked, 4 fully correct,
+  0 wrong AND POOLED; AI alone 5 checked, 1 fully correct (Karlsson). Lami AI
+  means 4.2/5.8 this run (3.8/5.2 in 121950), truth 7.35/7.4.
+- 7c prompt fix: Domain 4 rule + PICO outcome to RoB2; 7 tests, 1156 passed.
+  Run 20261111_171313: outcome_measurement off Low for all five, Jensen
+  overall High by the domain rule (model said Some concerns). Lami AI means
+  3.2/4.1 (3.8/5.2 in 121950, 4.2/5.8 in 161320; truth 7.35/7.4).
+- 46fbd9b pushed; PR #8 CI green, 1156 passed, both jobs. 7j High outright:
+  1 test, 1157 passed. Run 20261111_175754: Domain 4 and overall High for
+  all five, no other domain changed vs 171313; Ang not pooled -> 7m.
+- PR #8 CI green at b32f4c4: 1193 passed, both jobs.
+- Docs (Session 38 close): Readme/readme_sr_pipeline.txt added (user guide:
+  how the SR pipeline works and how to use it). docs/sr/REVIEWER_GUIDE.md
+  rewritten for reviewers (kept, not deleted: cited by 2 tests, 5 console
+  messages, 6 README lines and flashcard-help.html). Section numbers 2.2,
+  3.1, 3.5, 5, 6 kept; 2.2 still numbers 5 branches (doc-sync test passes).
+  Updated: McCrae pooled from reviewer values (Table 3 p9, arms combined),
+  Tesseract instead of the offset decoder, qwen3-vl-plus, review gate,
+  exclude_from_meta, RoB2 checks (new 3.6), change vs final values, new
+  2.3 (errors seen in the worked example).
+- Checked against code at close: screening cuts at MAX_SCREEN_CHARS = 6000
+  (relevance_screener.py 222); RoB2 sends Methods + Results up to 50,000
+  chars (MAX_ROB2_SECTION_CHARS), first 6000 if no Methods heading, retry
+  cut to 6000 - readme section 5 corrected to say so; sr_score_run.py
+  writes score.txt itself (line 242-243, UTF-8 no BOM) -> old 7b done.
+- 7g superseded by 7k (Ang excluded, so change-vs-final mixing does not
+  arise). Next work renumbered 1-19 in plan order.
+- Suite unchanged: 1193 passed, 10 deselected (docs only).
 
-     
+## Session 39 - 2026-11-12 - branch v2.10-sr-screening
+- Jensen N in the truth fixture: sr_truth.yaml had 25/18 (randomised,
+  n_status: provisional) while the reference override had 19/15
+  (completed treatment, Fig 1 p3 = the N behind posttreatment Table 3),
+  so sr_score_run.py marked a correct override WRONG. Truth now 19/15,
+  n_status: inferred (Table 3 N is not stated in the text). Rule in the
+  yaml header: N = N analysed at the reported timepoint, not randomised N.
+  New tests/test_sr_truth_override_sync.py: for every checked study in
+  both files, truth N must equal override N; prints the denominator
+  (8 N fields, 4 studies; Ang unchecked). Failed before the fix on Jensen
+  only. test_empty_cell_is_missing now expects MATCH for Jensen N (WRONG
+  path still covered by the Ang 17/15 test). Regression fixture comments
+  no longer call 25/18 "reviewer-verified". The scorer never reads
+  n_status (it compares FIELDS only). Suite: 1215 -> 1217 passed.
+- Item 4 (b)(c)(e): override_fields entries have three shapes
+  (study_overrides.py): field(old->v) / field(absent->v) = changed,
+  field(confirmed v) = reviewer agreed with the AI, bare names
+  (first_author, year, exclude_from_meta) = no value. Only a changed
+  value now counts as reviewer-entered data.
+  Scorer (sr_score_run.py): parse_override_fields(); exclude-only (Ang)
+  no longer prints "values from study_overrides.yaml"; confirmed fields
+  are the AI's own values, so a confirm-only study gets "AI alone" lines
+  and "reviewer confirmed the AI's values". Real run 20261112_222233:
+  only Ang's line changed.
+  Reports: new pipelines/sr/src/reporting/override_summary.py used by
+  html_report.py and report_generator.py (same rule, counts cannot
+  differ). Run 20261112_222233 would have said 5 of 5; now 4 of 5.
+  Confirm-only studies named separately. Tests +8 (test_sr_score_run.py
+  4, test_sr_report_overrides.py 4); Word tests confirmed failing on the
+  old report_generator.py (git stash). Suite 1217 -> 1225. Commit 434e771.
+- CI on 13a3a86: green, 1217 passed, both jobs; 57 warnings (44 before;
+  unpinned versions, not investigated).
+- Item 4 (d): not a bug. "[SENSITIVITY] no needs-review studies" was
+  correct: Jensen passes the F4 gate because its override covers every
+  flagged field ([AGREEMENT]), so it is pooled, not held back. Now
+  [SENSITIVITY] names such studies: "Runs disagreed on Jensen (2012), but
+  a reviewer overrode every flagged field, so it is not held back".
+  main.py: resolved_by_override list, resolved= parameter. Tests +3
+  (tests/test_sr_review_gate.py). Suite 1225 -> 1228.
+- CI on 083539e: green, 1225 passed, both jobs, 57 warnings.
+- Item 4 (a): Word report (report_generator.py) now has "Studies included
+  in the review but not in the meta-analysis" after the Meta-Analysis
+  paragraph: "N of M studies pooled", one bullet per left-out study with
+  the plain reason (plain_skip_reason from html_report.py) and
+  [Reviewer]/[Automatic]. main.py passes meta_audit to ReportGenerator.
+  Tests +3 (tests/test_sr_report_overrides.py). Suite 1228 -> 1231.
+  Item 4 is complete.
+- CI on 8d5a44f: <paste result>.
+- Item 5 (SR LaTeX check): DONE, no code change. Run 20261112_222233:
+  no stray $...$ in pipeline outputs (5 CSV, 1 HTML, 2 TXT, 1 JSON,
+  docx paragraphs + tables); pattern \$[^$\s][^$]{0,80}\$ confirmed on
+  a positive example. The only hits were in uploads/zsy234.pdf (McCrae
+  source paper): its text layer is a broken font, every character
+  shifted down by one ("o]hmqdctbshnmr" = "painreductions", "$" = "%").
+  Not LaTeX, but any text-layer read of McCrae gets garbage.
+  Not checked: console (no log saved). Open question: no pipeline-made
+  PDF report in the run folder although main.py calls
+  PDFReportGenerator().generate( - where does it write, or did it fail?
+- CI on ccc6e86: green, 1231 passed, 10 deselected, both jobs, 57 warnings.
+- PDF report (open question from item 5): run 20261112_222233 had no PDF
+  because WeasyPrint is not installed in .venv (ModuleNotFoundError),
+  although pipelines/sr/requirements.txt lists weasyprint>=62.0.
+  PDFReportGenerator fell back to HTML-only mode; the run summary printed
+  only "PDF -> None" and the warning was lost (no log saved). Fix:
+  result["pdf_error"] for both failure paths, pdf_summary_line() in
+  pdf_report.py; main.py summary now warns "PDF -> NOT WRITTEN (<reason>)".
+  Reviewer decision: no real PDF needed (HTML + DOCX), WeasyPrint stays
+  uninstalled. tests/test_sr_pdf_report_status.py (4). Suite 1231->1235.
+- CI on 858273e: green, 1235 passed, 10 deselected, both jobs, 57 warnings.
+- Item 6a (stale RoB2 log text): DONE. rob2_tool.py OCR log no longer says
+  "(prompt uses first 6000)" - stale since Session 38 (prompt = Methods +
+  Results via rob2_text, up to 50000; [ROB2 TEXT] logs what is sent).
+  tests/test_sr_rob2_log_text.py (2). Suite 1235->1237.
+- CI on 9cd6dfc: green, 1237 passed, 10 deselected, both jobs, 57 warnings.
+- Item 6 b/c/d (RoB2 run-to-run): DONE, no code change. 4 runs
+  (20261111_175754, 20261111_190839, 20261112_161648, 20261112_222233),
+  5 studies x 6 cells: 1 of 30 differed (Lami missing_data Some concerns in
+  161648, High in the others); overall High for all 5 in every run
+  (outcome_measurement High everywhere). The 11 Nov runs predate the
+  Session 38 RoB2 text change. Decision: no N-run vote (N x RoB2 cost for
+  one cell, overall unchanged).
+  6b: the flow-diagram lines ARE in the text sent to RoB2 (checked with
+  rob2_text on input/sr/paper_text). McCrae: sent "Completed post-treatment
+  (n=27/30/28)", but the model quoted "Did not receive intervention
+  (n=9/7/0)" and gave WLC 5. Lami: 5 and 11 put in the wrong arms
+  (analysed 28/27/36 imply 6/11/5). Flattened flow-diagram columns lose
+  the arm order; this is a model reading error, not a text-selection bug.
+  A reviewer must check dropout numbers in RoB2 justifications.
+  6d (Jensen 45.6 no_majority, Lami mean drift): extraction; already kept
+  out by the F4 gate and fixed by overrides; no further action.
+- CI on d39817e: green, 1237 passed, 10 deselected, both jobs, 57 warnings.
+- Item 7 (screening reads first 6000 chars): DONE, no code change.
+  Screening uses the shared paper_text (relevance_screener.py 122-123),
+  then cuts to MAX_SCREEN_CHARS = 6000 (221-222). In the 5 paper_text
+  files "random" is inside the cut for all 5; first "method" is after it
+  for Jensen (7172) and Lami (8887). 4 runs: 20 of 20 INCLUDE.
+  pico_outcome False for Jensen in all 4 runs (pain results in Table 3
+  p7, beyond the cut) - only the flag, not the decision (prompt leans to
+  INCLUDE). Decision: keep 6000 (screening runs on every uploaded paper;
+  Methods + Results up to 50000 = ~8x tokens per paper). Revisit if a
+  relevant paper is ever excluded on outcome. Minor: prompt label at
+  line 225 says "first 8 pages" although shared text is cut by characters.
+- CI on 263fc4c: green, 1237 passed, 10 deselected, both jobs, 57 warnings.
+- Screening note: run 20261112_222233 left Ang pico_outcome empty (not
+  True/False; rationale says no standard pain measure). Decision INCLUDE
+  unchanged; Ang is excluded from pooling by reviewer anyway. No action.
+- Item 8 (F8 N check): DONE. Branch 2 (number_not_in_quote) of
+  _flag_suspect_source_quotes now also checks each arm's N: if the quote has
+  candidate Ns (whole numbers 2-1500; not decimals, %, mean (SD) cells,
+  m +/- sd, ranges, SF-36-style, numbers after Week/Month), the extracted N
+  must be one of them. Ang 17/15 vs quote 15/13 now warns (it had no
+  warning). Branch count stays 5; REVIEWER_GUIDE 2.2 branch 2 extended.
+  source_quote_warning only logs, does not gate pooling.
+  Not done: arm-label check (McCrae control quote = CBT-P row) - needs the
+  paper's full arm list (only 2 labels known); revisit with item 10.
+  tests/test_sr_quote_n_check.py (6). Suite 1237->1243.
+- CI on 13af67d: green, 1243 passed, 10 deselected, both jobs, 57 warnings.
+- Item 9 (F6, number must appear in paper text): NOT BUILT, by measurement.
+  Offline trial on run 20261112_222233: AI values (old side of override
+  field(old->new)) checked with _number_in_text against input/sr/paper_text.
+  22 wrong AI values, 1 caught (Lami mean_control 5.1); the rest exist
+  elsewhere in the paper (Jensen 45.6 = mean age; Lami 38/41 = baseline Ns;
+  Karlsson other row/column; McCrae pooled time effect). 2 false alarms:
+  Ang -20.2 / -14.9 are correct (Table 2) but not found in paper_text
+  (cause not checked; minus-sign rendering suspected). Whole-paper presence
+  is too weak; binding a number to its own quote (branch 2, F8) is what
+  catches errors. Moved to item 10: with paper_text wired into extraction,
+  branch 5 (verbatim_mismatch) can check quotes against the paper (today
+  source_text=None, data_extractor.py ~2137).
+- Item 10 (paper_text into the quote check, option A): extract_batch passes
+  r["paper_text"] to extract_by_pdf_path and _extract_anthropic; branch 5
+  (verbatim_mismatch) now runs on image runs with source_text = paper_text
+  (was None, so never checked). New _quote_in_source(): tolerant token match
+  (ignores case, punctuation, whitespace, [?], stray dots), plus numseq for
+  table rows only (>= 4 numbers and numbers >= words; numbers in order within
+  40 tokens, for tables stored out of order, e.g. Ang Table 2). Sentences
+  never use numseq: a paraphrase that keeps the numbers still warns.
+  Run 20261112_222233: warns Lami x2 (made-up "mean = 4.2 (SD = 2.1)"
+  quotes) and Jensen control (override covers it); no false alarms (exact
+  matching had flagged Ang x2, McCrae x2). Branch count stays 5. Extraction
+  input (images vs text) not changed; options B/C need paid live runs.
+  tests/test_sr_quote_vs_paper.py (5 tests). Suite 1248.
+- CI on 3355f73: green, 1243 passed, 10 deselected, both jobs, 57 warnings.
+- Item 11 (control-type subgroups, option C): new src/analysis/subgroups.py.
+  Control type = reviewer's comparator_type in study_overrides.yaml
+  (waiting_list / usual_care / attention_placebo; now in ALLOWED_FIELDS,
+  bare name in override_fields so it is not counted as reviewer-entered
+  data), else the extracted control_group label (WL/WLC/wait-list ->
+  waiting list; UC/UMC/usual/TAU -> usual care; attention/placebo/sham).
+  Unknown label or unrecognised reviewer value -> unclassified: listed by
+  name, never pooled. Pooled rows only (Ang is excluded by the reviewer, so
+  it is not in any subgroup). k = 1 -> "1 study - not pooled"; k = 2 ->
+  pooled with "< 3" caution; pooling errors are reported, not raised.
+  Plus an estimate excluding waiting-list trials. main.py logs [SUBGROUP]
+  lines (not [SENSITIVITY]); Word and HTML reports get "Subgroups by
+  control type" from the shared subgroup_report_lines(). Expected on run
+  20261112_222233 data: waiting list k=3 (Jensen, Karlsson, McCrae)
+  pooled; usual care k=1 (Lami) and excluding-WL k=1 not pooled; all
+  classified from label. NOT yet seen in a real run (needs a paid run).
+  Tests: test_sr_subgroup_comparator.py (8), test_sr_subgroup_wiring.py
+  (4), test_sr_subgroup_reports.py (5). Suite 1265.
+- CI on f9551e7: green, 1248 passed, 10 deselected, both jobs, 57 warnings.
+- Item 11d: docs/sr/REVIEWER_GUIDE.md new section 5.2 (comparator_type:
+  allowed values, unclassified, bare name, exploratory, not [SENSITIVITY]).
+  Docs only; suite unchanged at 1265.
+- CI on 776b3d9: green, 1265 passed, 10 deselected, both jobs, 57 warnings.
+- Item 11c: second figure forest_plot_subgroups.png
+  (ForestPlotGenerator.generate_subgroups in forest_plot.py); the main
+  forest_plot.png is unchanged. Studies grouped by control type (matched
+  by name to subgroup_summary), orange diamond per pooled subgroup, note
+  text when not pooled, red overall diamond. Drawn in main.py Stage 5
+  inside try/except (a drawing error warns, the run continues). Shown in
+  the "Subgroups by control type" section of the Word and HTML reports
+  (HTML embeds it as base64, "Figure 2"). No subgroups -> no figure.
+  tests/test_sr_subgroup_forest.py (6), including the first real drawing
+  test of the main forest plot. Suite 1271.
+  Caught during the work: an edit dropped also_save_html=True from
+  PDFReportGenerator.generate; main.py passes it, so the next run would
+  have crashed at Stage 6. Only test_sr_pdf_report_status.py caught it.
+  The Stage 6 calls in main.py are checked by text-matching tests only,
+  not by a real call (possible later test: call the three generate()
+  methods with main.py's exact keyword set).
+- CI on 2c76ba5: green, 1265 passed, 10 deselected, both jobs, 57 warnings.
+- Stage 6 call test (follow-up to 11c): tests/test_sr_stage6_calls.py (5)
+  reads the keyword names of ReportGenerator().generate( and
+  PDFReportGenerator().generate( from main.py (ast), binds them to the
+  real signatures and calls both with fake data (WeasyPrint off, HTML-only).
+  A keyword dropped from a signature, or a new main.py keyword without a
+  fake value, now fails directly. Suite 1276.
+- CI on dde4cd8: green, 1271 passed, 10 deselected, both jobs, 57 warnings.
+- Readme/readme_sr_pipeline.txt rewritten: now explains the pipeline logic
+  and the reasons behind each method (protocol, shared text, screening,
+  repeated extraction, code checks, overrides, pooling gate, statistics,
+  subgroups, RoB 2, audit), the accuracy evidence (truth file + scorer) and
+  a comparison with a general cloud chat. User how-to belongs in
+  Readme/flashcard-help.html, not in this file.
+- CI on 05e55b7: green, 1276 passed, 10 deselected, both jobs, 57 warnings.
 
+## Next session - start here (end of Session 39)
+Branch v2.10-sr-screening, PR #8, suite 1276 passed, 10 deselected.
+Session 39 closed items 4-11 (11e open). Job list, in order:
+1. PR #8: decide whether to merge v2.10-sr-screening into main (main is
+   ef66b9f, 1064 tests). Check CI on the PR head first.
+2. Help page: move user how-to (starting a run, PICO prompts, overrides
+   file location, reading the output folder) into
+   Readme/flashcard-help.html; its footer is stale (v2.4.6, 401 tests,
+   "DeepSeek default") - fix in its own commit.
+   Old user-guide text to move: git show 05e55b7:Readme/readme_sr_pipeline.txt
+   (section 1 = launcher PICO, comparator, Exclude_WaitList, criteria,
+   rerunning the worked example; sections 2-6 how-to details).
+3. 11e (needs a paid run): check [SUBGROUP] lines, the report section and
+   forest_plot_subgroups.png. Expected on 20261112_222233 data: waiting
+   list k=3 pooled; usual care k=1 and excluding-WL k=1 not pooled; Ang in
+   no subgroup. Also confirm the item 10 quote check warns Lami x2 and
+   Jensen control only, then rescore with scripts/sr_score_run.py.
+4. Item 12: Ollama vision for SR (scripts/launcher.py BLOCKED_FOR_SR line
+   198, checked at 487 and 532; allow only when
+   ollama_models.model_capabilities lists "vision"). Start read-only.
+5. Item 13: rerun the nondet probe before REVIEWER_GUIDE section 6 claims
+   anything about run-to-run agreement.
+6. Small: relevance_screener.py line 225 prompt label says "first 8 pages"
+   but the cut is 6000 characters; launcher still hard-codes inclusion
+   [RCT, Adult participants] / exclusion [Non-RCT, Animal studies].
+- SR doc references fixed after the readme rewrite: REVIEWER_GUIDE cited old
+  readme sections 1, 2, 5, 7, 8. Now Appendix A (worked example, rewritten
+  as results), 3.2, 3.10, 4. Old section 7 (study_overrides.yaml when/how,
+  field list) moved into REVIEWER_GUIDE section 5, with comparator_type
+  added. The "AI alone 1 of 4" line now names the run (0 of 4 in
+  20261112_222233).
+
+## Session 40 - 2026-11-14 - branch v2.10-sr-screening
+
+- Figure 2 (forest_plot_subgroups.png) redesigned at the user's request.
+  Before: one block per control type, then the overall diamond; the
+  "Excluding waiting-list trials" entry was never drawn. Now two panels:
+  top = all pooled studies + overall estimate; bottom = the same studies in
+  the same order with waiting-list trials taken off. A study whose only
+  control is a waiting list has no comparator left: grey row, "wait-list
+  control only - not in this estimate", no effect. Unclassified studies are
+  greyed the same way ("control type unknown"). The bottom estimate is the
+  existing subgroup_summary sensitivity entry (k=1 -> "1 study - not
+  pooled").
+- Decided (user, option A): a missing wait-list arm is NEVER filled in as 0.
+  Setting the control mean to 0 turns the SMD into CBT score / SD (Jensen
+  would go from g=-0.437 to about +2.2, calculated from Table 3). A wait-list
+  arm is a measured arm (natural course), not zero.
+- Code: forest_plot.py - new module-level build_panels(ma_result,
+  subgroups) (what each panel shows, draws nothing); generate_subgroups
+  rewritten to draw it. subgroups.py unchanged. html_report.py Figure 2
+  alt text + caption: "Forest plot: all pooled studies and excluding
+  waiting-list trials (sensitivity analysis)". The section heading and table
+  "Subgroups by control type" are unchanged (they still group by control
+  type). pipelines/sr/main.py: comment and [SUBGROUP] warning text.
+- Tests: tests/test_sr_subgroup_forest.py +6 (two panels, order, wait-list
+  rows have no effect, k=1 not pooled, k=2 pooled, unknown control marked);
+  the caption test updated (failed first on the old caption).
+  Suite 1276 -> 1282 passed, 10 deselected. Figure checked by eye from the
+  test data (user: "looks good").
+- Docs: REVIEWER_GUIDE 5.2 new paragraph (how to read Figure 2; check that
+  each waiting-list trial's timepoint is the end of the waiting period);
+  Readme_sr_pipeline.txt 3.9 and output list; README line 7.
+- Changes to "Next session - start here":
+  - Job 1 (PR #8 merge): held until this commit's CI is green. CI on
+    a225885 (two docs commits after 05e55b7) was never confirmed.
+  - Job 3 (11e): the expected figure is now two panels. On 20261112_222233
+    data: top k=4 (Jensen, Karlsson, Lami, McCrae) with an overall diamond;
+    bottom k=1 (Lami only), "1 study - not pooled", the other three grey.
+    Also check that the Karlsson and McCrae timepoints are posttreatment
+    (end of waiting period), as Jensen's is.
+- New item (not built): trials with several control arms (e.g. CBT vs
+  wait-list vs usual care) should keep CBT vs the non-wait-list arm in the
+  bottom panel. Needs per-arm extraction (one control arm is stored per
+  study today); goes with item 8's arm-list check.
+- Working preference (user): open files with `code -g <full path>:<line>`
+  and say "select lines N-M"; no keystroke recipes.

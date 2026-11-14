@@ -65,9 +65,10 @@ def _run_folder(tmp_path, rows, overrides=None):
     return tmp_path
 
 
-def test_truth_file_has_three_checked_studies(truth):
+def test_truth_file_has_four_checked_studies(truth):
+    # Session 38: Karlsson hand-checked (Table 2 p6, MPI-1 Pain severity).
     checked = sorted(a for a, s in truth["studies"].items() if s["checked"])
-    assert checked == ["Ang", "Jensen", "Lami"]
+    assert checked == ["Jensen", "Karlsson", "Lami", "McCrae"] 
 
 
 def test_exact_values_match(sc, truth):
@@ -86,7 +87,12 @@ def test_within_tolerance_matches_and_outside_is_wrong(sc, truth):
 
 
 def test_ang_wrong_n_is_caught_while_means_match(sc, truth):
-    r = sc.score_row(_row("Ang", "17", "15", "-20.2", "23.9", "-14.9", "16.4"), truth)
+    # Session 38 (7k): Ang is unchecked now (NFR row, excluded by the reviewer);
+    # mark a copy checked so the "wrong N, matching means" path stays covered.
+    import copy
+    t = copy.deepcopy(truth)
+    t["studies"]["Ang"]["checked"] = True
+    r = sc.score_row(_row("Ang", "17", "15", "-20.2", "23.9", "-14.9", "16.4"), t)
     assert r["fields"]["n_intervention"] == "WRONG"
     assert r["fields"]["n_control"] == "WRONG"
     assert r["fields"]["mean_intervention"] == "MATCH"
@@ -94,13 +100,21 @@ def test_ang_wrong_n_is_caught_while_means_match(sc, truth):
 
 
 def test_empty_cell_is_missing(sc, truth):
+    # Session 39: truth Jensen N is 19/15 (completed treatment), so N matches;
+    # the WRONG path stays covered by the Ang 17/15 test above.
     r = sc.score_row(_row("Jensen", "19", "15", "", "", "", ""), truth)
     assert r["fields"]["mean_intervention"] == "MISSING"
-    assert r["fields"]["n_intervention"] == "WRONG"
+    assert r["fields"]["n_intervention"] == "MATCH"
+    assert r["fields"]["n_control"] == "MATCH"
 
 
 def test_unchecked_and_unknown_studies_are_not_scored(sc, truth):
-    k = sc.score_row(_row("Karlsson", "24", "24", "3.88", "1.05", "3.67", "0.75"), truth)
+    # Session 38: Karlsson is now hand-checked, so mark a copy unchecked;
+    # the not_checked path stays covered whatever the reviewer has checked.
+    import copy
+    t = copy.deepcopy(truth)
+    t["studies"]["Karlsson"]["checked"] = False
+    k = sc.score_row(_row("Karlsson", "24", "24", "3.88", "1.05", "3.67", "0.75"), t)
     assert k["status"] == "not_checked"
     u = sc.score_row(_row("Nobody", "1", "1", "1", "1", "1", "1"), truth)
     assert u["status"] == "no_truth"
@@ -122,7 +136,10 @@ def test_baseline_run_flags_wrong_pooled_studies(sc, truth, tmp_path):
     assert by["McCrae"]["included_in_meta"] is False
     report = sc.format_report(results)
     assert "WRONG" in report
-    assert "3 checked" in report and "0 fully correct" in report
+    # Session 38: Karlsson hand-checked (values match); Ang unchecked (7k, NFR row).
+    assert "4 checked" in report and "1 fully correct" in report
+    offenders = report.split("differ from the hand-checked truth:")[-1].split("\n")[0]
+    assert "Karlsson" not in offenders and "Ang" not in offenders
     assert sc.exit_code(results) == 1
 
 
@@ -145,3 +162,183 @@ def test_correct_run_exits_zero(sc, truth, tmp_path):
     ])
     results = sc.score_run_folder(folder, truth)
     assert sc.exit_code(results) == 0
+
+
+
+# Session 38: the score is also saved as <run folder>/score.txt (it used to
+# only print to the screen). Same text as the screen, replaced on every
+# rerun, nothing written when the folder is not a run.
+
+def _score(sc, folder, capsys):
+    code = sc.main([str(folder), "--truth", str(TRUTH)])
+    return code, capsys.readouterr().out
+
+
+def test_score_is_saved_as_score_txt_in_run_folder(sc, tmp_path, capsys):
+    folder = _run_folder(tmp_path, [_row("Lami", "28", "36", "7.35", "2.08", "7.4", "1.29")])
+    _, out = _score(sc, folder, capsys)
+    path = folder / "score.txt"
+    assert path.exists(), "score.txt not written to the run folder"
+    saved = path.read_text(encoding="utf-8")
+    assert not path.read_bytes().startswith(b"\xef\xbb\xbf"), "score.txt has a BOM"
+    assert saved.startswith("[SCORE] ")
+    assert "Lami" in saved
+    assert out == saved + f"[SCORE] saved {path}\n"
+
+
+def test_rescore_replaces_score_txt(sc, tmp_path, capsys):
+    folder = _run_folder(tmp_path, [_row("Lami", "28", "36", "7.35", "2.08", "7.4", "1.29")])
+    _score(sc, folder, capsys)
+    first = (folder / "score.txt").read_text(encoding="utf-8")
+    _score(sc, folder, capsys)
+    second = (folder / "score.txt").read_text(encoding="utf-8")
+    assert second == first
+    assert second.count("[SCORE] ") == 1, "rerun appended instead of replacing"
+
+
+def test_not_a_run_folder_writes_no_score_txt(sc, tmp_path, capsys):
+    code, out = _score(sc, tmp_path, capsys)   # empty folder, no data/results csv
+    assert code == 2
+    assert out.startswith("[SCORE] ")
+    assert not (tmp_path / "score.txt").exists()
+
+
+
+# Session 38 (7f): an override hides what the AI extracted. The AI's own value
+# survives in extracted_data.csv override_fields as "field(old->new)"; the
+# scorer shows it as separate "AI alone" lines and a separate count. The
+# pooled result and the exit code do not change.
+
+LAMI_ROW = ("Lami", "28", "36", "7.35", "2.08", "7.4", "1.29")
+LAMI_OVR = ("n_intervention(38->28); n_control(41->36); mean_intervention(3.8->7.35); "
+            "sd_intervention(2.1->2.08); mean_control(5.2->7.4); sd_control(2.3->1.29)")
+
+
+def _report(sc, truth, folder):
+    results = sc.score_run_folder(folder, truth)
+    return results, sc.format_report(results)
+
+
+def test_override_shows_ai_values_scored_against_truth(sc, truth, tmp_path):
+    folder = _run_folder(tmp_path, [_row(*LAMI_ROW)], overrides={"Lami": LAMI_OVR})
+    _, text = _report(sc, truth, folder)
+    assert "Lami       POOLED     ALL MATCH" in text          # review result unchanged
+    assert "AI alone: n_intervention WRONG (AI 38, truth 28)" in text
+    assert "AI alone: mean_control WRONG (AI 5.2, truth 7.4)" in text
+
+
+def test_absent_ai_value_is_missing_and_untouched_fields_count_as_ai(sc, truth, tmp_path):
+    folder = _run_folder(tmp_path, [_row(*LAMI_ROW)],
+                         overrides={"Lami": "first_author; year; sd_intervention(absent->2.08)"})
+    _, text = _report(sc, truth, folder)
+    assert "AI alone: sd_intervention MISSING (AI empty, truth 2.08)" in text
+    assert "AI alone: n_intervention" not in text             # not overridden = AI's own value
+
+
+def test_summary_counts_ai_alone_and_exit_code_unchanged(sc, truth, tmp_path):
+    folder = _run_folder(tmp_path, [_row(*LAMI_ROW)], overrides={"Lami": LAMI_OVR})
+    results, text = _report(sc, truth, folder)
+    assert "SUMMARY: 1 checked, 1 fully correct, 0 wrong or missing AND POOLED." in text
+    assert "AI alone: 1 checked, 0 fully correct" in text
+    assert sc.exit_code(results) == 0
+
+
+def test_ai_values_that_match_show_all_match(sc, truth, tmp_path):
+    folder = _run_folder(tmp_path, [_row(*LAMI_ROW)],
+                         overrides={"Lami": "n_intervention(28.0->28)"})
+    _, text = _report(sc, truth, folder)
+    assert "AI alone: ALL MATCH" in text
+    assert "AI alone: 1 checked, 1 fully correct" in text
+
+
+def test_no_override_prints_no_ai_lines(sc, truth, tmp_path):
+    folder = _run_folder(tmp_path, [_row(*LAMI_ROW)])
+    _, text = _report(sc, truth, folder)
+    assert "AI alone" not in text
+
+# --- Session 38 (7m): the score report prints the pooled count, so a drop
+# (175754 pooled 4 -> 3) is visible. Separate line; SUMMARY and exit code unchanged.
+def test_report_prints_pooled_count_and_names(sc, truth, tmp_path):
+    folder = _run_folder(tmp_path, [
+        _row("Ang", "17", "15", "-20.2", "23.9", "-14.9", "16.4",
+             included="False", skip="excluded by reviewer: NFR row"),
+        _row("Jensen", "19", "15", "", "", "", "",
+             included="False", skip="insufficient mean/SD/N to derive effect size"),
+        _row("Karlsson", "24", "24", "3.88", "1.05", "3.67", "0.75"),
+        _row("Lami", "28", "36", "7.35", "2.08", "7.4", "1.29"),
+        _row("McCrae", "57", "28", "46.86", "24.06", "52.38", "24.04"),
+    ])
+    report = sc.format_report(sc.score_run_folder(folder, truth))
+    assert "POOLED: 3 of 5 studies (Karlsson, Lami, McCrae); not pooled: Ang, Jensen" in report
+
+
+def test_report_pooled_count_includes_unknown_and_zero(sc, truth, tmp_path):
+    folder = _run_folder(tmp_path, [
+        _row("Nobody", "1", "1", "1", "1", "1", "1",
+             included="False", skip="pooled SD is zero"),
+        _row("Jensen", "19", "15", "", "", "", "",
+             included="False", skip="insufficient mean/SD/N to derive effect size"),
+    ])
+    report = sc.format_report(sc.score_run_folder(folder, truth))
+    assert "POOLED: 0 of 2 studies; not pooled: Nobody, Jensen" in report
+
+# --- Session 39 (item 4b/4e): exclude-only (Ang) and confirm-only entries in
+# override_fields are not "values from study_overrides.yaml". Confirmed fields
+# are the AI's own values, so a confirm-only study gets "AI alone" lines too.
+ANG_OVR = "first_author; exclude_from_meta"
+KARLSSON_ROW = ("Karlsson", "24", "24", "3.88", "1.05", "3.67", "0.75")
+KARLSSON_OVR = ("first_author; year; n_intervention(confirmed 24); n_control(confirmed 24); "
+                "mean_intervention(4.05->3.88); sd_intervention(0.85->1.05); "
+                "mean_control(3.43->3.67); sd_control(0.82->0.75)")
+KARLSSON_ALL_CONFIRMED = (
+    "first_author; year; n_intervention(confirmed 24); n_control(confirmed 24); "
+    "mean_intervention(confirmed 3.88); sd_intervention(confirmed 1.05); "
+    "mean_control(confirmed 3.67); sd_control(confirmed 0.75)")
+JENSEN_OVR = ("n_intervention(25->19); n_control(18->15); mean_intervention(45.6->49); "
+              "sd_intervention(absent->19); mean_control(45.6->59); sd_control(absent->26)")
+
+
+def test_parse_override_fields_real_strings(sc):
+    assert sc.parse_override_fields(ANG_OVR) == ({}, {})
+    changed, confirmed = sc.parse_override_fields(KARLSSON_OVR)
+    assert confirmed == {"n_intervention": 24, "n_control": 24}
+    assert set(changed) == {"mean_intervention", "sd_intervention",
+                            "mean_control", "sd_control"}
+    assert changed["mean_intervention"] == 4.05
+    changed, confirmed = sc.parse_override_fields(JENSEN_OVR)
+    assert confirmed == {} and changed["sd_intervention"] is None
+
+
+def test_exclude_only_override_prints_no_values_line(sc, truth, tmp_path):
+    folder = _run_folder(
+        tmp_path, [_row("Ang", "15", "13", "-20.2", "23.9", "-14.9", "16.4",
+                        included="False", skip="excluded by reviewer")],
+        overrides={"Ang": ANG_OVR})
+    results, text = _report(sc, truth, folder)
+    assert results[0]["override"] is False
+    assert "values from study_overrides.yaml" not in text
+    assert "AI alone" not in text
+    assert "skip_reason: excluded by reviewer" in text
+
+
+def test_confirm_only_override_shows_ai_alone_all_match(sc, truth, tmp_path):
+    folder = _run_folder(tmp_path, [_row(*KARLSSON_ROW)],
+                         overrides={"Karlsson": KARLSSON_ALL_CONFIRMED})
+    results, text = _report(sc, truth, folder)
+    assert results[0]["override"] is False
+    assert results[0]["confirmed_only"] is True
+    assert "values from study_overrides.yaml" not in text
+    assert "reviewer confirmed the AI's values" in text
+    assert "AI alone: ALL MATCH" in text
+    assert "AI alone: 1 checked, 1 fully correct" in text
+
+
+def test_real_karlsson_override_unchanged(sc, truth, tmp_path):
+    # Guard: confirmed Ns + changed means/SDs (run 20261112_222233).
+    folder = _run_folder(tmp_path, [_row(*KARLSSON_ROW)],
+                         overrides={"Karlsson": KARLSSON_OVR})
+    results, text = _report(sc, truth, folder)
+    assert results[0]["override"] is True
+    assert "values from study_overrides.yaml" in text
+    assert "AI alone: mean_intervention WRONG (AI 4.05, truth 3.88)" in text
+    assert "AI alone: n_intervention" not in text   # confirmed = the AI was right

@@ -1,15 +1,17 @@
-review_title: Effect of Cognitive-Behavioral Therapy on Pain
-effect_measure: SMD
+# Sample review criteria. The launcher replaces this file from the PICO step.
+# If you run the SR pipeline directly, replace every <...> first;
+# the run stops while any <...> remain.
+# Worked example: reference/sr_cbt_fibromyalgia/prisma_criteria.yaml
+review_title: "<Review title, e.g. Effect of X on Y>"
+effect_measure: SMD        # SMD, MD, OR or RR
 pico:
-  population: Adults with fibromyalgia
-  intervention: Cognitive-Behavioral Therapy
-  comparator: Placebo or active comparator
-  outcome: Pain intensity at post intervention
-pubmed_query_cleaned: Adults with fibromyalgia AND Cognitive-Behavioral Therapy AND
-  Pain intensity AND randomized controlled trial[pt]
+  population:   "<e.g. Adults with condition X>"
+  intervention: "<e.g. Treatment X>"
+  comparator:   "<e.g. Placebo, usual care or waiting list>"
+  outcome:      "<e.g. Symptom score at post intervention>"
 inclusion_criteria:
-- RCT
-- Adult participants
+  - RCT
+  - Adult participants
 exclusion_criteria:
-- Non-RCT
-- Animal studies
+  - Non-RCT
+  - Animal studies

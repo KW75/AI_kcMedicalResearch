@@ -1424,21 +1424,11 @@ def run_sr_launcher(provider: str = "", model: str = "") -> None:
             try:
                 pico_data = _json.loads(pico_path.read_text(encoding="utf-8"))
                 print(f"\n   - PICO loaded from: {pico_path.name}")
-                print(f"     Population:   {pico_data.get('population', 'N/A')}")
-                print(f"     Intervention: {pico_data.get('intervention', 'N/A')}")
-                print(f"     Comparator:   {pico_data.get('comparator', 'N/A')}")
-                print(f"     Outcome:      {pico_data.get('outcome', 'N/A')}")
-                print(f"     Effect:       {pico_data.get('effect_measure', 'SMD')}")
-                
-                # Ask if user wants to modify
-                try:
-                    modify = input("\n  Modify this PICO? [y/N]: ").strip().upper()
-                except (EOFError, KeyboardInterrupt):
-                    modify = "N"
-                
-                if modify == "Y":
-                    pico_data = _modify_pico(pico_data)
-                    # Save modified version
+                print("     Check each item: Enter keeps the value in [ ], or type a new one.")
+                original = dict(pico_data)
+                pico_data = _modify_pico(pico_data)
+                if pico_data != original:
+                    pico_data["timestamp"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                     new_path = INPUT_SR / f"pico_{timestamp}.json"
                     new_path.write_text(
@@ -1446,7 +1436,9 @@ def run_sr_launcher(provider: str = "", model: str = "") -> None:
                         encoding="utf-8"
                     )
                     pico_path = new_path
-                    print(f"   - Modified PICO saved to: {new_path.name}")
+                    print(f"   - Changed PICO saved to: {new_path.name}")
+                else:
+                    print(f"   - PICO unchanged, using: {pico_path.name}")
                     
             except Exception as e:
                 print(f"  [!] Could not load PICO: {e}")
@@ -1484,9 +1476,11 @@ def run_sr_launcher(provider: str = "", model: str = "") -> None:
     
     # -- Step 3: Update prisma_criteria.yaml with PICO data -----------------
     cfg_yaml: dict = {}
+    run_config = None    
     if pico_data:
+        inclusion, exclusion = _criteria_from_pico(pico_data)
         cfg_yaml = {
-            "review_title":       pico_data.get("topic", pico_data.get("topic", "Systematic Review")),
+            "review_title":       pico_data.get("topic", "Systematic Review"),
             "effect_measure":     pico_data.get("effect_measure", "SMD"),
             "pico": {
                 "population":     pico_data.get("population", ""),
@@ -1495,20 +1489,23 @@ def run_sr_launcher(provider: str = "", model: str = "") -> None:
                 "outcome":        pico_data.get("outcome", ""),
             },
             "pubmed_query_cleaned": pico_data.get("pubmed_query_cleaned", ""),
-            "inclusion_criteria": ["RCT", "Adult participants"],
-            "exclusion_criteria": ["Non-RCT", "Animal studies"],
+            "inclusion_criteria": inclusion,
+            "exclusion_criteria": exclusion,
         }
-        
-        prisma_path = SOURCE_CODE_DIR / "pipelines" / "sr" / "config" / "prisma_criteria.yaml"
-        prisma_path.parent.mkdir(parents=True, exist_ok=True)
-        prisma_path.write_text(
-            _yaml.dump(cfg_yaml, allow_unicode=True, sort_keys=False),
-            encoding="utf-8",
-        )
-        print(f"\n   - prisma_criteria.yaml updated with PICO")
-        print(f"     PubMed query: {cfg_yaml.get('pubmed_query_cleaned', 'n/a')}")
+
+        from pipelines.sr.src.utils.criteria_file import write_criteria_if_changed
+        run_config = SR_RUN_CONFIG
+        if write_criteria_if_changed(run_config, cfg_yaml):
+            print(f"\n   - Run criteria written to input/sr/{run_config.name}")
+        else:
+            print(f"\n   - Run criteria unchanged (input/sr/{run_config.name})")
+        print(f"     PubMed query: {cfg_yaml.get('pubmed_query_cleaned') or 'n/a'}")
+        print(f"     Comparator:   {cfg_yaml['pico']['comparator'] or 'n/a'}")
+        print(f"     Inclusion:    {'; '.join(inclusion)}")
+        print(f"     Exclusion:    {'; '.join(exclusion)}")
     else:
-        print("\n  [i] Using existing prisma_criteria.yaml")
+        print("\n  [i] No PICO: the sample criteria file in pipelines/sr/config is used;")
+        print("      the run stops until its <...> placeholders are replaced.")
 
     # -- Step 4: resolve provider and model ------------------------------------
 
@@ -1545,14 +1542,9 @@ def run_sr_launcher(provider: str = "", model: str = "") -> None:
 
 
     # -- Step 5: run sr/main.py (as a module so relative imports resolve) -----
-    cmd = [
-        sys.executable, "-m", "SOURCE_CODE.pipelines.sr.main",
-        "--pdf-dir",        str(INPUT_SR),
-        "--provider",       _provider,
-        "--model",          _model,
-        "--effect-measure", cfg_yaml.get("effect_measure", "SMD")
-                            if pico_data else "SMD",
-    ]
+    run_id = datetime.now().strftime("%Y%m%d_%H%M%S")
+    effect = cfg_yaml.get("effect_measure", "SMD") if pico_data else "SMD"
+    cmd = _build_sr_cmd(_provider, _model, effect, run_config, run_id)
     print(f"\n[SR] Running: {' '.join(cmd)}\n")
     _run_started = time.time() - 2  # small slack for filesystem timestamp granularity
     result = _sp.run(cmd, cwd=str(BASE_DIR))
@@ -1583,25 +1575,124 @@ def run_sr_launcher(provider: str = "", model: str = "") -> None:
             else:
                 print(f"[SR] {_label:<7}-> not generated "
                       f"(see pipeline log above)")
-        print(f"[SR] Full run (with audit CSVs) -> {runs_root}\\<run_id>\\")
+        _pico_copy = _save_pico_to_run(pico_path, runs_root, run_id)
+        print(f"[SR] Full run (with audit CSVs) -> {runs_root / run_id}")
+        if _pico_copy:
+            print(f"[SR] PICO used -> {_pico_copy}")
+            print("[SR]   To reuse it, copy it back into input/sr.")
     else:
         print(f"\n[SR] Pipeline exited with code {result.returncode}.")
         print("[SR] Check the output above for errors.")
 
 
 
+# PICO defaults (Session 39). Comparator: inactive controls (usual care,
+# attention placebo, waiting list) are pooled, the usual approach (Cochrane
+# Handbook ch. 3); typing Exclude_WaitList saves "Usual care or attention
+# placebo" to leave out waiting-list trials. Criteria are shown and editable.
+DEFAULT_COMPARATOR = "Usual care, attention placebo or waiting list (pooled)"
+EXCLUDE_WAITLIST_KEYWORD = "exclude_waitlist"
+EXCLUDE_WAITLIST_COMPARATOR = "Usual care or attention placebo"
+
+def _resolve_comparator(typed, current: str) -> str:
+    """Enter keeps current; the Exclude_WaitList keyword (any case) becomes plain
+    text the screening AI understands; anything else is used as typed."""
+    text = (typed or "").strip()
+    if text.lower() == EXCLUDE_WAITLIST_KEYWORD:
+        return EXCLUDE_WAITLIST_COMPARATOR
+    return text or current
+
+DEFAULT_INCLUSION = ["RCT", "Adult participants"]
+DEFAULT_EXCLUSION = ["Non-RCT", "Animal studies"]
+
+
+def _split_criteria(text) -> list:
+    """Split on ';' (a criterion may contain commas); drop blanks."""
+    if isinstance(text, (list, tuple)):
+        return [str(t).strip() for t in text if str(t).strip()]
+    return [part.strip() for part in str(text or "").split(";") if part.strip()]
+
+
+def _criteria_from_pico(pico_data: dict) -> tuple:
+    """Inclusion/exclusion lists from a PICO dict; defaults if missing (old files)."""
+    inclusion = _split_criteria(pico_data.get("inclusion_criteria")) or list(DEFAULT_INCLUSION)
+    exclusion = _split_criteria(pico_data.get("exclusion_criteria")) or list(DEFAULT_EXCLUSION)
+    return inclusion, exclusion
+
+
+def _ask_criteria(label: str, current: list) -> list:
+    """Show the current list; Enter keeps it, typed text (';'-separated) replaces it."""
+    typed = input(f"    {label} [{'; '.join(current)}]: ").strip()
+    return _split_criteria(typed) or list(current)
+
+
+# Item 2a (Session 39): the run's prisma_criteria.yaml is internal. The
+# launcher writes it to input/sr (git-ignored) and passes --config; the
+# tracked sample in pipelines/sr/config is never written by the launcher.
+SR_RUN_CONFIG = INPUT_SR / "prisma_criteria.yaml"
+
+
+def _ask_required(label: str, current: str = "") -> str:
+    """Ask until the answer is not empty. Enter keeps a non-empty current value."""
+    while True:
+        hint = f" [{current}]" if current else ""
+        value = input(f"    {label}{hint}: ").strip()
+        if value:
+            return value
+        if current:
+            return current
+        print("      This field is required.")
+
+
+def _build_sr_cmd(provider, model, effect_measure, config_path, run_id) -> list:
+    """Command that starts the SR pipeline. config_path None = the sample config,
+    whose <...> placeholders stop the run."""
+    cmd = [
+        sys.executable, "-m", "SOURCE_CODE.pipelines.sr.main",
+        "--pdf-dir",        str(INPUT_SR),
+        "--provider",       provider,
+        "--model",          model,
+        "--effect-measure", effect_measure,
+        "--run-id",         run_id,
+    ]
+    if config_path is not None:
+        cmd += ["--config", str(config_path)]
+    return cmd
+
+
+def _save_pico_to_run(pico_path, runs_root, run_id):
+    """Copy the PICO JSON used for a run into reports/sr/<run_id>/ so it can be
+    copied back into input/sr to reuse. Returns the copy, or None."""
+    run_dir = Path(runs_root) / run_id
+    if pico_path is None or not Path(pico_path).exists() or not run_dir.is_dir():
+        return None
+    dest = run_dir / Path(pico_path).name
+    dest.write_bytes(Path(pico_path).read_bytes())
+    return dest
+
+
 def _create_pico() -> dict:
     """Interactive PICO creation."""
     print("\n  Enter PICO components for your systematic review:")
-    print("  (Press Enter to skip any field)")
-    
-    population = input("    Population   (P): ").strip()
-    intervention = input("    Intervention (I): ").strip()
-    comparator = input("    Comparator   (C): ").strip()
-    outcome = input("    Outcome      (O): ").strip()
-    
+    print("  (Population, Intervention and Outcome are required; where a default")
+    print("   is shown in [ ], Enter keeps it)")
+
+    population = _ask_required("Population   (P)")
+    intervention = _ask_required("Intervention (I)")
+    print("    Comparator: press Enter for the default, or type Exclude_WaitList.")
+    print("        Default: usual care, attention placebo and waiting list pooled")
+    print("                 into one result (the usual approach).")
+    print("        Exclude_WaitList: type this to exclude waiting-list trials.")
+    comparator = _resolve_comparator(
+        input(f"    Comparator   (C) [{DEFAULT_COMPARATOR}]: "), DEFAULT_COMPARATOR)
+    outcome = _ask_required("Outcome      (O)")
+
+    print("\n  Inclusion / exclusion criteria (separate with ';'):")
+    inclusion = _ask_criteria("Inclusion criteria", DEFAULT_INCLUSION)
+    exclusion = _ask_criteria("Exclusion criteria", DEFAULT_EXCLUSION)
+
     topic = f"Effect of {intervention} on {outcome}" if intervention and outcome else "Systematic Review"
-    
+
     pico_data = {
         "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "topic": topic,
@@ -1609,37 +1700,48 @@ def _create_pico() -> dict:
         "intervention": intervention,
         "comparator": comparator,
         "outcome": outcome,
+        "inclusion_criteria": inclusion,
+        "exclusion_criteria": exclusion,
         "study_design": "RCT",
         "effect_measure": "SMD",
         "source_mode": "manual_sr",
         "pubmed_query_raw": f"{population} AND {intervention} AND {outcome}" if all([population, intervention, outcome]) else "",
         "pubmed_query_cleaned": "",
     }
-    
+
     return pico_data
 
 
 def _modify_pico(pico_data: dict) -> dict:
     """Allow user to modify existing PICO."""
     print("\n  Modify PICO components (press Enter to keep current value):")
-    
+
     fields = [
         ("population", "Population   (P)"),
         ("intervention", "Intervention (I)"),
         ("comparator", "Comparator   (C)"),
         ("outcome", "Outcome      (O)"),
     ]
-    
+
     for key, label in fields:
         current = pico_data.get(key, "")
-        new_val = input(f"    {label} [{current}]: ").strip()
-        if new_val:
-            pico_data[key] = new_val
-    
+        if key == "comparator":
+            if not current:
+                current = DEFAULT_COMPARATOR
+            new_val = input(f"    {label} [{current}]: ").strip()
+            pico_data[key] = _resolve_comparator(new_val, current)
+        else:
+            pico_data[key] = _ask_required(label, current)
+
+    inclusion, exclusion = _criteria_from_pico(pico_data)
+    print("\n  Inclusion / exclusion criteria (separate with ';'; Enter keeps):")
+    pico_data["inclusion_criteria"] = _ask_criteria("Inclusion criteria", inclusion)
+    pico_data["exclusion_criteria"] = _ask_criteria("Exclusion criteria", exclusion)
+
     # Update topic if intervention or outcome changed
     if pico_data.get("intervention") and pico_data.get("outcome"):
         pico_data["topic"] = f"Effect of {pico_data['intervention']} on {pico_data['outcome']}"
-    
+
     return pico_data
 
 

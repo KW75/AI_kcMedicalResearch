@@ -1,10 +1,10 @@
 {
   "timestamp": "2026-07-30 09:22:37",
   "topic": "Effect of Cognitive-Behavioral Therapy on Pain",
-  "formulator_output": "**Research topic:** Effect of Cognitive-Behavioral Therapy on Pain\n\n**Structured PICO question:**\n\n- P (Population)    : Adults with fibromyalgia\n- I (Intervention)  : Cognitive-Behavioral Therapy\n- C (Comparison)    : Placebo or active comparator\n- O (Outcome)       : Pain intensity at post intervention\n\n**Clinical question:** In adults with fibromyalgia, does Cognitive-Behavioral Therapy compared with placebo or active comparator improve pain intensity at post intervention?",
+  "formulator_output": "**Research topic:** Effect of Cognitive-Behavioral Therapy on Pain\n\n**Structured PICO question:**\n\n- P (Population)    : Adults with fibromyalgia\n- I (Intervention)  : Cognitive-Behavioral Therapy\n- C (Comparison)    : Placebo, active comparator, or waiting list (waiting list reported as a subgroup)\n- O (Outcome)       : Pain intensity at post intervention\n\n**Clinical question:** In adults with fibromyalgia, does Cognitive-Behavioral Therapy compared with placebo, active comparator, or waiting list improve pain intensity at post intervention?",
   "population": "Adults with fibromyalgia",
   "intervention": "Cognitive-Behavioral Therapy",
-  "comparator": "Placebo or active comparator",
+  "comparator": "Placebo, active comparator, or waiting list (waiting list reported as a subgroup)",
   "outcome": "Pain intensity at post intervention",
   "study_design": "RCT",
   "effect_measure": "SMD",

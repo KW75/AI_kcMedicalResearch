@@ -1,24 +1,20 @@
-# Reviewer-verified corrections, keyed by PDF filename.
+# Reviewer-entered values (optional). The pipeline reads this file on every run.
+# Add an entry only after checking the value in the paper (PDF), and say where
+# it came from in "note". Entries are listed in the report as reviewer-entered.
+# Key = the PDF file name in input/sr, in quotes. Leave out fields you did not check.
 #
-# Metadata fields (first_author, year, doi, study, study_id) fill in only
-# when extraction left them blank.
+# "Smith 2020 - trial.pdf":
+#   first_author: Smith
+#   year: 2020
+#   n_intervention: 30
+#   n_control: 28
+#   mean_intervention: 4.1
+#   sd_intervention: 1.2
+#   mean_control: 4.9
+#   sd_control: 1.4
+#   note: "Table 2 p5, pain VAS post-treatment. Verified from the PDF."
 #
-# Numeric fields (n_intervention, n_control, mean_*, sd_*) REPLACE whatever
-# the extractor produced. Use them only for values you have read yourself
-# from the source table, and always record where they came from in `note`.
+# To keep a study out of the meta-analysis, with the reason shown in the report:
+#   exclude_from_meta: "reason in one line"
 #
-# Every applied override appears in extracted_data.csv under
-# override_fields / override_note.
-
-"s10608-017-9875-4.pdf":
-  first_author: Lami
-  year: 2018
-  n_intervention: 28
-  n_control: 36
-  mean_intervention: 7.35
-  sd_intervention: 2.08
-  mean_control: 7.40
-  sd_control: 1.29
-  note: >-
-    Table 4, post-intervention CBT-P vs UMC. Ns are post-intervention
-    (28/36), not baseline (34/41). Verified from PDF pages 12-13.
+# Worked examples: reference/sr_cbt_fibromyalgia/study_overrides.yaml

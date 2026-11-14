@@ -40,7 +40,8 @@ Paper: Lami. text_fallback path with a study_overrides.yaml entry.
   reviewer's study_overrides.yaml entry was needed and why the
   missing-quote branch must keep firing on this shape.
 
-Paper: Jensen. Reviewer-verified row (Ns and SDs strictly pinned;
+Paper: Jensen. Row as extracted in that run (25/18 = randomised N, not the
+  truth N 19/15 in tests/fixtures/sr_truth.yaml; Ns and SDs strictly pinned;
   means pinned as observed value sets, per handoff guidance):
       n_intervention=25, n_control=18
       sd_intervention=19.0, sd_control=26.0
@@ -285,7 +286,7 @@ JENSEN_MEAN_CONTROL_VALUES      = (59.0, 59.1, 59.2)
 
 
 def _jensen_result(mean_i: float, mean_c: float):
-    """Build a Jensen extraction with the reviewer-verified Ns and SDs
+    """Build a Jensen extraction with the extracted Ns (25/18, randomised) and SDs
     and the chosen per-run means. The source quotes are constructed to
     contain each arm's mean and SD verbatim so the tripwire must clear
     on any observed (mean_i, mean_c) combination.

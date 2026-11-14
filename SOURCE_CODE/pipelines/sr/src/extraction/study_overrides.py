@@ -35,7 +35,7 @@ NUMERIC_FIELDS = (
     "sd_control",
 )
 
-ALLOWED_FIELDS = METADATA_FIELDS + NUMERIC_FIELDS + ("note",)
+ALLOWED_FIELDS = METADATA_FIELDS + NUMERIC_FIELDS + ("note", "exclude_from_meta", "comparator_type")
 
 _MISSING_STRINGS = {"", "none", "null", "nan", "na", "n/a", "not reported", "not stated"}
 
@@ -305,6 +305,19 @@ class StudyOverrides:
             if field in entry and is_missing(result.get(field)):
                 result[field] = entry[field]
                 applied.append(field)
+
+        # Session 38 (7k): reviewer decision to leave the study out of the pool.
+        excl = str(entry.get("exclude_from_meta") or "").strip()
+        if excl:
+            result["reviewer_exclusion"] = excl
+            applied.append("exclude_from_meta")
+
+        # Session 39 (item 11): reviewer's control type for subgroups.
+        # Bare name in override_fields = no value (not reviewer-entered data).
+        ctype = str(entry.get("comparator_type") or "").strip()
+        if ctype:
+            result["comparator_type"] = ctype
+            applied.append("comparator_type")
 
         po = result.get("primary_outcome")
         if not isinstance(po, dict):

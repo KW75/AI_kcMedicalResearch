@@ -151,3 +151,37 @@ def test_loop_keeps_gated_effect_sizes_and_calls_sensitivity():
     tail = src[src.index("write_results(layout.results_csv"):src.index("if len(rows) < 2:")]
     assert "_log_review_sensitivity(rows, review_rows" in tail, \
         "sensitivity must run before the '< 2 studies' abort"
+
+
+
+# --- Session 39 (item 4d): a study whose runs disagreed but whose flagged
+# fields were all overridden passes the gate ([AGREEMENT]). [SENSITIVITY]
+# names it, so "no needs-review studies" is not read as a contradiction.
+def test_sensitivity_names_studies_resolved_by_override(monkeypatch, caplog):
+    main_mod = _main_mod()
+    _FakeMA.seen.clear()
+    monkeypatch.setattr(main_mod, "MetaAnalyzer", _FakeMA)
+    with caplog.at_level(logging.INFO):
+        main_mod._log_review_sensitivity([{"study": "A"}, {"study": "B"}], [], "SMD",
+                                         resolved=["Jensen (2012)"])
+    txt = "\n".join(caplog.messages)
+    assert _FakeMA.seen == []                      # still no comparison estimate
+    assert "nothing to compare" in txt
+    assert "Runs disagreed on Jensen (2012)" in txt
+    assert "not held back" in txt
+
+
+def test_sensitivity_no_resolved_note_when_none(monkeypatch, caplog):
+    main_mod = _main_mod()
+    monkeypatch.setattr(main_mod, "MetaAnalyzer", _FakeMA)
+    with caplog.at_level(logging.INFO):
+        main_mod._log_review_sensitivity([{"study": "A"}, {"study": "B"}], [], "SMD")
+    assert "Runs disagreed" not in "\n".join(caplog.messages)
+
+
+def test_loop_collects_resolved_and_passes_them():
+    src = (ROOT / "SOURCE_CODE" / "pipelines" / "sr" / "main.py").read_text(encoding="utf-8")
+    loop = src[src.index("meta_audit= []"):src.index("write_results(layout.results_csv")]
+    assert "resolved_by_override.append(" in loop
+    tail = src[src.index("write_results(layout.results_csv"):src.index("if len(rows) < 2:")]
+    assert "resolved=resolved_by_override" in tail

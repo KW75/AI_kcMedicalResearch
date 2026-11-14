@@ -1167,8 +1167,88 @@ class DataExtractor:
         return False
 
 
+    # Session 39 (F8): candidate Ns in a source quote. Not counted: decimals,
+    # percentages, mean (SD) cells, "m ± sd" pairs, ranges (0-100), numbers
+    # glued to letters/hyphens (SF-36, T2), numbers after Week/Month/Day.
+    # Session 39 (item 10): branch 5 match. Words and numbers only (signs,
+    # symbols, [?] and punctuation ignored - OCR/text-layer noise); fallback:
+    # the quote's numbers (>= 2) in the same order within `span` tokens (table
+    # rows quoted with cells skipped, e.g. Ang Table 2).
+    _QTOK = re.compile(r"[a-z]+|\d+(?:\.\d+)?")
 
+    @classmethod
+    def _quote_in_source(cls, quote, source_text, span=40):
+        """Branch 5 (Session 39, item 10): True if the quote is in the source.
+        1) tolerant: the quote's word/number tokens appear contiguously in the
+           source tokens (ignores case, punctuation, whitespace, OCR stray
+           dots, [?] marks, +/- signs).
+        2) numseq, TABLE ROWS ONLY: quote has >= 4 numbers and at least as
+           many numbers as words; its numbers appear in the same order within
+           `span` source tokens (tables stored out of order, e.g. Ang Table 2).
+           Not used for sentences: a paraphrase that keeps the numbers must
+           still warn (test_source_quote_check_text_path_flags_quote_absent_from_source)."""
+        q = cls._QTOK.findall(str(quote or "").lower())
+        if not q or not source_text:
+            return True
+        s = cls._QTOK.findall(str(source_text).lower())
+        n = len(q)
+        for i, tok in enumerate(s):
+            if tok == q[0] and s[i:i + n] == q:
+                return True
+        nums = [t for t in q if t[0].isdigit()]
+        if len(nums) < 4 or len(nums) < n - len(nums):
+            return False
+        for i, tok in enumerate(s):
+            if tok != nums[0]:
+                continue
+            j, k = i + 1, 1
+            while k < len(nums) and j < len(s) and j - i <= span:
+                if s[j] == nums[k]:
+                    k += 1
+                j += 1
+            if k == len(nums):
+                return True
+        return False
 
+    _N_CELL = re.compile(r"[-+\u2212]?\d+(?:[.,]\d+)?\s*\(\s*[-+\u2212]?\d+(?:[.,]\d+)?\s*\)")
+    _N_PM = re.compile(r"[-+\u2212]?\d+(?:[.,]\d+)?\s*(?:\u00b1|\+/-)\s*\d+(?:[.,]\d+)?")
+    _N_RANGE = re.compile(r"\d+ ?[-\u2013\u2014\u2212] ?\d+")
+    _N_INT = re.compile(r"(?<![A-Za-z\d.,\-])\d+(?!\d|[.,]\d)(?!\s*%)")
+    _N_TIME_BEFORE = re.compile(r"(?i)\b(?:weeks?|wk|months?|days?|years?|sessions?|visits?)\s*$")
+
+    @classmethod
+    def _quote_n_candidates(cls, quote, exclude=()):
+        q = str(quote or "")
+        for rx in (cls._N_CELL, cls._N_PM, cls._N_RANGE):
+            q = rx.sub(" ", q)
+        skip = set()
+        for v in exclude:
+            try:
+                skip.add(float(v))
+            except (TypeError, ValueError):
+                pass
+        out = set()
+        for m in cls._N_INT.finditer(q):
+            v = int(m.group(0))
+            if not 2 <= v <= 1500 or float(v) in skip:
+                continue
+            if cls._N_TIME_BEFORE.search(q[:m.start()]):
+                continue
+            out.add(v)
+        return sorted(out)
+
+    @staticmethod
+    def _arm_n(result, primary, arm):
+        part = result.get("participants")
+        for src in (part if isinstance(part, dict) else {}, primary, result):
+            v = src.get(f"n_{arm}")
+            if v in (None, ""):
+                continue
+            try:
+                return int(float(v))
+            except (TypeError, ValueError):
+                return None
+        return None
 
     def _flag_suspect_source_quotes(self, result: dict,
                                     source_text: str = None) -> dict:
@@ -1198,6 +1278,16 @@ class DataExtractor:
                         f"{arm} {label} ({value}) does not appear in its own "
                         f"source quote - the quote does not support this number")
 
+            
+            # Session 39 (F8): branch 2 also binds the arm's N to its quote.
+            n_val = self._arm_n(result, primary, arm)
+            if n_val is not None:
+                cands = self._quote_n_candidates(quote, exclude=(mean, sd))
+                if cands and n_val not in cands:
+                    warnings_found.append(
+                        f"{arm} N ({n_val}) does not appear in its own source "
+                        f"quote (quote has {', '.join(map(str, cands))}) - "
+                        f"check the analysed N for this arm (F8)")
             if sd is not None and self._SE_MARKER.search(quote):
                 warnings_found.append(
                     f"{arm} SD ({sd}) was quoted from text containing "
@@ -1238,8 +1328,7 @@ class DataExtractor:
 
 
             if source_text:
-                norm = lambda t: re.sub(r"\s+", " ", t).strip().lower()
-                if norm(quote) not in norm(source_text):
+                if not self._quote_in_source(quote, source_text):
                     warnings_found.append(
                         f"{arm} source quote was not found verbatim in the "
                         f"extracted source text - it may be paraphrased or "
@@ -1881,7 +1970,7 @@ for that field - NOT the quoted string "null".
 
         return resp.choices[0].message.content.strip()
 
-    def extract_by_pdf_path(self, pdf_path: str, filename="") -> dict:
+    def extract_by_pdf_path(self, pdf_path: str, filename="", paper_text=None) -> dict:
         """Extract data using vision API with fallback page selection"""
         try:
             logger.info(f"[VISION] Extracting from {filename}")
@@ -2001,7 +2090,7 @@ for that field - NOT the quoted string "null".
                     result.pop(key, None)
 
             result = self._flag_suspect_source_quotes(
-                result, source_text=text_payload)
+                result, source_text=text_payload or paper_text)
 
             result.update({
                 "file_id": None,
@@ -2030,10 +2119,12 @@ for that field - NOT the quoted string "null".
             logger.info(f"[EXTRACT {i}/{len(included_records)}] {r['filename']}")
 
             if self.provider == "anthropic":
-                results.append(self._extract_anthropic(r["file_id"], r["filename"]))
+                results.append(self._extract_anthropic(
+                    r["file_id"], r["filename"], paper_text=r.get("paper_text")))
             else:
                 results.append(self.extract_by_pdf_path(
-                    r.get("pdf_path", ""), r["filename"]))
+                    r.get("pdf_path", ""), r["filename"],
+                    paper_text=r.get("paper_text")))
 
             if i < len(included_records):
                 time.sleep(delay_seconds)
@@ -2082,7 +2173,7 @@ for that field - NOT the quoted string "null".
 
         logger.info("-" * 60)
 
-    def _extract_anthropic(self, file_id, filename):
+    def _extract_anthropic(self, file_id, filename, paper_text=None):
         """Anthropic-specific extraction (routes through shared tripwires)."""
         try:
             resp = self.client.beta.messages.create(
@@ -2134,7 +2225,7 @@ for that field - NOT the quoted string "null".
 
             result.setdefault("extraction_method", "anthropic_file")
 
-            result = self._flag_suspect_source_quotes(result, source_text=None)
+            result = self._flag_suspect_source_quotes(result, source_text=paper_text)
 
             result.update({"file_id": file_id, "filename": filename,
                            "extraction_error": None})

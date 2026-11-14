@@ -3,13 +3,17 @@
 # Used by scripts/sr_score_run.py to score a real SR run against the truth.
 # Primary outcome: pain intensity, post-intervention. Keyed by first author.
 # checked: false = reported by the scorer but not scored.
+# N = N analysed at the reported timepoint (the N behind the mean/SD), not
+# randomised N. Must match reference/sr_cbt_fibromyalgia/study_overrides.yaml
+# (tests/test_sr_truth_override_sync.py).
 tolerance: 0.1
 
 studies:
   Ang:
     year: 2010
-    checked: true
-    source: "Table 2, Week 6 change, pain mean +/- SD; Ns from the same row"
+    checked: false
+    note: "Excluded from the meta-analysis by the reviewer (exclude_from_meta). Values below are the NFR pain rating, not pain intensity; kept for history, not scored."
+    source: "Table 2, Week 6 change, NFR pain rating (0-100) mean +/- SD; Ns from the same row"
     comparator_type: active          # usual care
     mean_intervention: -20.2
     sd_intervention: 23.9
@@ -27,9 +31,9 @@ studies:
     sd_intervention: 19
     mean_control: 59
     sd_control: 26
-    n_intervention: 25
-    n_control: 18
-    n_status: provisional            # randomised N (p1); N behind Table 3 not stated
+    n_intervention: 19
+    n_control: 15
+    n_status: inferred               # completed treatment (Fig 1 p3) = posttreatment Table 3; 25/18 randomised (p1); Table 3 N not stated in text
 
   Lami:
     year: 2018
@@ -45,12 +49,24 @@ studies:
 
   Karlsson:
     year: 2015
-    checked: false
+    checked: true
+    source: "Table 2 p6, MPI-1 Pain severity (tertiary outcome), crude mean (SD) after treatment vs after wait list; n 24/24 (Fig. 2)"
     comparator_type: waiting_list
-    note: "Run values 3.88 (1.05) vs 3.67 (0.75), N 24/24 plausible; columns and N not hand-checked"
+    mean_intervention: 3.88
+    sd_intervention: 1.05
+    mean_control: 3.67
+    sd_control: 0.75
+    n_intervention: 24
+    n_control: 24
 
   McCrae:
     year: 2019
-    checked: false
+    checked: true
     comparator_type: waiting_list
-    note: "Control must be the WLC arm, not CBT-P. Which CBT arm (CBT-I or CBT-P) is the intervention is not decided"
+    n_intervention: 57
+    n_control: 28
+    mean_intervention: 46.86
+    sd_intervention: 24.06
+    mean_control: 52.38
+    sd_control: 24.04
+    note: "CBT-I + CBT-P combined (Cochrane 23.3.4) vs WLC; morning pain VAS, post-treatment, Table 3 p9; N = completers (Fig 1). Hand-checked Session 37."
