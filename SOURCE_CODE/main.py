@@ -1509,7 +1509,7 @@ def run_sr_launcher(provider: str = "", model: str = "") -> None:
 
     # -- Step 4: resolve provider and model ------------------------------------
 
-    _provider = provider or "qwen"
+    _provider = provider or SR_DEFAULT_PROVIDER
     
     # --- Provider check for vision support ---
     if _provider == "deepseek":
@@ -1539,6 +1539,13 @@ def run_sr_launcher(provider: str = "", model: str = "") -> None:
     
 
     _model = model or _sr_default_model(_provider)
+    # Session 40: a local model must be able to read page images; stop before
+    # any AI call otherwise (as OCR does).
+    if _provider == "ollama":
+        _verr = sr_ollama_vision_error(_model)
+        if _verr:
+            print("\n" + _verr)
+            return
 
 
     # -- Step 5: run sr/main.py (as a module so relative imports resolve) -----
@@ -2453,8 +2460,26 @@ def ocr_provider_error(mode: str, provider: str) -> str | None:
 
 # Session 40: SR reads page images like OCR, so it uses the same list.
 SR_PROVIDERS = OCR_PROVIDERS
-# SR default when no usable provider is given (commit 2 changes it to "ollama").
-SR_DEFAULT_PROVIDER = "qwen"
+# SR default when no usable provider is given: local first (Session 40, commit 2).
+SR_DEFAULT_PROVIDER = "ollama"
+
+
+def sr_ollama_vision_error(model: str, caps_fn=None, host=None) -> str | None:
+    """SR on Ollama needs a model whose /api/show lists 'vision' (as OCR).
+    Returns a message if it cannot read images or is not pulled, else None."""
+    if caps_fn is None:
+        import ollama_models
+        caps_fn = ollama_models.model_capabilities
+    try:
+        caps = caps_fn(host, model)
+    except Exception:
+        caps = set()
+    if "vision" in caps:
+        return None
+    return (f"SR: Ollama model {model} cannot read page images (no 'vision' "
+            "capability) or is not pulled. Run: ollama pull gemma4:e4b, or set "
+            "OLLAMA_MODEL to a vision model, or use --provider qwen or openai "
+            "(cloud).")
 
 
 def sr_provider_error(mode: str, provider: str | None) -> str | None:

@@ -219,28 +219,20 @@ class DataExtractor:
         self.pico = pico_criteria or {}
         self.outcome = pico_outcome or self.pico.get("outcome")
 
-        # --- Vision support check ---
-        # Only these providers support vision API
-        vision_providers = ["qwen", "openai", "anthropic", "groq"]
-        if self.provider not in vision_providers:
+        # --- Provider check (Session 40): same list as OCR / main.SR_PROVIDERS ---
+        sr_providers = ("ollama", "qwen", "openai")
+        if self.provider not in sr_providers:
             raise ValueError(
-                f" - Provider '{self.provider}' does NOT support vision API.\n"
-                "The SR pipeline requires vision-based extraction (images of PDF pages).\n\n"
-                "Supported providers for SR mode:\n"
-                "   - qwen     (recommended) - Qwen vision model\n"
-                "   - openai   - GPT-4 vision\n"
-                "   - anthropic - Claude vision\n"
-                "   - groq     - Vision models available\n\n"
-                "Please use one of the supported providers:\n"
-                "  python src/main.py --mode sr --provider qwen"
+                f"Provider '{self.provider}' cannot be used for SR extraction. "
+                "Use --provider ollama (local vision model), qwen or openai."
             )
 
         if not self.outcome:
             logger.warning("DataExtractor: no review outcome specified")
 
-        if self.provider == "anthropic":
-            self.client = anthropic.Anthropic(
-                api_key=api_key or os.environ["ANTHROPIC_API_KEY"])
+        if self.provider == "ollama":
+            # Local: every call goes through providers.call_ollama_provider.
+            self.client = None
         else:
             from openai import OpenAI
             from ..screening.rob2_tool import _openai_compat_creds
@@ -1745,7 +1737,11 @@ for that field - NOT the quoted string "null".
         )
 
     def _call_chat_api_with_prompt(self, prompt: str, max_tokens: int = 256) -> str:
-        """Send an arbitrary text-only prompt via the OpenAI-compatible client."""
+        """Send a text-only prompt (Ollama, or the OpenAI-compatible client)."""
+        if self.provider == "ollama":
+            import providers  # lazy
+            return providers.call_ollama_provider(
+                prompt, model=self.model, max_tokens=max_tokens).strip()
         resp = self.client.chat.completions.create(
             model=self.model,
             messages=[{"role": "user", "content": prompt}],
@@ -1797,7 +1793,12 @@ for that field - NOT the quoted string "null".
         return result
 
     def _call_text_api(self, extracted_text: str, filename: str = "") -> str:
-        """Send extracted PDF text to the chat-completions client as a fallback."""
+        """Send extracted PDF text to the AI as a fallback (Ollama or cloud)."""
+        if self.provider == "ollama":
+            import providers  # lazy
+            return providers.call_ollama_provider(
+                self._text_extraction_prompt(extracted_text, filename),
+                model=self.model, max_tokens=4096).strip()
         resp = self.client.chat.completions.create(
             model=self.model,
             messages=[
@@ -1948,10 +1949,18 @@ for that field - NOT the quoted string "null".
 
     def _call_vision_api(self, base64_images: list, prompt: str) -> str:
         """Send images to vision API."""
-        if self.provider not in ["qwen", "openai", "anthropic", "groq"]:
+        if self.provider == "ollama":
+            # Session 40: local vision model via providers.call_ollama_provider
+            # (sets num_ctx from OLLAMA_CONTEXT). It takes PNG bytes; max 5 pages.
+            import base64 as _b64
+            import providers  # lazy, like pipelines/ocr/engine.py
+            pngs = [_b64.b64decode(img) for img in base64_images[:5]]
+            return providers.call_ollama_provider(
+                prompt, model=self.model, max_tokens=4096, images=pngs).strip()
+        if self.provider not in ["qwen", "openai"]:
             raise RuntimeError(
-                f" - Provider '{self.provider}' does NOT support vision API.\n"
-                "Please use --provider qwen (recommended), openai, anthropic, or groq."
+                f"Provider '{self.provider}' cannot read page images for SR. "
+                "Use --provider ollama (local), qwen or openai."
             )
 
         content = [{"type": "text", "text": prompt}]

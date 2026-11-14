@@ -48,7 +48,7 @@ so those catches happen at session open, not mid-work.
 
 | Component      | Status |
 |----------------|--------|
-| Tests | 1299 passed, 10 deselected on v2.11-sr-local (Session 40); main 1282 (8a8a42e, PR #8 merged) (python -m pytest -m "not live" --tb=short -q) |
+| Tests | 1315 passed, 10 deselected on v2.11-sr-local (Session 40); main 1282 (8a8a42e, PR #8 merged) (python -m pytest -m "not live" --tb=short -q) |
 | Branch         | main = ef66b9f (PR #7 merged 2026-11-10: F7 truth fixture sr_truth.yaml + scripts/sr_score_run.py). Work on v2.10-sr-screening, PR #8 open: shared paper text (b3d804c), prisma_criteria write-if-changed (afd90a3), RoB2 overall rule (3e3785e), RoB2 Methods/Results text (908f889, 306d838), registration lines to RoB2 (Session 38); Session 38: Karlsson/Ang overrides (cf75209), RoB2 Domain 4 self-report rule (46fbd9b), Domain 4 High outright (e4e97b8), Ang excluded by reviewer + not-pooled report section (a56dc55), plain report reasons + POOLED line (0bf59dc), fibromyalgia set moved to reference/ (7h, b32f4c4), REVIEWER_GUIDE rewrite + readme_sr_pipeline.txt (docs, this commit). Branches v2.6-ocr-editor, v2.5-major-updates, v2.7-sr-fixes, v2.8-sr-review-gate, v2.9-sr-fixture deleted |
 | CI | green on PR #8 at green on PR #8 at 05e55b7 (1276 passed, 10 deselected, 57 warnings). Last confirmed on main: bcd42d9 (2026-11-09, 1027, both jobs). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
 | SR docs        | Readme/readme_sr_pipeline.txt = how the SR pipeline works and why (logic, rationale, accuracy evidence, Appendix A worked example); no how-to. How-to = Readme/flashcard-help.html. study_overrides.yaml fields and format = REVIEWER_GUIDE section 5.
@@ -2623,3 +2623,35 @@ Session 39 closed items 4-11 (11e open). Job list, in order:
   in test_sr_provider_rule.py (they set DEFAULT_PROVIDER themselves). Suite
   1295 -> 1299. Lesson repeated from Session 29: a test that passes because
   of the dev .env proves nothing; set the value inside the test.
+
+- Commit 2 (item 12): SR extraction on local Ollama.
+  - data_extractor.py: provider list = ollama, qwen, openai (anthropic/groq
+    refused); for ollama self.client = None and the vision, text and chat
+    calls go to providers.call_ollama_provider (sets num_ctx from
+    OLLAMA_CONTEXT; vision call decodes base64 to PNG bytes, max 5 pages).
+  - main.py: SR_DEFAULT_PROVIDER = "ollama"; run_sr_launcher uses it and calls
+    new sr_ollama_vision_error(model) before any AI call (no 'vision' in
+    /api/show, or not pulled -> stop, tell the user to pull gemma4:e4b or use
+    --provider qwen/openai).
+  - pipelines/sr/main.py (direct run): --provider default ollama, choices
+    ollama/qwen/openai.
+  - Tests: tests/test_sr_ollama_extraction.py (16, call_ollama_provider and
+    resolve_model faked). Suite 1299 -> 1315.
+  - Docs: README Ollama row (128) and the "Noted, not fixed" Ollama item
+    (FIXED); readme_sr_pipeline.txt 386.
+- Known gaps after commit 2 (do NOT merge yet; for commit 3):
+  - Screening and RoB2 on Ollama still go through the OpenAI-style /v1 URL
+    (_openai_compat_creds, rob2_tool.py line 74, OLLAMA_URL). /v1 does not
+    set num_ctx, so a long RoB2 prompt (up to 50,000 chars) can be cut
+    silently. Route them through call_ollama_provider; settle on OLLAMA_HOST.
+  - No cloud offer yet when no local vision model is pulled (OCR has one:
+    ocr/cli.py _offer_cloud); SR just stops with the message.
+  - A direct run of pipelines/sr/main.py --provider ollama skips the vision
+    check (it lives in main.run_sr_launcher).
+  - Ollama uses OLLAMA_TEMPERATURE (default 0.3), not the extractor's
+    temperature: the N=3 vote may vary more than on qwen.
+  - Dead code now: data_extractor._extract_anthropic (~line 2188) and the
+    Stage 1 anthropic upload in pipelines/sr/main.py (~line 512). Remove in
+    a later cleanup commit.
+  - Item 12g still required before local SR is called usable: gemma4:e4b on
+    the reference set, N=3, field by field vs qwen3-vl-plus and the PDFs.

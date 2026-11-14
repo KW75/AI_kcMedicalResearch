@@ -451,10 +451,10 @@ def main():
                     choices=["OR", "RR", "MD", "SMD"])
     ap.add_argument("--model",          default=None,
                     help="Model name (default: provider's configured model)")
-    ap.add_argument("--provider",       default="qwen",
-                    choices=["ollama", "openai", "anthropic",
-                             "deepseek", "groq", "qwen"],
-                    help="AI provider for screening and extraction")
+    ap.add_argument("--provider",       default="ollama",
+                    choices=["ollama", "qwen", "openai"],
+                    help="AI provider for screening and extraction "
+                         "(Session 40: local Ollama first, like OCR)")
     ap.add_argument("--run-id",         default=None,
                     help="Override run timestamp (e.g. for re-runs)")
     ap.add_argument("--n-agreement",    default=None, type=int,
