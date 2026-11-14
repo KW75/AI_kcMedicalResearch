@@ -2899,3 +2899,28 @@ Session 39 closed items 4-11 (11e open). Job list, in order:
   - Issues closed from Session 41 on are recorded in session notes like this one.
   - Tests: +2 in tests/test_path_utils_dirs.py; suite 1380 -> 1382, 10 deselected.
   - DO NOT MERGE v2.11-sr-local yet. PR #9 stays a draft.
+
+- Session 41 reference rerun 2 (2026-11-14): local SR run 20261114_202253.
+  - Setup: gemma4:e4b, N=3, OLLAMA_TEMPERATURE 0.3, same 5 PDFs, pico_20261112_210735.json,
+    0 overrides, code 2923cc3. 24 min (20:22-20:46), no cloud, no OOM.
+  - Live pass: 4d run.log written (180 lines, Stages 1-4); 4c [SAMPLING] temperature=0.3;
+    option 3 screening 5 INCLUDE / 0 EXCLUDE (second run in a row); 4a Kim->Lami,
+    2011->2017, Karin B.->Jensen; mixed_runs flagged Jensen and McCrae, both not pooled.
+  - Scorer: 4 checked, 0 fully correct. POOLED 1 of 5 (Karlsson). Stage 4 aborted
+    (< 2 usable studies), so no pooled estimate or report was produced.
+  - HOLE (most important): Karlsson pooled with wrong values: mean_int 3.61 (truth 3.88),
+    sd_int 0.85 (1.05), sd_ctrl 0.92 (0.75). Runs were unanimous on those three; only flag
+    mean_control:majority, so the gate let it in. Same as S40 Lami: N=3 agreement cannot
+    catch a consistent misread. Only the reviewer (study_overrides.yaml) or a check
+    against the source text can.
+  - RoB2 label rule (080982f): reported_result now Low for all 5 (fixed). Randomisation
+    still High in 4 of 5; Karlsson, Lami and McCrae justifications describe adequate
+    methods (two say "low risk of bias"). Only Jensen Low. Overall High for all 5 via
+    Domain 4, so overall unchanged here. gemma4:e4b ignores the rule for Domain 1.
+  - New small bugs (not fixed): a) usable_runs counts runs with no numbers (Lami runs 2
+    and 3 all None, log said 3/3 usable); b) [OUTCOME/TIMEPOINT] block printed twice in
+    Stage 4; c) "Skip study:" lines do not name the study.
+  - Extraction remains the blocker. Next options: 1) extraction on qwen behind cloud gate;
+    2) larger local vision model; 3) reviewer entries in study_overrides.yaml;
+    4) RoB2 label/justification consistency check, or RoB2 on qwen; 5) small bugs a-c.
+  - DO NOT MERGE v2.11-sr-local yet. PR #9 stays a draft.
