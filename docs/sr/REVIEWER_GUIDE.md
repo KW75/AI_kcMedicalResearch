@@ -129,6 +129,7 @@ patterns, checked per arm:
    (the qwen text-fallback path); see the Session 39 note below for image extractions. The Anthropic path never ran it, and SR refuses that provider since Session 40. A
    missing branch-5 result means the check could not run, not that it passed.
   Since Session 39 (item 10) this check also runs on image extractions, against the shared paper text (input/sr/paper_text/). Matching ignores case, punctuation and OCR marks; a table row whose numbers appear in the same order nearby also counts as found. A reworded sentence still warns.
+  Since Session 41, on image extractions a quote that cannot be checked because no paper text was available warns "could not be checked against the paper text". That warning, a missing quote (branch 1) or a quote not found keeps the study out of the pooled estimate until a reviewer enters all four means/SDs in study_overrides.yaml.
 
 On the McCrae extract above the flag fired four times per re-extraction
 (branch 3 and the multi-timepoint part of branch 4, on both arms).

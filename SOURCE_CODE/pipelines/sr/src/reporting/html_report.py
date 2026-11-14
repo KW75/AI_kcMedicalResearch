@@ -137,8 +137,8 @@ def _plain_one(part):
                 + part[len("outcome_match=False:"):].strip())
     if part.startswith("needs review: source quote not found"):
         return ("The numbers were read from page images and the AI's source "
-                "quote was not found in the paper's text. Not confirmed by a "
-                "reviewer.")
+                "quote was missing, could not be checked, or was not found in "
+                "the paper's text. Not confirmed by a reviewer.")
     if part.startswith("needs review"):
         head = "needs review: runs disagree ("
         flags = part[len(head):].split(")", 1)[0] if part.startswith(head) else ""

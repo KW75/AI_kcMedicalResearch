@@ -1261,7 +1261,8 @@ class DataExtractor:
         return None
 
     def _flag_suspect_source_quotes(self, result: dict,
-                                    source_text: str = None) -> dict:
+                                    source_text: str = None,
+                                    require_source_text: bool = False) -> dict:
         """Deterministic tripwire for Known Issue #48."""
         if not isinstance(result, dict):
             return result
@@ -1337,7 +1338,13 @@ class DataExtractor:
                         f"from the intended timepoint (#64)")
 
 
-            if source_text:
+            # Session 41 empty-text gap: production calls require paper text;
+            # without it the quote is unverified, not clean (branch 5).
+            if require_source_text and not str(source_text or "").strip():
+                warnings_found.append(
+                    f"{arm} source quote could not be checked against the "
+                    f"paper text - no paper text was available")
+            elif source_text:
                 if not self._quote_in_source(quote, source_text):
                     warnings_found.append(
                         f"{arm} source quote was not found verbatim in the "
@@ -2165,7 +2172,7 @@ for that field - NOT the quoted string "null".
                     result.pop(key, None)
 
             result = self._flag_suspect_source_quotes(
-                result, source_text=text_payload or paper_text)
+                result, source_text=text_payload or paper_text, require_source_text=True)
 
             result.update({
                 "file_id": None,
@@ -2300,7 +2307,7 @@ for that field - NOT the quoted string "null".
 
             result.setdefault("extraction_method", "anthropic_file")
 
-            result = self._flag_suspect_source_quotes(result, source_text=paper_text)
+            result = self._flag_suspect_source_quotes(result, source_text=paper_text, require_source_text=True)
 
             result.update({"file_id": file_id, "filename": filename,
                            "extraction_error": None})

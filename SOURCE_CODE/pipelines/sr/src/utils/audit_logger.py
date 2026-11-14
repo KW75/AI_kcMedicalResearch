@@ -62,6 +62,11 @@ def _overridden_fields(override_fields) -> set:
 # not in the paper text need review. Run 20261114_202253 pooled Karlsson with
 # a misread all N=3 runs agreed on; a vote cannot catch that.
 QUOTE_NOT_FOUND_MARKER = "was not found verbatim"
+# Session 41 empty-text gap: a missing quote, or one that could not be checked
+# because no paper text was available, is as unverified as one not found.
+QUOTE_GATE_MARKERS = (QUOTE_NOT_FOUND_MARKER,
+                      "no source quote provided",
+                      "could not be checked against the paper text")
 QUOTE_GATE_TOKEN = "quote_not_found"
 QUOTE_GATE_REASON = ("needs review: source quote not found (quote_not_found) - "
                      "numbers read from page images; verify all four means/SDs "
@@ -97,7 +102,7 @@ def review_skip_reason(cell, override_fields=None, quote_warning=None,
                 "input/sr/study_overrides.yaml with a source-page note")
     # Quote gate: text-path studies keep today's behaviour; a missing method
     # counts as page images (safe side). Cleared by all four means/SDs.
-    if (QUOTE_NOT_FOUND_MARKER in str(quote_warning or "")
+    if (any(m in str(quote_warning or "") for m in QUOTE_GATE_MARKERS)
             and not str(extraction_method or "").startswith("text")
             and not all(f in done for f in _REVIEW_NUMERIC_FIELDS)):
         reasons.append(QUOTE_GATE_REASON)

@@ -48,7 +48,7 @@ so those catches happen at session open, not mid-work.
 
 | Component      | Status |
 |----------------|--------|
-| Tests | 1408 passed, 10 deselected on v2.11-sr-local (Session 41); main 1282 (8a8a42e, PR #8 merged) (python -m pytest -m "not live" --tb=short -q) |
+| Tests | 1421 passed, 10 deselected on v2.11-sr-local (Session 41); main 1282 (8a8a42e, PR #8 merged) (python -m pytest -m "not live" --tb=short -q) |
 | Branch         | main = ef66b9f (PR #7 merged 2026-11-10: F7 truth fixture sr_truth.yaml + scripts/sr_score_run.py). Work on v2.10-sr-screening, PR #8 open: shared paper text (b3d804c), prisma_criteria write-if-changed (afd90a3), RoB2 overall rule (3e3785e), RoB2 Methods/Results text (908f889, 306d838), registration lines to RoB2 (Session 38); Session 38: Karlsson/Ang overrides (cf75209), RoB2 Domain 4 self-report rule (46fbd9b), Domain 4 High outright (e4e97b8), Ang excluded by reviewer + not-pooled report section (a56dc55), plain report reasons + POOLED line (0bf59dc), fibromyalgia set moved to reference/ (7h, b32f4c4), REVIEWER_GUIDE rewrite + readme_sr_pipeline.txt (docs, this commit). Branches v2.6-ocr-editor, v2.5-major-updates, v2.7-sr-fixes, v2.8-sr-review-gate, v2.9-sr-fixture deleted |
 | CI | green on PR #8 at green on PR #8 at 05e55b7 (1276 passed, 10 deselected, 57 warnings). Last confirmed on main: bcd42d9 (2026-11-09, 1027, both jobs). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
 | SR docs        | Readme/readme_sr_pipeline.txt = how the SR pipeline works and why (logic, rationale, accuracy evidence, Appendix A worked example); no how-to. How-to = Readme/flashcard-help.html. study_overrides.yaml fields and format = REVIEWER_GUIDE section 5.
@@ -2957,4 +2957,13 @@ Session 39 closed items 4-11 (11e open). Job list, in order:
   - Wording left open: skip_reason for too_few_runs says "runs disagree (too_few_runs)" and the [AGREEMENT] header says "= the runs read different table cells" - both slightly off for too_few_runs.
   - Not yet run live: the next reference run should show each fix in run.log.
   - New tests/test_sr_small_bugs_ac.py (11); suite 1397 -> 1408, 10 deselected.
+  - DO NOT MERGE v2.11-sr-local yet. PR #9 stays a draft.
+
+- Session 41 empty-text gap + missing-quote hole (2026-11-14):
+  - Empty-text gap: _flag_suspect_source_quotes ran the verbatim check only if source_text was non-empty, so a page-image study with no paper text got no warning and passed the quote gate. New keyword require_source_text (default False); both production calls (vision path, anthropic_file path) pass True. A quote with no or whitespace-only paper text now warns "<arm> source quote could not be checked against the paper text - no paper text was available". Calls without the keyword (old unit tests) are unchanged.
+  - Missing-quote hole: a page-image study with no quote ("no source quote provided") was pooled, because the gate only looked for "was not found verbatim".
+  - Gate: audit_logger.QUOTE_GATE_MARKERS = not found verbatim / no source quote provided / could not be checked against the paper text; page-image studies only; cleared by all four means/SDs; text_fallback unchanged. Token stays quote_not_found; html_report plain wording now says "missing, could not be checked, or was not found in the paper's text".
+  - Branch count stays 5 (new outcome is part of branch 5, verbatim_mismatch); docs/sr/REVIEWER_GUIDE.md section 2.2 item 5 got one line; HANDOFF "actually fires on five" still true.
+  - Left open: the machine skip_reason still says "source quote not found" for missing/unchecked quotes; how often paper_text is empty depends on get_paper_text (main.py ~576-592), not yet read.
+  - Not yet run live. New tests/test_sr_quote_unchecked.py (13); suite 1408 -> 1421, 10 deselected.
   - DO NOT MERGE v2.11-sr-local yet. PR #9 stays a draft.
