@@ -317,7 +317,7 @@ def _log_stage4_summary(meta_audit: list[dict],
         logger.warning(
             f"[AGREEMENT] {len(flagged)} of {len(voted)} voted studies "
             f"disagreed across N runs ({len(mandatory)} mandatory: "
-            f"no_majority/table_shift = the runs read different table "
+            f"no_majority/table_shift/mixed_runs = the runs read different table "
             f"cells; a majority there is not evidence). Verify each "
             f"against the source PDF before trusting this pooled estimate "
             f"(#11):")

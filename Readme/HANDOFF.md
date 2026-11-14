@@ -48,7 +48,7 @@ so those catches happen at session open, not mid-work.
 
 | Component      | Status |
 |----------------|--------|
-| Tests | 1357 passed, 10 deselected on v2.11-sr-local (Session 41); main 1282 (8a8a42e, PR #8 merged) (python -m pytest -m "not live" --tb=short -q) |
+| Tests | 1371 passed, 10 deselected on v2.11-sr-local (Session 41); main 1282 (8a8a42e, PR #8 merged) (python -m pytest -m "not live" --tb=short -q) |
 | Branch         | main = ef66b9f (PR #7 merged 2026-11-10: F7 truth fixture sr_truth.yaml + scripts/sr_score_run.py). Work on v2.10-sr-screening, PR #8 open: shared paper text (b3d804c), prisma_criteria write-if-changed (afd90a3), RoB2 overall rule (3e3785e), RoB2 Methods/Results text (908f889, 306d838), registration lines to RoB2 (Session 38); Session 38: Karlsson/Ang overrides (cf75209), RoB2 Domain 4 self-report rule (46fbd9b), Domain 4 High outright (e4e97b8), Ang excluded by reviewer + not-pooled report section (a56dc55), plain report reasons + POOLED line (0bf59dc), fibromyalgia set moved to reference/ (7h, b32f4c4), REVIEWER_GUIDE rewrite + readme_sr_pipeline.txt (docs, this commit). Branches v2.6-ocr-editor, v2.5-major-updates, v2.7-sr-fixes, v2.8-sr-review-gate, v2.9-sr-fixture deleted |
 | CI | green on PR #8 at green on PR #8 at 05e55b7 (1276 passed, 10 deselected, 57 warnings). Last confirmed on main: bcd42d9 (2026-11-09, 1027, both jobs). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
 | SR docs        | Readme/readme_sr_pipeline.txt = how the SR pipeline works and why (logic, rationale, accuracy evidence, Appendix A worked example); no how-to. How-to = Readme/flashcard-help.html. study_overrides.yaml fields and format = REVIEWER_GUIDE section 5.
@@ -2821,4 +2821,26 @@ Session 39 closed items 4-11 (11e open). Job list, in order:
     writes its own log into the run folder.
   - Next code job (pick one, failing test first): vote mixing, RoB2 label
     definition, 4c (temperature log line), 4d (run log). Option 1 open.
+  - DO NOT MERGE v2.11-sr-local yet. PR #9 stays a draft.
+
+- Session 41 fix: vote mixing (mixed_runs).
+  - data_extractor._vote_runs: each field is still voted on its own; if no
+    single run holds every chosen numeric value, the vote adds the flag
+    mixed_runs (NONDET_FLAG_MIXED_RUNS). Gap closed: majorities from
+    different pairs of runs (e.g. 1+2, 1+3, 2+3) gave only ':majority'
+    flags, no table_shift, and the F4 gate pooled a set no run read.
+  - audit_logger: mixed_runs is a mandatory marker; review_skip_reason
+    treats it like table_shift (pooled only when a reviewer overrides all
+    four means/SDs).
+  - html_report: own sentence ('the chosen numbers came from different
+    repeated readings; no single reading had them all'); main.py Stage 4
+    [AGREEMENT] header names mixed_runs.
+  - Unchanged: no_majority keeps run 1's value (pinned by
+    test_agreement_no_majority_flags_and_keeps_first); ':majority' alone
+    is still pooled.
+  - Tests: tests/test_sr_vote_mixed_runs.py (14); suite 1357 -> 1371.
+    Its main_mod fixture drops the rob2_tool stub so the file passes alone.
+  - Trade-off: a run that left a voted field empty cannot be the single
+    run, so a few extra mixed_runs flags are possible (never a wrong pool).
+  - Still open: RoB2 label definition, 4c, 4d, option 1.
   - DO NOT MERGE v2.11-sr-local yet. PR #9 stays a draft.

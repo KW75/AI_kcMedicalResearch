@@ -61,6 +61,12 @@ NONDET_FLAG_SINGLE_RUN = "single_run"
 # like no_majority. Three-of-four alone is NOT enough: the 1-s2.0 paper
 # jittered three fields by one digit (0.85/0.95, 0.92/0.82) with no shift.
 NONDET_FLAG_TABLE_SHIFT = "table_shift"
+# `mixed_runs` (Session 41): each field is voted on its own, so majorities from
+# different pairs of runs can build a set no single run read (20261114_184026
+# Karlsson: mean_control 48.8 from run 1, the rest ~3.6 from runs 2-3). Added
+# when no run holds every chosen numeric value; the F4 gate treats it like
+# table_shift. no_majority still keeps run 1's value.
+NONDET_FLAG_MIXED_RUNS = "mixed_runs"
 
 
 def _sampling_defaults_from_env():
@@ -1920,6 +1926,11 @@ for that field - NOT the quoted string "null".
 
         if self._looks_like_table_shift(keys, chosen_idx, detail, n):
             flag.append(NONDET_FLAG_TABLE_SHIFT)
+        # Session 41: no single run holds every chosen number -> mixed_runs.
+        num = [f for f in AGREEMENT_NUMERIC_FIELDS if f in chosen_idx]
+        if num and not any(all(keys[f][j] == keys[f][chosen_idx[f]] for f in num)
+                           for j in range(n)):
+            flag.append(NONDET_FLAG_MIXED_RUNS)
 
         # Base run = the one that already holds the chosen value most often.
         score = [sum(1 for f, i in chosen_idx.items() if keys[f][i] == keys[f][j])

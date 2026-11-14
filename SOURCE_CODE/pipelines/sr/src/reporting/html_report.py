@@ -138,10 +138,12 @@ def _plain_one(part):
     if part.startswith("needs review"):
         head = "needs review: runs disagree ("
         flags = part[len(head):].split(")", 1)[0] if part.startswith(head) else ""
-        fields, shift = [], False
+        fields, shift, mixed = [], False, False
         for tok in (t.strip() for t in flags.split("|")):
             if tok == "table_shift":
                 shift = True
+            elif tok == "mixed_runs":
+                mixed = True
             elif tok.endswith(":no_majority"):
                 f = tok.split(":", 1)[0]
                 fields.append(_FIELD_WORDS.get(f, f.replace("_", " ")))
@@ -151,6 +153,9 @@ def _plain_one(part):
                         + ", ".join(fields) + ")")
         if shift:
             bits.append("one of the repeated readings took a neighbouring table row")
+        if mixed:
+            bits.append("the chosen numbers came from different repeated readings; "
+                        "no single reading had them all")
         if not bits:
             bits.append("the AI read different values on repeated readings")
         text = "; ".join(bits)

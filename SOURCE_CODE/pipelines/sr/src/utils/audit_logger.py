@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 # error rows and on the Anthropic path where no vote runs.
 NONDET_CELL_UNANIMOUS = "unanimous"
 NONDET_CELL_NOT_CHECKED = "not_checked"
-NONDET_MANDATORY_MARKERS = ("no_majority", "table_shift")
+NONDET_MANDATORY_MARKERS = ("no_majority", "table_shift", "mixed_runs")
 
 
 def nondet_flag_to_cell(flag) -> str:
@@ -64,7 +64,7 @@ def review_skip_reason(cell, override_fields=None):
     A mandatory nondet flag (no_majority / table_shift) means the N runs read
     different table cells; baseline 20261110_120707 pooled Jensen and Lami
     with numbers that are not in the PDFs. The row passes only if a reviewer
-    overrode every flagged field (table_shift: all four means/SDs).
+    overrode every flagged field (table_shift / mixed_runs: all four means/SDs).
     """
     cell = cell or ""
     if not nondet_cell_is_mandatory(cell):
@@ -72,7 +72,7 @@ def review_skip_reason(cell, override_fields=None):
     done = _overridden_fields(override_fields)
     still_open = []
     for tok in (t.strip() for t in cell.split("|")):
-        if tok == "table_shift":
+        if tok in ("table_shift", "mixed_runs"):
             if not all(f in done for f in _REVIEW_NUMERIC_FIELDS):
                 still_open.append(tok)
         elif tok.endswith(":no_majority"):
