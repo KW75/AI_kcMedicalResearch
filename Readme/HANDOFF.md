@@ -2779,3 +2779,46 @@ Session 39 closed items 4-11 (11e open). Job list, in order:
   - This proves the rule is SENT, not that gemma4:e4b obeys it. Check:
     repeat the reference run; Jensen and Karlsson must be INCLUDE.
   - Still open: 4c, 4d, option 1. PR #9 stays a draft.
+
+- Session 41 reference rerun (2026-11-14): local SR run 20261114_184026.
+  - Setup: gemma4:e4b, N=3, OLLAMA_TEMPERATURE 0.3, OLLAMA_CONTEXT 64000;
+    same 5 PDFs and pico_20261112_210735.json as 20261114_133303 and the
+    qwen baseline 20261112_210735; study_overrides.yaml empty; 18:40-19:03,
+    local, no cloud, no OOM. Code at e75b497 (CI green).
+  - Option 3 passed live: screening 5 INCLUDE / 0 EXCLUDE (Jensen and
+    Karlsson back in; Session 40 excluded them at confidence 1.0). One run
+    at temperature 0.3: the rule can work, not proven that it always does.
+  - Fix 4a passed live: [METADATA] replaced 'Kim' by 'Lami', 2011 by 2017,
+    'Karin B. Jensen' by 'Jensen'. Fix 4b passed live: the scorer now finds
+    Jensen, Karlsson, Lami and McCrae (4 checked).
+  - Extraction: AI alone 0 of 4 fully correct; POOLED 0 of 5 (table_shift
+    and no_majority flags kept every bad set out). Stage 4 stopped with
+    < 2 usable studies; no new report (output/sr files are old copies).
+    Correct: Karlsson n 24/24, Lami n_control 36. Every mean and SD wrong.
+  - New bug (vote mixing): each field is voted on separately, so the chosen
+    set can combine values no single run read. Karlsson: mean_control 48.8
+    (run 1, other scale) with the rest ~3.6 from runs 2-3 -> g = -50.2.
+    With no_majority the vote appears to take run 1's value (Jensen: all 3
+    no_majority fields; confirm in code). Fix idea: vote on whole runs
+    (one consistent set). Failing test first.
+  - Jensen check: McCrae's truth values (46.86 / 52.38 / 24.06) appear
+    nowhere in SOURCE_CODE, so no leak from code or prompts. Jensen runs
+    read means [46.9, 52.4, 46.9] / [52.0, 65.0, 58.3], SDs 1.1 to 28.0;
+    the quotes ('46.9 +/- 1.1') were not found verbatim. Treated as misread
+    or invented; not yet checked against the PDF (pages 3 / 7).
+  - RoB2: overall High for all 5 in both runs (domain 4: self-reported
+    pain, participants knew their arm; expected). But gemma4:e4b domain
+    labels contradict their justifications: randomisation High for all 5
+    while the text describes adequate methods ('sealed envelopes, which
+    meets criteria for high risk'); reported_result High for Ang and the
+    Jensen PDF because results were 'clearly reported'; Jensen domain 4
+    text argues High, label says Some concerns. Domain-level RoB2 from
+    gemma4:e4b is not trustworthy. Fix idea: a prompt line defining High as
+    high risk of bias (bad) plus a test, or RoB2 on qwen behind the cloud
+    gate.
+  - 4d: the Start-Transcript file reports/sr/rerun_gemma_console.txt was
+    never created, so no transcript workaround. Fix in code: the pipeline
+    writes its own log into the run folder.
+  - Next code job (pick one, failing test first): vote mixing, RoB2 label
+    definition, 4c (temperature log line), 4d (run log). Option 1 open.
+  - DO NOT MERGE v2.11-sr-local yet. PR #9 stays a draft.
