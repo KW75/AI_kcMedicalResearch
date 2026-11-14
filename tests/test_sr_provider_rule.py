@@ -36,3 +36,45 @@ def test_run_cli_stops_before_any_work_on_a_refused_sr_provider(capsys):
         main.run_cli(args)
     assert e.value.code == 1
     assert "anthropic" in capsys.readouterr().out
+
+
+# --- Session 40: a .env DEFAULT_PROVIDER that SR cannot use must not stop
+# SR when --provider was not typed (CI sets deepseek). A typed --provider is
+# still refused. Tests set DEFAULT_PROVIDER themselves: no .env dependence.
+
+def _run_sr(monkeypatch, env_default, argv):
+    calls = []
+    monkeypatch.setattr(main, "DEFAULT_PROVIDER", env_default)
+    monkeypatch.setattr(main, "validate_api_keys", lambda *a, **k: None)
+    monkeypatch.setattr(main, "run_sr_launcher",
+                        lambda **kw: calls.append(kw))
+    main.run_cli(main.parse_args(argv))
+    return calls
+
+
+def test_env_default_sr_cannot_use_falls_back_to_sr_default(monkeypatch, capsys):
+    calls = _run_sr(monkeypatch, "deepseek", ["--mode", "sr", "--confirm-cloud"])
+    assert calls and calls[0]["provider"] == main.SR_DEFAULT_PROVIDER
+    assert main.SR_DEFAULT_PROVIDER in main.SR_PROVIDERS
+    out = capsys.readouterr().out
+    assert "deepseek" in out and main.SR_DEFAULT_PROVIDER in out
+
+
+def test_env_default_sr_can_use_is_kept(monkeypatch):
+    calls = _run_sr(monkeypatch, "ollama", ["--mode", "sr", "--confirm-cloud"])
+    assert calls and calls[0]["provider"] == "ollama"
+
+
+def test_typed_provider_still_refused_whatever_env_says(monkeypatch):
+    with pytest.raises(SystemExit) as e:
+        _run_sr(monkeypatch, "ollama",
+                ["--mode", "sr", "--provider", "deepseek", "--confirm-cloud"])
+    assert e.value.code == 1
+
+
+def test_parse_args_records_whether_provider_was_typed(monkeypatch):
+    monkeypatch.setattr(main, "DEFAULT_PROVIDER", "deepseek")
+    a = main.parse_args(["--mode", "coding"])
+    assert a.provider == "deepseek" and a.provider_explicit is False
+    b = main.parse_args(["--mode", "coding", "--provider", "qwen"])
+    assert b.provider == "qwen" and b.provider_explicit is True

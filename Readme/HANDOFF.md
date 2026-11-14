@@ -48,7 +48,7 @@ so those catches happen at session open, not mid-work.
 
 | Component      | Status |
 |----------------|--------|
-| Tests | 1295 passed, 10 deselected on v2.11-sr-local (Session 40); main 1282 (8a8a42e, PR #8 merged) (python -m pytest -m "not live" --tb=short -q) |
+| Tests | 1299 passed, 10 deselected on v2.11-sr-local (Session 40); main 1282 (8a8a42e, PR #8 merged) (python -m pytest -m "not live" --tb=short -q) |
 | Branch         | main = ef66b9f (PR #7 merged 2026-11-10: F7 truth fixture sr_truth.yaml + scripts/sr_score_run.py). Work on v2.10-sr-screening, PR #8 open: shared paper text (b3d804c), prisma_criteria write-if-changed (afd90a3), RoB2 overall rule (3e3785e), RoB2 Methods/Results text (908f889, 306d838), registration lines to RoB2 (Session 38); Session 38: Karlsson/Ang overrides (cf75209), RoB2 Domain 4 self-report rule (46fbd9b), Domain 4 High outright (e4e97b8), Ang excluded by reviewer + not-pooled report section (a56dc55), plain report reasons + POOLED line (0bf59dc), fibromyalgia set moved to reference/ (7h, b32f4c4), REVIEWER_GUIDE rewrite + readme_sr_pipeline.txt (docs, this commit). Branches v2.6-ocr-editor, v2.5-major-updates, v2.7-sr-fixes, v2.8-sr-review-gate, v2.9-sr-fixture deleted |
 | CI | green on PR #8 at green on PR #8 at 05e55b7 (1276 passed, 10 deselected, 57 warnings). Last confirmed on main: bcd42d9 (2026-11-09, 1027, both jobs). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
 | SR docs        | Readme/readme_sr_pipeline.txt = how the SR pipeline works and why (logic, rationale, accuracy evidence, Appendix A worked example); no how-to. How-to = Readme/flashcard-help.html. study_overrides.yaml fields and format = REVIEWER_GUIDE section 5.
@@ -2609,3 +2609,17 @@ Session 39 closed items 4-11 (11e open). Job list, in order:
      N=3, field by field vs qwen3-vl-plus and the PDFs (sr_score_run.py).
 - Not changed: flashcard-help.html footer (v2.4.6, 401 tests) is still job 2,
   in its own commit.
+
+- Fix (CI red on PR #9, 6d61ed2): test_main_coverage
+  test_sr_mode_never_reaches_choose_role failed on CI only. CI sets
+  DEFAULT_PROVIDER=deepseek; parse_args filled --provider from it, so the new
+  sr_provider_error refused an SR run where no provider was typed (dev .env
+  says ollama, so it passed locally). Real bug: a user with that .env could
+  not start SR. Now: parse_args sets ns.provider_explicit (--provider default
+  None, then filled from DEFAULT_PROVIDER); run_cli refuses a TYPED provider
+  that SR cannot use (exit 1), but replaces a .env default that SR cannot use
+  with SR_DEFAULT_PROVIDER (qwen; commit 2 -> ollama), with one [i] line,
+  before the cloud gate and the SR route. Other modes unchanged. Tests: 4 new
+  in test_sr_provider_rule.py (they set DEFAULT_PROVIDER themselves). Suite
+  1295 -> 1299. Lesson repeated from Session 29: a test that passes because
+  of the dev .env proves nothing; set the value inside the test.

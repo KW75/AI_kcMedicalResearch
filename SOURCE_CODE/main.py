@@ -2396,7 +2396,7 @@ def parse_args(args: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--role",           type=str, default="Builder",
                         choices=["Builder", "Reviewer", "Tester"],
                         help="Starting role for --revise pipeline (default: Builder)")
-    parser.add_argument("--provider",       type=str, default=DEFAULT_PROVIDER,
+    parser.add_argument("--provider",       type=str, default=None,
                         choices=["ollama", "openai", "anthropic", "deepseek", "groq", "qwen"])
     parser.add_argument("--confirm-cloud",  action="store_true", default=False,
                         help="Agree in advance to send this job's input to the cloud "
@@ -2425,6 +2425,10 @@ def parse_args(args: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument('--sub', '--submode', type=str, default=None,
                     help='Sub-mode selection: 1=Topic Search, 2=Article Search')
     ns = parser.parse_args(args)
+    # Session 40: record whether --provider was typed, then fill the default.
+    ns.provider_explicit = ns.provider is not None
+    if ns.provider is None:
+        ns.provider = DEFAULT_PROVIDER
     import time_limits  # stdlib-only; every entry point goes through parse_args
     time_limits.set_limit(time_limits.parse(ns.time_limit))
     return ns
@@ -2449,6 +2453,8 @@ def ocr_provider_error(mode: str, provider: str) -> str | None:
 
 # Session 40: SR reads page images like OCR, so it uses the same list.
 SR_PROVIDERS = OCR_PROVIDERS
+# SR default when no usable provider is given (commit 2 changes it to "ollama").
+SR_DEFAULT_PROVIDER = "qwen"
 
 
 def sr_provider_error(mode: str, provider: str | None) -> str | None:
@@ -2475,10 +2481,17 @@ def run_cli(args: argparse.Namespace) -> None:
     entry-point guard below owns the clean-exit message.
     """
 
-    sr_error = sr_provider_error(args.mode, args.provider)
-    if sr_error:
-        print(sr_error)
-        sys.exit(1)
+    # Session 40: SR provider. A typed --provider that SR cannot use is
+    # refused. A .env DEFAULT_PROVIDER that SR cannot use is replaced by the
+    # SR default, before the cloud gate and the SR route see it.
+    if args.mode == "sr" and args.provider and args.provider not in SR_PROVIDERS:
+        if getattr(args, "provider_explicit", True):
+            print(sr_provider_error(args.mode, args.provider))
+            sys.exit(1)
+        print(f"[i] SR: DEFAULT_PROVIDER={args.provider} cannot be used for SR; "
+              f"using {SR_DEFAULT_PROVIDER} for this run "
+              "(choose with --provider ollama, qwen or openai).")
+        args.provider = SR_DEFAULT_PROVIDER
     ocr_error = ocr_provider_error(args.mode, args.provider)
     if ocr_error:
         print(ocr_error)
