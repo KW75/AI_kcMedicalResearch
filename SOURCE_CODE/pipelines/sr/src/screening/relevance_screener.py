@@ -14,6 +14,11 @@ MAX_SCREEN_CHARS = 6000  # total chars passed to the screening prompt
 
 PROMPT = """You are a systematic review methodologist performing full-text screening.
 PICO CRITERIA:\n{pico}\nINCLUSION:\n{inclusion}\nEXCLUSION:\n{exclusion}
+OUTCOME RULE: the outcome criterion asks whether the trial MEASURED and
+reported the outcome, not whether the intervention improved it. A trial that
+reports the outcome with no effect, a null result or a non-significant
+difference still meets it (outcome: true). Never EXCLUDE a trial because its
+result was null or unfavourable; excluding on results biases the review.
 The attached PDF is a candidate RCT. Return ONLY valid JSON:
 {{"decision":"INCLUDE"|"EXCLUDE"|"UNCERTAIN","confidence":<0.0-1.0>,
 "pico_match":{{"population":true|false|null,"intervention":true|false|null,
@@ -286,8 +291,17 @@ class RelevanceScreener:
             _last_err = None
             for _attempt in range(1, 4):
                 try:
-                    with _ur.urlopen(req, timeout=120) as resp:
-                        data = _json.loads(resp.read())
+                    if self.provider == "ollama":
+                        # Session 40 (commit 3a): native /api/generate with
+                        # num_ctx from OLLAMA_CONTEXT; the /v1 route set none
+                        # and could cut the article text silently.
+                        import providers  # lazy, like data_extractor.py
+                        _text = providers.call_ollama_provider(
+                            full_prompt, model=self.model, max_tokens=1024)
+                        data = {"choices": [{"message": {"content": _text}}]}
+                    else:
+                        with _ur.urlopen(req, timeout=120) as resp:
+                            data = _json.loads(resp.read())
                     break
                 except _ue.HTTPError as http_err:
                     body = http_err.read().decode("utf-8", errors="replace")
@@ -299,6 +313,9 @@ class RelevanceScreener:
                 except (_ue.URLError, _hc.HTTPException,
                         ConnectionError, TimeoutError, OSError) as net_err:
                     _last_err = net_err
+                except RuntimeError as ollama_err:
+                    # Ollama (commit 3a): empty answer or not reachable -> retry
+                    _last_err = ollama_err
                 if _attempt < 3:
                     logger.warning(
                         f"Screening call attempt {_attempt}/3 failed for "

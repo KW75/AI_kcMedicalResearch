@@ -50,3 +50,19 @@ def test_future_modes_get_no_docs_folder(tmp_path):
     PathManager(tmp_path)
     for mode in FUTURE_MODES:
         assert not (tmp_path / "docs" / mode).exists(), f"docs/{mode} should not exist yet"
+
+
+# Session 41 tidy: PathManager recreated an empty SOURCE_CODE/docs on every
+# import (PATH_MANAGER = PathManager()); aa0f210 removed it but it kept
+# coming back. Nothing stores files there, so it must not be created.
+def test_does_not_create_source_code_docs(tmp_path):
+    PathManager(tmp_path)
+    assert not (tmp_path / "SOURCE_CODE" / "docs").exists()
+    assert (tmp_path / "SOURCE_CODE").is_dir()
+    assert (tmp_path / "docs" / "sr").is_dir()
+
+
+def test_doc_dir_path_still_available(tmp_path):
+    pm = PathManager(tmp_path)
+    assert pm.doc_dir == tmp_path / "SOURCE_CODE" / "docs"
+    assert pm.get_mode_reference_path("sr") == tmp_path / "SOURCE_CODE" / "docs" / "modes" / "sr.md"

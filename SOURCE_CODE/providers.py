@@ -283,6 +283,12 @@ def ollama_model_missing_message(model: str) -> str:
     )
 
 
+def ollama_temperature() -> float:
+    """OLLAMA_TEMPERATURE (default 0.3): the temperature every Ollama call
+    sends. The SR [SAMPLING] log line shows it too (Session 41, 4c)."""
+    return float(os.getenv("OLLAMA_TEMPERATURE", "0.3"))
+
+
 def call_ollama_provider(
     prompt: str,
     model: str | None = None,
@@ -305,7 +311,7 @@ def call_ollama_provider(
         "options": {
             "num_predict": max_tokens,
             "num_ctx": int(os.getenv("OLLAMA_CONTEXT", "32768")),
-            "temperature": float(os.getenv("OLLAMA_TEMPERATURE", "0.3")),
+            "temperature": ollama_temperature(),
             "top_p": 0.9,
             "repeat_penalty": 1.1,
         },

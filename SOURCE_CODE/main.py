@@ -1371,7 +1371,7 @@ def _sr_default_model(provider: str) -> str:
     return sr_default_model(provider)
 
 
-def run_sr_launcher(provider: str = "", model: str = "") -> None:
+def run_sr_launcher(provider: str = "", model: str = "", confirm=None) -> None:
     """Run the SR automation pipeline (CLI mode)."""
     import shutil
     import subprocess as _sp
@@ -1509,7 +1509,7 @@ def run_sr_launcher(provider: str = "", model: str = "") -> None:
 
     # -- Step 4: resolve provider and model ------------------------------------
 
-    _provider = provider or "qwen"
+    _provider = provider or SR_DEFAULT_PROVIDER
     
     # --- Provider check for vision support ---
     if _provider == "deepseek":
@@ -1539,6 +1539,20 @@ def run_sr_launcher(provider: str = "", model: str = "") -> None:
     
 
     _model = model or _sr_default_model(_provider)
+    # Session 40: a local model must be able to read page images; stop before
+    # any AI call otherwise (as OCR does).
+    if _provider == "ollama":
+        _verr = sr_ollama_vision_error(_model)
+        if _verr:
+            print("\n" + _verr)
+            # Session 40 (commit 3b): offer qwen/openai like OCR, only when
+            # SR picked the model itself (a typed --model gets no offer).
+            _cloud = None if model else sr_offer_cloud(confirm)
+            if _cloud is None:
+                return
+            _provider = _cloud
+            _model = _sr_default_model(_provider)
+            print(f"[SR] Using {_provider} / {_model} (cloud, confirmed).")
 
 
     # -- Step 5: run sr/main.py (as a module so relative imports resolve) -----
@@ -2396,7 +2410,7 @@ def parse_args(args: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--role",           type=str, default="Builder",
                         choices=["Builder", "Reviewer", "Tester"],
                         help="Starting role for --revise pipeline (default: Builder)")
-    parser.add_argument("--provider",       type=str, default=DEFAULT_PROVIDER,
+    parser.add_argument("--provider",       type=str, default=None,
                         choices=["ollama", "openai", "anthropic", "deepseek", "groq", "qwen"])
     parser.add_argument("--confirm-cloud",  action="store_true", default=False,
                         help="Agree in advance to send this job's input to the cloud "
@@ -2425,6 +2439,10 @@ def parse_args(args: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument('--sub', '--submode', type=str, default=None,
                     help='Sub-mode selection: 1=Topic Search, 2=Article Search')
     ns = parser.parse_args(args)
+    # Session 40: record whether --provider was typed, then fill the default.
+    ns.provider_explicit = ns.provider is not None
+    if ns.provider is None:
+        ns.provider = DEFAULT_PROVIDER
     import time_limits  # stdlib-only; every entry point goes through parse_args
     time_limits.set_limit(time_limits.parse(ns.time_limit))
     return ns
@@ -2434,30 +2452,6 @@ def parse_args(args: list[str] | None = None) -> argparse.Namespace:
 # ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
-def sr_provider_warning(mode: str, provider: str):
-    """Return the SR warning for a provider that skips checks, else None.
-
-    Anthropic extraction (_extract_anthropic) gets structured JSON, not the
-    PDF text, so it calls _flag_suspect_source_quotes(source_text=None).
-    Two checks cannot run there: the verbatim quote-in-source check and the
-    text-line SD/SE check (_flag_possible_se_as_sd). Group/timepoint and the
-    other source-quote checks still run. See REVIEWER_GUIDE.md section 6.
-    """
-    if mode != "sr" or provider != "anthropic":
-        return None
-    return (
-        "\n[!] Note: with --provider anthropic, two SR checks cannot run, "
-        "because this route has no extracted text from the PDF:\n"
-        "    - source quotes are not checked word for word against the "
-        "paper's text\n"
-        "    - the text-line SD/SE check does not run\n"
-        "    The other checks still run. See docs/sr/REVIEWER_GUIDE.md "
-        "section 6, which explains when to prefer --provider qwen.\n"
-        "    Manual verification against source PDFs remains required "
-        "either way.\n"
-    )
-
-
 OCR_PROVIDERS = ("ollama", "qwen", "openai")
 
 
@@ -2467,6 +2461,61 @@ def ocr_provider_error(mode: str, provider: str) -> str | None:
     Groq/Anthropic are not wired for OCR yet."""
     if mode == "ocr" and provider not in OCR_PROVIDERS:
         return (f"OCR: {provider} cannot be used to read page images. "
+                "Use --provider ollama (local), qwen or openai.")
+    return None
+
+
+# Session 40: SR reads page images like OCR, so it uses the same list.
+SR_PROVIDERS = OCR_PROVIDERS
+# SR default when no usable provider is given: local first (Session 40, commit 2).
+SR_DEFAULT_PROVIDER = "ollama"
+
+
+def sr_ollama_vision_error(model: str, caps_fn=None, host=None) -> str | None:
+    """SR on Ollama needs a vision model (as OCR). The check lives in
+    ollama_models.sr_vision_error so the direct run of pipelines/sr/main.py
+    uses the same one (Session 40, commit 3b)."""
+    import ollama_models
+    return ollama_models.sr_vision_error(model, caps_fn=caps_fn, host=host)
+
+
+# Cloud providers SR can offer when no local vision model is usable: same as
+# OCR (pipelines/ocr/cli.py CLOUD_KEYS; a test keeps them equal).
+SR_CLOUD_KEYS = {"qwen": "DASHSCOPE_API_KEY", "openai": "OPENAI_API_KEY"}
+
+
+def sr_offer_cloud(confirm, input_fn=input, log=print) -> str | None:
+    """Local model cannot read page images: offer qwen/openai (API key set),
+    like OCR. Needs a consent function; returns the provider, or None = SR
+    not run (no key, no consent function, Enter, wrong number, no 'y')."""
+    choices = [p for p, k in SR_CLOUD_KEYS.items() if os.getenv(k, "").strip()]
+    if not confirm or not choices:
+        return None
+    log("A cloud AI can read the pages instead, but page images and the "
+        "text of your papers will leave this machine.")
+    for i, p in enumerate(choices, start=1):
+        log(f"  {i}. {p}")
+    answer = input_fn("Cloud provider number (Enter = cancel): ").strip()
+    if not answer:
+        log("Cancelled. SR not run.")
+        return None
+    if not answer.isdigit() or not 1 <= int(answer) <= len(choices):
+        log("Not a valid number. SR not run.")
+        return None
+    provider = choices[int(answer) - 1]
+    if not confirm(provider):
+        log("Cloud not confirmed. SR not run.")
+        return None
+    return provider
+
+
+def sr_provider_error(mode: str, provider: str | None) -> str | None:
+    """SR: local Ollama (vision model) first; qwen / openai only behind the
+    cloud gate. DeepSeek has no image input; Anthropic and Groq are refused
+    (Session 40, replaces the old Anthropic warning). No provider given ->
+    None: the SR route picks its default."""
+    if mode == "sr" and provider and provider not in SR_PROVIDERS:
+        return (f"SR: {provider} cannot be used for the SR pipeline. "
                 "Use --provider ollama (local), qwen or openai.")
     return None
 
@@ -2484,9 +2533,17 @@ def run_cli(args: argparse.Namespace) -> None:
     entry-point guard below owns the clean-exit message.
     """
 
-    sr_warning = sr_provider_warning(args.mode, args.provider)
-    if sr_warning:
-        print(sr_warning)
+    # Session 40: SR provider. A typed --provider that SR cannot use is
+    # refused. A .env DEFAULT_PROVIDER that SR cannot use is replaced by the
+    # SR default, before the cloud gate and the SR route see it.
+    if args.mode == "sr" and args.provider and args.provider not in SR_PROVIDERS:
+        if getattr(args, "provider_explicit", True):
+            print(sr_provider_error(args.mode, args.provider))
+            sys.exit(1)
+        print(f"[i] SR: DEFAULT_PROVIDER={args.provider} cannot be used for SR; "
+              f"using {SR_DEFAULT_PROVIDER} for this run "
+              "(choose with --provider ollama, qwen or openai).")
+        args.provider = SR_DEFAULT_PROVIDER
     ocr_error = ocr_provider_error(args.mode, args.provider)
     if ocr_error:
         print(ocr_error)
@@ -2564,6 +2621,8 @@ def run_cli(args: argparse.Namespace) -> None:
         run_sr_launcher(
             provider=args.provider,
             model=args.model,
+            confirm=lambda p: confirm_data_destinations(
+                "sr", p, confirm_cloud=args.confirm_cloud),
         )
     elif args.mode == "rct_search":
         run_rct_search_pipeline(

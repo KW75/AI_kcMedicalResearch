@@ -126,7 +126,7 @@ patterns, checked per arm:
 5. **Verbatim mismatch against the source text.** The quote could not be
    found verbatim (after whitespace and case normalisation) in the raw source
    text the extractor worked from. This runs only on paths that have raw text
-   (the qwen text-fallback path), not on pure-vision or Anthropic paths. A
+   (the qwen text-fallback path); see the Session 39 note below for image extractions. The Anthropic path never ran it, and SR refuses that provider since Session 40. A
    missing branch-5 result means the check could not run, not that it passed.
   Since Session 39 (item 10) this check also runs on image extractions, against the shared paper text (input/sr/paper_text/). Matching ignores case, punctuation and OCR marks; a table row whose numbers appear in the same order nearby also counts as found. A reworded sentence still warns.
 
@@ -240,7 +240,7 @@ and `nondet_runs`; per-run values are in `extracted_data.csv`
 | any `field:no_majority` | all runs differed | **not pooled** until the reviewer enters the field (§5) |
 | `table_shift` | runs read neighbouring cells (all four mean/SD fields disagree, or one arm's pair equals the other arm's). A 2-of-3 majority here is a coin flip | **not pooled** until the reviewer enters all four means/SDs |
 | `single_run` | `--n-agreement 1`; nothing voted | re-run with the default |
-| `not_checked` | extraction error, or Anthropic path | n/a |
+| `not_checked` | extraction error, or Anthropic path (runs before Session 40) | n/a |
 
 Example of `table_shift`: Karlsson, two readings took Pain severity
 3.88 (1.05) vs 3.67 (0.75), one took the next row (Interference).
@@ -473,11 +473,11 @@ compares two treated groups.
 | Outcome tables may be embedded images | Values cannot be cross-checked against the text | Manual verification is the only check |
 | Author/year heuristics fail on unusual name formats | Wrong study labels | Flagged `pdf_auto (verify)`; override as needed |
 | No semantic SD/SE disambiguation | Silent ~8× error in dispersion (§2.2) | Source-quote branch 3; item 3.1 |
-| Text-line SD/SE tripwire (`sd_se_warning`) and verbatim branch 5 do not run on the Anthropic path | That path receives structured JSON and never sees raw PDF text. Branch 3 still runs and catches an SE label quoted with the value; the uncovered case is an SE value reported as SD without the label in the quote. `group_timepoint_warning` runs on Anthropic. This is a permanent limitation of that path | Prefer `--provider qwen` where SE/SD confusion is likely (its text fallback adds a second SE check). Item 3.1 on every Anthropic run |
+| Text-line SD/SE tripwire (`sd_se_warning`) and verbatim branch 5 did not run on the Anthropic path | Applies only to runs made before Session 40: SR now refuses `--provider anthropic` (it uses ollama, qwen or openai, like OCR). That path received structured JSON and never saw raw PDF text; branch 3 still ran | Re-check any older Anthropic run with item 3.1 |
 | No semantic within- vs between-group detection | Silent invalid effect size (§2.2) | Source-quote branch 4; item 3.1 |
 | Quote check is a tripwire, not a verifier | Hallucinated or misattributed quotes do not flag | `source_quote_warning = None` is not "correct" |
 | Quote matching is character-level | Thousands separators can miss (`1234` vs `1,234`) | Treat a mismatch as a prompt; check the digits in the table |
-| Retry, OCR and quote-check behaviour tested on the qwen path only | Anthropic path may behave differently | Reviewer verification on any Anthropic run |
+| Retry, OCR and quote-check behaviour tested on the qwen path only | The openai and ollama paths may behave differently | Reviewer verification on any run not made with qwen |
 | RoB 2 judgements vary outside Domain 4 | Different runs give different domain judgements | §3.6 |
 | RoB 2 runs independently of overrides | RoB may use text of a study whose data was hand-entered | Review RoB judgements separately |
 

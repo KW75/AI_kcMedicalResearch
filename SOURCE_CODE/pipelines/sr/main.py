@@ -63,6 +63,33 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s -- %(message)s")
 logger = logging.getLogger("sr.main")
 
+_RUN_LOG_FORMAT = "%(asctime)s [%(levelname)s] %(name)s -- %(message)s"
+
+
+def attach_run_log(folder):
+    """Session 41 (4d): also write this run's log to <folder>/run.log.
+    Run 20261114_184026 left no log. An earlier run-log handler (a run that
+    returned early) is removed first, so no line goes to an old folder."""
+    root = logging.getLogger()
+    for old in list(root.handlers):
+        if getattr(old, "_sr_run_log", False):
+            detach_run_log(old)
+    folder = Path(folder)
+    folder.mkdir(parents=True, exist_ok=True)
+    h = logging.FileHandler(folder / "run.log", encoding="utf-8")
+    h.setFormatter(logging.Formatter(_RUN_LOG_FORMAT))
+    h._sr_run_log = True
+    root.addHandler(h)
+    return h
+
+
+def detach_run_log(handler):
+    """Stop writing run.log and close the file."""
+    if handler is None:
+        return
+    logging.getLogger().removeHandler(handler)
+    handler.close()
+
 SR_DIR = Path(__file__).resolve().parent
 
 # ---------------------------------------------------------------------------
@@ -317,7 +344,7 @@ def _log_stage4_summary(meta_audit: list[dict],
         logger.warning(
             f"[AGREEMENT] {len(flagged)} of {len(voted)} voted studies "
             f"disagreed across N runs ({len(mandatory)} mandatory: "
-            f"no_majority/table_shift = the runs read different table "
+            f"no_majority/table_shift/mixed_runs = the runs read different table "
             f"cells; a majority there is not evidence). Verify each "
             f"against the source PDF before trusting this pooled estimate "
             f"(#11):")
@@ -451,10 +478,10 @@ def main():
                     choices=["OR", "RR", "MD", "SMD"])
     ap.add_argument("--model",          default=None,
                     help="Model name (default: provider's configured model)")
-    ap.add_argument("--provider",       default="qwen",
-                    choices=["ollama", "openai", "anthropic",
-                             "deepseek", "groq", "qwen"],
-                    help="AI provider for screening and extraction")
+    ap.add_argument("--provider",       default="ollama",
+                    choices=["ollama", "qwen", "openai"],
+                    help="AI provider for screening and extraction "
+                         "(Session 40: local Ollama first, like OCR)")
     ap.add_argument("--run-id",         default=None,
                     help="Override run timestamp (e.g. for re-runs)")
     ap.add_argument("--n-agreement",    default=None, type=int,
@@ -467,6 +494,13 @@ def main():
     args = ap.parse_args()
     args.model = resolve_model(args.provider, args.model)
     logger.info(f"Provider {args.provider} / model {args.model}")
+    # Session 40 (commit 3b): same vision check as the launcher, before any
+    # AI call. The direct run offers no cloud: retype with --provider qwen.
+    if args.provider == "ollama":
+        import ollama_models  # SOURCE_CODE is on sys.path (top of file)
+        _verr = ollama_models.sr_vision_error(args.model)
+        if _verr:
+            raise SystemExit(_verr)
 
     cfg = load_config(args.config)
 
@@ -500,7 +534,11 @@ def main():
 
     #  Initialise project layo
     layout = SRProjectLayout(run_id=args.run_id)
+    # Session 41 (4d): from here on, every log line also goes to run.log.
+    _run_log = attach_run_log(layout.project)
     logger.info(f"Project folder: {layout.project}")
+    logger.info(f"Run log: {Path(str(layout.project)) / 'run.log'}")
+    logger.info(f"Provider {args.provider} / model {args.model}")
     # Every audit CSV row carries this run's id: #17 (extraction
     # non-determinism) means the same paper can carry different values
     # in different runs' CSVs, and a CSV without a run id is silently
@@ -995,6 +1033,7 @@ def main():
     logger.info(f"  Extracts -> {layout.extracted_csv}")
     logger.info(f"  RoB2     -> {layout.rob2_csv}")
     logger.info(f"  Results  -> {layout.results_csv}")
+    detach_run_log(_run_log)
 
 if __name__ == "__main__":
     main()

@@ -4,7 +4,7 @@ A multi-mode AI assistant for medical research, critical appraisal, systematic r
 
 
     Version: 2.6.0
-    Tests: 1282 passed, 10 deselected
+    Tests: 1382 passed, 10 deselected
            (reproduce with `python -m pytest -m "not live" --tb=short -q`)
     CI: GitHub Actions - Green
     GitHub: https://github.com/KW75/AI_kcMedicalResearch
@@ -123,9 +123,9 @@ The launcher asks for it after the model (Enter = 15 minutes).
 | DeepSeek           | `--provider deepseek`  | `DEEPSEEK_API_KEY`   | Fast, cost-efficient                        |
 | Qwen               | `--provider qwen`      | `DASHSCOPE_API_KEY`  | Recommended for SR (auto-uses vision model) |
 | OpenAI             | `--provider openai`    | `OPENAI_API_KEY`     | GPT-4 vision                                |
-| Anthropic          | `--provider anthropic` | `ANTHROPIC_API_KEY`  | Claude vision - partial tripwires, see REVIEWER_GUIDE.md §6.  |
+| Anthropic          | `--provider anthropic` | `ANTHROPIC_API_KEY`  | Claude - not available for SR or OCR (they use ollama, qwen or openai). |
 | Groq               | `--provider groq`      | `GROQ_API_KEY`       | Fast inference                              |
-| Ollama (default)   | `--provider ollama`    | `OLLAMA_HOST`, `OLLAMA_MODEL` | Free, offline. Not for SR yet (the app does not send images to Ollama). Set OLLAMA_MODEL (default gemma4:e4b). |
+| Ollama (default)   | `--provider ollama`    | `OLLAMA_HOST`, `OLLAMA_MODEL` | Free, offline. SR and OCR need a vision model (default gemma4:e4b); SR on Ollama is new in v2.11, not yet checked against the reference set. Set OLLAMA_MODEL (default gemma4:e4b). |
 
 
 **Confidentiality gate.** Ollama runs entirely on your machine and starts without any prompt. If you choose a cloud provider, the app first lists every external service your input could be sent to (the chosen provider plus any `FALLBACK_PROVIDERS` backups) and asks `Continue? [y/N]`. Pressing Enter cancels. For scripted or non-interactive runs, add `--confirm-cloud` to accept explicitly; without it, a run with no keyboard attached is refused. Search modes always contact PubMed / Europe PMC (and DuckDuckGo for Search) with your search terms, even when the AI model is local.
@@ -308,7 +308,7 @@ review's data-collection methods.
 ## Known Issues
 
 Issue numbers are stable so that HANDOFF.md and commit messages can cite
-them; gaps are closed issues. Closed issues: `Readme/RESOLVED_ISSUES.md`.
+them; gaps are closed issues. Closed issues up to Session 40: `git show 2923cc3:Readme/RESOLVED_ISSUES.md`; later ones are in HANDOFF session notes.
 
 | #  | Issue | Priority | What to do |
 |----|-------|----------|------------|
@@ -360,8 +360,13 @@ On branch:
 
 Noted, not fixed:
 - rob2_tool.py reads `OLLAMA_URL`; the rest of the app reads `OLLAMA_HOST`.
+  FIXED (Session 40, v2.11): rob2_tool.py reads `OLLAMA_HOST` too; SR
+  screening and RoB2 on Ollama go through call_ollama_provider (num_ctx set).
 - An Ollama SR run screens locally, then fails at extraction (no vision).
-  It should stop at the start, like the DeepSeek warning.
+  FIXED (Session 40, v2.11): SR extraction runs on Ollama; a model without
+  'vision' stops the run before any AI call.
+  Since commit 3b the launcher then offers qwen or openai (API key set,
+  [CLOUD] banner + typed y); a direct run of pipelines/sr/main.py stops.
 - main.call_ai swallows streaming errors (`except Exception: pass`), so an
   Ollama failure waits through two timeouts. Revisit with time limits.
 - RelevanceScreener defaults to provider="anthropic",

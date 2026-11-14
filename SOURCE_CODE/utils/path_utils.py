@@ -53,7 +53,7 @@ class PathManager:
         # Main directories
         main_dirs = [
             self.src_dir, self.utils_dir, self.pipelines_dir,
-            self.sr_dir, self.doc_dir,
+            self.sr_dir,  # not doc_dir: SOURCE_CODE/docs holds nothing, so it is not created (Session 41)
             self.prompts_dir, self.docs_dir, self.readme_dir,
             self.scripts_dir,
             self.scripts_windows_dir, self.scripts_macos_dir,

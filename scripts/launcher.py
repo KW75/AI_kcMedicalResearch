@@ -194,10 +194,11 @@ PROVIDERS = [
     ('6', 'Anthropic', 'Claude vision',           '--provider anthropic'),
 ]
 
-VISION_PROVIDERS  = {'qwen', 'openai', 'anthropic', 'groq'}
-BLOCKED_FOR_SR    = {'ollama', 'deepseek'}
 OCR_PROVIDERS     = {'ollama', 'qwen', 'openai'}
 BLOCKED_FOR_OCR   = {'groq', 'deepseek', 'anthropic'}
+# Session 40: SR uses the same lists as OCR (local Ollama first).
+SR_PROVIDERS      = OCR_PROVIDERS
+BLOCKED_FOR_SR    = BLOCKED_FOR_OCR
 
 
 _MODE_INPUT_MAP = {
@@ -493,7 +494,7 @@ def pick_provider(mode_flag: str = '') -> str:
                 prow  = (f'  {FRAME}│{RESET}  {INFO}{key}{RESET}  '
                          f'{INFO}{name:<12}{RESET}  {INFO}{desc:<26}{RESET}'
                          f'{badge}{FRAME}│{RESET}')
-            elif (is_sr and prov_id in VISION_PROVIDERS) or (is_ocr and prov_id in OCR_PROVIDERS):
+            elif (is_sr and prov_id in SR_PROVIDERS) or (is_ocr and prov_id in OCR_PROVIDERS):
                 badge = f'{GOOD}{"+ vision":<{BADGE_W}}{RESET}'
                 prow  = (f'  {FRAME}│{RESET}  {ACCENT}{key}{RESET}  '
                          f'{TEXT}{name:<12}{RESET}  {INFO}{desc:<26}{RESET}'
@@ -507,9 +508,9 @@ def pick_provider(mode_flag: str = '') -> str:
         print()
 
         if is_sr:
-            print(f'  {WARN}⚠  SR Pipeline requires a vision-capable provider.{RESET}')
-            print(f'  {INFO}   Supported: {GOOD}qwen, openai, anthropic, groq{RESET}')
-            print(f'  {INFO}   Blocked:   {ERR}ollama, deepseek{RESET}')
+            print(f'  {WARN}!  SR needs a provider that can read page images.{RESET}')
+            print(f'  {INFO}   Supported: {GOOD}ollama (vision model), qwen, openai{RESET}')
+            print(f'  {INFO}   Blocked:   {ERR}groq, deepseek, anthropic{RESET}')
             print()
 
         if is_ocr:
@@ -541,13 +542,8 @@ def pick_provider(mode_flag: str = '') -> str:
 
         if is_sr and prov_id in BLOCKED_FOR_SR:
             print()
-            print(f'  {ERR}x  "{prov_id}" does not support the vision API.{RESET}')
-            print(f'  {INFO}  The SR pipeline extracts data from PDF images -{RESET}')
-            print(f'  {INFO}  a vision-capable model is required.{RESET}')
-            print()
-            print(f'  {GOOD}  Supported vision providers:{RESET}')
-            for p in sorted(VISION_PROVIDERS):
-                print(f'     {GOOD}.{RESET}  {TEXT}{p}{RESET}')
+            print(f'  {ERR}x  {prov_id} cannot read page images for SR.{RESET}')
+            print(f'  {GOOD}  Use: ollama (local), qwen or openai.{RESET}')
             print()
             safe_input(f'  {INFO}Press Enter to choose again...{RESET}')
             continue
@@ -560,7 +556,7 @@ def pick_provider(mode_flag: str = '') -> str:
             safe_input(f'  {INFO}Press Enter to choose again...{RESET}')
             continue
 
-        if prov_id == 'ollama' and not is_ocr:
+        if prov_id == 'ollama' and not (is_ocr or is_sr):
             model = pick_ollama_model()
             if model:
                 return f'{prov_flag} --model {model}'
