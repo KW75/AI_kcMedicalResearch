@@ -14,6 +14,11 @@ MAX_SCREEN_CHARS = 6000  # total chars passed to the screening prompt
 
 PROMPT = """You are a systematic review methodologist performing full-text screening.
 PICO CRITERIA:\n{pico}\nINCLUSION:\n{inclusion}\nEXCLUSION:\n{exclusion}
+OUTCOME RULE: the outcome criterion asks whether the trial MEASURED and
+reported the outcome, not whether the intervention improved it. A trial that
+reports the outcome with no effect, a null result or a non-significant
+difference still meets it (outcome: true). Never EXCLUDE a trial because its
+result was null or unfavourable; excluding on results biases the review.
 The attached PDF is a candidate RCT. Return ONLY valid JSON:
 {{"decision":"INCLUDE"|"EXCLUDE"|"UNCERTAIN","confidence":<0.0-1.0>,
 "pico_match":{{"population":true|false|null,"intervention":true|false|null,
