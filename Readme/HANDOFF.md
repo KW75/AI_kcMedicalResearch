@@ -1,8 +1,8 @@
 # HANDOFF
 
 Single source of truth for the next session. Read this, then work.
-Session-by-session history (1-23) is in `Readme/HANDOFF_archive_pre_S19.md`
-and git log; consult it only before reopening a closed issue.
+Session-by-session history (1-23): `git show 2923cc3:Readme/HANDOFF_archive_pre_S19.md`
+(file removed in Session 41) and git log; consult it only before reopening a closed issue.
 
 Repository: https://github.com/KW75/AI_kcMedicalResearch
 Live app:   https://ai-kcmedicalresearch.onrender.com
@@ -18,7 +18,7 @@ Before treating any Open Issue as work, and before ending the session:
    `python -m pytest -m "not live" --collect-only -q | tail -1` (or
    equivalent) and confirm the two match. Update README if not.
 2. **Closed-issue citation grep.** Take the issue numbers from the table
-   rows of `Readme/RESOLVED_ISSUES.md` (pattern `^\|\s*(\d+)\s*\|`; print
+   rows of `git show 2923cc3:Readme/RESOLVED_ISSUES.md` (pattern `^\|\s*(\d+)\s*\|`; print
    the count so "clean" cannot mean "never ran"). The pattern `#(\d+)`
    finds only numbers cited in passing. Grep `README.md` and this file's
    Current State / Open Issues / Next work sections for `(#N)`. Any hit
@@ -48,7 +48,7 @@ so those catches happen at session open, not mid-work.
 
 | Component      | Status |
 |----------------|--------|
-| Tests | 1380 passed, 10 deselected on v2.11-sr-local (Session 41); main 1282 (8a8a42e, PR #8 merged) (python -m pytest -m "not live" --tb=short -q) |
+| Tests | 1382 passed, 10 deselected on v2.11-sr-local (Session 41); main 1282 (8a8a42e, PR #8 merged) (python -m pytest -m "not live" --tb=short -q) |
 | Branch         | main = ef66b9f (PR #7 merged 2026-11-10: F7 truth fixture sr_truth.yaml + scripts/sr_score_run.py). Work on v2.10-sr-screening, PR #8 open: shared paper text (b3d804c), prisma_criteria write-if-changed (afd90a3), RoB2 overall rule (3e3785e), RoB2 Methods/Results text (908f889, 306d838), registration lines to RoB2 (Session 38); Session 38: Karlsson/Ang overrides (cf75209), RoB2 Domain 4 self-report rule (46fbd9b), Domain 4 High outright (e4e97b8), Ang excluded by reviewer + not-pooled report section (a56dc55), plain report reasons + POOLED line (0bf59dc), fibromyalgia set moved to reference/ (7h, b32f4c4), REVIEWER_GUIDE rewrite + readme_sr_pipeline.txt (docs, this commit). Branches v2.6-ocr-editor, v2.5-major-updates, v2.7-sr-fixes, v2.8-sr-review-gate, v2.9-sr-fixture deleted |
 | CI | green on PR #8 at green on PR #8 at 05e55b7 (1276 passed, 10 deselected, 57 warnings). Last confirmed on main: bcd42d9 (2026-11-09, 1027, both jobs). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
 | SR docs        | Readme/readme_sr_pipeline.txt = how the SR pipeline works and why (logic, rationale, accuracy evidence, Appendix A worked example); no how-to. How-to = Readme/flashcard-help.html. study_overrides.yaml fields and format = REVIEWER_GUIDE section 5.
@@ -2882,4 +2882,20 @@ Session 39 closed items 4-11 (11e open). Job list, in order:
     written under reports/sr.
   - Still open: option 1; reference rerun to check RoB2 labels, mixed_runs
     and run.log.
+  - DO NOT MERGE v2.11-sr-local yet. PR #9 stays a draft.
+
+- Session 41 tidy (2026-11-14): empty SOURCE_CODE/docs; two old Readme files.
+  - Cause: utils/path_utils.py put doc_dir (SOURCE_CODE/docs) in the
+    _ensure_directories list; PATH_MANAGER = PathManager() runs on every
+    import, so the empty folder came back after aa0f210 removed it.
+  - Fix: doc_dir taken out of the mkdir list (line 56). The attribute and
+    get_mode_reference_path stay; they only build a path. Folder deleted once.
+  - Found, not fixed: pipelines/writing/writing.py line 88 reads
+    SOURCE_CODE/docs/modes/writing.md/<track>, which never exists (dead read).
+  - Removed from repo: Readme/RESOLVED_ISSUES.md, Readme/HANDOFF_archive_pre_S19.md.
+    Local copy: D:\AI_kcMedicalResearch_backups\2026-11-14\Readme\ (SHA256 checked).
+    Read from git: git show 2923cc3:Readme/<name>. HANDOFF lines 4-5,
+    checklist item 2 and README Known Issues now point there.
+  - Issues closed from Session 41 on are recorded in session notes like this one.
+  - Tests: +2 in tests/test_path_utils_dirs.py; suite 1380 -> 1382, 10 deselected.
   - DO NOT MERGE v2.11-sr-local yet. PR #9 stays a draft.

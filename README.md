@@ -4,7 +4,7 @@ A multi-mode AI assistant for medical research, critical appraisal, systematic r
 
 
     Version: 2.6.0
-    Tests: 1380 passed, 10 deselected
+    Tests: 1382 passed, 10 deselected
            (reproduce with `python -m pytest -m "not live" --tb=short -q`)
     CI: GitHub Actions - Green
     GitHub: https://github.com/KW75/AI_kcMedicalResearch
@@ -308,7 +308,7 @@ review's data-collection methods.
 ## Known Issues
 
 Issue numbers are stable so that HANDOFF.md and commit messages can cite
-them; gaps are closed issues. Closed issues: `Readme/RESOLVED_ISSUES.md`.
+them; gaps are closed issues. Closed issues up to Session 40: `git show 2923cc3:Readme/RESOLVED_ISSUES.md`; later ones are in HANDOFF session notes.
 
 | #  | Issue | Priority | What to do |
 |----|-------|----------|------------|
