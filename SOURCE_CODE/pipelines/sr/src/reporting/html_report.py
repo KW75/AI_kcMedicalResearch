@@ -142,12 +142,14 @@ def _plain_one(part):
     if part.startswith("needs review"):
         head = "needs review: runs disagree ("
         flags = part[len(head):].split(")", 1)[0] if part.startswith(head) else ""
-        fields, shift, mixed = [], False, False
+        fields, shift, mixed, few = [], False, False, False
         for tok in (t.strip() for t in flags.split("|")):
             if tok == "table_shift":
                 shift = True
             elif tok == "mixed_runs":
                 mixed = True
+            elif tok == "too_few_runs":
+                few = True
             elif tok.endswith(":no_majority"):
                 f = tok.split(":", 1)[0]
                 fields.append(_FIELD_WORDS.get(f, f.replace("_", " ")))
@@ -157,6 +159,9 @@ def _plain_one(part):
                         + ", ".join(fields) + ")")
         if shift:
             bits.append("one of the repeated readings took a neighbouring table row")
+        if few:
+            bits.append("only one of the repeated readings returned numbers, "
+                        "so nothing could be compared")
         if mixed:
             bits.append("the chosen numbers came from different repeated readings; "
                         "no single reading had them all")

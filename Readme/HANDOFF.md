@@ -48,7 +48,7 @@ so those catches happen at session open, not mid-work.
 
 | Component      | Status |
 |----------------|--------|
-| Tests | 1397 passed, 10 deselected on v2.11-sr-local (Session 41); main 1282 (8a8a42e, PR #8 merged) (python -m pytest -m "not live" --tb=short -q) |
+| Tests | 1408 passed, 10 deselected on v2.11-sr-local (Session 41); main 1282 (8a8a42e, PR #8 merged) (python -m pytest -m "not live" --tb=short -q) |
 | Branch         | main = ef66b9f (PR #7 merged 2026-11-10: F7 truth fixture sr_truth.yaml + scripts/sr_score_run.py). Work on v2.10-sr-screening, PR #8 open: shared paper text (b3d804c), prisma_criteria write-if-changed (afd90a3), RoB2 overall rule (3e3785e), RoB2 Methods/Results text (908f889, 306d838), registration lines to RoB2 (Session 38); Session 38: Karlsson/Ang overrides (cf75209), RoB2 Domain 4 self-report rule (46fbd9b), Domain 4 High outright (e4e97b8), Ang excluded by reviewer + not-pooled report section (a56dc55), plain report reasons + POOLED line (0bf59dc), fibromyalgia set moved to reference/ (7h, b32f4c4), REVIEWER_GUIDE rewrite + readme_sr_pipeline.txt (docs, this commit). Branches v2.6-ocr-editor, v2.5-major-updates, v2.7-sr-fixes, v2.8-sr-review-gate, v2.9-sr-fixture deleted |
 | CI | green on PR #8 at green on PR #8 at 05e55b7 (1276 passed, 10 deselected, 57 warnings). Last confirmed on main: bcd42d9 (2026-11-09, 1027, both jobs). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
 | SR docs        | Readme/readme_sr_pipeline.txt = how the SR pipeline works and why (logic, rationale, accuracy evidence, Appendix A worked example); no how-to. How-to = Readme/flashcard-help.html. study_overrides.yaml fields and format = REVIEWER_GUIDE section 5.
@@ -2947,4 +2947,14 @@ Session 39 closed items 4-11 (11e open). Job list, in order:
   - Screening 5 INCLUDE / 0 EXCLUDE (third run in a row).
   - Bug c seen again: "Skip study:" log lines do not name the study.
   - Next (pick one, test first): reviewer-override proof (Karlsson 3.88/1.05/3.67/0.75 in study_overrides.yaml); gate on number-not-in-quote; empty-text gap; bugs a-c.
+  - DO NOT MERGE v2.11-sr-local yet. PR #9 stays a draft.
+
+- Session 41 small bugs a-c (2026-11-14):
+  - a) The vision vote counted runs with no mean/SD (only outcome_match/Ns) as usable, and their Nones broke the vote (Lami, run 20261114_202253: [13.68, None, None] -> no_majority + table_shift, nondet_usable_runs 3). Now only runs with at least one mean/SD are voted and counted (data_extractor._extract_vision_with_agreement); if no run has numbers, behaviour is unchanged.
+  - a) New flag too_few_runs (NONDET_FLAG_TOO_FEW_RUNS) when n_agreement >= 2 and only 1 run has numbers (vision path only); mandatory in audit_logger.NONDET_MANDATORY_MARKERS, cleared like table_shift (all four means/SDs overridden); html_report plain wording "only one of the repeated readings returned numbers".
+  - b) [OUTCOME/TIMEPOINT] was printed twice: the inline copy in main() (old lines 888-928) is deleted; the _log_stage4_summary copy stays (it drops fully-empty rows, #66). tests/test_outcome_timepoint_surfacing.py now drives _log_stage4_summary instead of exec-ing the inline block.
+  - c) "Skip study:" warnings now name the study: "Skip study: <first_author> (<year>): <reason>".
+  - Wording left open: skip_reason for too_few_runs says "runs disagree (too_few_runs)" and the [AGREEMENT] header says "= the runs read different table cells" - both slightly off for too_few_runs.
+  - Not yet run live: the next reference run should show each fix in run.log.
+  - New tests/test_sr_small_bugs_ac.py (11); suite 1397 -> 1408, 10 deselected.
   - DO NOT MERGE v2.11-sr-local yet. PR #9 stays a draft.

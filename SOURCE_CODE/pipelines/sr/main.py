@@ -344,7 +344,7 @@ def _log_stage4_summary(meta_audit: list[dict],
         logger.warning(
             f"[AGREEMENT] {len(flagged)} of {len(voted)} voted studies "
             f"disagreed across N runs ({len(mandatory)} mandatory: "
-            f"no_majority/table_shift/mixed_runs = the runs read different table "
+            f"no_majority/table_shift/mixed_runs/too_few_runs = the runs read different table "
             f"cells; a majority there is not evidence). Verify each "
             f"against the source PDF before trusting this pooled estimate "
             f"(#11):")
@@ -868,13 +868,13 @@ def main():
             if _review:
                 review_rows.append(_row)
                 audit_row["skip_reason"] = _review
-                logger.warning(f"Skip study: {_review} "
+                logger.warning(f"Skip study: {audit_row['first_author']} ({audit_row['year']}): {_review} "
                                f"(kept for the [SENSITIVITY] comparison)")
             else:
                 rows.append(_row)
 
         except Exception as e:
-            logger.warning(f"Skip study: {e}")
+            logger.warning(f"Skip study: {audit_row['first_author']} ({audit_row['year']}): {e}")
             audit_row["skip_reason"] = f"{_review}; also: {e}" if _review else str(e)
 
         meta_audit.append(audit_row)
@@ -884,47 +884,6 @@ def main():
     _log_stage4_summary(meta_audit, er, args.effect_measure)
     _log_review_sensitivity(rows, review_rows, args.effect_measure,
                             resolved=resolved_by_override)
-
-    # ---------------------------------------------------------------------
-    # [OUTCOME/TIMEPOINT] provenance surfacing (#22 / #51).
-    # Extraction is non-deterministic (#11): the same paper can draw its
-    # numbers from different outcomes or different timepoints across runs
-    # (Ang's bimodal g=+0.075 vs -0.248 was the motivating case). The
-    # schema records outcome_selected and timepoint_selected per study;
-    # the fields land in primary_outcome after the restructure step on
-    # both extraction paths. Surface them here so a reviewer sees WHICH
-    # row of each paper's results the pooled estimate is keyed to,
-    # without opening extracted_data.csv.
-    # ---------------------------------------------------------------------
-    _op_rows = []
-    for r in er:
-        if not isinstance(r, dict):
-            continue
-        m_ = r.get("study_metadata", {}) or {}
-        po_ = r.get("primary_outcome", {}) or {}
-        outcome_sel = po_.get("outcome_selected")
-        timepoint_sel = po_.get("timepoint_selected")
-        _op_rows.append({
-            "author": m_.get("first_author") or "?",
-            "year": m_.get("year") or "",
-            "filename": r.get("filename", "?"),
-            "outcome_selected": outcome_sel,
-            "timepoint_selected": timepoint_sel,
-        })
-    _op_recorded = sum(
-        1 for x in _op_rows
-        if x["outcome_selected"] is not None or x["timepoint_selected"] is not None)
-    logger.info(
-        f"[OUTCOME/TIMEPOINT] {_op_recorded} of {len(_op_rows)} studies "
-        f"recorded outcome_selected and/or timepoint_selected. These "
-        f"fields document WHICH outcome and WHICH timepoint each run "
-        f"drew from - a run whose numbers change between executions "
-        f"(#11) will show the change here without opening the CSV.")
-    for x in _op_rows:
-        logger.info(
-            f"[OUTCOME/TIMEPOINT]   {x['author']} ({x['year']}): "
-            f"outcome={x['outcome_selected'] if x['outcome_selected'] is not None else '(not recorded)'} "
-            f"| timepoint={x['timepoint_selected'] if x['timepoint_selected'] is not None else '(not recorded)'}")
 
     if len(rows) < 2:
         logger.error("< 2 studies with usable data. Aborting meta-analysis.")

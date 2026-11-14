@@ -199,6 +199,12 @@ SOURCE_QUOTE_WARNING_BRANCHES = (
     "verbatim_mismatch",
 )
 
+# Session 41 bug a: only one of the N runs returned any mean/SD, so nothing
+# was compared. Mandatory like table_shift (audit_logger), cleared by all four
+# means/SDs in study_overrides.yaml.
+NONDET_FLAG_TOO_FEW_RUNS = "too_few_runs"
+
+
 class DataExtractor:
     def __init__(self, pico_criteria: Optional[dict] = None,
                  pico_outcome: Optional[str] = None,
@@ -1978,12 +1984,27 @@ for that field - NOT the quoted string "null".
                             filename, i + 1, self.n_agreement)
         if not runs:
             return None, [], {}, 0
+        # Session 41 bug a: a run with no mean/SD (only outcome_match / Ns)
+        # counted as usable and its Nones broke the vote (Lami, run
+        # 20261114_202253: [13.68, None, None] -> no_majority + table_shift,
+        # usable_runs 3). Vote only runs with numbers; if none has numbers,
+        # keep the old behaviour (Stage 4 skips the study for missing data).
+        numeric = [r for r in runs if any(
+            self._agreement_key(f, r.get(f)) is not None
+            for f in ("mean_intervention", "sd_intervention",
+                      "mean_control", "sd_control"))]
+        if numeric and len(numeric) < len(runs):
+            logger.info("[AGREEMENT] %s: %d run(s) without any mean/SD left "
+                        "out of the vote", filename, len(runs) - len(numeric))
+            runs = numeric
         if self.n_agreement == 1:
             return runs[0], [NONDET_FLAG_SINGLE_RUN], {}, 1
 
         result, flag, detail = self._vote_runs(runs)
         if len(runs) < self.n_agreement:
             flag.append(f"usable_runs:{len(runs)}/{self.n_agreement}")
+        if len(runs) < 2:
+            flag.append(NONDET_FLAG_TOO_FEW_RUNS)
         logger.info("[AGREEMENT] %s: %d/%d usable runs, nondet_flag=%s",
                     filename, len(runs), self.n_agreement, flag or "[]")
         for f, d in detail.items():

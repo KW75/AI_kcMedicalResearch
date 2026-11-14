@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 # error rows and on the Anthropic path where no vote runs.
 NONDET_CELL_UNANIMOUS = "unanimous"
 NONDET_CELL_NOT_CHECKED = "not_checked"
-NONDET_MANDATORY_MARKERS = ("no_majority", "table_shift", "mixed_runs")
+NONDET_MANDATORY_MARKERS = ("no_majority", "table_shift", "mixed_runs", "too_few_runs")
 
 
 def nondet_flag_to_cell(flag) -> str:
@@ -84,7 +84,7 @@ def review_skip_reason(cell, override_fields=None, quote_warning=None,
     if nondet_cell_is_mandatory(cell):
         still_open = []
         for tok in (t.strip() for t in cell.split("|")):
-            if tok in ("table_shift", "mixed_runs"):
+            if tok in ("table_shift", "mixed_runs", "too_few_runs"):
                 if not all(f in done for f in _REVIEW_NUMERIC_FIELDS):
                     still_open.append(tok)
             elif tok.endswith(":no_majority"):

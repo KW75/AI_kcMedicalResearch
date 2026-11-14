@@ -43,45 +43,56 @@ SR_MAIN = (
     / "SOURCE_CODE" / "pipelines" / "sr" / "main.py"
 )
 
-# Markers delimiting the [OUTCOME/TIMEPOINT] block in sr/main.py. Both
-# strings must appear verbatim in the block; if a future refactor
-# renames the log tag, this test fails and forces a decision.
-_BLOCK_START = "[OUTCOME/TIMEPOINT] provenance surfacing"
-_BLOCK_END = "if len(rows) < 2:"
+# Session 41 (bug b): the inline copy of the [OUTCOME/TIMEPOINT] block in
+# main() was deleted - it printed the block a second time. These tests now
+# drive the one remaining copy in _log_stage4_summary (meta_audit=[]).
 
 
-def _extract_block_source() -> str:
-    """Read sr/main.py and return the [OUTCOME/TIMEPOINT] block, dedented."""
-    text = SR_MAIN.read_text(encoding="utf-8")
-    start = text.find(_BLOCK_START)
-    assert start != -1, (
-        "Could not find [OUTCOME/TIMEPOINT] block start marker in "
-        "sr/main.py - the Session 19 provenance surfacing block appears "
-        "to have been removed or renamed."
-    )
-    # Rewind to the start of the comment line
-    start = text.rfind("\n", 0, start) + 1
-    end = text.find(_BLOCK_END, start)
-    assert end != -1, "Could not find block end marker (if len(rows) < 2)."
-    block = text[start:end]
-    return textwrap.dedent(block)
+def _main_module():
+    import importlib
+    import sys
+    for cand in ("pipelines.sr.main", "SOURCE_CODE.pipelines.sr.main"):
+        if cand in sys.modules:
+            return sys.modules[cand]
+    for stub in ("pipelines.sr.src.screening.rob2_tool",
+                 "SOURCE_CODE.pipelines.sr.src.screening.rob2_tool"):
+        m = sys.modules.get(stub)
+        if m is not None and not hasattr(m, "RoB2Assessor"):
+            del sys.modules[stub]
+    err = None
+    for cand in ("pipelines.sr.main", "SOURCE_CODE.pipelines.sr.main"):
+        try:
+            return importlib.import_module(cand)
+        except ImportError as e:
+            err = e
+    raise err
 
 
 def _run_block(er, logger):
-    """Exec the extracted block against a supplied `er` and `logger`."""
-    block = _extract_block_source()
-    ns = {"er": er, "logger": logger}
-    exec(compile(block, str(SR_MAIN) + ":OUTCOME_TIMEPOINT", "exec"), ns)
+    """Run _log_stage4_summary with no meta rows; capture its log lines."""
+    mod = _main_module()
+    old = mod.logger
+    mod.logger = logger
+    try:
+        mod._log_stage4_summary([], er, "SMD")
+    finally:
+        mod.logger = old
 
 
 class _CaptureLogger:
-    """Minimal logger stand-in that records .info / .warning calls."""
+    """Minimal logger stand-in that records every call."""
     def __init__(self):
         self.messages = []
+    def _rec(self, lvl, msg, *args):
+        self.messages.append((lvl, msg % args if args else msg))
     def info(self, msg, *args):
-        self.messages.append(("INFO", msg % args if args else msg))
+        self._rec("INFO", msg, *args)
     def warning(self, msg, *args):
-        self.messages.append(("WARNING", msg % args if args else msg))
+        self._rec("WARNING", msg, *args)
+    def error(self, msg, *args):
+        self._rec("ERROR", msg, *args)
+    def debug(self, msg, *args):
+        self._rec("DEBUG", msg, *args)
 
 
 def _study(author, year, filename, outcome=None, timepoint=None):
