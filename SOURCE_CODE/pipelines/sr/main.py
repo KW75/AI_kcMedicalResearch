@@ -63,6 +63,33 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s -- %(message)s")
 logger = logging.getLogger("sr.main")
 
+_RUN_LOG_FORMAT = "%(asctime)s [%(levelname)s] %(name)s -- %(message)s"
+
+
+def attach_run_log(folder):
+    """Session 41 (4d): also write this run's log to <folder>/run.log.
+    Run 20261114_184026 left no log. An earlier run-log handler (a run that
+    returned early) is removed first, so no line goes to an old folder."""
+    root = logging.getLogger()
+    for old in list(root.handlers):
+        if getattr(old, "_sr_run_log", False):
+            detach_run_log(old)
+    folder = Path(folder)
+    folder.mkdir(parents=True, exist_ok=True)
+    h = logging.FileHandler(folder / "run.log", encoding="utf-8")
+    h.setFormatter(logging.Formatter(_RUN_LOG_FORMAT))
+    h._sr_run_log = True
+    root.addHandler(h)
+    return h
+
+
+def detach_run_log(handler):
+    """Stop writing run.log and close the file."""
+    if handler is None:
+        return
+    logging.getLogger().removeHandler(handler)
+    handler.close()
+
 SR_DIR = Path(__file__).resolve().parent
 
 # ---------------------------------------------------------------------------
@@ -507,7 +534,11 @@ def main():
 
     #  Initialise project layo
     layout = SRProjectLayout(run_id=args.run_id)
+    # Session 41 (4d): from here on, every log line also goes to run.log.
+    _run_log = attach_run_log(layout.project)
     logger.info(f"Project folder: {layout.project}")
+    logger.info(f"Run log: {Path(str(layout.project)) / 'run.log'}")
+    logger.info(f"Provider {args.provider} / model {args.model}")
     # Every audit CSV row carries this run's id: #17 (extraction
     # non-determinism) means the same paper can carry different values
     # in different runs' CSVs, and a CSV without a run id is silently
@@ -1002,6 +1033,7 @@ def main():
     logger.info(f"  Extracts -> {layout.extracted_csv}")
     logger.info(f"  RoB2     -> {layout.rob2_csv}")
     logger.info(f"  Results  -> {layout.results_csv}")
+    detach_run_log(_run_log)
 
 if __name__ == "__main__":
     main()

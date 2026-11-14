@@ -245,9 +245,15 @@ class DataExtractor:
             _key, _base = _openai_compat_creds(self.provider, api_key)
             self.client = OpenAI(api_key=_key, base_url=_base)
 
+        # Session 41 (4c): Ollama calls send OLLAMA_TEMPERATURE (providers),
+        # not self.temperature; log the value that is actually sent.
+        _log_temp = self.temperature
+        if self.provider == "ollama":
+            import providers
+            _log_temp = providers.ollama_temperature()
         logger.info("[SAMPLING] provider=%s model=%s temperature=%s seed=%s "
                     "n_agreement=%s",
-                    self.provider, self.model, self.temperature, self.seed,
+                    self.provider, self.model, _log_temp, self.seed,
                     self.n_agreement)
 
     def _sampling_kwargs(self) -> dict:
