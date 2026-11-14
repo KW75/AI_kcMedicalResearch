@@ -4,7 +4,7 @@ A multi-mode AI assistant for medical research, critical appraisal, systematic r
 
 
     Version: 2.6.0
-    Tests: 1282 passed, 10 deselected
+    Tests: 1295 passed, 10 deselected
            (reproduce with `python -m pytest -m "not live" --tb=short -q`)
     CI: GitHub Actions - Green
     GitHub: https://github.com/KW75/AI_kcMedicalResearch
@@ -123,7 +123,7 @@ The launcher asks for it after the model (Enter = 15 minutes).
 | DeepSeek           | `--provider deepseek`  | `DEEPSEEK_API_KEY`   | Fast, cost-efficient                        |
 | Qwen               | `--provider qwen`      | `DASHSCOPE_API_KEY`  | Recommended for SR (auto-uses vision model) |
 | OpenAI             | `--provider openai`    | `OPENAI_API_KEY`     | GPT-4 vision                                |
-| Anthropic          | `--provider anthropic` | `ANTHROPIC_API_KEY`  | Claude vision - partial tripwires, see REVIEWER_GUIDE.md §6.  |
+| Anthropic          | `--provider anthropic` | `ANTHROPIC_API_KEY`  | Claude - not available for SR or OCR (they use ollama, qwen or openai). |
 | Groq               | `--provider groq`      | `GROQ_API_KEY`       | Fast inference                              |
 | Ollama (default)   | `--provider ollama`    | `OLLAMA_HOST`, `OLLAMA_MODEL` | Free, offline. Not for SR yet (the app does not send images to Ollama). Set OLLAMA_MODEL (default gemma4:e4b). |
 

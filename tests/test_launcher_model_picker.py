@@ -141,12 +141,30 @@ class TestPickProviderWiring:
             assert launcher.pick_provider("--mode writing") == "--provider deepseek"
         fake_pick.assert_not_called()
 
-    def test_sr_blocks_ollama_before_asking_for_a_model(self, launcher):
-        # "1" = Ollama (blocked for SR), "" = "Press Enter to choose again", "2" = Qwen
+    def test_sr_ollama_allowed_and_skips_launcher_model_list(self, launcher):
+        # SR like OCR: the SR run lists only vision models itself.
         with patch.object(launcher, "pick_ollama_model") as fake_pick, \
-             patch.object(launcher, "safe_input", side_effect=["1", "", "2"]):
+             patch.object(launcher, "safe_input", side_effect=[""]):
+            assert launcher.pick_provider("--mode sr") == "--provider ollama"
+        fake_pick.assert_not_called()
+
+    @pytest.mark.parametrize("choice, flag", [("2", "--provider qwen"),
+                                              ("5", "--provider openai")])
+    def test_sr_cloud_vision_providers_allowed(self, launcher, choice, flag):
+        with patch.object(launcher, "safe_input", side_effect=[choice]):
+            assert launcher.pick_provider("--mode sr") == flag
+
+    @pytest.mark.parametrize("blocked", ["3", "4", "6"])
+    def test_sr_refuses_groq_deepseek_anthropic(self, launcher, blocked):
+        # blocked choice, "" = "Press Enter to choose again", "2" = Qwen
+        with patch.object(launcher, "pick_ollama_model") as fake_pick, \
+             patch.object(launcher, "safe_input", side_effect=[blocked, "", "2"]):
             assert launcher.pick_provider("--mode sr") == "--provider qwen"
         fake_pick.assert_not_called()
+
+    def test_sr_and_ocr_share_provider_sets(self, launcher):
+        assert launcher.SR_PROVIDERS == launcher.OCR_PROVIDERS
+        assert launcher.BLOCKED_FOR_SR == launcher.BLOCKED_FOR_OCR
 
 class TestPickTimeLimit:
     """v2.5: launcher asks the time limit per AI call. Enter = 15 min and adds

@@ -48,7 +48,7 @@ so those catches happen at session open, not mid-work.
 
 | Component      | Status |
 |----------------|--------|
-| Tests | 1282 passed, 10 deselected on v2.10-sr-screening (Session 40); main 1064 (ef66b9f) (python -m pytest -m "not live" --tb=short -q) |
+| Tests | 1295 passed, 10 deselected on v2.11-sr-local (Session 40); main 1282 (8a8a42e, PR #8 merged) (python -m pytest -m "not live" --tb=short -q) |
 | Branch         | main = ef66b9f (PR #7 merged 2026-11-10: F7 truth fixture sr_truth.yaml + scripts/sr_score_run.py). Work on v2.10-sr-screening, PR #8 open: shared paper text (b3d804c), prisma_criteria write-if-changed (afd90a3), RoB2 overall rule (3e3785e), RoB2 Methods/Results text (908f889, 306d838), registration lines to RoB2 (Session 38); Session 38: Karlsson/Ang overrides (cf75209), RoB2 Domain 4 self-report rule (46fbd9b), Domain 4 High outright (e4e97b8), Ang excluded by reviewer + not-pooled report section (a56dc55), plain report reasons + POOLED line (0bf59dc), fibromyalgia set moved to reference/ (7h, b32f4c4), REVIEWER_GUIDE rewrite + readme_sr_pipeline.txt (docs, this commit). Branches v2.6-ocr-editor, v2.5-major-updates, v2.7-sr-fixes, v2.8-sr-review-gate, v2.9-sr-fixture deleted |
 | CI | green on PR #8 at green on PR #8 at 05e55b7 (1276 passed, 10 deselected, 57 warnings). Last confirmed on main: bcd42d9 (2026-11-09, 1027, both jobs). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
 | SR docs        | Readme/readme_sr_pipeline.txt = how the SR pipeline works and why (logic, rationale, accuracy evidence, Appendix A worked example); no how-to. How-to = Readme/flashcard-help.html. study_overrides.yaml fields and format = REVIEWER_GUIDE section 5.
@@ -2555,3 +2555,57 @@ Session 39 closed items 4-11 (11e open). Job list, in order:
   study today); goes with item 8's arm-list check.
 - Working preference (user): open files with `code -g <full path>:<line>`
   and say "select lines N-M"; no keystroke recipes.
+
+## Session 40 (continued) - 2026-11-14 - PR #8 merged; branch v2.11-sr-local
+
+- Job 1 DONE: PR #8 merged into main as 8a8a42e (CI green on aa929ec:
+  1282 passed, 10 deselected, both jobs). The PR was still a draft, so
+  `gh pr ready 8` was needed first. Branch v2.10-sr-screening kept for now.
+- assets/ is back on main (8 icons: icon_AI_kcMedicalResearch, icon_input,
+  icon_output, icon_reports, each .ico + .png), merged with PR #8. Session 33
+  had removed assets/ with the Streamlit UI. Decided (user): KEEP them, for
+  desktop shortcuts only. No code uses them; do not delete them again.
+- Filename case: git tracks Readme/readme_sr_pipeline.txt (lower-case r).
+  Windows ignores case, git does not: `git add Readme/Readme_sr_pipeline.txt`
+  staged nothing, with no error (hence aa929ec). Copy names from `git status`.
+  The Session 40 block above writes it with a capital R.
+- New branch v2.11-sr-local from 8a8a42e: item 12, SR local-first like OCR.
+  Commit 1 (this one), the provider rule:
+  - main.py: SR_PROVIDERS = OCR_PROVIDERS (ollama, qwen, openai);
+    new sr_provider_error(mode, provider), called in run_cli (exit 1) and
+    in the SR route (it replaces the DeepSeek "Continue anyway? [y/N]" block,
+    which listed anthropic). sr_provider_warning (the Anthropic two-checks
+    warning) removed: Anthropic is now refused for SR, so the warning could
+    never be shown. No provider given -> no error; the SR route still
+    defaults to qwen (_provider = provider or "qwen") until commit 2.
+  - launcher.py: VISION_PROVIDERS removed; SR_PROVIDERS / BLOCKED_FOR_SR
+    point at the OCR sets; SR help text and refusal message match OCR's;
+    Ollama for SR skips the launcher model list (`not (is_ocr or is_sr)`),
+    because the SR run must list only vision models itself, as ocr/cli.py does.
+  - Tests: new tests/test_sr_provider_rule.py (9); test_launcher_model_picker.py
+    SR tests (Ollama allowed, qwen/openai allowed, groq/deepseek/anthropic
+    refused, sets equal to OCR's); test_sr_anthropic_warning.py now checks
+    refusal and that the warning is gone (#61 guard kept). Suite 1282 -> 1295.
+  - Docs: README line 7 and the Anthropic provider row; REVIEWER_GUIDE lines
+    129, 243, 476, 480 (Anthropic limitations apply only to runs before
+    Session 40).
+- DO NOT MERGE v2.11-sr-local yet. Ollama now passes the provider check, but
+  data_extractor.py line 224 still refuses it (vision_providers = qwen,
+  openai, anthropic, groq), and screening / RoB2 are not wired to Ollama.
+  Next commits (item 12):
+  2. Extraction: Ollama images via providers.call_ollama_provider(images=...)
+     (the OCR engine.py pattern); drop anthropic/groq from vision_providers;
+     the SR run lists only models whose /api/show has "vision"; no local
+     vision model -> offer pull or cloud (qwen default, openai) behind the
+     [CLOUD] banner + typed "y". Check OLLAMA_CONTEXT 32768 fits 5 page images.
+     SR default provider qwen -> ollama.
+  3. Screening and RoB2 through the same call; rob2_tool.py OLLAMA_URL ->
+     OLLAMA_HOST (one name).
+  4. providers.py line 77: Ollama vision per model, not per provider.
+  5. Docs that change once extraction works locally: README 128 ("Not for SR
+     yet") and 363 ("An Ollama SR run ... fails at extraction"),
+     readme_sr_pipeline.txt 386 ("A cloud vision model is needed for SR today").
+  6. Item 12g, before calling local SR usable: gemma4:e4b on the reference set,
+     N=3, field by field vs qwen3-vl-plus and the PDFs (sr_score_run.py).
+- Not changed: flashcard-help.html footer (v2.4.6, 401 tests) is still job 2,
+  in its own commit.

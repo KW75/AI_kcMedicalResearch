@@ -2434,30 +2434,6 @@ def parse_args(args: list[str] | None = None) -> argparse.Namespace:
 # ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
-def sr_provider_warning(mode: str, provider: str):
-    """Return the SR warning for a provider that skips checks, else None.
-
-    Anthropic extraction (_extract_anthropic) gets structured JSON, not the
-    PDF text, so it calls _flag_suspect_source_quotes(source_text=None).
-    Two checks cannot run there: the verbatim quote-in-source check and the
-    text-line SD/SE check (_flag_possible_se_as_sd). Group/timepoint and the
-    other source-quote checks still run. See REVIEWER_GUIDE.md section 6.
-    """
-    if mode != "sr" or provider != "anthropic":
-        return None
-    return (
-        "\n[!] Note: with --provider anthropic, two SR checks cannot run, "
-        "because this route has no extracted text from the PDF:\n"
-        "    - source quotes are not checked word for word against the "
-        "paper's text\n"
-        "    - the text-line SD/SE check does not run\n"
-        "    The other checks still run. See docs/sr/REVIEWER_GUIDE.md "
-        "section 6, which explains when to prefer --provider qwen.\n"
-        "    Manual verification against source PDFs remains required "
-        "either way.\n"
-    )
-
-
 OCR_PROVIDERS = ("ollama", "qwen", "openai")
 
 
@@ -2467,6 +2443,21 @@ def ocr_provider_error(mode: str, provider: str) -> str | None:
     Groq/Anthropic are not wired for OCR yet."""
     if mode == "ocr" and provider not in OCR_PROVIDERS:
         return (f"OCR: {provider} cannot be used to read page images. "
+                "Use --provider ollama (local), qwen or openai.")
+    return None
+
+
+# Session 40: SR reads page images like OCR, so it uses the same list.
+SR_PROVIDERS = OCR_PROVIDERS
+
+
+def sr_provider_error(mode: str, provider: str | None) -> str | None:
+    """SR: local Ollama (vision model) first; qwen / openai only behind the
+    cloud gate. DeepSeek has no image input; Anthropic and Groq are refused
+    (Session 40, replaces the old Anthropic warning). No provider given ->
+    None: the SR route picks its default."""
+    if mode == "sr" and provider and provider not in SR_PROVIDERS:
+        return (f"SR: {provider} cannot be used for the SR pipeline. "
                 "Use --provider ollama (local), qwen or openai.")
     return None
 
@@ -2484,9 +2475,10 @@ def run_cli(args: argparse.Namespace) -> None:
     entry-point guard below owns the clean-exit message.
     """
 
-    sr_warning = sr_provider_warning(args.mode, args.provider)
-    if sr_warning:
-        print(sr_warning)
+    sr_error = sr_provider_error(args.mode, args.provider)
+    if sr_error:
+        print(sr_error)
+        sys.exit(1)
     ocr_error = ocr_provider_error(args.mode, args.provider)
     if ocr_error:
         print(ocr_error)
