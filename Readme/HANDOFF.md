@@ -48,7 +48,7 @@ so those catches happen at session open, not mid-work.
 
 | Component      | Status |
 |----------------|--------|
-| Tests | 1382 passed, 10 deselected on v2.11-sr-local (Session 41); main 1282 (8a8a42e, PR #8 merged) (python -m pytest -m "not live" --tb=short -q) |
+| Tests | 1397 passed, 10 deselected on v2.11-sr-local (Session 41); main 1282 (8a8a42e, PR #8 merged) (python -m pytest -m "not live" --tb=short -q) |
 | Branch         | main = ef66b9f (PR #7 merged 2026-11-10: F7 truth fixture sr_truth.yaml + scripts/sr_score_run.py). Work on v2.10-sr-screening, PR #8 open: shared paper text (b3d804c), prisma_criteria write-if-changed (afd90a3), RoB2 overall rule (3e3785e), RoB2 Methods/Results text (908f889, 306d838), registration lines to RoB2 (Session 38); Session 38: Karlsson/Ang overrides (cf75209), RoB2 Domain 4 self-report rule (46fbd9b), Domain 4 High outright (e4e97b8), Ang excluded by reviewer + not-pooled report section (a56dc55), plain report reasons + POOLED line (0bf59dc), fibromyalgia set moved to reference/ (7h, b32f4c4), REVIEWER_GUIDE rewrite + readme_sr_pipeline.txt (docs, this commit). Branches v2.6-ocr-editor, v2.5-major-updates, v2.7-sr-fixes, v2.8-sr-review-gate, v2.9-sr-fixture deleted |
 | CI | green on PR #8 at green on PR #8 at 05e55b7 (1276 passed, 10 deselected, 57 warnings). Last confirmed on main: bcd42d9 (2026-11-09, 1027, both jobs). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
 | SR docs        | Readme/readme_sr_pipeline.txt = how the SR pipeline works and why (logic, rationale, accuracy evidence, Appendix A worked example); no how-to. How-to = Readme/flashcard-help.html. study_overrides.yaml fields and format = REVIEWER_GUIDE section 5.
@@ -2923,4 +2923,16 @@ Session 39 closed items 4-11 (11e open). Job list, in order:
   - Extraction remains the blocker. Next options: 1) extraction on qwen behind cloud gate;
     2) larger local vision model; 3) reviewer entries in study_overrides.yaml;
     4) RoB2 label/justification consistency check, or RoB2 on qwen; 5) small bugs a-c.
+  - DO NOT MERGE v2.11-sr-local yet. PR #9 stays a draft.
+
+- Session 41 option B quote gate (2026-11-14):
+  - Rule: numbers read from page images (extraction_method not starting with "text", or missing) whose source_quote_warning contains "was not found verbatim" need review; skip token quote_not_found; not in the primary pool.
+  - Cleared only when a reviewer overrides all four means/SDs in input/sr/study_overrides.yaml (same rule as table_shift / mixed_runs).
+  - Code: audit_logger.review_skip_reason(cell, override_fields, quote_warning=, extraction_method=); runs-disagree and quote reasons joined with "; also: "; main.py passes source_quote_warning and r["extraction_method"]; html_report._plain_one has plain wording.
+  - Closes the Karlsson hole (run 20261114_202253, unanimous misread pooled) and the S40 Lami case (run 20261114_133303, unanimous, pooled).
+  - Trade-off: with gemma4:e4b every study in both reference runs carries the warning, so nothing pools until a reviewer checks it.
+  - Unchanged: text_fallback studies; other quote warnings (number not in quote, timepoints, SE label) do not trip the gate.
+  - Still open: if text_payload and paper_text are both empty, data_extractor.py _flag_suspect_source_quotes (~line 1334) skips the verbatim check, writes no warning, and the gate passes the study; fix needs a new SOURCE_QUOTE_WARNING_BRANCHES entry plus REVIEWER_GUIDE.md (test_source_quote_doc_sync.py).
+  - Not yet run live: the next reference run should show 0 pooled and quote_not_found in skip_reason.
+  - New tests/test_sr_quote_gate.py (15); suite 1382 -> 1397, 10 deselected.
   - DO NOT MERGE v2.11-sr-local yet. PR #9 stays a draft.

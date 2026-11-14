@@ -58,7 +58,19 @@ def _overridden_fields(override_fields) -> set:
     return names
 
 
-def review_skip_reason(cell, override_fields=None):
+# Session 41 option B (quote gate): page-image numbers whose source quote is
+# not in the paper text need review. Run 20261114_202253 pooled Karlsson with
+# a misread all N=3 runs agreed on; a vote cannot catch that.
+QUOTE_NOT_FOUND_MARKER = "was not found verbatim"
+QUOTE_GATE_TOKEN = "quote_not_found"
+QUOTE_GATE_REASON = ("needs review: source quote not found (quote_not_found) - "
+                     "numbers read from page images; verify all four means/SDs "
+                     "against the PDF and enter them in "
+                     "input/sr/study_overrides.yaml with a source-page note")
+
+
+def review_skip_reason(cell, override_fields=None, quote_warning=None,
+                       extraction_method=None):
     """F4 gate: None = may be pooled; str = keep OUT of the pooled estimate.
 
     A mandatory nondet flag (no_majority / table_shift) means the N runs read
@@ -67,22 +79,29 @@ def review_skip_reason(cell, override_fields=None):
     overrode every flagged field (table_shift / mixed_runs: all four means/SDs).
     """
     cell = cell or ""
-    if not nondet_cell_is_mandatory(cell):
-        return None
     done = _overridden_fields(override_fields)
-    still_open = []
-    for tok in (t.strip() for t in cell.split("|")):
-        if tok in ("table_shift", "mixed_runs"):
-            if not all(f in done for f in _REVIEW_NUMERIC_FIELDS):
-                still_open.append(tok)
-        elif tok.endswith(":no_majority"):
-            if tok.split(":", 1)[0] not in done:
-                still_open.append(tok)
-    if not still_open:
-        return None
-    return ("needs review: runs disagree (" + "|".join(still_open) + ") - "
-            "verify against the PDF, or enter the values in "
-            "input/sr/study_overrides.yaml with a source-page note")
+    reasons = []
+    if nondet_cell_is_mandatory(cell):
+        still_open = []
+        for tok in (t.strip() for t in cell.split("|")):
+            if tok in ("table_shift", "mixed_runs"):
+                if not all(f in done for f in _REVIEW_NUMERIC_FIELDS):
+                    still_open.append(tok)
+            elif tok.endswith(":no_majority"):
+                if tok.split(":", 1)[0] not in done:
+                    still_open.append(tok)
+        if still_open:
+            reasons.append(
+                "needs review: runs disagree (" + "|".join(still_open) + ") - "
+                "verify against the PDF, or enter the values in "
+                "input/sr/study_overrides.yaml with a source-page note")
+    # Quote gate: text-path studies keep today's behaviour; a missing method
+    # counts as page images (safe side). Cleared by all four means/SDs.
+    if (QUOTE_NOT_FOUND_MARKER in str(quote_warning or "")
+            and not str(extraction_method or "").startswith("text")
+            and not all(f in done for f in _REVIEW_NUMERIC_FIELDS)):
+        reasons.append(QUOTE_GATE_REASON)
+    return "; also: ".join(reasons) or None
 
 
 def _write_csv(path: Path, rows: list[dict], fieldnames: list[str]) -> None:

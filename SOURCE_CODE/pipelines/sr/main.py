@@ -763,7 +763,9 @@ def main():
             logger.warning(f"[EXCLUDED] {audit_row['first_author']} ({audit_row['year']}): {_excl}")
             continue
         _review = review_skip_reason(audit_row["nondet_flag"],
-                                     audit_row["override_fields"])
+                                     audit_row["override_fields"],
+                                     quote_warning=source_quote_warning,
+                                     extraction_method=r.get("extraction_method"))
         if not _review and nondet_cell_is_mandatory(audit_row["nondet_flag"]):
             logger.info(
                 f"[AGREEMENT] {m.get('first_author','?')}: runs disagreed but "
