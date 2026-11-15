@@ -1987,8 +1987,8 @@ for that field - NOT the quoted string "null".
             if isinstance(r, dict) and self._has_usable_extraction_result(r):
                 runs.append(r)
             else:
-                logger.info("[AGREEMENT] %s run %d/%d unusable",
-                            filename, i + 1, self.n_agreement)
+                logger.info("[AGREEMENT] %s run %d/%d unusable (%s)",
+                            filename, i + 1, self.n_agreement, answer_snippet(raw))
         if not runs:
             return None, [], {}, 0
         # Session 41 bug a: a run with no mean/SD (only outcome_match / Ns)
@@ -2314,3 +2314,11 @@ for that field - NOT the quoted string "null".
             return result
         except Exception as e:
             return {"file_id": file_id, "filename": filename, "extraction_error": str(e)}
+
+
+def answer_snippet(raw) -> str:
+    """Length and first 200 characters of a model answer, for the
+    [AGREEMENT] 'unusable' line (Session 42: run 20261115_230933 said
+    'unusable' 21 times without showing what came back)."""
+    text = raw if isinstance(raw, str) else ("" if raw is None else str(raw))
+    return f"answer {len(text)} chars: {text[:200]!r}"

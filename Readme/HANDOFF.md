@@ -48,9 +48,9 @@ so those catches happen at session open, not mid-work.
 
 | Component      | Status |
 |----------------|--------|
-| Tests | 1470 passed, 10 deselected on v2.11-sr-local (Session 42); main 1282 (8a8a42e) (python -m pytest -m "not live" --tb=short -q) |
+| Tests | 1492 passed, 10 deselected on v2.11-sr-local (Session 42); main 1282 (8a8a42e) (python -m pytest -m "not live" --tb=short -q) |
 | Branch | main = 8a8a42e (PR #8 merged 2026-11-14, Session 40). Work on v2.11-sr-local (from 8a8a42e), draft PR #9: SR local-first. Latest commit: run `git log --oneline -1` (not written here, because every commit changes it). Key commits: fffedcd (metadata precedence reviewer > PDF > model; scorer surname match), e75b497 (null-result screening rule), 9601b1c (mixed_runs vote flag), 080982f (RoB2 label rule), 2923cc3 (run.log; Ollama temperature in [SAMPLING]), 739b2ce (tidy), a1f0f12 (quote gate), 3c36570 (small bugs a-c, too_few_runs; 1408), 422dc65 (missing / unchecked quote gate; 1421), Session 42: 545af00 Setup -> Local AI vision lines (1428), shared SR/OCR vision picker (1453; see Session 42 log). DO NOT MERGE: item 1 (old 12g) open. v2.10-sr-screening merged; can be deleted (item 20) |
-| CI | PR #9: green (2 of 2) at every Session 41 commit checked and at 545af00, 678fadc, 265fe63 and fc3e79e (Session 42). Earlier red at 6d61ed2 (CI .env default reached the SR provider check; fixed via ns.provider_explicit). main: aa929ec (PR #8, 1282 passed, 10 deselected, both jobs). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
+| CI | PR #9: green (2 of 2) at every Session 41 commit checked and at 545af00, 678fadc, 265fe63 and fc3e79e and b56845d (Session 42). Earlier red at 6d61ed2 (CI .env default reached the SR provider check; fixed via ns.provider_explicit). main: aa929ec (PR #8, 1282 passed, 10 deselected, both jobs). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
 | Version | 2.6.0 (main.py VERSION and README line 6; last bump Session 36). Branch names v2.7-v2.11 are labels, not versions |
 | SR docs | Readme/readme_sr_pipeline.txt = how the SR pipeline works and why (Appendix A worked example); no how-to. How-to = Readme/flashcard-help.html. study_overrides.yaml format = REVIEWER_GUIDE section 5; control-type subgroups = 5.2. docs/sr/REVIEWER_GUIDE.md = what reviewers check by hand (sections 2.2, 3.1, 3.5, 5, 6 are cited by code/tests/README, keep them; 2.2 item 5 covers the quote gate). Readme/RESOLVED_ISSUES.md and HANDOFF_archive_pre_S19.md removed in Session 41 (739b2ce): read with `git show 2923cc3:Readme/<name>`; local copy D:\AI_kcMedicalResearch_backups\2026-11-14\Readme\ |
 | Deploy | None: CLI only, local first. Render deleted 2026-10-27. UptimeRobot monitor for the old URL: not confirmed paused/deleted (user, outside the repo; item 19) |
@@ -3039,4 +3039,26 @@ Session 39 closed items 4-11 (11e open). Job list, in order:
   wording in html_report. table_shift / mixed_runs / no_majority keep
   'runs disagree'. New tests/test_sr_s42_small_fixes.py (10); TOO_FEW_REASON
   in test_sr_small_bugs_ac.py updated; suite 1460 -> 1470. Not yet run live.
+- Item 1b live run 20261115_230933 (qwen3-vl:30b, CPU, time limit 4):
+  broken by setup, not a model score. Screening 5 INCLUDE, RoB2 4 of 5,
+  no OOM; extraction 0 of 4 (every call timed out at 15 min 3 s or was
+  unusable, 21 of 21 runs). Not scored.
+  - Cause 1: the launcher's time limit never reached the SR subprocess
+    (_build_sr_cmd passed no --time-limit; time_limits is module-level).
+    Fixed: time_limits.key_for; _build_sr_cmd always passes --time-limit;
+    pipelines/sr/main.py accepts it and calls set_limit.
+  - Cause 2: qwen3-vl:30b is the Thinking build; it ignores think=false on
+    /api/chat and /api/generate (probe: done_reason=length, ~1200 chars of
+    thinking, empty answer). Fixed: call_ollama_provider names the model and
+    says to pick an -instruct vision model when the answer is empty after
+    thinking, or was cut off by thinking (done_reason=length).
+  - Also: the [AGREEMENT] unusable line logs the answer length and first 200
+    characters (answer_snippet); Skip study lines use skip_label (author and
+    year, else file name; was None (None)). Session 41 bug-c test updated.
+  - qwen3-vl:30b removed; qwen3-vl:30b-a3b-instruct pulled, passes the
+    think=false probe (done_reason=stop, 0 thinking, clean JSON). .env
+    default stays gemma4:e4b. New tests/test_sr_s42_live_fixes.py (22);
+    suite 1470 -> 1492, 10 deselected. Not yet run live.
+  - Next: Karlsson-only check on the -instruct model, then the 5-PDF
+    reference run scored with sr_score_run.py (pass mark to agree first).
 - DO NOT MERGE v2.11-sr-local yet. PR #9 stays a draft.

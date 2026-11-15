@@ -330,7 +330,29 @@ def call_ollama_provider(
             data = json.loads(resp.read())
         response_text = data.get("response", "")
         if not response_text:
+            # Session 42: a thinking model can ignore "think": false and
+            # spend the whole num_predict budget thinking (live run
+            # 20261115_230933). Say so instead of a bare "empty".
+            _thinking = data.get("thinking") or ""
+            if _thinking:
+                raise RuntimeError(
+                    f"{model} returned no answer: it spent its answer "
+                    f"budget thinking ({len(_thinking)} characters, "
+                    f"done_reason={data.get('done_reason')}). It is a "
+                    f"thinking model that ignores think=false. Choose a "
+                    f"vision model whose tag ends in -instruct (launcher "
+                    f"10 Setup -> 2 Local AI), or raise OLLAMA_NUM_PREDICT.")
             raise RuntimeError("Ollama returned an empty response.")
+        # Session 42: thinking text + done_reason=length = the answer was
+        # cut off mid-JSON; it would only fail to parse ("unusable").
+        if data.get("thinking") and data.get("done_reason") == "length":
+            raise RuntimeError(
+                f"{model} answer was cut off: it spent its answer budget "
+                f"thinking ({len(data['thinking'])} characters, "
+                f"done_reason=length). It is a thinking model that ignores "
+                f"think=false. Choose a vision model whose tag ends in "
+                f"-instruct (launcher 10 Setup -> 2 Local AI), or raise "
+                f"OLLAMA_NUM_PREDICT.")
         return response_text
     except urllib.error.HTTPError as exc:
         # 404 = the model has not been pulled yet. Give a plain-language fix

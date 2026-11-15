@@ -115,6 +115,18 @@ def split_quote_flagged(rows):
     return flagged, cleared
 
 
+def skip_label(row) -> str:
+    """'Author (year)' for log lines; the file name when author/year are
+    missing (run 20261115_230933 printed 'Skip study: None (None)').
+    Session 42."""
+    author, year = row.get("first_author"), row.get("year")
+    if author and year:
+        return f"{author} ({year})"
+    if author:
+        return str(author)
+    return row.get("filename") or "unknown study"
+
+
 def review_skip_reason(cell, override_fields=None, quote_warning=None,
                        extraction_method=None):
     """F4 gate: None = may be pooled; str = keep OUT of the pooled estimate.

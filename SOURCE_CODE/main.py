@@ -1677,6 +1677,10 @@ def _build_sr_cmd(provider, model, effect_measure, config_path, run_id) -> list:
         "--effect-measure", effect_measure,
         "--run-id",         run_id,
     ]
+    # Session 42: the SR process starts with the 15-minute default unless
+    # told; pass the limit chosen in the launcher (e.g. "none").
+    import time_limits  # stdlib-only, as in parse_args
+    cmd += ["--time-limit", time_limits.key_for(time_limits.get_limit())]
     if config_path is not None:
         cmd += ["--config", str(config_path)]
     return cmd

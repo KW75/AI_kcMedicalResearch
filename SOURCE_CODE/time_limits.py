@@ -33,6 +33,16 @@ def parse(text):
     return CHOICES[key]
 
 
+def key_for(seconds):
+    """Reverse of parse: 900 -> '15', None -> 'none'. Used to pass the
+    current limit to a child process (SR runs as its own process; the
+    module-level limit is not inherited). Session 42."""
+    for key, value in CHOICES.items():
+        if value == seconds:
+            return key
+    raise ValueError(f"no time-limit choice for {seconds!r} seconds")
+
+
 def set_limit(seconds):
     global _limit
     _limit = seconds

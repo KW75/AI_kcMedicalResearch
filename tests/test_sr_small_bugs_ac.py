@@ -217,4 +217,5 @@ def test_c_skip_study_lines_name_the_study():
              if 'logger.warning(f"Skip study:' in l]
     assert len(lines) == 2, lines
     for l in lines:
-        assert "first_author" in l and "year" in l, l
+        # Session 42: skip_label gives "Author (year)", else the file name
+        assert "skip_label(audit_row)" in l, l

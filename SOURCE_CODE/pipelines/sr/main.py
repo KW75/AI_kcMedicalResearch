@@ -27,7 +27,7 @@ from .src.utils.criteria_file import placeholder_fields
 from .src.utils.audit_logger import (
     write_screens, write_extracts, write_rob2, write_results,
     nondet_flag_to_cell, nondet_cell_is_mandatory, NONDET_CELL_UNANIMOUS,
-    review_skip_reason, split_quote_flagged, reviewer_exclusion_reason
+    review_skip_reason, split_quote_flagged, reviewer_exclusion_reason, skip_label
 
 )
 
@@ -502,8 +502,13 @@ def main():
                          "SR_EXTRACT_N_AGREEMENT; 1 disables the vote and "
                          "writes nondet_flag=single_run. Costs N x Stage-3 "
                          "vision calls.")
+    ap.add_argument("--time-limit",     default="15", type=str.lower,
+                    help="Max time per AI call: 15, 30, 60 (minutes) or "
+                         "none. Passed on by the launcher (Session 42).")
 
     args = ap.parse_args()
+    import time_limits  # same module providers.py reads
+    time_limits.set_limit(time_limits.parse(args.time_limit))
     args.model = resolve_model(args.provider, args.model)
     logger.info(f"Provider {args.provider} / model {args.model}")
     # Session 40 (commit 3b): same vision check as the launcher, before any
@@ -880,13 +885,13 @@ def main():
             if _review:
                 review_rows.append(_row)
                 audit_row["skip_reason"] = _review
-                logger.warning(f"Skip study: {audit_row['first_author']} ({audit_row['year']}): {_review} "
+                logger.warning(f"Skip study: {skip_label(audit_row)}: {_review} "
                                f"(kept for the [SENSITIVITY] comparison)")
             else:
                 rows.append(_row)
 
         except Exception as e:
-            logger.warning(f"Skip study: {audit_row['first_author']} ({audit_row['year']}): {e}")
+            logger.warning(f"Skip study: {skip_label(audit_row)}: {e}")
             audit_row["skip_reason"] = f"{_review}; also: {e}" if _review else str(e)
 
         meta_audit.append(audit_row)
