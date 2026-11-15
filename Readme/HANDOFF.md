@@ -48,8 +48,8 @@ so those catches happen at session open, not mid-work.
 
 | Component      | Status |
 |----------------|--------|
-| Tests | 1421 passed, 10 deselected on v2.11-sr-local (422dc65); main 1282 (8a8a42e) (python -m pytest -m "not live" --tb=short -q) |
-| Branch | main = 8a8a42e (PR #8 merged 2026-11-14, Session 40). Work on v2.11-sr-local (from 8a8a42e), draft PR #9: SR local-first. Last code commit 422dc65 (check `git log --oneline -1`; later commits are docs only). Key commits: fffedcd (metadata precedence reviewer > PDF > model; scorer surname match), e75b497 (null-result screening rule), 9601b1c (mixed_runs vote flag), 080982f (RoB2 label rule), 2923cc3 (run.log; Ollama temperature in [SAMPLING]), 739b2ce (tidy), a1f0f12 (quote gate), 3c36570 (small bugs a-c, too_few_runs; 1408), 422dc65 (missing / unchecked quote gate; 1421). DO NOT MERGE: item 1 (old 12g) open. v2.10-sr-screening merged; can be deleted (item 20) |
+| Tests | 1428 passed, 10 deselected on v2.11-sr-local (Session 42); main 1282 (8a8a42e) (python -m pytest -m "not live" --tb=short -q) |
+| Branch | main = 8a8a42e (PR #8 merged 2026-11-14, Session 40). Work on v2.11-sr-local (from 8a8a42e), draft PR #9: SR local-first. Latest commit: run `git log --oneline -1` (not written here, because every commit changes it). Key commits: fffedcd (metadata precedence reviewer > PDF > model; scorer surname match), e75b497 (null-result screening rule), 9601b1c (mixed_runs vote flag), 080982f (RoB2 label rule), 2923cc3 (run.log; Ollama temperature in [SAMPLING]), 739b2ce (tidy), a1f0f12 (quote gate), 3c36570 (small bugs a-c, too_few_runs; 1408), 422dc65 (missing / unchecked quote gate; 1421), Session 42: Setup -> Local AI vision lines (1428; see Session 42 log). DO NOT MERGE: item 1 (old 12g) open. v2.10-sr-screening merged; can be deleted (item 20) |
 | CI | PR #9: green (2 of 2) at every Session 41 commit checked, last 422dc65. Earlier red at 6d61ed2 (CI .env default reached the SR provider check; fixed via ns.provider_explicit). main: aa929ec (PR #8, 1282 passed, 10 deselected, both jobs). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
 | Version | 2.6.0 (main.py VERSION and README line 6; last bump Session 36). Branch names v2.7-v2.11 are labels, not versions |
 | SR docs | Readme/readme_sr_pipeline.txt = how the SR pipeline works and why (Appendix A worked example); no how-to. How-to = Readme/flashcard-help.html. study_overrides.yaml format = REVIEWER_GUIDE section 5; control-type subgroups = 5.2. docs/sr/REVIEWER_GUIDE.md = what reviewers check by hand (sections 2.2, 3.1, 3.5, 5, 6 are cited by code/tests/README, keep them; 2.2 item 5 covers the quote gate). Readme/RESOLVED_ISSUES.md and HANDOFF_archive_pre_S19.md removed in Session 41 (739b2ce): read with `git show 2923cc3:Readme/<name>`; local copy D:\AI_kcMedicalResearch_backups\2026-11-14\Readme\ |
@@ -80,13 +80,17 @@ list is the only place to tick items off. Old item numbers in brackets
 for tracing. Line numbers checked by grep at 422dc65.
 
 SR local-first: blockers before PR #9 can leave draft
-1. Decide the accuracy route (old 12g). gemma4:e4b reads wrong values even
-   when all 3 runs agree (Karlsson, run 20261114_202253). Pick one before
-   any code: a) extraction on qwen behind the cloud gate, with screening /
-   RoB2 kept local; b) a larger local vision model, same reference set, N=3,
-   scored with sr_score_run.py; c) local extraction kept, every study needs
-   reviewer values in study_overrides.yaml (the quote gate already forces
-   this for page-image studies).
+1. Accuracy route (old 12g): DECIDED Session 42 = b) a larger local vision
+   model. gemma4:e4b reads wrong values even when all 3 runs agree
+   (Karlsson, run 20261114_202253). 1a) In the app, colleagues choose their
+   own vision model. DONE: Setup -> 2 Local AI shows the vision models and
+   whether a pulled model can read images. NEXT: shared SR/OCR vision
+   picker (decision A; see Session 42 log). 1b) Reference run on a machine
+   with more VRAM: same 5 PDFs and PICO, empty overrides, N=3,
+   OLLAMA_TEMPERATURE 0.3, scored with sr_score_run.py. Proposed pass mark
+   (agree before the run): AI alone >= 1 of 4 fully correct, 0 wrong AND
+   pooled, screening 5 INCLUDE, no OOM. Not chosen: a) qwen extraction
+   behind the cloud gate; c) reviewer values for every study.
 2. Reviewer-override proof: read the Karlsson PDF (S1877886015000567), enter
    all four means/SDs (truth 3.88 / 1.05 / 3.67 / 0.75) in
    input/sr/study_overrides.yaml with a source-page note, and confirm on a
@@ -2935,3 +2939,36 @@ Session 39 closed items 4-11 (11e open). Job list, in order:
   - Left open: the machine skip_reason still says "source quote not found" for missing/unchecked quotes; how often paper_text is empty depends on get_paper_text (main.py ~576-592), not yet read.
   - Not yet run live. New tests/test_sr_quote_unchecked.py (13); suite 1408 -> 1421, 10 deselected.
   - DO NOT MERGE v2.11-sr-local yet. PR #9 stays a draft.
+
+## Session 42 - 2026-11-15 - branch v2.11-sr-local
+
+- d9e8d1e (docs): HANDOFF Current State and Next work refreshed for
+  Session 42. Line numbers re-grepped at 422dc65; item 9f done
+  ('qwen-vl-plus' only in comments). CI on d9e8d1e not confirmed
+  ("no checks reported" right after the push).
+- Decided (user): accuracy route = item 1b, a larger local vision model.
+  The app must not be limited to the dev machine: colleagues pick their
+  own model. Dev machine: Intel UHD Graphics 770 (no separate GPU),
+  63.7 GB RAM, Ollama 0.40.16, so models run on the CPU; the item 1b
+  reference run is planned on a desktop with more VRAM.
+- Decided (user): A = one shared vision picker for SR and OCR, inside the
+  app (the launcher skips its model list for SR/OCR, launcher.py line
+  559). Parked, no code: B OLLAMA_VISION_MODEL (vision-only default),
+  C size/RAM warning, D larger-model suggestions in README/help,
+  E Ollama vision per model (= item 9c).
+- Setup -> 2 Local AI (scripts/launcher.py): status shows
+  "Vision models (SR/OCR): <names>" or "none - use 2 to pull one"; the
+  pull prompt adds https://ollama.com/search?c=vision; after a pull it
+  says whether the model can read images (SR and OCR will / will not
+  list it); "Make default" now says "for all modes (incl. Writing)".
+  Still no model names in code. tests/test_launcher_local_ai.py +7
+  (_run takes models= / caps=). Suite 1421 -> 1428, 10 deselected.
+- Next: A. Move vision_models and the default rule from
+  pipelines/ocr/cli.py (lines 31-43; menu 157-171) to ollama_models.py
+  and show describe() lines; use it in run_sr_launcher (main.py ~1541)
+  when no --model is typed; no vision model -> point to "launcher 10
+  Setup -> 2 Local AI", then the existing cloud offer. OCR's own
+  DEFAULT_VISION_MODEL (cli.py line 27) -> OLLAMA_DEFAULT_MODEL. Keep
+  cli.vision_models / _default_model working (tests/test_ocr_cli.py
+  lines 72, 101).
+- DO NOT MERGE v2.11-sr-local yet. PR #9 stays a draft.

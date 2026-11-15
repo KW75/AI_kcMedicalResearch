@@ -823,6 +823,7 @@ def _change_default_model(models: list) -> None:
 def _pull_model(exe: str) -> None:
     print()
     print(f'  {INFO}Find model names at https://ollama.com/search (e.g. qwen3:4b).{RESET}')
+    print(f'  {INFO}Vision models (needed for SR and OCR): https://ollama.com/search?c=vision{RESET}')
     name = safe_input(f'  {ACCENT}>> Model to pull (Enter to cancel): {RESET}')
     if not name:
         print(f'  {INFO}Cancelled.{RESET}')
@@ -848,7 +849,11 @@ def _pull_model(exe: str) -> None:
         print(f'  {ERR}Download failed (ollama exit code {rc}). Check the name at https://ollama.com/search.{RESET}')
         return
     print(f'  {ACCENT}{name} is ready.{RESET}')
-    answer = safe_input(f'  {ACCENT}>> Make {name} the default model? [y/N]: {RESET}')
+    if 'vision' in model_capabilities(None, name):
+        print(f'  {ACCENT}{name} can read images - SR and OCR will list it.{RESET}')
+    else:
+        print(f'  {WARN}{name} cannot read images - SR and OCR will not list it.{RESET}')
+    answer = safe_input(f'  {ACCENT}>> Make {name} the default model for all modes (incl. Writing)? [y/N]: {RESET}')
     if answer.lower() in ('y', 'yes'):
         _save_default_model(name)
 
@@ -879,6 +884,11 @@ def local_ai_menu() -> None:
         print()
         print(f'  {TEXT}Ollama {version} - running{RESET}')
         print(f'  {TEXT}Default model: {default} ({state}){RESET}')
+        vision = [m['name'] for m in models if 'vision' in model_capabilities(None, m['name'])]
+        if vision:
+            print(f'  {TEXT}Vision models (SR/OCR): {", ".join(vision)}{RESET}')
+        else:
+            print(f'  {WARN}Vision models (SR/OCR): none - use 2 to pull one{RESET}')
         _warn_if_system_ollama_model()
         print()
         print(f'  {ACCENT}1{RESET}  {TEXT}Change default model{RESET}')
