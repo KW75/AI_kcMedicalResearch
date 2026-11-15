@@ -72,6 +72,17 @@ QUOTE_GATE_REASON = ("needs review: source quote not found (quote_not_found) - "
                      "numbers read from page images; verify all four means/SDs "
                      "against the PDF and enter them in "
                      "input/sr/study_overrides.yaml with a source-page note")
+# Session 42 item 3: a mean/SD that is not in its own source quote, although
+# the quote itself was found. Run 20261114_224231: Ang's control mean/SD; only
+# table_shift kept Ang out. The marker is the tail of the mean/SD warning
+# (data_extractor branch 2), which the F8 N warning does not contain:
+# overriding means/SDs cannot fix an N.
+NUMBER_NOT_IN_QUOTE_MARKER = "the quote does not support this number"
+NUMBER_GATE_TOKEN = "number_not_in_quote"
+NUMBER_GATE_REASON = ("needs review: a mean/SD is not in its own source quote "
+                      "(number_not_in_quote) - numbers read from page images; verify "
+                      "all four means/SDs against the PDF and enter them in "
+                      "input/sr/study_overrides.yaml with a source-page note")
 
 
 def review_skip_reason(cell, override_fields=None, quote_warning=None,
@@ -100,12 +111,17 @@ def review_skip_reason(cell, override_fields=None, quote_warning=None,
                 "needs review: runs disagree (" + "|".join(still_open) + ") - "
                 "verify against the PDF, or enter the values in "
                 "input/sr/study_overrides.yaml with a source-page note")
-    # Quote gate: text-path studies keep today's behaviour; a missing method
-    # counts as page images (safe side). Cleared by all four means/SDs.
-    if (any(m in str(quote_warning or "") for m in QUOTE_GATE_MARKERS)
-            and not str(extraction_method or "").startswith("text")
-            and not all(f in done for f in _REVIEW_NUMERIC_FIELDS)):
-        reasons.append(QUOTE_GATE_REASON)
+    # Quote gates (quote_not_found, number_not_in_quote): text-path studies
+    # keep today's behaviour; a missing method counts as page images (safe
+    # side). Both are cleared by all four means/SDs.
+    page_images = not str(extraction_method or "").startswith("text")
+    all_four = all(f in done for f in _REVIEW_NUMERIC_FIELDS)
+    warn = str(quote_warning or "")
+    if page_images and not all_four:
+        if any(m in warn for m in QUOTE_GATE_MARKERS):
+            reasons.append(QUOTE_GATE_REASON)
+        if NUMBER_NOT_IN_QUOTE_MARKER in warn:
+            reasons.append(NUMBER_GATE_REASON)
     return "; also: ".join(reasons) or None
 
 

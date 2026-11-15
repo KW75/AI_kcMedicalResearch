@@ -139,6 +139,11 @@ def _plain_one(part):
         return ("The numbers were read from page images and the AI's source "
                 "quote was missing, could not be checked, or was not found in "
                 "the paper's text. Not confirmed by a reviewer.")
+    if part.startswith("needs review: a mean/SD is not in its own source quote"):
+        # Session 42 (item 3): number gate (audit_logger.NUMBER_GATE_REASON)
+        return ("The numbers were read from page images and a mean or SD is "
+                "not in its own source quote (the AI's quote does not support "
+                "that number). Not confirmed by a reviewer.")
     if part.startswith("needs review"):
         head = "needs review: runs disagree ("
         flags = part[len(head):].split(")", 1)[0] if part.startswith(head) else ""

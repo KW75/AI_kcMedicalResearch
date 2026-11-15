@@ -20,8 +20,13 @@ NOT_FOUND = (
     "source text - it may be paraphrased or fabricated | control source "
     "quote was not found verbatim in the extracted source text - it may be "
     "paraphrased or fabricated")
-OTHER_ONLY = ("intervention SD (3.7) does not appear in its own source quote "
-              "- the quote does not support this number")
+# Session 42: the mean/SD-not-in-quote warning now has its own gate
+# (number_not_in_quote); these two warnings must still trip no gate.
+OTHER_ONLY = ("control N (41) does not appear in its own source quote (quote "
+              "has 36) - check the analysed N for this arm (F8) | intervention "
+              "SD (2.1) was quoted from text containing 'SE'/'SEM'/'standard "
+              "error' - verify this is really an SD, not a standard error "
+              "(Known Issue #9)")
 ALL_FOUR = ("mean_intervention(3.61->3.88); sd_intervention(0.85->1.05); "
             "mean_control(confirmed 3.67); sd_control(0.92->0.75)")
 THREE = ("mean_intervention(3.61->3.88); sd_intervention(0.85->1.05); "
@@ -121,3 +126,54 @@ def test_plain_wording_quote_only():
 def test_plain_wording_shift_plus_quote():
     s = _hr().plain_skip_reason(SHIFT_REASON + "; also: " + QUOTE_REASON)
     assert "neighbouring table row" in s and "page images" in s
+
+
+# --- Session 42 item 3: number not in its own (found) source quote ----------
+# Run 20261114_224231: Ang's control mean -8.9 / SD 25.3 were not in their
+# own quote although the quote was found verbatim; only table_shift kept Ang
+# out. Same rule as quote_not_found: page images only, cleared by all four
+# means/SDs. The F8 N warning is not caught (overriding means/SDs cannot fix N).
+
+ANG = ("control mean (-8.9) does not appear in its own source quote - the "
+       "quote does not support this number | control SD (25.3) does not "
+       "appear in its own source quote - the quote does not support this number")
+NUMBER_REASON = ("needs review: a mean/SD is not in its own source quote "
+                 "(number_not_in_quote) - numbers read from page images; verify "
+                 "all four means/SDs against the PDF and enter them in "
+                 "input/sr/study_overrides.yaml with a source-page note")
+EXTRACTOR = (Path(__file__).resolve().parents[1] / "SOURCE_CODE" / "pipelines"
+             / "sr" / "src" / "extraction" / "data_extractor.py")
+
+
+def test_ang_number_not_in_own_quote_needs_review():
+    assert gate("unanimous", warn=ANG) == NUMBER_REASON
+
+
+def test_number_gate_cleared_by_all_four_overrides():
+    assert gate("unanimous", ALL_FOUR, ANG) is None
+
+
+def test_number_gate_three_overrides_do_not_clear_it():
+    assert "number_not_in_quote" in (gate("unanimous", THREE, ANG) or "")
+
+
+def test_number_gate_text_fallback_unchanged():
+    assert gate("unanimous", warn=ANG, method="text_fallback") is None
+
+
+def test_quote_not_found_and_number_gate_both_named():
+    r = gate("unanimous", warn=NOT_FOUND + " | " + ANG) or ""
+    assert "quote_not_found" in r and "number_not_in_quote" in r
+
+
+def test_number_gate_marker_matches_extractor_wording():
+    src = EXTRACTOR.read_text(encoding="utf-8")
+    assert audit.NUMBER_NOT_IN_QUOTE_MARKER in src
+    assert audit.NUMBER_NOT_IN_QUOTE_MARKER not in "check the analysed N for this arm (F8)"
+
+
+def test_plain_wording_number_only():
+    s = _hr().plain_skip_reason(NUMBER_REASON)
+    assert "not in its own source quote" in s and "page images" in s
+    assert "not found in the paper" not in s
+    assert "different values" not in s
