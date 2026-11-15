@@ -208,6 +208,22 @@ def _log_review_sensitivity(rows, review_rows, effect_measure, resolved=None):
     return ma
 
 
+_POOLED_TARGET = "this pooled estimate"
+_NOT_POOLED_TARGET = "these values (no pooled estimate in this run)"
+
+
+def _trust_target(rows: list[dict]) -> str:
+    """Session 42: what the Stage-4 warnings ask the reviewer to verify
+    before trusting. A pooled estimate exists only when 2 or more studies
+    were pooled (the run aborts below 2). Pooled = included_in_meta and no
+    skip_reason (the error path sets skip_reason without resetting
+    included_in_meta). Run k20261116_070736 said "this pooled estimate"
+    although nothing was pooled."""
+    pooled = sum(1 for r in rows
+                 if r.get("included_in_meta") and not r.get("skip_reason"))
+    return _POOLED_TARGET if pooled >= 2 else _NOT_POOLED_TARGET
+
+
 def _log_stage4_summary(meta_audit: list[dict],
                         er: list[dict],
                         effect_measure: str) -> None:
@@ -220,6 +236,7 @@ def _log_stage4_summary(meta_audit: list[dict],
     zero means 'checked and clean' or 'nothing was there to check'.
     """
     n_extracted = sum(1 for r in meta_audit if _row_has_extracted_value(r))
+    target = _trust_target(meta_audit)
 
     # --- [PLAUSIBILITY] --------------------------------------------------
     _bound = PLAUSIBILITY_BOUNDS.get(effect_measure)
@@ -228,8 +245,7 @@ def _log_stage4_summary(meta_audit: list[dict],
         logger.warning(
             f"[PLAUSIBILITY] {len(flagged)} of {n_extracted} extracted "
             f"studies exceeded the effect-size plausibility bound and "
-            f"need manual verification before this pooled estimate is "
-            f"trusted:")
+            f"need manual verification before trusting {target}:")
         for r in flagged:
             logger.warning(
                 f"  - {r.get('first_author','?')} ({r.get('year','')}): "
@@ -259,7 +275,7 @@ def _log_stage4_summary(meta_audit: list[dict],
             f"studies had a value extracted into an SD field from a "
             f"source line also containing 'SE'/'SEM'/'standard error' - "
             f"verify these are genuine SDs, not standard errors, before "
-            f"trusting this pooled estimate (see REVIEWER_GUIDE.md 3.1):")
+            f"trusting {target} (see REVIEWER_GUIDE.md 3.1):")
         for r in se_flagged:
             logger.warning(
                 f"  - {r.get('first_author','?')} ({r.get('year','')}): "
@@ -279,8 +295,8 @@ def _log_stage4_summary(meta_audit: list[dict],
             f"{n_extracted} extracted studies had a group label that "
             f"looks like a timepoint, or identical intervention/control "
             f"labels - possible within- vs between-group confusion. "
-            f"Verify against the source PDF before trusting this pooled "
-            f"estimate (see REVIEWER_GUIDE.md 2.2):")
+            f"Verify against the source PDF before trusting {target} "
+            f"(see REVIEWER_GUIDE.md 2.2):")
         for r in group_flagged:
             logger.warning(
                 f"  - {r.get('first_author','?')} ({r.get('year','')}): "
@@ -310,8 +326,8 @@ def _log_stage4_summary(meta_audit: list[dict],
             f"bound to a clean verbatim source quote (missing quote, "
             f"number absent from its quote, SE-labelled quote for an "
             f"SD, or within-subject timepoint language in the quote) - "
-            f"verify each against the source PDF before trusting this "
-            f"pooled estimate (Known Issue #48):")
+            f"verify each against the source PDF before trusting {target} "
+            f"(Known Issue #48):")
         for r in quote_flagged:
             logger.warning(
                 f"  - {r.get('first_author','?')} ({r.get('year','')}): "
@@ -358,8 +374,7 @@ def _log_stage4_summary(meta_audit: list[dict],
             f"disagreed across N runs ({len(mandatory)} mandatory: "
             f"no_majority/table_shift/mixed_runs/too_few_runs = the runs read different table "
             f"cells; a majority there is not evidence). Verify each "
-            f"against the source PDF before trusting this pooled estimate "
-            f"(#11):")
+            f"against the source PDF before trusting {target} (#11):")
         for r in flagged:
             tag = "MANDATORY" if nondet_cell_is_mandatory(r.get("nondet_flag")) else "check"
             logger.warning(
