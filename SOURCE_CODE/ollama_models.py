@@ -114,6 +114,68 @@ def sr_vision_error(model: str, caps_fn=None, host=None) -> str | None:
             "(cloud).")
 
 
+# --- Vision-model picker shared by SR and OCR (Session 42, decision A) -------
+# Colleagues pull their own vision models (launcher 10 Setup -> 2 Local AI);
+# SR and OCR list whatever is pulled. No model names here apart from
+# OLLAMA_DEFAULT_MODEL.
+
+NO_VISION_HINT = (
+    "No pulled Ollama model can read images. Pull one in launcher "
+    "10 Setup -> 2 Local AI (vision models: https://ollama.com/search?c=vision)."
+)
+
+
+def vision_models(list_fn=None, caps_fn=None, host=None) -> list[dict]:
+    """Pulled Ollama models that report the 'vision' capability."""
+    list_fn = list_fn or list_ollama_models
+    caps_fn = caps_fn or model_capabilities
+    return [m for m in list_fn(host) if "vision" in caps_fn(host, m["name"])]
+
+
+def _with_tag(name: str) -> str:
+    """Ollama lists 'llava' as 'llava:latest'."""
+    return name if ":" in name else name + ":latest"
+
+
+def default_vision_model(names: list[str]) -> str:
+    """OLLAMA_MODEL if it is in names (with or without ':latest'), else
+    OLLAMA_DEFAULT_MODEL if pulled, else the first name."""
+    env = os.getenv("OLLAMA_MODEL", "").strip()
+    if env:
+        for candidate in (env, _with_tag(env)):
+            if candidate in names:
+                return candidate
+    if OLLAMA_DEFAULT_MODEL in names:
+        return OLLAMA_DEFAULT_MODEL
+    return names[0]
+
+
+def pick_vision_model(models: list[dict], input_fn=input, log=print) -> str | None:
+    """Ask which pulled vision model to use. Enter = default; no keyboard
+    (EOFError) = default; Ctrl+C or a bad answer = None (job not run)."""
+    if not models:
+        log(NO_VISION_HINT)
+        return None
+    default = default_vision_model([m["name"] for m in models])
+    for i, m in enumerate(models, start=1):
+        mark = "  (default)" if m["name"] == default else ""
+        log(f"  {i}  {describe(m, {'vision'})}{mark}")
+    try:
+        answer = input_fn("Model number (Enter = default): ").strip()
+    except EOFError:
+        log(f"No keyboard: using the default model {default}.")
+        return default
+    except KeyboardInterrupt:
+        log("Cancelled. Job not run.")
+        return None
+    if not answer:
+        return default
+    if answer.isdigit() and 1 <= int(answer) <= len(models):
+        return models[int(answer) - 1]["name"]
+    log("Not a valid model number. Job not run.")
+    return None
+
+
 def describe(model: dict, caps: set[str]) -> str:
     """One ASCII line for the launcher's model picker."""
     vision = "yes" if "vision" in caps else "no"

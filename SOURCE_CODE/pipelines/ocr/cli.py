@@ -29,18 +29,15 @@ CLOUD_KEYS = {"qwen": "DASHSCOPE_API_KEY", "openai": "OPENAI_API_KEY"}
 
 
 def vision_models(list_fn, caps_fn, host=None) -> list[dict]:
-    """Pulled Ollama models that report the 'vision' capability."""
-    return [m for m in list_fn(host) if "vision" in caps_fn(host, m["name"])]
+    """Pulled Ollama models that report 'vision' (shared with SR, Session 42)."""
+    import ollama_models  # lazy
+    return ollama_models.vision_models(list_fn, caps_fn, host)
 
 
 def _default_model(names: list[str]) -> str:
-    """OLLAMA_MODEL if it can read images, else gemma4:e4b, else the first."""
-    env = os.getenv("OLLAMA_MODEL", "").strip()
-    if env in names:
-        return env
-    if DEFAULT_VISION_MODEL in names:
-        return DEFAULT_VISION_MODEL
-    return names[0]
+    """Default vision model: the shared rule in ollama_models."""
+    import ollama_models  # lazy
+    return ollama_models.default_vision_model(names)
 
 
 def _pick(options: list, answer: str):
@@ -131,7 +128,8 @@ def run(base_dir, model=None, *, provider="ollama", confirm=None,
             models = vision_models(list_fn, caps_fn)
             if not models:
                 pull = (f"No pulled Ollama model can read images. Run: ollama "
-                        f"pull {DEFAULT_VISION_MODEL}  (other vision models: "
+                        f"pull {DEFAULT_VISION_MODEL}, or pull one in launcher "
+                        f"10 Setup -> 2 Local AI (vision models: "
                         f"https://ollama.com/search?c=vision).")
                 choices = _cloud_choices() if confirm else []
                 if not choices:
@@ -155,20 +153,10 @@ def run(base_dir, model=None, *, provider="ollama", confirm=None,
                     "Enter = OCR_<date>_<time>): ").strip()
 
     if models:
-        names = [m["name"] for m in models]
-        default = _default_model(names)
-        for i, m in enumerate(models, start=1):
-            mark = "  (default)" if m["name"] == default else ""
-            log(f"  {i}. {m['name']}  {m['size_gb']} GB{mark}")
-        answer = input_fn("Model number (Enter = default): ").strip()
-        if not answer:
-            model = default
-        else:
-            picked = _pick(models, answer)
-            if picked is None:
-                log("Not a valid model number. Job not run.")
-                return None
-            model = picked["name"]
+        import ollama_models  # lazy, as above; shared with SR (Session 42)
+        model = ollama_models.pick_vision_model(models, input_fn=input_fn, log=log)
+        if model is None:
+            return None
 
     extra = {}
     label = model
