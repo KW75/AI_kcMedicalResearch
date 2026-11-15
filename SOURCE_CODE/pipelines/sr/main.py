@@ -27,7 +27,7 @@ from .src.utils.criteria_file import placeholder_fields
 from .src.utils.audit_logger import (
     write_screens, write_extracts, write_rob2, write_results,
     nondet_flag_to_cell, nondet_cell_is_mandatory, NONDET_CELL_UNANIMOUS,
-    review_skip_reason, reviewer_exclusion_reason
+    review_skip_reason, split_quote_flagged, reviewer_exclusion_reason
 
 )
 
@@ -295,7 +295,14 @@ def _log_stage4_summary(meta_audit: list[dict],
             f"still required.")
 
     # --- [SOURCE QUOTE CHECK] --------------------------------------------
-    quote_flagged = [r for r in meta_audit if r.get("source_quote_warning")]
+    # Session 42: a study whose four means/SDs a reviewer overrode is not
+    # listed as "verify each" (run 20261115_213016 still listed Karlsson).
+    quote_flagged, quote_cleared = split_quote_flagged(meta_audit)
+    for r in quote_cleared:
+        logger.info(
+            f"[SOURCE QUOTE CHECK] {r.get('first_author','?')} ({r.get('year','')}): "
+            f"quote warning cleared by reviewer override (all four "
+            f"means/SDs entered in study_overrides.yaml).")
     if quote_flagged:
         logger.warning(
             f"[SOURCE QUOTE CHECK] {len(quote_flagged)} of {n_extracted} "
@@ -309,6 +316,11 @@ def _log_stage4_summary(meta_audit: list[dict],
             logger.warning(
                 f"  - {r.get('first_author','?')} ({r.get('year','')}): "
                 f"{r.get('source_quote_warning')}")
+    elif quote_cleared:
+        logger.info(
+            f"[SOURCE QUOTE CHECK] 0 still flagged of {n_extracted} extracted "
+            f"studies; {len(quote_cleared)} cleared by reviewer override "
+            f"(see above). Manual verification still required.")
     elif n_extracted == 0:
         logger.info(
             f"[SOURCE QUOTE CHECK] 0 flagged of 0 extracted studies "

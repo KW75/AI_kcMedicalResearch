@@ -84,6 +84,36 @@ NUMBER_GATE_REASON = ("needs review: a mean/SD is not in its own source quote "
                       "all four means/SDs against the PDF and enter them in "
                       "input/sr/study_overrides.yaml with a source-page note")
 
+# Session 42: too_few_runs has its own reason - with one usable run nothing
+# could disagree (run 20261115_213016, Lami). Cleared like table_shift.
+TOO_FEW_RUNS_REASON = ("needs review: too few usable runs (too_few_runs) - only one "
+                       "reading returned numbers, so nothing could be compared; "
+                       "verify against the PDF, or enter all four means/SDs in "
+                       "input/sr/study_overrides.yaml with a source-page note")
+
+
+def means_sds_overridden(override_fields) -> bool:
+    """True when a reviewer entered all four means/SDs (same rule as the gate)."""
+    done = _overridden_fields(override_fields)
+    return all(f in done for f in _REVIEW_NUMERIC_FIELDS)
+
+
+def split_quote_flagged(rows):
+    """Rows with a source-quote warning -> (still flagged, cleared by override).
+
+    Session 42: run 20261115_213016 still asked to verify Karlsson after the
+    reviewer override of all four means/SDs had cleared quote_not_found.
+    """
+    flagged, cleared = [], []
+    for r in rows:
+        if not r.get("source_quote_warning"):
+            continue
+        if means_sds_overridden(r.get("override_fields")):
+            cleared.append(r)
+        else:
+            flagged.append(r)
+    return flagged, cleared
+
 
 def review_skip_reason(cell, override_fields=None, quote_warning=None,
                        extraction_method=None):
@@ -99,8 +129,12 @@ def review_skip_reason(cell, override_fields=None, quote_warning=None,
     reasons = []
     if nondet_cell_is_mandatory(cell):
         still_open = []
+        too_few = False
         for tok in (t.strip() for t in cell.split("|")):
-            if tok in ("table_shift", "mixed_runs", "too_few_runs"):
+            if tok == "too_few_runs":
+                if not all(f in done for f in _REVIEW_NUMERIC_FIELDS):
+                    too_few = True
+            elif tok in ("table_shift", "mixed_runs"):
                 if not all(f in done for f in _REVIEW_NUMERIC_FIELDS):
                     still_open.append(tok)
             elif tok.endswith(":no_majority"):
@@ -111,6 +145,8 @@ def review_skip_reason(cell, override_fields=None, quote_warning=None,
                 "needs review: runs disagree (" + "|".join(still_open) + ") - "
                 "verify against the PDF, or enter the values in "
                 "input/sr/study_overrides.yaml with a source-page note")
+        if too_few:
+            reasons.append(TOO_FEW_RUNS_REASON)
     # Quote gates (quote_not_found, number_not_in_quote): text-path studies
     # keep today's behaviour; a missing method counts as page images (safe
     # side). Both are cleared by all four means/SDs.

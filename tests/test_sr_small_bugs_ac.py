@@ -26,9 +26,10 @@ MAIN = (Path(__file__).resolve().parents[1]
         / "SOURCE_CODE" / "pipelines" / "sr" / "main.py")
 ALL_FOUR = ("mean_intervention(13.68->7.35); sd_intervention(4.61->2.08); "
             "mean_control(13.79->7.4); sd_control(4.22->1.29)")
-TOO_FEW_REASON = ("needs review: runs disagree (too_few_runs) - verify against "
-                  "the PDF, or enter the values in input/sr/study_overrides.yaml "
-                  "with a source-page note")
+TOO_FEW_REASON = ("needs review: too few usable runs (too_few_runs) - only one "
+                  "reading returned numbers, so nothing could be compared; "
+                  "verify against the PDF, or enter all four means/SDs in "
+                  "input/sr/study_overrides.yaml with a source-page note")
 
 
 def _stub(name, **attrs):

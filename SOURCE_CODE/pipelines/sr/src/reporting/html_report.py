@@ -144,6 +144,10 @@ def _plain_one(part):
         return ("The numbers were read from page images and a mean or SD is "
                 "not in its own source quote (the AI's quote does not support "
                 "that number). Not confirmed by a reviewer.")
+    if part.startswith("needs review: too few usable runs"):
+        # Session 42: audit_logger.TOO_FEW_RUNS_REASON
+        return ("Only one of the repeated readings returned numbers, so "
+                "nothing could be compared. Not confirmed by a reviewer.")
     if part.startswith("needs review"):
         head = "needs review: runs disagree ("
         flags = part[len(head):].split(")", 1)[0] if part.startswith(head) else ""

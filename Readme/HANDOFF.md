@@ -48,9 +48,9 @@ so those catches happen at session open, not mid-work.
 
 | Component      | Status |
 |----------------|--------|
-| Tests | 1460 passed, 10 deselected on v2.11-sr-local (Session 42); main 1282 (8a8a42e) (python -m pytest -m "not live" --tb=short -q) |
+| Tests | 1470 passed, 10 deselected on v2.11-sr-local (Session 42); main 1282 (8a8a42e) (python -m pytest -m "not live" --tb=short -q) |
 | Branch | main = 8a8a42e (PR #8 merged 2026-11-14, Session 40). Work on v2.11-sr-local (from 8a8a42e), draft PR #9: SR local-first. Latest commit: run `git log --oneline -1` (not written here, because every commit changes it). Key commits: fffedcd (metadata precedence reviewer > PDF > model; scorer surname match), e75b497 (null-result screening rule), 9601b1c (mixed_runs vote flag), 080982f (RoB2 label rule), 2923cc3 (run.log; Ollama temperature in [SAMPLING]), 739b2ce (tidy), a1f0f12 (quote gate), 3c36570 (small bugs a-c, too_few_runs; 1408), 422dc65 (missing / unchecked quote gate; 1421), Session 42: 545af00 Setup -> Local AI vision lines (1428), shared SR/OCR vision picker (1453; see Session 42 log). DO NOT MERGE: item 1 (old 12g) open. v2.10-sr-screening merged; can be deleted (item 20) |
-| CI | PR #9: green (2 of 2) at every Session 41 commit checked and at 545af00, 678fadc and 265fe63 (Session 42). Earlier red at 6d61ed2 (CI .env default reached the SR provider check; fixed via ns.provider_explicit). main: aa929ec (PR #8, 1282 passed, 10 deselected, both jobs). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
+| CI | PR #9: green (2 of 2) at every Session 41 commit checked and at 545af00, 678fadc, 265fe63 and fc3e79e (Session 42). Earlier red at 6d61ed2 (CI .env default reached the SR provider check; fixed via ns.provider_explicit). main: aa929ec (PR #8, 1282 passed, 10 deselected, both jobs). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
 | Version | 2.6.0 (main.py VERSION and README line 6; last bump Session 36). Branch names v2.7-v2.11 are labels, not versions |
 | SR docs | Readme/readme_sr_pipeline.txt = how the SR pipeline works and why (Appendix A worked example); no how-to. How-to = Readme/flashcard-help.html. study_overrides.yaml format = REVIEWER_GUIDE section 5; control-type subgroups = 5.2. docs/sr/REVIEWER_GUIDE.md = what reviewers check by hand (sections 2.2, 3.1, 3.5, 5, 6 are cited by code/tests/README, keep them; 2.2 item 5 covers the quote gate). Readme/RESOLVED_ISSUES.md and HANDOFF_archive_pre_S19.md removed in Session 41 (739b2ce): read with `git show 2923cc3:Readme/<name>`; local copy D:\AI_kcMedicalResearch_backups\2026-11-14\Readme\ |
 | Deploy | None: CLI only, local first. Render deleted 2026-10-27. UptimeRobot monitor for the old URL: not confirmed paused/deleted (user, outside the repo; item 19) |
@@ -3028,4 +3028,15 @@ Session 39 closed items 4-11 (11e open). Job list, in order:
 - Small follow-ups seen in this run: [SOURCE QUOTE CHECK] summary still asks
   to verify Karlsson although the reviewer override cleared it; Lami's reason
   says 'runs disagree (too_few_runs)' though only 1 run was usable.
+- Small fixes from live run 20261115_213016 (tests first):
+  1) [SOURCE QUOTE CHECK] summary: audit_logger.split_quote_flagged /
+  means_sds_overridden. A study whose four means/SDs a reviewer overrode
+  gets one 'cleared by reviewer override' info line instead of 'verify
+  each'; if every flagged study is cleared the summary says '0 still
+  flagged', not 'every value was bound to a verbatim quote'.
+  2) too_few_runs has its own reason (audit_logger.TOO_FEW_RUNS_REASON,
+  'too few usable runs'), still cleared by all four means/SDs; own plain
+  wording in html_report. table_shift / mixed_runs / no_majority keep
+  'runs disagree'. New tests/test_sr_s42_small_fixes.py (10); TOO_FEW_REASON
+  in test_sr_small_bugs_ac.py updated; suite 1460 -> 1470. Not yet run live.
 - DO NOT MERGE v2.11-sr-local yet. PR #9 stays a draft.
