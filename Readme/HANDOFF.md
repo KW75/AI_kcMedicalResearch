@@ -44,21 +44,20 @@ so those catches happen at session open, not mid-work.
 
 ---
 
-## Current State (Session 38, v2.6.0 on main, 2026-11-11)
+## Current State (for Session 42; as of Session 41 close, 2026-11-14)
 
 | Component      | Status |
 |----------------|--------|
-| Tests | 1421 passed, 10 deselected on v2.11-sr-local (Session 41); main 1282 (8a8a42e, PR #8 merged) (python -m pytest -m "not live" --tb=short -q) |
-| Branch         | main = ef66b9f (PR #7 merged 2026-11-10: F7 truth fixture sr_truth.yaml + scripts/sr_score_run.py). Work on v2.10-sr-screening, PR #8 open: shared paper text (b3d804c), prisma_criteria write-if-changed (afd90a3), RoB2 overall rule (3e3785e), RoB2 Methods/Results text (908f889, 306d838), registration lines to RoB2 (Session 38); Session 38: Karlsson/Ang overrides (cf75209), RoB2 Domain 4 self-report rule (46fbd9b), Domain 4 High outright (e4e97b8), Ang excluded by reviewer + not-pooled report section (a56dc55), plain report reasons + POOLED line (0bf59dc), fibromyalgia set moved to reference/ (7h, b32f4c4), REVIEWER_GUIDE rewrite + readme_sr_pipeline.txt (docs, this commit). Branches v2.6-ocr-editor, v2.5-major-updates, v2.7-sr-fixes, v2.8-sr-review-gate, v2.9-sr-fixture deleted |
-| CI | green on PR #8 at green on PR #8 at 05e55b7 (1276 passed, 10 deselected, 57 warnings). Last confirmed on main: bcd42d9 (2026-11-09, 1027, both jobs). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
-| SR docs        | Readme/readme_sr_pipeline.txt = how the SR pipeline works and why (logic, rationale, accuracy evidence, Appendix A worked example); no how-to. How-to = Readme/flashcard-help.html. study_overrides.yaml fields and format = REVIEWER_GUIDE section 5.
- docs/sr/REVIEWER_GUIDE.md = for reviewers: what to check by hand, documented failures, limitations, methods statement (rewritten Session 38; section numbers 2.2, 3.1, 3.5, 5, 6 are cited by code/tests/README, keep them). README.md = the app. Update the SR docs when SR behaviour changes |
-| Deploy         | None: CLI only, local first. Render service deleted 2026-10-27; Streamlit UI and Render files removed in Session 33. UptimeRobot monitor for the old Render URL: not yet confirmed paused/deleted (user, outside the repo) |
-| Writing mode   | one-pass (write + edit + review in one call); tracks Topic 800 / Article 3,500 / Report 500 / Synopsis 1,500; on main since fa4edb9; tested on gemma4:e4b; terminal menus only |
-| OCR mode       | `--mode ocr`, launcher menu 8. Reads PDF / image / .txt / .docx; .doc refused with a message. Records in `reports/ocr/<header>/`, SUMMARY / SYNOPSIS in `output/ocr/`. Ollama by default; Qwen / OpenAI only behind the cloud gate; groq / deepseek / anthropic refused. Broken-font PDFs: text layer with [?], AI fills symbols only, document-wide vote per font code. [?] left varies run to run (Ang 2010, gemma4:e4b: 19 in s36_check, 7 in s36_vote; vote fills checked against Table 2) |
-| SR pipeline    | working via CLI with Qwen; Ang 2010 verified against PDF (NFR week 6, unanimous N=3); text-fallback drops surface in Stage 4 `[SKIP]` block. Hard-coded `qwen-vl-plus` (404 on the current key) still in the SR extractors (see Next work) |
-| Providers      | Ollama (default, local, never falls back to cloud; model = OLLAMA_MODEL in .env, else gemma4:e4b) / DeepSeek / Qwen (SR) / OpenAI / Anthropic / Groq. Anthropic and Gemini are geo-restricted on the dev machine; the planned Anthropic -> Gemini switch is on hold |
-
+| Tests | 1421 passed, 10 deselected on v2.11-sr-local (422dc65); main 1282 (8a8a42e) (python -m pytest -m "not live" --tb=short -q) |
+| Branch | main = 8a8a42e (PR #8 merged 2026-11-14, Session 40). Work on v2.11-sr-local (from 8a8a42e), draft PR #9: SR local-first. Last code commit 422dc65 (check `git log --oneline -1`; later commits are docs only). Key commits: fffedcd (metadata precedence reviewer > PDF > model; scorer surname match), e75b497 (null-result screening rule), 9601b1c (mixed_runs vote flag), 080982f (RoB2 label rule), 2923cc3 (run.log; Ollama temperature in [SAMPLING]), 739b2ce (tidy), a1f0f12 (quote gate), 3c36570 (small bugs a-c, too_few_runs; 1408), 422dc65 (missing / unchecked quote gate; 1421). DO NOT MERGE: item 1 (old 12g) open. v2.10-sr-screening merged; can be deleted (item 20) |
+| CI | PR #9: green (2 of 2) at every Session 41 commit checked, last 422dc65. Earlier red at 6d61ed2 (CI .env default reached the SR provider check; fixed via ns.provider_explicit). main: aa929ec (PR #8, 1282 passed, 10 deselected, both jobs). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
+| Version | 2.6.0 (main.py VERSION and README line 6; last bump Session 36). Branch names v2.7-v2.11 are labels, not versions |
+| SR docs | Readme/readme_sr_pipeline.txt = how the SR pipeline works and why (Appendix A worked example); no how-to. How-to = Readme/flashcard-help.html. study_overrides.yaml format = REVIEWER_GUIDE section 5; control-type subgroups = 5.2. docs/sr/REVIEWER_GUIDE.md = what reviewers check by hand (sections 2.2, 3.1, 3.5, 5, 6 are cited by code/tests/README, keep them; 2.2 item 5 covers the quote gate). Readme/RESOLVED_ISSUES.md and HANDOFF_archive_pre_S19.md removed in Session 41 (739b2ce): read with `git show 2923cc3:Readme/<name>`; local copy D:\AI_kcMedicalResearch_backups\2026-11-14\Readme\ |
+| Deploy | None: CLI only, local first. Render deleted 2026-10-27. UptimeRobot monitor for the old URL: not confirmed paused/deleted (user, outside the repo; item 19) |
+| Writing mode | one-pass (write + edit + review in one call); tracks Topic 800 / Article 3,500 / Report 500 / Synopsis 1,500; tested on gemma4:e4b; terminal menus only |
+| OCR mode | `--mode ocr`, launcher menu 8. PDF / image / .txt / .docx; .doc refused. Ollama by default; Qwen / OpenAI only behind the cloud gate. Broken-font PDFs: text layer with [?], AI fills symbols only, document-wide vote per font code |
+| SR pipeline | On v2.11-sr-local: providers ollama (default) / qwen / openai; Anthropic, Groq, DeepSeek refused. Screening, extraction and RoB2 all run on Ollama; no local vision model -> cloud offer only after a typed "y". Runs end to end on gemma4:e4b (N=3, OLLAMA_TEMPERATURE 0.3, OLLAMA_CONTEXT 64000, ~24 min, no OOM) but NOT accurate enough: AI alone 0 of 4 fully correct (qwen3-vl-plus 1 of 4). Gates that keep bad sets out of the pool: table_shift, no_majority, mixed_runs, quote_not_found (live-proven in 20261114_224231, code a1f0f12); too_few_runs and the missing / unchecked-quote part of quote_not_found are unit-tested only (3c36570, 422dc65; see item 5). Each run writes reports/sr/<run_id>/run.log. On main: qwen3-vl-plus path as in Session 39 |
+| Providers | Ollama (default, local, never falls back to cloud; model = OLLAMA_MODEL in .env, else gemma4:e4b; host = OLLAMA_HOST, OLLAMA_URL no longer read) / DeepSeek / Qwen / OpenAI / Anthropic / Groq. Ollama vision is still one flag for the whole provider (providers.py line 77; item 9c). Anthropic and Gemini geo-restricted on the dev machine |
 
 Issue numbers below match `README.md` > Known Issues.
 
@@ -75,134 +74,103 @@ Issue numbers below match `README.md` > Known Issues.
 
 ## Next work (start here)
 
-Updated at Session 38 close (2026-11-11). Done items are removed; the
-Session 38 log keeps the evidence. This list is the only place to tick
-items off. Old item IDs (7i, 7n, ...) in brackets for tracing.
+Updated at Session 42 start (2026-11-15) from the Session 41 close.
+Done items are removed; the Session 39-41 logs keep the evidence. This
+list is the only place to tick items off. Old item numbers in brackets
+for tracing. Line numbers checked by grep at 422dc65.
 
-SR - review content
-1. DONE (2026-11-12): criteria in the PICO step (old 7i). _create_pico /
-   _modify_pico ask inclusion/exclusion after the Outcome (';'-separated;
-   defaults RCT; Adult participants / Non-RCT; Animal studies; Enter keeps),
-   saved in pico_<timestamp>.json, written to prisma_criteria.yaml via
-   _criteria_from_pico (hard-coded lists removed). Comparator default
-   "Usual care, attention placebo or waiting list (pooled)"; typing
-   Exclude_WaitList saves "Usual care or attention placebo" (create and
-   modify). tests/test_sr_pico_criteria.py (12). Docs: readme sections 1
-   and 3, REVIEWER_GUIDE 4.1.
-2. DONE (2026-11-12): 7h leftovers. Run 20261111_190839 had been copied
-   into a misspelt folder "referemces/" (this was the "ouput" mix-up; the
-   output folder name was already correct); moved to
-   reference/sr_cbt_fibromyalgia/reports/20261111_190839 (complete: console,
-   score, CSVs, report; "Loaded 4 study override(s)", pooled SMD -0.042
-   [-0.327, 0.242], I2 0%, k=3). Duplicate top-level output/ deleted. Also
-   kept locally: 20261111_175754 (before Ang excluded) and 20261112_161648
-   (no overrides: Ang + Karlsson pooled, SMD 0.030). Reference README: full
-   citations (Lami = 2018;42:63-79, online 2017), three runs described,
-   old comparator wording noted, restore steps. pico_sample.json name kept
-   (README says it is search output; renaming touches .gitignore/tests).
-2a. DONE (2026-11-12, 4095e1f): launcher writes the run criteria to
-    input/sr/prisma_criteria.yaml (git-ignored) and passes --config and
-    --run-id; the tracked sample in pipelines/sr/config is never written.
-    A saved PICO is prefilled in the normal P/I/C/O questions (no "Modify
-    this PICO? [y/N]"); new pico_<timestamp>.json only if changed. P/I/O
-    required; empty P/I/O also stop a direct run (placeholder_fields).
-    PICO JSON copied to reports/sr/<run_id>/ after a successful run.
-    tests/test_sr_launcher_config.py (11). Reference README removed; its
-    content is in Readme/readme_sr_pipeline.txt Appendix A (old version:
-    git show b274d24:reference/sr_cbt_fibromyalgia/README.md).
-    Verified by launcher run 20261112_210735 (new comparator default, 4
-    overrides): same result as 20261111_190839 (Karlsson 0.226, Lami
-    -0.029, McCrae -0.227; SMD -0.042 [-0.327, 0.242], I2 0%, k=3). Open
-    cosmetic: the [OUTCOME/TIMEPOINT] log block prints twice.
-3. DONE (2026-11-12): Jensen override in
-   reference/sr_cbt_fibromyalgia/study_overrides.yaml (Table 3 p7, weekly
-   FM pain VAS 0-100 posttreatment, 49 (19) CBT vs 59 (26) waiting list;
-   brackets confirmed SD; N = completed treatment 19/15 (Fig 1 p3; 25/18
-   randomised)). Test test_reference_override_jensen_values. Commit
-   e7b7b85. Run 20261112_222233 (launcher, saved PICO reused, "Loaded 5
-   study override(s)"): Jensen g=-0.437 [-1.106, 0.232]; pooled SMD
-   -0.103 [-0.365, 0.159], I2 0%, k=4; Ang excluded. New reference run
-   (local only: reference/sr_cbt_fibromyalgia/reports/20261112_222233; no
-   console.txt). DONE (Session 39): truth Jensen N 19/15 (inferred), matches the
-   override; pinned by tests/test_sr_truth_override_sync.py.
-4. DONE (Session 39): report cosmetics (old 7n, 7f+) a-e; see Session 39 log.
-5. SR LaTeX check: DONE (Session 39), no code change - no stray $...$ in
-   run 20261112_222233 outputs. Console not checked (no log saved).
-   PDF: WeasyPrint not installed (HTML-only, by decision); summary now says why.
-6. Run-to-run variation (old 7l): DONE (Session 39), no code change -
-   1 of 30 RoB2 cells varied over 4 runs, overall never; no vote.
-   RoB2 dropout numbers can be wrong (flow-diagram arm order lost):
-   reviewer checks them (see Session 39 log). Stale log text: DONE (6a).
-7. Screening 6000 chars: DONE (Session 39), no code change - 20 of 20
-   INCLUDE over 4 runs; kept for cost (see Session 39 log).
-
-SR - extraction checks
-8. F8: N check DONE (Session 39) - arm N must appear in its quote when the
-   quote has candidate Ns. Open: arm-label check (needs full arm list; with
-   item 10).
-9. F6: NOT BUILT (Session 39) - whole-paper number check caught 1 of 22
-   wrong values, 2 false alarms; quote-vs-paper check moved to item 10.
-10. Wire paper_text into extraction: DONE (Session 39, option A) - images
-    stay the extraction input; paper_text goes to the quote check only
-    (branch 5). See Session 39 log.
+SR local-first: blockers before PR #9 can leave draft
+1. Decide the accuracy route (old 12g). gemma4:e4b reads wrong values even
+   when all 3 runs agree (Karlsson, run 20261114_202253). Pick one before
+   any code: a) extraction on qwen behind the cloud gate, with screening /
+   RoB2 kept local; b) a larger local vision model, same reference set, N=3,
+   scored with sr_score_run.py; c) local extraction kept, every study needs
+   reviewer values in study_overrides.yaml (the quote gate already forces
+   this for page-image studies).
+2. Reviewer-override proof: read the Karlsson PDF (S1877886015000567), enter
+   all four means/SDs (truth 3.88 / 1.05 / 3.67 / 0.75) in
+   input/sr/study_overrides.yaml with a source-page note, and confirm on a
+   live run that the gate clears and Karlsson pools with those values. Three
+   of four overridden must still be held out.
+3. Gate on "number not in its own source quote": Ang's control mean -8.9 /
+   SD 25.3 are not in their own (verbatim-found) quote, and only table_shift
+   kept Ang out. Make that warning a gate marker too. Test-first.
+4. Empty-text gap: read get_paper_text
+   (SOURCE_CODE/pipelines/sr/src/utils/paper_text.py line 101; called from
+   pipelines/sr/main.py line 586) and find how often paper_text is empty.
+   Unchecked quotes now hit the gate, but frequent empty text would hold
+   out every page-image study.
+5. Live rerun on the reference set to confirm in run.log: small bugs a-c
+   (usable runs count only runs with numbers; [OUTCOME/TIMEPOINT] printed
+   once; "Skip study: <author> (<year>)"), the too_few_runs flag, and the
+   missing / unchecked quote gate (3c36570, 422dc65). None has run live yet.
+6. Wording: skip_reason "runs disagree (too_few_runs)" and the [AGREEMENT]
+   header "= the runs read different table cells" are wrong for
+   too_few_runs; the machine skip_reason still says "source quote not found"
+   for missing / unchecked quotes.
+7. [SAMPLING] logs seed=42 but call_ollama_provider sends no seed: send it,
+   or log "seed: not sent" on Ollama.
+8. RoB2 on gemma: labels still contradict justifications (randomisation
+   High in 4 of 5 while describing adequate methods; overall High for all 5
+   via Domain 4 either way). Add a label-vs-justification check, or run
+   RoB2 on qwen (goes with item 1).
+9. Item 12 leftovers: c) SOURCE_CODE/providers.py line 77 still sets
+   "ollama": {"vision": False, ...} for the whole provider; decide per model
+   (ollama_models.model_capabilities). d) record whether OLLAMA_CONTEXT
+   32768 fits 5 page images (reference runs used 64000). (f done Session 42:
+   'qwen-vl-plus' appears only in comments, data_extractor.py line 28 and
+   model_default.py line 3.)
+10. Cleanup commit (dead code, lines at 422dc65):
+    data_extractor._extract_anthropic (data_extractor.py line 2258);
+    the Stage 1 anthropic upload (pipelines/sr/main.py line 550);
+    RelevanceScreener.__init__ defaults model="claude-opus-4-7",
+    provider="anthropic" (relevance_screener.py lines 88-89) and always
+    builds an Anthropic client; the DeepSeek "Continue anyway?" block in
+    run_sr_launcher (SOURCE_CODE/main.py lines 1514-1538; still lists
+    anthropic at 1525). Grep again before editing.
 
 SR - report
-11. Control-type subgroups: 11a (subgroups by control type) and 11b
-    (estimate excluding waiting-list trials) DONE (Session 39, see log).
-    11c forest plot by control type and 11d REVIEWER_GUIDE section 5.2
-    DONE. Open: 11e check the [SUBGROUP] lines, the report section and
-    forest_plot_subgroups.png on the next real run.
+11. 11e (needs a run with at least 2 pooled studies): check the [SUBGROUP]
+    lines, the report section, and the two-panel forest_plot_subgroups.png.
+    Expected on 20261112_222233 data: top k=4 with overall diamond; bottom
+    Lami only ("1 study - not pooled"), other three grey. The two-panel
+    figure has only been checked against test data. Also confirm the
+    Karlsson and McCrae timepoints are posttreatment.
 
-SR - local-first (after 1-11)
-12. Ollama vision for SR (Session 35 TODO SR item 3):
-    a. Launcher: remove ollama from BLOCKED_FOR_SR (scripts/launcher.py
-       line 198, checked at 487 and 532); allow only when
-       ollama_models.model_capabilities lists "vision" (as OCR does).
-    b. data_extractor.py: add ollama to vision_providers (lines 219-228)
-       via OLLAMA_URL/v1 after checking image parts work there, or use
-       call_ollama_provider(images=...). rob2_tool.py reads OLLAMA_URL,
-       the rest of the app OLLAMA_HOST: settle one name.
-    c. providers.py line 77: ollama vision=False for the whole provider;
-       decide per model.
-    d. OLLAMA_CONTEXT (default 32768) must fit 5 page images per call.
-    e. No local vision model: offer cloud only after a typed "y";
-       DeepSeek stays blocked.
-    f. Verify only: hard-coded qwen-vl-plus was removed in Session 37.
-       Grep SOURCE_CODE and scripts for 'qwen-vl-plus'; expect tests and
-       comments only.
-    g. Test: gemma4:e4b on the reference set, N=3, field by field vs
-       qwen3-vl-plus and the PDFs (sr_score_run.py "AI alone" lines).
+SR - extraction checks
+12. F8 arm-label check (old 8): needs the full arm list.
 
 SR - carried
 13. Baseline SR run on qwen3-vl-plus checked against the PDFs; rerun the
     nondet probe before REVIEWER_GUIDE section 6 claims anything about it.
-14. Corrected paper text: paper_text.py caches input/sr/paper_text/<name>.txt
-    and reruns reuse it. Still open: a PDF hash so a replaced PDF with the
-    same name does not reuse stale text; "[?] left: N" per paper; run-1 vs
-    run-2 comparison. Check Tesseract-missing behaviour in
-    relevance_screener.py. HybridTableExtractor (built only by tests): wire
-    in or remove. Text-based screening/RoB2 for CBT-women and zsy234
-    UNVERIFIED until checked.
+14. paper_text cache: PDF hash so a replaced PDF with the same name does not
+    reuse stale text; "[?] left: N" per paper; run-1 vs run-2 comparison.
+    Tesseract-missing behaviour in relevance_screener.py.
+    HybridTableExtractor (built only by tests): wire in or remove.
+    Text-based screening/RoB2 for CBT-women and zsy234 UNVERIFIED.
 15. Session 28 priorities: vote outcome_selected / timepoint_selected;
     Ang outcome change S26 -> S27 (Readme/evidence/s26_issue11/); decoder
     !-for-space gap (low).
 
 OCR
-16. One-file run without SUMMARY (Session 37 decision; single-vote fills:
-    see Session 37 log); Tesseract as second reader for [?] left (Session
-    36 log); leftovers: "decrease of -10.2" double negative, nested bullets
-    in SUMMARY .docx, "AI answers for refused lines" message, LaTeX in fill
+16. One-file run without SUMMARY; Tesseract as second reader for [?] left;
+    leftovers: "decrease of -10.2" double negative, nested bullets in
+    SUMMARY .docx, "AI answers for refused lines" message, LaTeX in fill
     answers before _accept.
 
 Writing
 17. Read input through the OCR reader so .docx tables reach the AI; a read
-    error must be a [SKIP] message; `--report` path (main.py ~985-998) and
-    `list_input_names` still skip .doc silently.
+    error must be a [SKIP] message; `--report` path and `list_input_names`
+    still skip .doc silently. Dead read: pipelines/writing/writing.py line 88
+    returns SOURCE_CODE/docs/modes/writing.md/<track>, which does not exist
+    (found Session 41, not fixed).
 
 Other
 18. Menu 7 Data Analysis: design questions first.
 19. Outside the repo: confirm the UptimeRobot monitor for the old Render
     URL is paused or deleted (user).
+20. Delete branch v2.10-sr-screening (merged in PR #8) once nothing more is
+    needed from it.
 
 ---
 
