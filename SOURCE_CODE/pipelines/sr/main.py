@@ -215,6 +215,9 @@ def _write_no_pool_html(html_path, cfg, er, sr, rob, meta_audit, effect_measure,
                        f"({type(e).__name__}: {e})")
         return None
     logger.info(f"[REPORT] HTML report written without a pooled estimate: {out}")
+    logger.info("[REPORT] DOCX and PDF are not written when nothing pools "
+        "(by design); the HTML report holds the extraction table, the "
+        "not-pooled list and RoB 2.")
     return out
 
 
