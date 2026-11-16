@@ -48,9 +48,9 @@ so those catches happen at session open, not mid-work.
 
 | Component      | Status |
 |----------------|--------|
-| Tests | 1507 passed, 10 deselected on v2.11-sr-local (Session 42); main 1282 (8a8a42e) (python -m pytest -m "not live" --tb=short -q) |
+| Tests | 1519 passed, 10 deselected on v2.11-sr-local (Session 42); main 1282 (8a8a42e) (python -m pytest -m "not live" --tb=short -q) |
 | Branch | main = 8a8a42e (PR #8 merged 2026-11-14, Session 40). Work on v2.11-sr-local (from 8a8a42e), draft PR #9: SR local-first. Latest commit: run `git log --oneline -1` (not written here, because every commit changes it). Key commits: fffedcd (metadata precedence reviewer > PDF > model; scorer surname match), e75b497 (null-result screening rule), 9601b1c (mixed_runs vote flag), 080982f (RoB2 label rule), 2923cc3 (run.log; Ollama temperature in [SAMPLING]), 739b2ce (tidy), a1f0f12 (quote gate), 3c36570 (small bugs a-c, too_few_runs; 1408), 422dc65 (missing / unchecked quote gate; 1421), Session 42: 545af00 Setup -> Local AI vision lines (1428), shared SR/OCR vision picker (1453; see Session 42 log). DO NOT MERGE: item 1 (old 12g) open. v2.10-sr-screening merged; can be deleted (item 20) |
-| CI | PR #9: green (2 of 2) at every Session 41 commit checked and at 545af00, 678fadc, 265fe63 and fc3e79e and b56845d and 569fbb8 (Session 42). Earlier red at 6d61ed2 (CI .env default reached the SR provider check; fixed via ns.provider_explicit). main: aa929ec (PR #8, 1282 passed, 10 deselected, both jobs). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
+| CI | PR #9: green (2 of 2) at every Session 41 commit checked and at 545af00, 678fadc, 265fe63 and fc3e79e and b56845d and 569fbb8 and b0cd52a (Session 42). Earlier red at 6d61ed2 (CI .env default reached the SR provider check; fixed via ns.provider_explicit). main: aa929ec (PR #8, 1282 passed, 10 deselected, both jobs). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
 | Version | 2.6.0 (main.py VERSION and README line 6; last bump Session 36). Branch names v2.7-v2.11 are labels, not versions |
 | SR docs | Readme/readme_sr_pipeline.txt = how the SR pipeline works and why (Appendix A worked example); no how-to. How-to = Readme/flashcard-help.html. study_overrides.yaml format = REVIEWER_GUIDE section 5; control-type subgroups = 5.2. docs/sr/REVIEWER_GUIDE.md = what reviewers check by hand (sections 2.2, 3.1, 3.5, 5, 6 are cited by code/tests/README, keep them; 2.2 item 5 covers the quote gate). Readme/RESOLVED_ISSUES.md and HANDOFF_archive_pre_S19.md removed in Session 41 (739b2ce): read with `git show 2923cc3:Readme/<name>`; local copy D:\AI_kcMedicalResearch_backups\2026-11-14\Readme\ |
 | Deploy | None: CLI only, local first. Render deleted 2026-10-27. UptimeRobot monitor for the old URL: not confirmed paused/deleted (user, outside the repo; item 19) |
@@ -3080,4 +3080,18 @@ Session 39 closed items 4-11 (11e open). Job list, in order:
   this run); 5 sites. Tests 1507.
   Next: F13 full 5-PDF reference run on qwen3-vl:30b-a3b-instruct, scored
   with scripts/sr_score_run.py; pass mark to be agreed first.
+- Session 42 (cont., 2026-11-16): SR default vision model.
+  SR pipeline only: ollama_models.SR_VISION_MODEL = qwen3-vl:30b-a3b-instruct
+  is the SR picker default when pulled, even over OLLAMA_MODEL in .env
+  (gemma4:e4b is too small for SR: Karlsson 3 of 4 means/SDs wrong; the
+  instruct model 6 of 6, run k20261116_070736). Not pulled -> old rule
+  (OLLAMA_MODEL, else gemma4:e4b) plus a too-small warning with the pull
+  command. SR vision hint now names the SR model. OCR, text modes, .env and
+  the launcher Setup default unchanged (gemma4:e4b). Tests 1519.
+  F13 pass mark (agreed 2026-11-16): any wrong study pooled or OOM -> fail,
+  revert the SR default; 0 of 4 fully correct -> fail, revert; 1 of 4 ->
+  pass, keep, matches cloud (qwen3-vl-plus 1 of 4); 2+ of 4 -> pass, better
+  than cloud. Fully correct = all six values within 0.1 of sr_truth.yaml
+  (held-back studies count); screening 5 INCLUDE; Ang not scored; ending
+  with < 2 studies / no report is not a failure.
 - DO NOT MERGE v2.11-sr-local yet. PR #9 stays a draft.

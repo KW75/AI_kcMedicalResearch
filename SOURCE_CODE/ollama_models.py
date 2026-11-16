@@ -25,6 +25,16 @@ OLLAMA_HOST_DEFAULT = os.environ.get("OLLAMA_HOST", "http://localhost:11434")
 # README and .env.example must name the same model (test_providers.py).
 OLLAMA_DEFAULT_MODEL = "gemma4:e4b"
 
+# SR pipeline only (Session 42): default vision model for SR extraction.
+# gemma4:e4b is too small for SR: on Karlsson it read 3 of 4 means/SDs wrong
+# and all 3 runs agreed on the misread. qwen3-vl:30b-a3b-instruct read all
+# six values right, AI alone (run k20261116_070736). Use an -instruct tag: the
+# thinking tag (qwen3-vl:30b) ignores think=false and gave 21 of 21 unusable
+# runs (20261115_230933). About 20 GB; runs CPU-only (slow).
+# Not pulled -> SR falls back to the rule below, with a warning.
+# OCR, text modes and .env keep OLLAMA_DEFAULT_MODEL.
+SR_VISION_MODEL = "qwen3-vl:30b-a3b-instruct"
+
 
 def ollama_version(host: str | None = None) -> str:
     """Ollama's version from /api/version, e.g. '0.40.11'. '' if not reachable."""
@@ -109,7 +119,7 @@ def sr_vision_error(model: str, caps_fn=None, host=None) -> str | None:
     if "vision" in caps:
         return None
     return (f"SR: Ollama model {model} cannot read page images (no 'vision' "
-            "capability) or is not pulled. Run: ollama pull gemma4:e4b, or set "
+            f"capability) or is not pulled. Run: ollama pull {SR_VISION_MODEL}, or set "
             "OLLAMA_MODEL to a vision model, or use --provider qwen or openai "
             "(cloud).")
 
@@ -117,7 +127,7 @@ def sr_vision_error(model: str, caps_fn=None, host=None) -> str | None:
 # --- Vision-model picker shared by SR and OCR (Session 42, decision A) -------
 # Colleagues pull their own vision models (launcher 10 Setup -> 2 Local AI);
 # SR and OCR list whatever is pulled. No model names here apart from
-# OLLAMA_DEFAULT_MODEL.
+# OLLAMA_DEFAULT_MODEL and SR_VISION_MODEL (SR only, see top of file).
 
 NO_VISION_HINT = (
     "No pulled Ollama model can read images. Pull one in launcher "
@@ -137,9 +147,14 @@ def _with_tag(name: str) -> str:
     return name if ":" in name else name + ":latest"
 
 
-def default_vision_model(names: list[str]) -> str:
-    """OLLAMA_MODEL if it is in names (with or without ':latest'), else
-    OLLAMA_DEFAULT_MODEL if pulled, else the first name."""
+def default_vision_model(names: list[str], preferred: str = "") -> str:
+    """preferred (SR passes SR_VISION_MODEL) if pulled, else OLLAMA_MODEL if
+    it is in names (with or without ':latest'), else OLLAMA_DEFAULT_MODEL if
+    pulled, else the first name. OCR passes no preference (unchanged)."""
+    if preferred:
+        for candidate in (preferred, _with_tag(preferred)):
+            if candidate in names:
+                return candidate
     env = os.getenv("OLLAMA_MODEL", "").strip()
     if env:
         for candidate in (env, _with_tag(env)):
@@ -150,13 +165,14 @@ def default_vision_model(names: list[str]) -> str:
     return names[0]
 
 
-def pick_vision_model(models: list[dict], input_fn=input, log=print) -> str | None:
+def pick_vision_model(models: list[dict], input_fn=input, log=print,
+                      preferred: str = "") -> str | None:
     """Ask which pulled vision model to use. Enter = default; no keyboard
     (EOFError) = default; Ctrl+C or a bad answer = None (job not run)."""
     if not models:
         log(NO_VISION_HINT)
         return None
-    default = default_vision_model([m["name"] for m in models])
+    default = default_vision_model([m["name"] for m in models], preferred=preferred)
     for i, m in enumerate(models, start=1):
         mark = "  (default)" if m["name"] == default else ""
         log(f"  {i}  {describe(m, {'vision'})}{mark}")

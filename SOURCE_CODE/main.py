@@ -2541,7 +2541,15 @@ def sr_choose_ollama_model(model: str, list_fn=None, caps_fn=None,
     if not models:
         log(ollama_models.NO_VISION_HINT)
         return ""
-    return ollama_models.pick_vision_model(models, input_fn=input_fn, log=log)
+    # Session 42: SR defaults to SR_VISION_MODEL (gemma4:e4b is too small for SR).
+    sr = ollama_models.SR_VISION_MODEL
+    if sr not in [m["name"] for m in models]:
+        log(f"[SR] {sr} is not pulled; the default below is likely too small "
+            f"for reliable SR extraction (gemma4:e4b read 3 of 4 means/SDs "
+            f"wrong). Pull it in launcher 10 Setup -> 2 Local AI, or run: "
+            f"ollama pull {sr}")
+    return ollama_models.pick_vision_model(models, input_fn=input_fn, log=log,
+                                           preferred=sr)
 
 
 def sr_provider_error(mode: str, provider: str | None) -> str | None:
