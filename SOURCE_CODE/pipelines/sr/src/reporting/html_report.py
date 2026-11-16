@@ -211,13 +211,33 @@ def _override_confirmed_only(override_fields) -> bool:
     s = str(override_fields or "")
     return "(confirmed " in s and "->" not in s
 
+_NO_POOL_BANNER = ('  <div class="wb" style="background:#fee2e2;border-color:#ef4444;">&#9888; '
+                   '<strong>No pooled estimate in this run:</strong> fewer than 2 studies '
+                   'passed the checks. The studies not pooled and their reasons are listed '
+                   'under Meta-Analysis Results; verify them against the PDFs. The RoB 2 '
+                   'table still needs the reviewer (D4).</div>\n')
+
+
+def _no_pool_template(t: str) -> str:
+    """Session 43: report when < 2 studies pool. Banner on top; no pooled
+    numbers, heterogeneity cards or forest plot. ValueError if the template
+    changed (tests/test_sr_no_pool_report.py catches it)."""
+    i = t.index('  <div class="section" id="ov">')
+    t = t[:i] + _NO_POOL_BANNER + t[i:]
+    i, j = t.index('    <div class="rb2">'), t.index('    {not_pooled_html}')
+    t = (t[:i] + '    <div class="rb2"><div class="rm">No pooled estimate: fewer '
+         'than 2 studies passed the checks.</div></div>\n' + t[j:])
+    i, j = t.index('  <div class="section" id="fp">'), t.index('</div>\n<div class="footer">')
+    return t[:i] + t[j:]
+
+
 class HTMLReportGenerator:
     def generate(self, title, authors, pico, inclusion_criteria, exclusion_criteria,
                  ma_result, extraction_results, screening_results, rob_results,
                  forest_plot_path, effect_measure="OR", model_name="claude-opus-4-7",
-                 output_path="outputs/reports/systematic_review.html", meta_audit=None, subgroups=None, subgroup_plot_path=None) -> str:
+                 output_path="outputs/reports/systematic_review.html", meta_audit=None, subgroups=None, subgroup_plot_path=None, no_pool=False) -> str:
         out = Path(output_path); out.parent.mkdir(parents=True, exist_ok=True)
-        html = HTML_TEMPLATE.format(
+        fields = dict(
             title=self._e(title),
             authors_html=f'<p style="margin-top:10px;opacity:.9;">{self._e(authors)}</p>' if authors else "",
             generated_date=datetime.datetime.now().strftime("%Y-%m-%d %H:%M UTC"),
@@ -244,8 +264,17 @@ class HTMLReportGenerator:
             tau2_display=f"{ma_result.get('tau2',0):.4f}",
             q_display=f"{ma_result.get('Q',0):.2f}",
             q_p_display=f"{ma_result.get('Q_p',0):.3f}",
-            forest_plot_html=self._forest_html(forest_plot_path),
+            forest_plot_html="" if no_pool else self._forest_html(forest_plot_path),
         )
+        template = HTML_TEMPLATE
+        if no_pool:
+            template = _no_pool_template(template)
+            for key in ("pooled_display", "ci_lower_display", "ci_upper_display",
+                        "z_display", "p_display", "i2_display", "tau2_display",
+                        "q_display", "q_p_display"):
+                fields[key] = "n/a"
+            fields["k_studies"] = 0
+        html = template.format(**fields)
         out.write_text(html, encoding="utf-8"); return str(out.resolve())
 
     @staticmethod

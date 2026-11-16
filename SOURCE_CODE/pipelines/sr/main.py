@@ -193,6 +193,31 @@ def _review_name(row) -> str:
     return f"{name} [{'; '.join(labels)}]" if labels else name
 
 
+def _write_no_pool_html(html_path, cfg, er, sr, rob, meta_audit, effect_measure, model_name):
+    """Session 43: < 2 studies pool -> still write the HTML report (banner, no
+    pooled numbers, no forest plot) so the reviewer sees the not-pooled
+    reasons and the RoB 2 table (D4 'reviewer to confirm') before review.
+    A report error must not stop the run: warn and return None."""
+    try:
+        from SOURCE_CODE.pipelines.sr.src.reporting.html_report import HTMLReportGenerator
+        cfg = cfg or {}
+        out = HTMLReportGenerator().generate(
+            title=cfg.get("review_title", "Systematic Review"), authors="",
+            pico=cfg.get("pico", {}),
+            inclusion_criteria=cfg.get("inclusion_criteria", []),
+            exclusion_criteria=cfg.get("exclusion_criteria", []),
+            ma_result={}, extraction_results=er or [], screening_results=sr or [],
+            rob_results=rob or [], forest_plot_path=None,
+            effect_measure=effect_measure, model_name=model_name,
+            output_path=str(html_path), meta_audit=meta_audit, no_pool=True)
+    except Exception as e:
+        logger.warning(f"[REPORT] HTML report (no pooled estimate) not written "
+                       f"({type(e).__name__}: {e})")
+        return None
+    logger.info(f"[REPORT] HTML report written without a pooled estimate: {out}")
+    return out
+
+
 def _log_review_sensitivity(rows, review_rows, effect_measure, resolved=None):
     """F4 comparison (Session 37): pool primary + needs-review studies.
 
@@ -947,6 +972,8 @@ def main():
 
     if len(rows) < 2:
         logger.error("< 2 studies with usable data. Aborting meta-analysis.")
+        _write_no_pool_html(layout.html, cfg, er, sr, rob, meta_audit,
+                            args.effect_measure, args.model)
         layout.mirror_all()
         return
 
