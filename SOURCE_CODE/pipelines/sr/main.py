@@ -169,10 +169,33 @@ def _row_has_extracted_value(row: dict) -> bool:
     return False
 
 
+# Session 43 (F13 a): short reason per needs-review study in [SENSITIVITY].
+# Keys are the tokens inside audit_logger's reason strings; a test checks
+# each key against the real reasons (tests/test_sr_sensitivity_reasons.py).
+_REVIEW_LABELS = (
+    ("runs disagree (", "runs disagree"),
+    ("(too_few_runs)", "too few usable runs"),
+    ("(quote_not_found)", "quote not found"),
+    ("(number_not_in_quote)", "number not in quote"),
+)
+
+
+def _review_labels(reason) -> list[str]:
+    text = str(reason or "")
+    return [label for key, label in _REVIEW_LABELS if key in text]
+
+
+def _review_name(row) -> str:
+    name = str(row.get("study", "?"))
+    labels = _review_labels(row.get("review_reason"))
+    return f"{name} [{'; '.join(labels)}]" if labels else name
+
+
 def _log_review_sensitivity(rows, review_rows, effect_measure, resolved=None):
     """F4 comparison (Session 37): pool primary + needs-review studies.
 
-    The primary estimate excludes studies whose N runs disagreed. This
+    The primary estimate excludes needs-review studies (runs disagree, too
+    few usable runs, quote gate, number gate; reason in brackets). This
     second estimate puts them back so the reviewer sees how much they move
     the result. Comparison only - never the reported estimate.
     Session 39 (item 4d): resolved = studies whose runs disagreed but a
@@ -188,8 +211,9 @@ def _log_review_sensitivity(rows, review_rows, effect_measure, resolved=None):
     if not review_rows:
         logger.info("[SENSITIVITY] no needs-review studies - nothing to compare.")
         return None
-    allrows = list(rows) + list(review_rows)
-    names = ", ".join(str(r.get("study", "?")) for r in review_rows)
+    allrows = [{k: v for k, v in r.items() if k != "review_reason"}
+               for r in list(rows) + list(review_rows)]
+    names = ", ".join(_review_name(r) for r in review_rows)
     k = len(review_rows)
     if len(allrows) < 2:
         logger.warning(f"[SENSITIVITY] {k} needs-review stud"
@@ -202,9 +226,9 @@ def _log_review_sensitivity(rows, review_rows, effect_measure, resolved=None):
         f"[SENSITIVITY] Pooled {effect_measure} INCLUDING {k} needs-review "
         f"stud{'y' if k == 1 else 'ies'} ({names}): "
         f"{ma['pooled_effect']:.3f} [{ma['ci_lower']:.3f},{ma['ci_upper']:.3f}] "
-        f"I2={ma['I2']:.1f}% (k={len(allrows)}). For comparison only - the "
-        f"runs disagreed on these studies' numbers; the primary estimate "
-        f"excludes them.")
+        f"I2={ma['I2']:.1f}% (k={len(allrows)}). For comparison only - these "
+        f"studies' numbers are not verified (reason in brackets); the primary "
+        f"estimate excludes them.")
     return ma
 
 
@@ -898,6 +922,7 @@ def main():
                 "plausibility_flag" : plausibility_flag,
             })
             if _review:
+                _row["review_reason"] = _review
                 review_rows.append(_row)
                 audit_row["skip_reason"] = _review
                 logger.warning(f"Skip study: {skip_label(audit_row)}: {_review} "
