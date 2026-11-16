@@ -2533,6 +2533,7 @@ def sr_choose_ollama_model(model: str, list_fn=None, caps_fn=None,
     if model:
         return model
     import ollama_models
+    log(ollama_models.VISION_WAIT_HINT)
     try:
         models = ollama_models.vision_models(list_fn, caps_fn)
     except Exception:

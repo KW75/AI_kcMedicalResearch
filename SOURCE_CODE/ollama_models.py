@@ -135,6 +135,30 @@ NO_VISION_HINT = (
 )
 
 
+VISION_WAIT_HINT = ("Checking local Ollama models for image support - this can "
+                    "take a minute. Please wait, do not press Enter.")
+
+
+def flush_keyboard() -> None:
+    """Drop keys typed while the program was busy (Session 43): an Enter
+    pressed during the wait would otherwise answer the next question.
+    Real console only; no console (pytest, piped input) -> nothing."""
+    import sys
+    try:
+        if not sys.stdin or not sys.stdin.isatty():
+            return
+        try:
+            import msvcrt
+        except ImportError:
+            import termios
+            termios.tcflush(sys.stdin, termios.TCIFLUSH)
+            return
+        while msvcrt.kbhit():
+            msvcrt.getwch()
+    except Exception:
+        return
+
+
 def vision_models(list_fn=None, caps_fn=None, host=None) -> list[dict]:
     """Pulled Ollama models that report the 'vision' capability."""
     list_fn = list_fn or list_ollama_models
@@ -166,7 +190,7 @@ def default_vision_model(names: list[str], preferred: str = "") -> str:
 
 
 def pick_vision_model(models: list[dict], input_fn=input, log=print,
-                      preferred: str = "") -> str | None:
+                      preferred: str = "", flush_fn=None) -> str | None:
     """Ask which pulled vision model to use. Enter = default; no keyboard
     (EOFError) = default; Ctrl+C or a bad answer = None (job not run)."""
     if not models:
@@ -176,6 +200,10 @@ def pick_vision_model(models: list[dict], input_fn=input, log=print,
     for i, m in enumerate(models, start=1):
         mark = "  (default)" if m["name"] == default else ""
         log(f"  {i}  {describe(m, {'vision'})}{mark}")
+    try:
+        (flush_fn or flush_keyboard)()
+    except Exception:
+        pass
     try:
         answer = input_fn("Model number (Enter = default): ").strip()
     except EOFError:
