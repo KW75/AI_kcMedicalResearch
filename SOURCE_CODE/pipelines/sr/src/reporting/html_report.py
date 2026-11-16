@@ -92,6 +92,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   <div class="section" id="rob">
     <div class="sh"><h2>Risk of Bias &mdash; Cochrane RoB 2.0</h2></div>
     <div class="tw"><table><thead><tr><th>Study</th><th>D1 Randomisation</th><th>D2 Deviations</th><th>D3 Missing Data</th><th>D4 Outcome</th><th>D5 Reported Result</th><th>Overall</th></tr></thead><tbody>{rob_rows}</tbody></table></div>
+    <p style="font-size:12px;color:#6b7280;margin:8px 0 0;">D4 Outcome: for self-reported outcomes in trials where participants knew their arm, the label (Some concerns or High) is a reviewer judgement &mdash; confirm it for each study. Overall follows the RoB 2 rule (any High &rarr; High).</p>
   </div>
   <div class="section" id="ma">
     <div class="sh"><h2>Meta-Analysis Results</h2></div>
@@ -400,12 +401,18 @@ class HTMLReportGenerator:
             if "high" in j2: return f'<td><span class="rh">High</span></td>'
             if "not assessed" in j2: return '<td><span style="color:#6b7280;font-style:italic">Not assessed</span></td>'
             return "<td>--</td>"
+        def c4(j):
+            # Session 43 (item 8, decision 8c): Domain 4 is a reviewer judgement.
+            cell=c(j)
+            if cell=="<td>--</td>" or "Not assessed" in cell:
+                return cell
+            return cell[:-len("</td>")]+'<br><small style="color:#6b7280">reviewer to confirm</small></td>'
         rows=[]
         for r in results:
             d=r.get("domains",{})
             rows.append(f"<tr><td><strong>{self._e(str(r.get('study',r.get('filename','?'))))}</strong></td>"
                         +c(d.get("randomisation","--"))+c(d.get("deviations","--"))
-                        +c(d.get("missing_data","--"))+c(d.get("outcome_measurement","--"))
+                        +c(d.get("missing_data","--"))+c4(d.get("outcome_measurement","--"))
                         +c(d.get("reported_result","--"))+c(r.get("overall_judgment","--"))+"</tr>")
         return "\n".join(rows)
 

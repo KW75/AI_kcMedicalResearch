@@ -256,6 +256,11 @@ shows the raw values.
 
 - Check Domains 1–3 and 5 by hand: judgements outside Domain 4 vary between
   runs (randomisation, deviations, missing data).
+- Confirm Domain 4 for every study (Session 43, decision 8c). The prompt
+  makes the model judge High for self-reported outcomes when participants
+  knew their arm; RoB 2 guidance allows Some concerns or High, depending on
+  whether knowing the arm is likely to have influenced the answer. The
+  report marks each D4 cell "reviewer to confirm"; Overall follows from it.
 - Check missing-data counts against the CONSORT flow diagram.
 - Overall is the program's rule (readme_sr_pipeline.txt section 3.10), not the
   model's; `overall_model` shows where they differ.
@@ -500,7 +505,8 @@ State, in the data-collection methods, something equivalent to:
 >
 > Risk of bias was assessed with RoB 2 for the review outcome. For
 > participant-reported outcomes in trials where participants knew their
-> allocation, Domain 4 was judged High. The overall judgement followed the
+> allocation, Domain 4 was judged [Some concerns / High] by the reviewers,
+> who checked the program's label [give the reason]. The overall judgement followed the
 > RoB 2 algorithm (any High -> High; all Low -> Low; otherwise Some concerns).
 
 Do not describe the extraction as automated without stating the verification
