@@ -579,11 +579,16 @@ def _find_move_destination(mode: str) -> Path:
     return fallback
 
 
+# Session 43: run settings stay in input/<mode>/ - moving study_overrides.yaml
+# out would pool numbers the reviewer never checked.
+_KEEP_IN_INPUT = {'study_overrides.yaml', 'prisma_criteria.yaml'}
+
+
 def check_input_folder(mode: str) -> None:
     input_dir = BASE / "input" / mode
     if not input_dir.exists():
         return
-    files = [f for f in input_dir.iterdir() if f.is_file()]
+    files = [f for f in input_dir.iterdir() if f.is_file() and f.name not in _KEEP_IN_INPUT]
     if not files:
         return
 
@@ -596,12 +601,18 @@ def check_input_folder(mode: str) -> None:
     print()
     print(f'  {TEXT}Were these files intentionally placed here for this run?{RESET}')
 
+    # Session 43: drop keys typed while busy; Enter keeps, only N moves.
+    try:
+        import ollama_models
+        ollama_models.flush_keyboard()
+    except Exception:
+        pass
     ans = safe_input(
-        f'  {ACCENT}>> Keep them? [Y = keep  /  N = move out]: {RESET}',
-        default='N',
+        f'  {ACCENT}>> Keep them? [Enter/Y = keep  /  N = move out]: {RESET}',
+        default='Y',
     ).strip().upper()
 
-    if ans == 'Y':
+    if ans != 'N':
         print(f'  {GOOD}✓  Files kept - they will be used in this session.{RESET}')
         return
 
