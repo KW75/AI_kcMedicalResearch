@@ -50,7 +50,7 @@ so those catches happen at session open, not mid-work.
 |----------------|--------|
 | Tests | 1578 passed, 10 deselected on v2.11-sr-local (Session 43); main 1282 (8a8a42e) (python -m pytest -m "not live" --tb=short -q) |
 | Branch | main = 8a8a42e (PR #8 merged 2026-11-14, Session 40). Work on v2.11-sr-local (from 8a8a42e), draft PR #9: SR local-first. Latest commit: run `git log --oneline -1` (not written here, because every commit changes it). Key commits: fffedcd (metadata precedence reviewer > PDF > model; scorer surname match), e75b497 (null-result screening rule), 9601b1c (mixed_runs vote flag), 080982f (RoB2 label rule), 2923cc3 (run.log; Ollama temperature in [SAMPLING]), 739b2ce (tidy), a1f0f12 (quote gate), 3c36570 (small bugs a-c, too_few_runs; 1408), 422dc65 (missing / unchecked quote gate; 1421), Session 42: 545af00 Setup -> Local AI vision lines (1428), 678fadc shared SR/OCR vision picker (1453), 265fe63 number gate, 86d9a9c SR_VISION_MODEL (1519), 38ea78a docs F13 (see Session 42 log). DO NOT MERGE: AI alone 1 of 4 (F13); see Next work items 1-10, 21, 22. v2.10-sr-screening merged; can be deleted (item 20) |
-| CI | PR #9: green (2 of 2) at every Session 41 commit checked and at 545af00, 678fadc, 265fe63 and fc3e79e and b56845d and 569fbb8 and b0cd52a, 86d9a9c, 38ea78a (Session 42), 9b5bc25, e6eb7f6, 359d307, 111178c, cc09801, 1f871ab, d318293, 48a306d, 77c0a4f, 62f3fc5, 6f10383, f38c39b, a573c99, 3055352, 6a84f95, 84e8a6b (Session 43; 4487f13 failed CI and was reverted by 3055352). Earlier red at 6d61ed2 (CI .env default reached the SR provider check; fixed via ns.provider_explicit). main: aa929ec (PR #8, 1282 passed, 10 deselected, both jobs). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
+| CI | PR #9: green (2 of 2) at every Session 41 commit checked and at 545af00, 678fadc, 265fe63 and fc3e79e and b56845d and 569fbb8 and b0cd52a, 86d9a9c, 38ea78a (Session 42), 9b5bc25, e6eb7f6, 359d307, 111178c, cc09801, 1f871ab, d318293, 48a306d, 77c0a4f, 62f3fc5, 6f10383, f38c39b, a573c99, 3055352, 6a84f95, 84e8a6b, 431b9cc (Session 43; 4487f13 failed CI and was reverted by 3055352). Earlier red at 6d61ed2 (CI .env default reached the SR provider check; fixed via ns.provider_explicit). main: aa929ec (PR #8, 1282 passed, 10 deselected, both jobs). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
 | Version | 2.6.0 (main.py VERSION and README line 6; last bump Session 36). Branch names v2.7-v2.11 are labels, not versions |
 | SR docs | Readme/readme_sr_pipeline.txt = how the SR pipeline works and why (Appendix A worked example); no how-to. How-to = Readme/flashcard-help.html. study_overrides.yaml format = REVIEWER_GUIDE section 5; control-type subgroups = 5.2. docs/sr/REVIEWER_GUIDE.md = what reviewers check by hand (sections 2.2, 3.1, 3.5, 5, 6 are cited by code/tests/README, keep them; 2.2 item 5 covers the quote gate). Readme/RESOLVED_ISSUES.md and HANDOFF_archive_pre_S19.md removed in Session 41 (739b2ce): read with `git show 2923cc3:Readme/<name>`; local copy D:\AI_kcMedicalResearch_backups\2026-11-14\Readme\ |
 | Deploy | None: CLI only, local first. Render deleted 2026-10-27. UptimeRobot monitor for the old URL: not confirmed paused/deleted (user, outside the repo; item 19) |
@@ -3281,4 +3281,21 @@ pooled rows, forest plot and report; D4 'reviewer to confirm' in the RoB table;
   held back only for other reasons. First a read-only look at
   outcome_selected, then decide an outcome_mismatch gate (a word match is not
   enough: "Pain catastrophizing" contains "pain").
+- Session 43 (cont. 4): live run 20261116_230750 (qwen3-vl:30b-a3b-instruct,
+  ~76 min, 0 overrides loaded): 1 of 4 correct (Karlsson), 0 of 5 pooled, 0
+  wrong values pooled - same score as 20261116_181723. Jensen and McCrae repeat
+  181723's wrong values exactly (Jensen 25/18, 60.5/4, 65/2.7; McCrae 39/37,
+  29.23/3.17, 55.3/2.83); Lami changed (4.95/2.37, 6.81/2.02) at the same seed
+  42 / temperature 0.3. Repeat agreement is not evidence; the quote gate alone
+  held these back. Jensen SDs 4/2.7 and McCrae SDs 3.17/2.83 look like SEs
+  (|SMD|=8.575 for McCrae). Lami: model gave author Burckhardt 1991 (a cited
+  paper); PDF lookup fixed the label, the numbers may come from the same place.
+  All Session 43 fixes seen live again. Minor: launcher lists stale DOCX /
+  forest plot under output/sr/ after a no-pool run; "Provider ... / model ..."
+  logged twice at start.
+- Next: one run on the reviewer path (verified values in
+  input/sr/study_overrides.yaml, Ang exclude_from_meta) to test pooling, forest
+  plot, DOCX and PDF end to end; outcome_mismatch gate (read-only look first);
+  sr_score_run.py "Excluded by the reviewer" comes from sr_truth.yaml, not the
+  run - fix the wording.
 - DO NOT MERGE v2.11-sr-local yet. PR #9 stays a draft.
