@@ -44,19 +44,19 @@ so those catches happen at session open, not mid-work.
 
 ---
 
-## Current State (for Session 42; as of Session 41 close, 2026-11-14)
+## Current State (for Session 43; as of Session 42 close, 2026-11-16)
 
 | Component      | Status |
 |----------------|--------|
 | Tests | 1519 passed, 10 deselected on v2.11-sr-local (Session 42); main 1282 (8a8a42e) (python -m pytest -m "not live" --tb=short -q) |
-| Branch | main = 8a8a42e (PR #8 merged 2026-11-14, Session 40). Work on v2.11-sr-local (from 8a8a42e), draft PR #9: SR local-first. Latest commit: run `git log --oneline -1` (not written here, because every commit changes it). Key commits: fffedcd (metadata precedence reviewer > PDF > model; scorer surname match), e75b497 (null-result screening rule), 9601b1c (mixed_runs vote flag), 080982f (RoB2 label rule), 2923cc3 (run.log; Ollama temperature in [SAMPLING]), 739b2ce (tidy), a1f0f12 (quote gate), 3c36570 (small bugs a-c, too_few_runs; 1408), 422dc65 (missing / unchecked quote gate; 1421), Session 42: 545af00 Setup -> Local AI vision lines (1428), shared SR/OCR vision picker (1453; see Session 42 log). DO NOT MERGE: item 1 (old 12g) open. v2.10-sr-screening merged; can be deleted (item 20) |
-| CI | PR #9: green (2 of 2) at every Session 41 commit checked and at 545af00, 678fadc, 265fe63 and fc3e79e and b56845d and 569fbb8 and b0cd52a, 86d9a9c (Session 42). Earlier red at 6d61ed2 (CI .env default reached the SR provider check; fixed via ns.provider_explicit). main: aa929ec (PR #8, 1282 passed, 10 deselected, both jobs). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
+| Branch | main = 8a8a42e (PR #8 merged 2026-11-14, Session 40). Work on v2.11-sr-local (from 8a8a42e), draft PR #9: SR local-first. Latest commit: run `git log --oneline -1` (not written here, because every commit changes it). Key commits: fffedcd (metadata precedence reviewer > PDF > model; scorer surname match), e75b497 (null-result screening rule), 9601b1c (mixed_runs vote flag), 080982f (RoB2 label rule), 2923cc3 (run.log; Ollama temperature in [SAMPLING]), 739b2ce (tidy), a1f0f12 (quote gate), 3c36570 (small bugs a-c, too_few_runs; 1408), 422dc65 (missing / unchecked quote gate; 1421), Session 42: 545af00 Setup -> Local AI vision lines (1428), 678fadc shared SR/OCR vision picker (1453), 265fe63 number gate, 86d9a9c SR_VISION_MODEL (1519), 38ea78a docs F13 (see Session 42 log). DO NOT MERGE: AI alone 1 of 4 (F13); see Next work items 1-10, 21, 22. v2.10-sr-screening merged; can be deleted (item 20) |
+| CI | PR #9: green (2 of 2) at every Session 41 commit checked and at 545af00, 678fadc, 265fe63 and fc3e79e and b56845d and 569fbb8 and b0cd52a, 86d9a9c, 38ea78a (Session 42). Earlier red at 6d61ed2 (CI .env default reached the SR provider check; fixed via ns.provider_explicit). main: aa929ec (PR #8, 1282 passed, 10 deselected, both jobs). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
 | Version | 2.6.0 (main.py VERSION and README line 6; last bump Session 36). Branch names v2.7-v2.11 are labels, not versions |
 | SR docs | Readme/readme_sr_pipeline.txt = how the SR pipeline works and why (Appendix A worked example); no how-to. How-to = Readme/flashcard-help.html. study_overrides.yaml format = REVIEWER_GUIDE section 5; control-type subgroups = 5.2. docs/sr/REVIEWER_GUIDE.md = what reviewers check by hand (sections 2.2, 3.1, 3.5, 5, 6 are cited by code/tests/README, keep them; 2.2 item 5 covers the quote gate). Readme/RESOLVED_ISSUES.md and HANDOFF_archive_pre_S19.md removed in Session 41 (739b2ce): read with `git show 2923cc3:Readme/<name>`; local copy D:\AI_kcMedicalResearch_backups\2026-11-14\Readme\ |
 | Deploy | None: CLI only, local first. Render deleted 2026-10-27. UptimeRobot monitor for the old URL: not confirmed paused/deleted (user, outside the repo; item 19) |
 | Writing mode | one-pass (write + edit + review in one call); tracks Topic 800 / Article 3,500 / Report 500 / Synopsis 1,500; tested on gemma4:e4b; terminal menus only |
 | OCR mode | `--mode ocr`, launcher menu 8. PDF / image / .txt / .docx; .doc refused. Ollama by default; Qwen / OpenAI only behind the cloud gate. Broken-font PDFs: text layer with [?], AI fills symbols only, document-wide vote per font code |
-| SR pipeline | On v2.11-sr-local: providers ollama (default) / qwen / openai; Anthropic, Groq, DeepSeek refused. Screening, extraction and RoB2 all run on Ollama; no local vision model -> cloud offer only after a typed "y". Runs end to end on gemma4:e4b (N=3, OLLAMA_TEMPERATURE 0.3, OLLAMA_CONTEXT 64000, ~24 min, no OOM) but NOT accurate enough: AI alone 0 of 4 fully correct on gemma4:e4b; 1 of 4 on qwen3-vl:30b-a3b-instruct (F13, 20261116_080329), same as qwen3-vl-plus 1 of 4. Gates that keep bad sets out of the pool: table_shift, no_majority, mixed_runs, quote_not_found (live-proven in 20261114_224231, code a1f0f12); too_few_runs live-proven in 20261115_213016 (Lami, 1 of 3 runs usable); a reviewer override of all four means/SDs clears quote_not_found live (Karlsson, same run, pooled). Unit-tested only: the missing / unchecked-quote part of quote_not_found (422dc65) and the number gate number_not_in_quote (265fe63) (see items 3 and 5). Each run writes reports/sr/<run_id>/run.log. On main: qwen3-vl-plus path as in Session 39 |
+| SR pipeline | On v2.11-sr-local: providers ollama (default) / qwen / openai; Anthropic, Groq, DeepSeek refused. Screening, extraction and RoB2 all run on Ollama; no local vision model -> cloud offer only after a typed "y". SR default model: qwen3-vl:30b-a3b-instruct (ollama_models.SR_VISION_MODEL, 86d9a9c) when pulled, even over OLLAMA_MODEL; else OLLAMA_MODEL / gemma4:e4b plus a too-small warning. Use -instruct vision tags only (qwen3-vl:30b thinking ignores think=false). Runs end to end on gemma4:e4b (N=3, OLLAMA_TEMPERATURE 0.3, OLLAMA_CONTEXT 64000, ~24 min, no OOM) but NOT accurate enough: AI alone 0 of 4 fully correct on gemma4:e4b; 1 of 4 on qwen3-vl:30b-a3b-instruct (F13, 20261116_080329), same as qwen3-vl-plus 1 of 4. Gates that keep bad sets out of the pool: table_shift, no_majority, mixed_runs, quote_not_found (live-proven in 20261114_224231, code a1f0f12); too_few_runs live-proven in 20261115_213016 (Lami, 1 of 3 runs usable); a reviewer override of all four means/SDs clears quote_not_found live (Karlsson, same run, pooled). Unit-tested only: the missing / unchecked-quote part of quote_not_found (422dc65) (see item 5). The number gate number_not_in_quote (265fe63) is live-proven in 20261116_080329 (Lami). Each run writes reports/sr/<run_id>/run.log. On main: qwen3-vl-plus path as in Session 39 |
 | Providers | Ollama (default, local, never falls back to cloud; model = OLLAMA_MODEL in .env, else gemma4:e4b; host = OLLAMA_HOST, OLLAMA_URL no longer read) / DeepSeek / Qwen / OpenAI / Anthropic / Groq. Ollama vision is still one flag for the whole provider (providers.py line 77; item 9c). Anthropic and Gemini geo-restricted on the dev machine |
 
 Issue numbers below match `README.md` > Known Issues.
@@ -74,7 +74,7 @@ Issue numbers below match `README.md` > Known Issues.
 
 ## Next work (start here)
 
-Updated at Session 42 start (2026-11-15) from the Session 41 close.
+Updated at Session 43 start (2026-11-16) from the Session 42 close.
 Done items are removed; the Session 39-41 logs keep the evidence. This
 list is the only place to tick items off. Old item numbers in brackets
 for tracing. Line numbers checked by grep at 422dc65.
@@ -91,6 +91,12 @@ SR local-first: blockers before PR #9 can leave draft
    (agree before the run): AI alone >= 1 of 4 fully correct, 0 wrong AND
    pooled, screening 5 INCLUDE, no OOM. Not chosen: a) qwen extraction
    behind the cloud gate; c) reviewer values for every study.
+   F13 (Session 42, run 20261116_080329, CPU, qwen3-vl:30b-a3b-instruct =
+   SR default since 86d9a9c): 1 of 4 fully correct (Karlsson), 0 wrong AND
+   pooled, 5 INCLUDE, no OOM = pass (agreed tier); default kept. Same as
+   cloud qwen3-vl-plus (1 of 4). Open (user decides): repeat on a machine
+   with more VRAM (speed; ~76 min on CPU), or close 1b. Reviewer values
+   stay required before pooling (F13 e).
 2. Reviewer-override proof: read the Karlsson PDF (S1877886015000567), enter
    all four means/SDs (truth 3.88 / 1.05 / 3.67 / 0.75) in
    input/sr/study_overrides.yaml with a source-page note, and confirm on a
@@ -116,17 +122,30 @@ SR local-first: blockers before PR #9 can leave draft
 5. Live rerun on the reference set to confirm in run.log: small bugs a-c
    (usable runs count only runs with numbers; [OUTCOME/TIMEPOINT] printed
    once; "Skip study: <author> (<year>)"), the too_few_runs flag, and the
-   missing / unchecked quote gate (3c36570, 422dc65). None has run live yet.
-6. Wording: skip_reason "runs disagree (too_few_runs)" and the [AGREEMENT]
-   header "= the runs read different table cells" are wrong for
-   too_few_runs; the machine skip_reason still says "source quote not found"
-   for missing / unchecked quotes.
+   missing / unchecked quote gate (3c36570, 422dc65).
+   Live so far (Session 42): too_few_runs (Lami, 20261115_213016);
+   Skip study lines naming the study, and the number gate (Lami), in F13
+   20261116_080329. Not yet confirmed in run.log: bug a (usable runs count
+   only runs with numbers), bug b ([OUTCOME/TIMEPOINT] printed once), and
+   the missing / unchecked-quote branch of quote_not_found.
+6. Wording. Done in b56845d: too_few_runs has its own reason
+   (audit_logger.TOO_FEW_RUNS_REASON, "too few usable runs"). Open (grep
+   first): the [AGREEMENT] header "= the runs read different table cells"
+   may still be wrong for too_few_runs; the machine skip_reason still says
+   "source quote not found" for missing / unchecked quotes; F13 (a): the
+   [SENSITIVITY] text says the runs disagreed also for studies held only by
+   the quote gate (Jensen, Karlsson) - name the real reason.
 7. [SAMPLING] logs seed=42 but call_ollama_provider sends no seed: send it,
    or log "seed: not sent" on Ollama.
 8. RoB2 on gemma: labels still contradict justifications (randomisation
    High in 4 of 5 while describing adequate methods; overall High for all 5
    via Domain 4 either way). Add a label-vs-justification check, or run
    RoB2 on qwen (goes with item 1).
+   F13 (d), qwen3-vl:30b-a3b-instruct: overall High for all 5 by the domain
+   rule, incl. two the model rated Low (column overall_model). The rule
+   (any High domain -> High; apply_rob2_overall) follows the RoB 2
+   algorithm. Open question: Domain 4 = High for self-reported pain when
+   participants know their arm. Reviewer decision, not a bug; record it.
 9. Item 12 leftovers: c) SOURCE_CODE/providers.py line 77 still sets
    "ollama": {"vision": False, ...} for the whole provider; decide per model
    (ollama_models.model_capabilities). d) record whether OLLAMA_CONTEXT
@@ -149,6 +168,13 @@ SR - report
     Lami only ("1 study - not pooled"), other three grey. The two-panel
     figure has only been checked against test data. Also confirm the
     Karlsson and McCrae timepoints are posttreatment.
+
+21. F13 (b): [PLAUSIBILITY] prints |SMD|=-8.575; print the absolute value
+    (8.575) inside the bars. Grep [PLAUSIBILITY] for the call site. Test-first.
+22. F13 (c): author labels mixed ("Dennis C. Ang", "B. Karlsson", "Jensen"):
+    pdf_auto gives a surname, the model a full name. Decide one display form
+    (surname only?); sr_score_run already matches by surname.
+(21 and 22 added Session 43; numbered after 20 so old numbers stay stable.)
 
 SR - extraction checks
 12. F8 arm-label check (old 8): needs the full arm list.
