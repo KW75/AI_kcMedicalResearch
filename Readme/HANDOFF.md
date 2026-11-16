@@ -48,9 +48,9 @@ so those catches happen at session open, not mid-work.
 
 | Component      | Status |
 |----------------|--------|
-| Tests | 1519 passed, 10 deselected on v2.11-sr-local (Session 42); main 1282 (8a8a42e) (python -m pytest -m "not live" --tb=short -q) |
+| Tests | 1523 passed, 10 deselected on v2.11-sr-local (Session 43); main 1282 (8a8a42e) (python -m pytest -m "not live" --tb=short -q) |
 | Branch | main = 8a8a42e (PR #8 merged 2026-11-14, Session 40). Work on v2.11-sr-local (from 8a8a42e), draft PR #9: SR local-first. Latest commit: run `git log --oneline -1` (not written here, because every commit changes it). Key commits: fffedcd (metadata precedence reviewer > PDF > model; scorer surname match), e75b497 (null-result screening rule), 9601b1c (mixed_runs vote flag), 080982f (RoB2 label rule), 2923cc3 (run.log; Ollama temperature in [SAMPLING]), 739b2ce (tidy), a1f0f12 (quote gate), 3c36570 (small bugs a-c, too_few_runs; 1408), 422dc65 (missing / unchecked quote gate; 1421), Session 42: 545af00 Setup -> Local AI vision lines (1428), 678fadc shared SR/OCR vision picker (1453), 265fe63 number gate, 86d9a9c SR_VISION_MODEL (1519), 38ea78a docs F13 (see Session 42 log). DO NOT MERGE: AI alone 1 of 4 (F13); see Next work items 1-10, 21, 22. v2.10-sr-screening merged; can be deleted (item 20) |
-| CI | PR #9: green (2 of 2) at every Session 41 commit checked and at 545af00, 678fadc, 265fe63 and fc3e79e and b56845d and 569fbb8 and b0cd52a, 86d9a9c, 38ea78a (Session 42). Earlier red at 6d61ed2 (CI .env default reached the SR provider check; fixed via ns.provider_explicit). main: aa929ec (PR #8, 1282 passed, 10 deselected, both jobs). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
+| CI | PR #9: green (2 of 2) at every Session 41 commit checked and at 545af00, 678fadc, 265fe63 and fc3e79e and b56845d and 569fbb8 and b0cd52a, 86d9a9c, 38ea78a (Session 42), 9b5bc25 (Session 43). Earlier red at 6d61ed2 (CI .env default reached the SR provider check; fixed via ns.provider_explicit). main: aa929ec (PR #8, 1282 passed, 10 deselected, both jobs). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
 | Version | 2.6.0 (main.py VERSION and README line 6; last bump Session 36). Branch names v2.7-v2.11 are labels, not versions |
 | SR docs | Readme/readme_sr_pipeline.txt = how the SR pipeline works and why (Appendix A worked example); no how-to. How-to = Readme/flashcard-help.html. study_overrides.yaml format = REVIEWER_GUIDE section 5; control-type subgroups = 5.2. docs/sr/REVIEWER_GUIDE.md = what reviewers check by hand (sections 2.2, 3.1, 3.5, 5, 6 are cited by code/tests/README, keep them; 2.2 item 5 covers the quote gate). Readme/RESOLVED_ISSUES.md and HANDOFF_archive_pre_S19.md removed in Session 41 (739b2ce): read with `git show 2923cc3:Readme/<name>`; local copy D:\AI_kcMedicalResearch_backups\2026-11-14\Readme\ |
 | Deploy | None: CLI only, local first. Render deleted 2026-10-27. UptimeRobot monitor for the old URL: not confirmed paused/deleted (user, outside the repo; item 19) |
@@ -171,6 +171,9 @@ SR - report
 
 21. F13 (b): [PLAUSIBILITY] prints |SMD|=-8.575; print the absolute value
     (8.575) inside the bars. Grep [PLAUSIBILITY] for the call site. Test-first.
+    DONE Session 43: main._check_plausibility prints abs(est); the check
+    already used abs(est), so only the text was wrong (console, Stage-4
+    summary, plausibility_flag column). tests/test_sr_plausibility_abs.py (4).
 22. F13 (c): author labels mixed ("Dennis C. Ang", "B. Karlsson", "Jensen"):
     pdf_auto gives a surname, the model a full name. Decide one display form
     (surname only?); sr_score_run already matches by surname.

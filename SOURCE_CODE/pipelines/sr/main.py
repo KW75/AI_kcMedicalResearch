@@ -125,7 +125,7 @@ def _check_plausibility(effect_measure: str, est: float, author_label: str) -> s
     if not implausible:
         return None
     msg = (
-        f"|{effect_measure}|={est:.3f} exceeds plausibility bound ({bound}) "
+        f"|{effect_measure}|={abs(est):.3f} exceeds plausibility bound ({bound}) "
         f"for {author_label} - verify against source PDF before trusting "
         f"this estimate (see Known Issues #9, #10, #13)."
     )
