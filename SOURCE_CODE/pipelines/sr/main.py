@@ -398,8 +398,9 @@ def _log_stage4_summary(meta_audit: list[dict],
         logger.warning(
             f"[AGREEMENT] {len(flagged)} of {len(voted)} voted studies "
             f"disagreed across N runs ({len(mandatory)} mandatory: "
-            f"no_majority/table_shift/mixed_runs/too_few_runs = the runs read different table "
-            f"cells; a majority there is not evidence). Verify each "
+            f"no_majority/table_shift/mixed_runs = the runs read different table "
+            f"cells; too_few_runs = too few runs gave usable numbers; "
+            f"a majority there is not evidence). Verify each "
             f"against the source PDF before trusting {target} (#11):")
         for r in flagged:
             tag = "MANDATORY" if nondet_cell_is_mandatory(r.get("nondet_flag")) else "check"

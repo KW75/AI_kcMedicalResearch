@@ -584,11 +584,16 @@ def _find_move_destination(mode: str) -> Path:
 _KEEP_IN_INPUT = {'study_overrides.yaml', 'prisma_criteria.yaml'}
 
 
+def _keep_in_input(name: str) -> bool:
+    """Run settings never move: overrides, criteria, pico_*.json (Session 43)."""
+    return name in _KEEP_IN_INPUT or (name.startswith('pico_') and name.endswith('.json'))
+
+
 def check_input_folder(mode: str) -> None:
     input_dir = BASE / "input" / mode
     if not input_dir.exists():
         return
-    files = [f for f in input_dir.iterdir() if f.is_file() and f.name not in _KEEP_IN_INPUT]
+    files = [f for f in input_dir.iterdir() if f.is_file() and not _keep_in_input(f.name)]
     if not files:
         return
 
