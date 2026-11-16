@@ -62,7 +62,7 @@ def test_no_lookup_result_keeps_the_model_author(monkeypatch, caplog):
     caplog.set_level(logging.INFO)
     ex = _extractor(monkeypatch, {})
     r = _run(ex, "Dennis C. Ang", 2010)
-    assert r["study_metadata"]["first_author"] == "Dennis C. Ang"
+    assert (r["study_metadata"]["first_author"], r["study_metadata"].get("first_author_full")) == ("Ang", "Dennis C. Ang")  # Session 43 (22a): surname only
     assert int(r["study_metadata"]["year"]) == 2010
     assert not _meta_warnings(caplog)
 

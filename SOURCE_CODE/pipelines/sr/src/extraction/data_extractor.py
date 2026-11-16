@@ -1490,6 +1490,20 @@ class DataExtractor:
                     result.get("filename", "?"), field, old, top, source)
                 sm[field] = top
 
+        # Session 43 (item 22, F13 c): labels use the surname only; the full
+        # name stays in study_metadata["first_author_full"].
+        from .study_overrides import _first_author_from_string
+        full = sm.get("first_author")
+        if not self._missing_like_value(full):
+            short = _first_author_from_string(full)
+            if short and short != str(full).strip():
+                sm["first_author_full"] = full
+                sm["first_author"] = short
+                if self._same_meta_value(result.get("first_author"), full):
+                    result["first_author"] = short
+                logger.info("[AUTHOR] %s: label %r -> %r (full name kept)",
+                            result.get("filename", "?"), full, short)
+
     @staticmethod
     def _same_meta_value(a, b) -> bool:
         """2017, "2017" and 2017.0 are the same; names compare case-insensitively."""
