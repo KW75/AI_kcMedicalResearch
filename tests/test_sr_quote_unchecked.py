@@ -98,7 +98,9 @@ def test_gate_all_four_overrides_clear_unchecked():
 
 def test_plain_wording_covers_missing_and_unchecked():
     hr = importlib.import_module("pipelines.sr.src.reporting.html_report")
-    s = hr.plain_skip_reason(audit.QUOTE_GATE_REASON)
+    s = " ".join(hr.plain_skip_reason(r) for r in (
+        audit.QUOTE_GATE_REASON, audit.QUOTE_MISSING_REASON,
+        audit.QUOTE_UNCHECKED_REASON))
     assert "missing" in s and "could not be checked" in s
     assert "page images" in s and "not found in the paper" in s
 

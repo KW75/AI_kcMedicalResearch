@@ -72,6 +72,17 @@ QUOTE_GATE_REASON = ("needs review: source quote not found (quote_not_found) - "
                      "numbers read from page images; verify all four means/SDs "
                      "against the PDF and enter them in "
                      "input/sr/study_overrides.yaml with a source-page note")
+# Session 43 (item 6): the other two quote-gate cases get their own wording;
+# same token (quote_not_found), same tail, cleared the same way.
+QUOTE_MISSING_MARKER = "no source quote provided"
+QUOTE_UNCHECKED_MARKER = "could not be checked against the paper text"
+_QUOTE_TAIL = ("numbers read from page images; verify all four means/SDs "
+               "against the PDF and enter them in "
+               "input/sr/study_overrides.yaml with a source-page note")
+QUOTE_MISSING_REASON = ("needs review: no source quote given (quote_not_found) - "
+                        + _QUOTE_TAIL)
+QUOTE_UNCHECKED_REASON = ("needs review: source quote not checked - no paper "
+                          "text (quote_not_found) - " + _QUOTE_TAIL)
 # Session 42 item 3: a mean/SD that is not in its own source quote, although
 # the quote itself was found. Run 20261114_224231: Ang's control mean/SD; only
 # table_shift kept Ang out. The marker is the tail of the mean/SD warning
@@ -166,8 +177,12 @@ def review_skip_reason(cell, override_fields=None, quote_warning=None,
     all_four = all(f in done for f in _REVIEW_NUMERIC_FIELDS)
     warn = str(quote_warning or "")
     if page_images and not all_four:
-        if any(m in warn for m in QUOTE_GATE_MARKERS):
+        if QUOTE_NOT_FOUND_MARKER in warn:
             reasons.append(QUOTE_GATE_REASON)
+        if QUOTE_MISSING_MARKER in warn:
+            reasons.append(QUOTE_MISSING_REASON)
+        if QUOTE_UNCHECKED_MARKER in warn:
+            reasons.append(QUOTE_UNCHECKED_REASON)
         if NUMBER_NOT_IN_QUOTE_MARKER in warn:
             reasons.append(NUMBER_GATE_REASON)
     return "; also: ".join(reasons) or None

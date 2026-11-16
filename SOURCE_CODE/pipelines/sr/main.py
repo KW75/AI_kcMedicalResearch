@@ -175,7 +175,9 @@ def _row_has_extracted_value(row: dict) -> bool:
 _REVIEW_LABELS = (
     ("runs disagree (", "runs disagree"),
     ("(too_few_runs)", "too few usable runs"),
-    ("(quote_not_found)", "quote not found"),
+    ("source quote not found (", "quote not found"),
+    ("no source quote given (", "no quote"),
+    ("source quote not checked - ", "quote not checked"),
     ("(number_not_in_quote)", "number not in quote"),
 )
 

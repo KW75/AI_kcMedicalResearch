@@ -137,8 +137,17 @@ def _plain_one(part):
                 + part[len("outcome_match=False:"):].strip())
     if part.startswith("needs review: source quote not found"):
         return ("The numbers were read from page images and the AI's source "
-                "quote was missing, could not be checked, or was not found in "
-                "the paper's text. Not confirmed by a reviewer.")
+                "quote was not found in the paper's text. Not confirmed by a "
+                "reviewer.")
+    if part.startswith("needs review: no source quote given"):
+        # Session 43: audit_logger.QUOTE_MISSING_REASON
+        return ("The numbers were read from page images and the AI's source "
+                "quote was missing. Not confirmed by a reviewer.")
+    if part.startswith("needs review: source quote not checked"):
+        # Session 43: audit_logger.QUOTE_UNCHECKED_REASON
+        return ("The numbers were read from page images and the AI's source "
+                "quote could not be checked, because no paper text was "
+                "available. Not confirmed by a reviewer.")
     if part.startswith("needs review: a mean/SD is not in its own source quote"):
         # Session 42 (item 3): number gate (audit_logger.NUMBER_GATE_REASON)
         return ("The numbers were read from page images and a mean or SD is "
