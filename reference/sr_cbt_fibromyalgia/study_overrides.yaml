@@ -7,11 +7,15 @@
 # the extractor produced. Use them only for values you have read yourself
 # from the source table, and always record where they came from in `note`.
 #
+# comparator_type (waiting_list / usual_care / attention_placebo) sets the
+# control-type subgroup only; it changes no numbers (REVIEWER_GUIDE 5.2).
+#
 # Every applied override appears in extracted_data.csv under
 # override_fields / override_note.
 
 "s10608-017-9875-4.pdf":
   first_author: Lami
+  comparator_type: usual_care  # paper: usual medical care (UMC, n=42); Figure 1 Received UMC n=41
   year: 2018
   n_intervention: 28
   n_control: 36
@@ -25,6 +29,7 @@
 
 zsy234.pdf:
   first_author: McCrae
+  comparator_type: waiting_list  # WLC = waiting-list control (Table 3 p9)
   year: 2019
   n_intervention: 57
   n_control: 28
@@ -32,7 +37,7 @@ zsy234.pdf:
   sd_intervention: 24.06
   mean_control: 52.38
   sd_control: 24.04
-  note: "Multi-arm trial (CBT-I, CBT-P, WLC). CBT-I and CBT-P combined into one intervention arm (Cochrane Handbook 23.3.4): CBT-I 47.01 (24.79) n 27, CBT-P 46.72 (23.81) n 30. Control WLC 52.38 (24.04) n 28. Morning pain VAS 0-100, post-treatment, mixed-model means, Table 3 p9. N = completed post-treatment (Figure 1). Evening pain in Table 3 not used. Waiting-list subgroup."
+  note: "Multi-arm trial (CBT-I, CBT-P, WLC). Intervention arm = CBT-I + CBT-P combined (Cochrane Handbook 23.3.4); 46.86 (24.06) n 57 is CALCULATED, not printed in the paper, from CBT-I 47.01 (24.79) n 27 and CBT-P 46.72 (23.81) n 30. Control WLC 52.38 (24.04) n 28. Morning pain VAS 0-100, post-treatment, mixed-model means, Table 3 p9. N = completed post-treatment (Figure 1). Evening pain not used. Waiting-list subgroup. Re-verified from the PDF, Session 44."
 
 "Arthritis Care Research - 2010 - Ang - Cognitive behavioral therapy attenuates nociceptive responding in patients with-1.pdf":
   first_author: Ang
@@ -49,6 +54,7 @@ zsy234.pdf:
 
 "Cognitive behaviour therapy in women with fibromyalgia_ A randomized clinical trial - 1-s2.0-S1877886015000567-main.pdf":
   first_author: Karlsson
+  comparator_type: waiting_list  # CBT vs wait list (Table 2 p6)
   year: 2015
   n_intervention: 24
   n_control: 24
@@ -58,13 +64,15 @@ zsy234.pdf:
   sd_control: 0.75
   note: >-
     Table 2 p6, MPI-1 Pain severity (tertiary outcome), crude mean (SD)
-    after treatment (CBT) vs after wait list; adjusted means (no SD) not
-    used. n 24/24, 48 randomised. One of 3 readings took the next row
-    (Interference) -> table_shift. Verified from the PDF (text is Tesseract
-    OCR, broken font).
-    
+    after treatment (CBT) vs after wait list. Adjusted means 4.20 (CBT) and
+    3.37 (wait list) are reported without SD, so not usable for an SMD; crude
+    values used. n 24/24, 48 randomised. One of 3 readings took the next row
+    (Interference) -> table_shift. Re-verified from the PDF, Session 44
+    (text is Tesseract OCR, broken font).
+
 "Cognitive Behavioral Therapy increases pain-evoked activation of the prefrontal cortex in patients with fibromyalgeia (1).pdf":
   first_author: Jensen
+  comparator_type: waiting_list  # paper: randomized, waiting-list controlled trial; CBT or remained on a waiting list (Methods)
   year: 2012
   n_intervention: 19
   n_control: 15
@@ -75,10 +83,5 @@ zsy234.pdf:
   note: >-
     Table 3 p7, weekly FM pain VAS 0-100, posttreatment, mean (SD): CBT
     49 (19) vs waiting list 59 (26). N = completed treatment 19/15
-    (Fig 1 p3); 25/18 randomised. The AI's 45.6 is the mean age (p2), not
-    pain. Waiting-list subgroup. Verified from the PDF.
-
-
-
-
-
+    (Fig 1 p3); 25/18 randomised. The AI's 45.6 is the mean age (p2) of the
+    whole group, not pain. Waiting-list subgroup. Verified from the PDF.
