@@ -27,7 +27,7 @@ from .src.utils.criteria_file import placeholder_fields
 from .src.utils.audit_logger import (
     write_screens, write_extracts, write_rob2, write_results,
     nondet_flag_to_cell, nondet_cell_is_mandatory, NONDET_CELL_UNANIMOUS,
-    review_skip_reason, split_quote_flagged, split_agreement_cleared, reviewer_exclusion_reason, skip_label
+    review_skip_reason, split_quote_flagged, split_agreement_cleared, means_sds_overridden, reviewer_exclusion_reason, skip_label
 
 )
 
@@ -598,6 +598,9 @@ def _log_stage4_summary(meta_audit: list[dict],
             "filename": r.get("filename", "?"),
             "outcome_selected": outcome_sel,
             "timepoint_selected": timepoint_sel,
+            # Session 46 (item g): reviewer entered all four means/SDs ->
+            # outcome/timepoint above is the AI reading, not the pooled values.
+            "reviewer_values": means_sds_overridden(r.get("override_fields")),
         })
     _op_recorded = sum(
         1 for x in _op_rows
@@ -608,11 +611,13 @@ def _log_stage4_summary(meta_audit: list[dict],
         f"fields document WHICH outcome and WHICH timepoint each run "
         f"drew from - a run whose numbers change between executions "
         f"(#11) will show the change here without opening the CSV.")
+    _rv_note = " (AI reading; means/SDs entered by reviewer - see override note)"
     for x in _op_rows:
         logger.info(
             f"[OUTCOME/TIMEPOINT]   {x['author']} ({x['year']}): "
             f"outcome={x['outcome_selected'] if x['outcome_selected'] is not None else '(not recorded)'} "
-            f"| timepoint={x['timepoint_selected'] if x['timepoint_selected'] is not None else '(not recorded)'}")
+            f"| timepoint={x['timepoint_selected'] if x['timepoint_selected'] is not None else '(not recorded)'}"
+            f"{_rv_note if x.get('reviewer_values') else ''}")
 
 def load_config(p=None):
     path = Path(p) if p else SR_DIR / "config" / "prisma_criteria.yaml"
