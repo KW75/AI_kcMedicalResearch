@@ -126,6 +126,28 @@ def split_quote_flagged(rows):
     return flagged, cleared
 
 
+def split_agreement_cleared(rows):
+    """Rows with a mandatory nondet flag -> (still mandatory, cleared by override).
+
+    Session 46 (item h): same rule as the pooling gate - review_skip_reason
+    with the flag and override_fields only (quote warnings are
+    [SOURCE QUOTE CHECK]'s job). Run 20261117_201642 pooled Lami (2018) with
+    reviewer values, but the [AGREEMENT] summary still listed it [MANDATORY].
+    Rows with only majority flags are never cleared: the gate never held
+    them back.
+    """
+    still, cleared = [], []
+    for r in rows:
+        cell = r.get("nondet_flag")
+        if not nondet_cell_is_mandatory(cell):
+            continue
+        if review_skip_reason(cell, r.get("override_fields")) is None:
+            cleared.append(r)
+        else:
+            still.append(r)
+    return still, cleared
+
+
 def skip_label(row) -> str:
     """'Author (year)' for log lines; the file name when author/year are
     missing (run 20261115_230933 printed 'Skip study: None (None)').

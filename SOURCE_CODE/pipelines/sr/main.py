@@ -27,7 +27,7 @@ from .src.utils.criteria_file import placeholder_fields
 from .src.utils.audit_logger import (
     write_screens, write_extracts, write_rob2, write_results,
     nondet_flag_to_cell, nondet_cell_is_mandatory, NONDET_CELL_UNANIMOUS,
-    review_skip_reason, split_quote_flagged, reviewer_exclusion_reason, skip_label
+    review_skip_reason, split_quote_flagged, split_agreement_cleared, reviewer_exclusion_reason, skip_label
 
 )
 
@@ -464,7 +464,16 @@ def _log_stage4_summary(meta_audit: list[dict],
              and (r.get("nondet_runs") or 0) >= 2]
     flagged = [r for r in voted
                if r.get("nondet_flag") not in (None, "", NONDET_CELL_UNANIMOUS)]
-    mandatory = [r for r in flagged if nondet_cell_is_mandatory(r.get("nondet_flag"))]
+    # Session 46 (item h): a study whose runs disagreed but whose flagged
+    # fields were all overridden passed the pooling gate (same rule:
+    # review_skip_reason); run 20261117_201642 still listed Lami [MANDATORY].
+    mandatory, agree_cleared = split_agreement_cleared(flagged)
+    _cleared_ids = {id(r) for r in agree_cleared}
+    flagged = [r for r in flagged if id(r) not in _cleared_ids]
+    for r in agree_cleared:
+        logger.info(
+            f"[AGREEMENT] {skip_label(r)}: runs disagreed; cleared by reviewer "
+            f"override (every flagged field entered in study_overrides.yaml).")
     if n_extracted == 0:
         logger.info(
             f"[AGREEMENT] 0 flagged of 0 extracted studies (nothing to check).")
@@ -487,6 +496,15 @@ def _log_stage4_summary(meta_audit: list[dict],
             logger.warning(
                 f"  - {r.get('first_author','?')} ({r.get('year','')}) "
                 f"[{tag}]: {r.get('nondet_flag')}")
+        if len(voted) < n_extracted:
+            logger.info(
+                f"[AGREEMENT]   ({n_extracted - len(voted)} extracted "
+                f"studies were not voted: text fallback or Anthropic path.)")
+    elif agree_cleared:
+        logger.info(
+            f"[AGREEMENT] 0 still flagged of {len(voted)} voted studies; "
+            f"{len(agree_cleared)} cleared by reviewer override (see above). "
+            f"Manual verification still required.")
         if len(voted) < n_extracted:
             logger.info(
                 f"[AGREEMENT]   ({n_extracted - len(voted)} extracted "
@@ -910,7 +928,7 @@ def main():
                                      extraction_method=r.get("extraction_method"))
         if not _review and nondet_cell_is_mandatory(audit_row["nondet_flag"]):
             logger.info(
-                f"[AGREEMENT] {m.get('first_author','?')}: runs disagreed but "
+                f"[AGREEMENT] {skip_label(audit_row)}: runs disagreed but "
                 f"every flagged field was overridden in study_overrides.yaml "
                 f"- pooled with reviewer values.")
             # Session 39 (item 4d): named in [SENSITIVITY].
