@@ -677,7 +677,7 @@ def main():
     _run_log = attach_run_log(layout.project)
     logger.info(f"Project folder: {layout.project}")
     logger.info(f"Run log: {Path(str(layout.project)) / 'run.log'}")
-    logger.info(f"Provider {args.provider} / model {args.model}")
+    logger.info(f"Settings: provider {args.provider} / model {args.model} (also shown above)")
     # Every audit CSV row carries this run's id: #17 (extraction
     # non-determinism) means the same paper can carry different values
     # in different runs' CSVs, and a CSV without a run id is silently
