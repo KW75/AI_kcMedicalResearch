@@ -109,6 +109,59 @@ def means_sds_overridden(override_fields) -> bool:
     return all(f in done for f in _REVIEW_NUMERIC_FIELDS)
 
 
+# Session 47 (item f): code-side outcome check. The model set outcome_match
+# True for PCS, FIQ, NFR and MPQ in runs 20261116_214126, 20261116_230750 and
+# 20261117_232734, so the "outcome_match is False" gate never fired.
+import re as _oc_re
+
+OUTCOME_MISMATCH_TOKEN = "outcome_mismatch"
+_OC_OTHER = _oc_re.compile(
+    r"catastroph|\bpcs\b|\bnfr\b|threshold|toleran|interfer|disabilit|"
+    r"depress|anxi|sleep|fatigue|quality of life|\bqol\b|physical function|\bmood\b",
+    _oc_re.I)
+_OC_FIQ = _oc_re.compile(r"\bfiq\b|fibromyalgia impact", _oc_re.I)
+_OC_PAIN = _oc_re.compile(r"\bpain\b", _oc_re.I)
+_OC_QUAL = _oc_re.compile(
+    r"intensit|severit|\bvas\b|\bnrs\b|\bscore\b|\b0\s*[-\u2013]\s*100?\b", _oc_re.I)
+
+
+def outcome_check(selected, pico_outcome):
+    """(status, detail) for outcome_selected against the PICO outcome.
+
+    match: names pain AND how it was measured (intensity, severity, VAS, NRS,
+    score, 0-10/0-100). mismatch: another measure (checked first, so "Pain
+    catastrophizing" is not a match), or the whole FIQ without its pain item.
+    unclear: bare "Pain", MPQ, or nothing recorded. not_checked: the PICO
+    outcome is not pain intensity/severity.
+    """
+    pico = str(pico_outcome or "")
+    if not (_OC_PAIN.search(pico) and _oc_re.search(r"intensit|severit", pico, _oc_re.I)):
+        return "not_checked", "review outcome is not pain intensity/severity"
+    sel = str(selected or "").strip()
+    if not sel:
+        return "unclear", "outcome_selected not recorded"
+    m = _OC_OTHER.search(sel)
+    if m:
+        return "mismatch", f"'{sel}' looks like another measure ({m.group(0).lower()}), not pain intensity"
+    if _OC_FIQ.search(sel) and not _OC_PAIN.search(sel):
+        return "mismatch", f"'{sel}' is the whole FIQ, not its pain item"
+    if _OC_PAIN.search(sel) and _OC_QUAL.search(sel):
+        return "match", ""
+    return "unclear", f"'{sel}' does not say how pain was measured"
+
+
+def outcome_mismatch_reason(selected, pico_outcome, override_fields=None):
+    """Gate reason for a mismatch; None otherwise or when all four means/SDs were overridden."""
+    status, detail = outcome_check(selected, pico_outcome)
+    if status != "mismatch":
+        return None
+    if override_fields and means_sds_overridden(override_fields):
+        return None
+    return (f"needs review: outcome does not match the review outcome "
+            f"({OUTCOME_MISMATCH_TOKEN}) - {detail}; verify against the PDF, or enter "
+            f"all four means/SDs in input/sr/study_overrides.yaml with a source-page note")
+
+
 def split_quote_flagged(rows):
     """Rows with a source-quote warning -> (still flagged, cleared by override).
 

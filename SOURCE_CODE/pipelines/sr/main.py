@@ -24,6 +24,7 @@ from .src.reporting.report_generator import ReportGenerator
 from .src.reporting.pdf_report import PDFReportGenerator, pdf_summary_line
 from .src.utils.project_layout import SRProjectLayout
 from .src.utils.criteria_file import placeholder_fields
+from .src.utils.audit_logger import outcome_check, outcome_mismatch_reason
 from .src.utils.audit_logger import (
     write_screens, write_extracts, write_rob2, write_results,
     nondet_flag_to_cell, nondet_cell_is_mandatory, NONDET_CELL_UNANIMOUS,
@@ -179,6 +180,7 @@ _REVIEW_LABELS = (
     ("no source quote given (", "no quote"),
     ("source quote not checked - ", "quote not checked"),
     ("(number_not_in_quote)", "number not in quote"),
+    ("(outcome_mismatch)", "outcome mismatch"),
 )
 
 
@@ -931,6 +933,19 @@ def main():
                                      audit_row["override_fields"],
                                      quote_warning=source_quote_warning,
                                      extraction_method=r.get("extraction_method"))
+        # Session 47 (item f): code-side outcome check - the model set
+        # outcome_match True for PCS, FIQ, NFR and MPQ, so line "outcome_match is False" never fired.
+        _pico_out = cfg.get("pico", {}).get("outcome")
+        _oc_status, _oc_detail = outcome_check(po.get("outcome_selected"), _pico_out)
+        _oc_reason = outcome_mismatch_reason(po.get("outcome_selected"), _pico_out,
+                                             audit_row["override_fields"])
+        if _oc_reason:
+            _review = f"{_review}; {_oc_reason}" if _review else _oc_reason
+        elif _oc_status == "mismatch":
+            logger.info(f"[OUTCOME CHECK] {skip_label(audit_row)}: {_oc_detail}; cleared by "
+                        f"reviewer override (all four means/SDs entered in study_overrides.yaml).")
+        elif _oc_status == "unclear":
+            logger.info(f"[OUTCOME CHECK] {skip_label(audit_row)} [check]: {_oc_detail}.")
         if not _review and nondet_cell_is_mandatory(audit_row["nondet_flag"]):
             logger.info(
                 f"[AGREEMENT] {skip_label(audit_row)}: runs disagreed but "
