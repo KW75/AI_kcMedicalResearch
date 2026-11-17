@@ -278,6 +278,21 @@ def _trust_target(rows: list[dict]) -> str:
     return _POOLED_TARGET if pooled >= 2 else _NOT_POOLED_TARGET
 
 
+_EXCLUDED_PREFIX = "excluded by reviewer:"
+
+
+def _split_reviewer_excluded(rows: list[dict]):
+    """Session 45 (item b): split meta_audit into (kept, excluded). Excluded =
+    skip_reason written by reviewer_exclusion_reason (exclude_from_meta)."""
+    kept, excluded = [], []
+    for r in rows:
+        if str(r.get("skip_reason") or "").startswith(_EXCLUDED_PREFIX):
+            excluded.append(r)
+        else:
+            kept.append(r)
+    return kept, excluded
+
+
 def _log_stage4_summary(meta_audit: list[dict],
                         er: list[dict],
                         effect_measure: str) -> None:
@@ -289,6 +304,16 @@ def _log_stage4_summary(meta_audit: list[dict],
     the key; print the zero' rule); the denominator now says whether the
     zero means 'checked and clean' or 'nothing was there to check'.
     """
+    # Session 45 (item b): a study the reviewer excluded is in no estimate,
+    # so it is left out of every check below (run 20261117_155621 listed Ang).
+    meta_audit, _excluded = _split_reviewer_excluded(meta_audit)
+    er = [r for r in er
+          if not (isinstance(r, dict) and reviewer_exclusion_reason(r))]
+    if _excluded:
+        logger.info(
+            f"[EXCLUDED] {', '.join(skip_label(r) for r in _excluded)}: "
+            f"left out of the checks below (excluded by the reviewer, "
+            f"in no estimate).")
     n_extracted = sum(1 for r in meta_audit if _row_has_extracted_value(r))
     target = _trust_target(meta_audit)
 
