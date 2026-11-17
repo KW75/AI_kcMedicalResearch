@@ -383,8 +383,11 @@ pipeline is built around one rule:
     do not change extraction; use study_overrides.yaml.
   - Screening reads the start of each paper only (up to 6000 characters).
   - Subgroup results with few studies are exploratory.
-  - A cloud vision model is needed for SR today; a local (Ollama) vision
-    option is planned.
+  - SR runs on a local Ollama vision model (default gemma4:e4b), or on qwen /
+    openai after the cloud warning. Local accuracy is not yet checked against
+    the reference set; check every value against the PDF.
+    If the local model cannot read images, the launcher offers qwen / openai
+    (API key set) behind the [CLOUD] banner and a typed y.
   - PDF reports need an extra library; Word and HTML reports are always
     produced.
 

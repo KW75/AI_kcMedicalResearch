@@ -92,6 +92,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   <div class="section" id="rob">
     <div class="sh"><h2>Risk of Bias &mdash; Cochrane RoB 2.0</h2></div>
     <div class="tw"><table><thead><tr><th>Study</th><th>D1 Randomisation</th><th>D2 Deviations</th><th>D3 Missing Data</th><th>D4 Outcome</th><th>D5 Reported Result</th><th>Overall</th></tr></thead><tbody>{rob_rows}</tbody></table></div>
+    <p style="font-size:12px;color:#6b7280;margin:8px 0 0;">D4 Outcome: for self-reported outcomes in trials where participants knew their arm, the label (Some concerns or High) is a reviewer judgement &mdash; confirm it for each study. Overall follows the RoB 2 rule (any High &rarr; High).</p>
   </div>
   <div class="section" id="ma">
     <div class="sh"><h2>Meta-Analysis Results</h2></div>
@@ -135,13 +136,39 @@ def _plain_one(part):
     if part.startswith("outcome_match=False:"):
         return ("Outcome does not match the review outcome: "
                 + part[len("outcome_match=False:"):].strip())
+    if part.startswith("needs review: source quote not found"):
+        return ("The numbers were read from page images and the AI's source "
+                "quote was not found in the paper's text. Not confirmed by a "
+                "reviewer.")
+    if part.startswith("needs review: no source quote given"):
+        # Session 43: audit_logger.QUOTE_MISSING_REASON
+        return ("The numbers were read from page images and the AI's source "
+                "quote was missing. Not confirmed by a reviewer.")
+    if part.startswith("needs review: source quote not checked"):
+        # Session 43: audit_logger.QUOTE_UNCHECKED_REASON
+        return ("The numbers were read from page images and the AI's source "
+                "quote could not be checked, because no paper text was "
+                "available. Not confirmed by a reviewer.")
+    if part.startswith("needs review: a mean/SD is not in its own source quote"):
+        # Session 42 (item 3): number gate (audit_logger.NUMBER_GATE_REASON)
+        return ("The numbers were read from page images and a mean or SD is "
+                "not in its own source quote (the AI's quote does not support "
+                "that number). Not confirmed by a reviewer.")
+    if part.startswith("needs review: too few usable runs"):
+        # Session 42: audit_logger.TOO_FEW_RUNS_REASON
+        return ("Only one of the repeated readings returned numbers, so "
+                "nothing could be compared. Not confirmed by a reviewer.")
     if part.startswith("needs review"):
         head = "needs review: runs disagree ("
         flags = part[len(head):].split(")", 1)[0] if part.startswith(head) else ""
-        fields, shift = [], False
+        fields, shift, mixed, few = [], False, False, False
         for tok in (t.strip() for t in flags.split("|")):
             if tok == "table_shift":
                 shift = True
+            elif tok == "mixed_runs":
+                mixed = True
+            elif tok == "too_few_runs":
+                few = True
             elif tok.endswith(":no_majority"):
                 f = tok.split(":", 1)[0]
                 fields.append(_FIELD_WORDS.get(f, f.replace("_", " ")))
@@ -151,6 +178,12 @@ def _plain_one(part):
                         + ", ".join(fields) + ")")
         if shift:
             bits.append("one of the repeated readings took a neighbouring table row")
+        if few:
+            bits.append("only one of the repeated readings returned numbers, "
+                        "so nothing could be compared")
+        if mixed:
+            bits.append("the chosen numbers came from different repeated readings; "
+                        "no single reading had them all")
         if not bits:
             bits.append("the AI read different values on repeated readings")
         text = "; ".join(bits)
@@ -178,13 +211,33 @@ def _override_confirmed_only(override_fields) -> bool:
     s = str(override_fields or "")
     return "(confirmed " in s and "->" not in s
 
+_NO_POOL_BANNER = ('  <div class="wb" style="background:#fee2e2;border-color:#ef4444;">&#9888; '
+                   '<strong>No pooled estimate in this run:</strong> fewer than 2 studies '
+                   'passed the checks. The studies not pooled and their reasons are listed '
+                   'under Meta-Analysis Results; verify them against the PDFs. The RoB 2 '
+                   'table still needs the reviewer (D4).</div>\n')
+
+
+def _no_pool_template(t: str) -> str:
+    """Session 43: report when < 2 studies pool. Banner on top; no pooled
+    numbers, heterogeneity cards or forest plot. ValueError if the template
+    changed (tests/test_sr_no_pool_report.py catches it)."""
+    i = t.index('  <div class="section" id="ov">')
+    t = t[:i] + _NO_POOL_BANNER + t[i:]
+    i, j = t.index('    <div class="rb2">'), t.index('    {not_pooled_html}')
+    t = (t[:i] + '    <div class="rb2"><div class="rm">No pooled estimate: fewer '
+         'than 2 studies passed the checks.</div></div>\n' + t[j:])
+    i, j = t.index('  <div class="section" id="fp">'), t.index('</div>\n<div class="footer">')
+    return t[:i] + t[j:]
+
+
 class HTMLReportGenerator:
     def generate(self, title, authors, pico, inclusion_criteria, exclusion_criteria,
                  ma_result, extraction_results, screening_results, rob_results,
                  forest_plot_path, effect_measure="OR", model_name="claude-opus-4-7",
-                 output_path="outputs/reports/systematic_review.html", meta_audit=None, subgroups=None, subgroup_plot_path=None) -> str:
+                 output_path="outputs/reports/systematic_review.html", meta_audit=None, subgroups=None, subgroup_plot_path=None, no_pool=False) -> str:
         out = Path(output_path); out.parent.mkdir(parents=True, exist_ok=True)
-        html = HTML_TEMPLATE.format(
+        fields = dict(
             title=self._e(title),
             authors_html=f'<p style="margin-top:10px;opacity:.9;">{self._e(authors)}</p>' if authors else "",
             generated_date=datetime.datetime.now().strftime("%Y-%m-%d %H:%M UTC"),
@@ -211,8 +264,17 @@ class HTMLReportGenerator:
             tau2_display=f"{ma_result.get('tau2',0):.4f}",
             q_display=f"{ma_result.get('Q',0):.2f}",
             q_p_display=f"{ma_result.get('Q_p',0):.3f}",
-            forest_plot_html=self._forest_html(forest_plot_path),
+            forest_plot_html="" if no_pool else self._forest_html(forest_plot_path),
         )
+        template = HTML_TEMPLATE
+        if no_pool:
+            template = _no_pool_template(template)
+            for key in ("pooled_display", "ci_lower_display", "ci_upper_display",
+                        "z_display", "p_display", "i2_display", "tau2_display",
+                        "q_display", "q_p_display"):
+                fields[key] = "n/a"
+            fields["k_studies"] = 0
+        html = template.format(**fields)
         out.write_text(html, encoding="utf-8"); return str(out.resolve())
 
     @staticmethod
@@ -368,12 +430,18 @@ class HTMLReportGenerator:
             if "high" in j2: return f'<td><span class="rh">High</span></td>'
             if "not assessed" in j2: return '<td><span style="color:#6b7280;font-style:italic">Not assessed</span></td>'
             return "<td>--</td>"
+        def c4(j):
+            # Session 43 (item 8, decision 8c): Domain 4 is a reviewer judgement.
+            cell=c(j)
+            if cell=="<td>--</td>" or "Not assessed" in cell:
+                return cell
+            return cell[:-len("</td>")]+'<br><small style="color:#6b7280">reviewer to confirm</small></td>'
         rows=[]
         for r in results:
             d=r.get("domains",{})
             rows.append(f"<tr><td><strong>{self._e(str(r.get('study',r.get('filename','?'))))}</strong></td>"
                         +c(d.get("randomisation","--"))+c(d.get("deviations","--"))
-                        +c(d.get("missing_data","--"))+c(d.get("outcome_measurement","--"))
+                        +c(d.get("missing_data","--"))+c4(d.get("outcome_measurement","--"))
                         +c(d.get("reported_result","--"))+c(r.get("overall_judgment","--"))+"</tr>")
         return "\n".join(rows)
 

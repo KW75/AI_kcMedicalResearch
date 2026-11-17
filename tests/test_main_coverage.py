@@ -152,7 +152,15 @@ class TestCliRouting:
     def test_sr_mode_routes_to_launcher(self, mock_launcher, _mock_keys):
         main.run_cli(main.parse_args(
             ['--mode', 'sr', '--provider', 'qwen', '--confirm-cloud']))
-        mock_launcher.assert_called_once_with(provider='qwen', model=None)
+        mock_launcher.assert_called_once()
+        kw = mock_launcher.call_args.kwargs
+        assert kw["provider"] == "qwen" and kw["model"] is None
+        # Session 40 (commit 3b): SR gets the consent function for a cloud
+        # offer; it must ask consent for mode "sr".
+        with patch.object(main, "confirm_data_destinations",
+                          return_value=True) as mock_confirm:
+            assert kw["confirm"]("openai") is True
+        assert mock_confirm.call_args.args[:2] == ("sr", "openai")
 
     @patch('SOURCE_CODE.main.validate_api_keys')
     @patch('SOURCE_CODE.main.choose_role')

@@ -120,6 +120,14 @@ def _first_author_from_string(raw):
             if nxt.lower() not in _PARTICLES:
                 break
         candidate = " ".join(joined)
+    elif idx == len(named) - 1:
+        # Session 43: "Anna van der Berg" -> "van der Berg". The first token is
+        # always a given name, so "Le Wang" stays "Wang".
+        j = idx
+        while j - 1 >= 1 and named[j - 1].lower() in _PARTICLES:
+            j -= 1
+        if j < idx:
+            candidate = " ".join(named[j:idx + 1])
 
     if candidate.lower() in _NOT_A_NAME:
         return None

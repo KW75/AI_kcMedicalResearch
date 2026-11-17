@@ -24,10 +24,11 @@ from .src.reporting.report_generator import ReportGenerator
 from .src.reporting.pdf_report import PDFReportGenerator, pdf_summary_line
 from .src.utils.project_layout import SRProjectLayout
 from .src.utils.criteria_file import placeholder_fields
+from .src.utils.audit_logger import outcome_check, outcome_mismatch_reason
 from .src.utils.audit_logger import (
     write_screens, write_extracts, write_rob2, write_results,
     nondet_flag_to_cell, nondet_cell_is_mandatory, NONDET_CELL_UNANIMOUS,
-    review_skip_reason, reviewer_exclusion_reason
+    review_skip_reason, split_quote_flagged, split_agreement_cleared, means_sds_overridden, reviewer_exclusion_reason, skip_label
 
 )
 
@@ -62,6 +63,33 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s -- %(message)s")
 logger = logging.getLogger("sr.main")
+
+_RUN_LOG_FORMAT = "%(asctime)s [%(levelname)s] %(name)s -- %(message)s"
+
+
+def attach_run_log(folder):
+    """Session 41 (4d): also write this run's log to <folder>/run.log.
+    Run 20261114_184026 left no log. An earlier run-log handler (a run that
+    returned early) is removed first, so no line goes to an old folder."""
+    root = logging.getLogger()
+    for old in list(root.handlers):
+        if getattr(old, "_sr_run_log", False):
+            detach_run_log(old)
+    folder = Path(folder)
+    folder.mkdir(parents=True, exist_ok=True)
+    h = logging.FileHandler(folder / "run.log", encoding="utf-8")
+    h.setFormatter(logging.Formatter(_RUN_LOG_FORMAT))
+    h._sr_run_log = True
+    root.addHandler(h)
+    return h
+
+
+def detach_run_log(handler):
+    """Stop writing run.log and close the file."""
+    if handler is None:
+        return
+    logging.getLogger().removeHandler(handler)
+    handler.close()
 
 SR_DIR = Path(__file__).resolve().parent
 
@@ -98,7 +126,7 @@ def _check_plausibility(effect_measure: str, est: float, author_label: str) -> s
     if not implausible:
         return None
     msg = (
-        f"|{effect_measure}|={est:.3f} exceeds plausibility bound ({bound}) "
+        f"|{effect_measure}|={abs(est):.3f} exceeds plausibility bound ({bound}) "
         f"for {author_label} - verify against source PDF before trusting "
         f"this estimate (see Known Issues #9, #10, #13)."
     )
@@ -142,10 +170,64 @@ def _row_has_extracted_value(row: dict) -> bool:
     return False
 
 
+# Session 43 (F13 a): short reason per needs-review study in [SENSITIVITY].
+# Keys are the tokens inside audit_logger's reason strings; a test checks
+# each key against the real reasons (tests/test_sr_sensitivity_reasons.py).
+_REVIEW_LABELS = (
+    ("runs disagree (", "runs disagree"),
+    ("(too_few_runs)", "too few usable runs"),
+    ("source quote not found (", "quote not found"),
+    ("no source quote given (", "no quote"),
+    ("source quote not checked - ", "quote not checked"),
+    ("(number_not_in_quote)", "number not in quote"),
+    ("(outcome_mismatch)", "outcome mismatch"),
+)
+
+
+def _review_labels(reason) -> list[str]:
+    text = str(reason or "")
+    return [label for key, label in _REVIEW_LABELS if key in text]
+
+
+def _review_name(row) -> str:
+    name = str(row.get("study", "?"))
+    labels = _review_labels(row.get("review_reason"))
+    return f"{name} [{'; '.join(labels)}]" if labels else name
+
+
+def _write_no_pool_html(html_path, cfg, er, sr, rob, meta_audit, effect_measure, model_name):
+    """Session 43: < 2 studies pool -> still write the HTML report (banner, no
+    pooled numbers, no forest plot) so the reviewer sees the not-pooled
+    reasons and the RoB 2 table (D4 'reviewer to confirm') before review.
+    A report error must not stop the run: warn and return None."""
+    try:
+        from SOURCE_CODE.pipelines.sr.src.reporting.html_report import HTMLReportGenerator
+        cfg = cfg or {}
+        out = HTMLReportGenerator().generate(
+            title=cfg.get("review_title", "Systematic Review"), authors="",
+            pico=cfg.get("pico", {}),
+            inclusion_criteria=cfg.get("inclusion_criteria", []),
+            exclusion_criteria=cfg.get("exclusion_criteria", []),
+            ma_result={}, extraction_results=er or [], screening_results=sr or [],
+            rob_results=rob or [], forest_plot_path=None,
+            effect_measure=effect_measure, model_name=model_name,
+            output_path=str(html_path), meta_audit=meta_audit, no_pool=True)
+    except Exception as e:
+        logger.warning(f"[REPORT] HTML report (no pooled estimate) not written "
+                       f"({type(e).__name__}: {e})")
+        return None
+    logger.info(f"[REPORT] HTML report written without a pooled estimate: {out}")
+    logger.info("[REPORT] DOCX and PDF are not written when nothing pools "
+        "(by design); the HTML report holds the extraction table, the "
+        "not-pooled list and RoB 2.")
+    return out
+
+
 def _log_review_sensitivity(rows, review_rows, effect_measure, resolved=None):
     """F4 comparison (Session 37): pool primary + needs-review studies.
 
-    The primary estimate excludes studies whose N runs disagreed. This
+    The primary estimate excludes needs-review studies (runs disagree, too
+    few usable runs, quote gate, number gate; reason in brackets). This
     second estimate puts them back so the reviewer sees how much they move
     the result. Comparison only - never the reported estimate.
     Session 39 (item 4d): resolved = studies whose runs disagreed but a
@@ -161,8 +243,9 @@ def _log_review_sensitivity(rows, review_rows, effect_measure, resolved=None):
     if not review_rows:
         logger.info("[SENSITIVITY] no needs-review studies - nothing to compare.")
         return None
-    allrows = list(rows) + list(review_rows)
-    names = ", ".join(str(r.get("study", "?")) for r in review_rows)
+    allrows = [{k: v for k, v in r.items() if k != "review_reason"}
+               for r in list(rows) + list(review_rows)]
+    names = ", ".join(_review_name(r) for r in review_rows)
     k = len(review_rows)
     if len(allrows) < 2:
         logger.warning(f"[SENSITIVITY] {k} needs-review stud"
@@ -175,10 +258,68 @@ def _log_review_sensitivity(rows, review_rows, effect_measure, resolved=None):
         f"[SENSITIVITY] Pooled {effect_measure} INCLUDING {k} needs-review "
         f"stud{'y' if k == 1 else 'ies'} ({names}): "
         f"{ma['pooled_effect']:.3f} [{ma['ci_lower']:.3f},{ma['ci_upper']:.3f}] "
-        f"I2={ma['I2']:.1f}% (k={len(allrows)}). For comparison only - the "
-        f"runs disagreed on these studies' numbers; the primary estimate "
-        f"excludes them.")
+        f"I2={ma['I2']:.1f}% (k={len(allrows)}). For comparison only - these "
+        f"studies' numbers are not verified (reason in brackets); the primary "
+        f"estimate excludes them.")
     return ma
+
+
+OVERRIDES_COPY_NAME = "study_overrides_used.yaml"
+
+
+def _save_overrides_used(layout, overrides):
+    """Session 45 (item c): keep a copy of the overrides file this run used
+    in data/extracted/, next to extracted_data.csv. No entries = no copy.
+    A failed copy warns; it must not stop the run."""
+    import shutil
+    entries = getattr(overrides, "entries", None) or {}
+    path = getattr(overrides, "path", None)
+    if not entries or not path:
+        logger.info("[OVERRIDES] none loaded - AI values only; "
+                    "no overrides copy in the run folder.")
+        return None
+    dst = Path(layout.extracted) / OVERRIDES_COPY_NAME
+    try:
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(path, dst)
+    except OSError as exc:
+        logger.warning(f"[OVERRIDES] could not copy {path} to the run "
+                       f"folder: {exc}")
+        return None
+    logger.info(f"[OVERRIDES] copied {path} ({len(entries)} entries) "
+                f"to {dst}")
+    return dst
+
+
+_POOLED_TARGET = "this pooled estimate"
+_NOT_POOLED_TARGET = "these values (no pooled estimate in this run)"
+
+
+def _trust_target(rows: list[dict]) -> str:
+    """Session 42: what the Stage-4 warnings ask the reviewer to verify
+    before trusting. A pooled estimate exists only when 2 or more studies
+    were pooled (the run aborts below 2). Pooled = included_in_meta and no
+    skip_reason (the error path sets skip_reason without resetting
+    included_in_meta). Run k20261116_070736 said "this pooled estimate"
+    although nothing was pooled."""
+    pooled = sum(1 for r in rows
+                 if r.get("included_in_meta") and not r.get("skip_reason"))
+    return _POOLED_TARGET if pooled >= 2 else _NOT_POOLED_TARGET
+
+
+_EXCLUDED_PREFIX = "excluded by reviewer:"
+
+
+def _split_reviewer_excluded(rows: list[dict]):
+    """Session 45 (item b): split meta_audit into (kept, excluded). Excluded =
+    skip_reason written by reviewer_exclusion_reason (exclude_from_meta)."""
+    kept, excluded = [], []
+    for r in rows:
+        if str(r.get("skip_reason") or "").startswith(_EXCLUDED_PREFIX):
+            excluded.append(r)
+        else:
+            kept.append(r)
+    return kept, excluded
 
 
 def _log_stage4_summary(meta_audit: list[dict],
@@ -192,7 +333,18 @@ def _log_stage4_summary(meta_audit: list[dict],
     the key; print the zero' rule); the denominator now says whether the
     zero means 'checked and clean' or 'nothing was there to check'.
     """
+    # Session 45 (item b): a study the reviewer excluded is in no estimate,
+    # so it is left out of every check below (run 20261117_155621 listed Ang).
+    meta_audit, _excluded = _split_reviewer_excluded(meta_audit)
+    er = [r for r in er
+          if not (isinstance(r, dict) and reviewer_exclusion_reason(r))]
+    if _excluded:
+        logger.info(
+            f"[EXCLUDED] {', '.join(skip_label(r) for r in _excluded)}: "
+            f"left out of the checks below (excluded by the reviewer, "
+            f"in no estimate).")
     n_extracted = sum(1 for r in meta_audit if _row_has_extracted_value(r))
+    target = _trust_target(meta_audit)
 
     # --- [PLAUSIBILITY] --------------------------------------------------
     _bound = PLAUSIBILITY_BOUNDS.get(effect_measure)
@@ -201,8 +353,7 @@ def _log_stage4_summary(meta_audit: list[dict],
         logger.warning(
             f"[PLAUSIBILITY] {len(flagged)} of {n_extracted} extracted "
             f"studies exceeded the effect-size plausibility bound and "
-            f"need manual verification before this pooled estimate is "
-            f"trusted:")
+            f"need manual verification before trusting {target}:")
         for r in flagged:
             logger.warning(
                 f"  - {r.get('first_author','?')} ({r.get('year','')}): "
@@ -232,7 +383,7 @@ def _log_stage4_summary(meta_audit: list[dict],
             f"studies had a value extracted into an SD field from a "
             f"source line also containing 'SE'/'SEM'/'standard error' - "
             f"verify these are genuine SDs, not standard errors, before "
-            f"trusting this pooled estimate (see REVIEWER_GUIDE.md 3.1):")
+            f"trusting {target} (see REVIEWER_GUIDE.md 3.1):")
         for r in se_flagged:
             logger.warning(
                 f"  - {r.get('first_author','?')} ({r.get('year','')}): "
@@ -252,8 +403,8 @@ def _log_stage4_summary(meta_audit: list[dict],
             f"{n_extracted} extracted studies had a group label that "
             f"looks like a timepoint, or identical intervention/control "
             f"labels - possible within- vs between-group confusion. "
-            f"Verify against the source PDF before trusting this pooled "
-            f"estimate (see REVIEWER_GUIDE.md 2.2):")
+            f"Verify against the source PDF before trusting {target} "
+            f"(see REVIEWER_GUIDE.md 2.2):")
         for r in group_flagged:
             logger.warning(
                 f"  - {r.get('first_author','?')} ({r.get('year','')}): "
@@ -268,7 +419,14 @@ def _log_stage4_summary(meta_audit: list[dict],
             f"still required.")
 
     # --- [SOURCE QUOTE CHECK] --------------------------------------------
-    quote_flagged = [r for r in meta_audit if r.get("source_quote_warning")]
+    # Session 42: a study whose four means/SDs a reviewer overrode is not
+    # listed as "verify each" (run 20261115_213016 still listed Karlsson).
+    quote_flagged, quote_cleared = split_quote_flagged(meta_audit)
+    for r in quote_cleared:
+        logger.info(
+            f"[SOURCE QUOTE CHECK] {r.get('first_author','?')} ({r.get('year','')}): "
+            f"quote warning cleared by reviewer override (all four "
+            f"means/SDs entered in study_overrides.yaml).")
     if quote_flagged:
         logger.warning(
             f"[SOURCE QUOTE CHECK] {len(quote_flagged)} of {n_extracted} "
@@ -276,12 +434,17 @@ def _log_stage4_summary(meta_audit: list[dict],
             f"bound to a clean verbatim source quote (missing quote, "
             f"number absent from its quote, SE-labelled quote for an "
             f"SD, or within-subject timepoint language in the quote) - "
-            f"verify each against the source PDF before trusting this "
-            f"pooled estimate (Known Issue #48):")
+            f"verify each against the source PDF before trusting {target} "
+            f"(Known Issue #48):")
         for r in quote_flagged:
             logger.warning(
                 f"  - {r.get('first_author','?')} ({r.get('year','')}): "
                 f"{r.get('source_quote_warning')}")
+    elif quote_cleared:
+        logger.info(
+            f"[SOURCE QUOTE CHECK] 0 still flagged of {n_extracted} extracted "
+            f"studies; {len(quote_cleared)} cleared by reviewer override "
+            f"(see above). Manual verification still required.")
     elif n_extracted == 0:
         logger.info(
             f"[SOURCE QUOTE CHECK] 0 flagged of 0 extracted studies "
@@ -303,7 +466,16 @@ def _log_stage4_summary(meta_audit: list[dict],
              and (r.get("nondet_runs") or 0) >= 2]
     flagged = [r for r in voted
                if r.get("nondet_flag") not in (None, "", NONDET_CELL_UNANIMOUS)]
-    mandatory = [r for r in flagged if nondet_cell_is_mandatory(r.get("nondet_flag"))]
+    # Session 46 (item h): a study whose runs disagreed but whose flagged
+    # fields were all overridden passed the pooling gate (same rule:
+    # review_skip_reason); run 20261117_201642 still listed Lami [MANDATORY].
+    mandatory, agree_cleared = split_agreement_cleared(flagged)
+    _cleared_ids = {id(r) for r in agree_cleared}
+    flagged = [r for r in flagged if id(r) not in _cleared_ids]
+    for r in agree_cleared:
+        logger.info(
+            f"[AGREEMENT] {skip_label(r)}: runs disagreed; cleared by reviewer "
+            f"override (every flagged field entered in study_overrides.yaml).")
     if n_extracted == 0:
         logger.info(
             f"[AGREEMENT] 0 flagged of 0 extracted studies (nothing to check).")
@@ -317,15 +489,24 @@ def _log_stage4_summary(meta_audit: list[dict],
         logger.warning(
             f"[AGREEMENT] {len(flagged)} of {len(voted)} voted studies "
             f"disagreed across N runs ({len(mandatory)} mandatory: "
-            f"no_majority/table_shift = the runs read different table "
-            f"cells; a majority there is not evidence). Verify each "
-            f"against the source PDF before trusting this pooled estimate "
-            f"(#11):")
+            f"no_majority/table_shift/mixed_runs = the runs read different table "
+            f"cells; too_few_runs = too few runs gave usable numbers; "
+            f"a majority there is not evidence). Verify each "
+            f"against the source PDF before trusting {target} (#11):")
         for r in flagged:
             tag = "MANDATORY" if nondet_cell_is_mandatory(r.get("nondet_flag")) else "check"
             logger.warning(
                 f"  - {r.get('first_author','?')} ({r.get('year','')}) "
                 f"[{tag}]: {r.get('nondet_flag')}")
+        if len(voted) < n_extracted:
+            logger.info(
+                f"[AGREEMENT]   ({n_extracted - len(voted)} extracted "
+                f"studies were not voted: text fallback or Anthropic path.)")
+    elif agree_cleared:
+        logger.info(
+            f"[AGREEMENT] 0 still flagged of {len(voted)} voted studies; "
+            f"{len(agree_cleared)} cleared by reviewer override (see above). "
+            f"Manual verification still required.")
         if len(voted) < n_extracted:
             logger.info(
                 f"[AGREEMENT]   ({n_extracted - len(voted)} extracted "
@@ -419,6 +600,9 @@ def _log_stage4_summary(meta_audit: list[dict],
             "filename": r.get("filename", "?"),
             "outcome_selected": outcome_sel,
             "timepoint_selected": timepoint_sel,
+            # Session 46 (item g): reviewer entered all four means/SDs ->
+            # outcome/timepoint above is the AI reading, not the pooled values.
+            "reviewer_values": means_sds_overridden(r.get("override_fields")),
         })
     _op_recorded = sum(
         1 for x in _op_rows
@@ -429,11 +613,13 @@ def _log_stage4_summary(meta_audit: list[dict],
         f"fields document WHICH outcome and WHICH timepoint each run "
         f"drew from - a run whose numbers change between executions "
         f"(#11) will show the change here without opening the CSV.")
+    _rv_note = " (AI reading; means/SDs entered by reviewer - see override note)"
     for x in _op_rows:
         logger.info(
             f"[OUTCOME/TIMEPOINT]   {x['author']} ({x['year']}): "
             f"outcome={x['outcome_selected'] if x['outcome_selected'] is not None else '(not recorded)'} "
-            f"| timepoint={x['timepoint_selected'] if x['timepoint_selected'] is not None else '(not recorded)'}")
+            f"| timepoint={x['timepoint_selected'] if x['timepoint_selected'] is not None else '(not recorded)'}"
+            f"{_rv_note if x.get('reviewer_values') else ''}")
 
 def load_config(p=None):
     path = Path(p) if p else SR_DIR / "config" / "prisma_criteria.yaml"
@@ -451,10 +637,10 @@ def main():
                     choices=["OR", "RR", "MD", "SMD"])
     ap.add_argument("--model",          default=None,
                     help="Model name (default: provider's configured model)")
-    ap.add_argument("--provider",       default="qwen",
-                    choices=["ollama", "openai", "anthropic",
-                             "deepseek", "groq", "qwen"],
-                    help="AI provider for screening and extraction")
+    ap.add_argument("--provider",       default="ollama",
+                    choices=["ollama", "qwen", "openai"],
+                    help="AI provider for screening and extraction "
+                         "(Session 40: local Ollama first, like OCR)")
     ap.add_argument("--run-id",         default=None,
                     help="Override run timestamp (e.g. for re-runs)")
     ap.add_argument("--n-agreement",    default=None, type=int,
@@ -463,10 +649,22 @@ def main():
                          "SR_EXTRACT_N_AGREEMENT; 1 disables the vote and "
                          "writes nondet_flag=single_run. Costs N x Stage-3 "
                          "vision calls.")
+    ap.add_argument("--time-limit",     default="15", type=str.lower,
+                    help="Max time per AI call: 15, 30, 60 (minutes) or "
+                         "none. Passed on by the launcher (Session 42).")
 
     args = ap.parse_args()
+    import time_limits  # same module providers.py reads
+    time_limits.set_limit(time_limits.parse(args.time_limit))
     args.model = resolve_model(args.provider, args.model)
     logger.info(f"Provider {args.provider} / model {args.model}")
+    # Session 40 (commit 3b): same vision check as the launcher, before any
+    # AI call. The direct run offers no cloud: retype with --provider qwen.
+    if args.provider == "ollama":
+        import ollama_models  # SOURCE_CODE is on sys.path (top of file)
+        _verr = ollama_models.sr_vision_error(args.model)
+        if _verr:
+            raise SystemExit(_verr)
 
     cfg = load_config(args.config)
 
@@ -500,7 +698,11 @@ def main():
 
     #  Initialise project layo
     layout = SRProjectLayout(run_id=args.run_id)
+    # Session 41 (4d): from here on, every log line also goes to run.log.
+    _run_log = attach_run_log(layout.project)
     logger.info(f"Project folder: {layout.project}")
+    logger.info(f"Run log: {Path(str(layout.project)) / 'run.log'}")
+    logger.info(f"Settings: provider {args.provider} / model {args.model} (also shown above)")
     # Every audit CSV row carries this run's id: #17 (extraction
     # non-determinism) means the same paper can carry different values
     # in different runs' CSVs, and a CSV without a run id is silently
@@ -616,18 +818,21 @@ def main():
 
     # Stage 3: Extraction
     logger.info("=== STAGE 3: Extraction ===")
-    er = DataExtractor(
+    extractor = DataExtractor(
         pico_criteria = cfg.get("pico", {}),
         model         = args.model,
         provider      = args.provider,
         n_agreement   = args.n_agreement,
-    ).extract_batch(included)
+    )
+    er = extractor.extract_batch(included)
 
     for _r in er:
         if isinstance(_r, dict):
             _r.setdefault("run_id", _run_id)
 
     write_extracts(layout.extracted_csv, er)
+    # Session 45 (item c): record the reviewer values this run used.
+    _save_overrides_used(layout, getattr(extractor, "_study_overrides", None))
 
     # Stage 3.5: RoB 2.0
     logger.info("=== STAGE 3.5: RoB 2.0 Assessment ===")
@@ -725,10 +930,25 @@ def main():
             logger.warning(f"[EXCLUDED] {audit_row['first_author']} ({audit_row['year']}): {_excl}")
             continue
         _review = review_skip_reason(audit_row["nondet_flag"],
-                                     audit_row["override_fields"])
+                                     audit_row["override_fields"],
+                                     quote_warning=source_quote_warning,
+                                     extraction_method=r.get("extraction_method"))
+        # Session 47 (item f): code-side outcome check - the model set
+        # outcome_match True for PCS, FIQ, NFR and MPQ, so line "outcome_match is False" never fired.
+        _pico_out = cfg.get("pico", {}).get("outcome")
+        _oc_status, _oc_detail = outcome_check(po.get("outcome_selected"), _pico_out)
+        _oc_reason = outcome_mismatch_reason(po.get("outcome_selected"), _pico_out,
+                                             audit_row["override_fields"])
+        if _oc_reason:
+            _review = f"{_review}; {_oc_reason}" if _review else _oc_reason
+        elif _oc_status == "mismatch":
+            logger.info(f"[OUTCOME CHECK] {skip_label(audit_row)}: {_oc_detail}; cleared by "
+                        f"reviewer override (all four means/SDs entered in study_overrides.yaml).")
+        elif _oc_status == "unclear":
+            logger.info(f"[OUTCOME CHECK] {skip_label(audit_row)} [check]: {_oc_detail}.")
         if not _review and nondet_cell_is_mandatory(audit_row["nondet_flag"]):
             logger.info(
-                f"[AGREEMENT] {m.get('first_author','?')}: runs disagreed but "
+                f"[AGREEMENT] {skip_label(audit_row)}: runs disagreed but "
                 f"every flagged field was overridden in study_overrides.yaml "
                 f"- pooled with reviewer values.")
             # Session 39 (item 4d): named in [SENSITIVITY].
@@ -826,15 +1046,16 @@ def main():
                 "plausibility_flag" : plausibility_flag,
             })
             if _review:
+                _row["review_reason"] = _review
                 review_rows.append(_row)
                 audit_row["skip_reason"] = _review
-                logger.warning(f"Skip study: {_review} "
+                logger.warning(f"Skip study: {skip_label(audit_row)}: {_review} "
                                f"(kept for the [SENSITIVITY] comparison)")
             else:
                 rows.append(_row)
 
         except Exception as e:
-            logger.warning(f"Skip study: {e}")
+            logger.warning(f"Skip study: {skip_label(audit_row)}: {e}")
             audit_row["skip_reason"] = f"{_review}; also: {e}" if _review else str(e)
 
         meta_audit.append(audit_row)
@@ -845,49 +1066,10 @@ def main():
     _log_review_sensitivity(rows, review_rows, args.effect_measure,
                             resolved=resolved_by_override)
 
-    # ---------------------------------------------------------------------
-    # [OUTCOME/TIMEPOINT] provenance surfacing (#22 / #51).
-    # Extraction is non-deterministic (#11): the same paper can draw its
-    # numbers from different outcomes or different timepoints across runs
-    # (Ang's bimodal g=+0.075 vs -0.248 was the motivating case). The
-    # schema records outcome_selected and timepoint_selected per study;
-    # the fields land in primary_outcome after the restructure step on
-    # both extraction paths. Surface them here so a reviewer sees WHICH
-    # row of each paper's results the pooled estimate is keyed to,
-    # without opening extracted_data.csv.
-    # ---------------------------------------------------------------------
-    _op_rows = []
-    for r in er:
-        if not isinstance(r, dict):
-            continue
-        m_ = r.get("study_metadata", {}) or {}
-        po_ = r.get("primary_outcome", {}) or {}
-        outcome_sel = po_.get("outcome_selected")
-        timepoint_sel = po_.get("timepoint_selected")
-        _op_rows.append({
-            "author": m_.get("first_author") or "?",
-            "year": m_.get("year") or "",
-            "filename": r.get("filename", "?"),
-            "outcome_selected": outcome_sel,
-            "timepoint_selected": timepoint_sel,
-        })
-    _op_recorded = sum(
-        1 for x in _op_rows
-        if x["outcome_selected"] is not None or x["timepoint_selected"] is not None)
-    logger.info(
-        f"[OUTCOME/TIMEPOINT] {_op_recorded} of {len(_op_rows)} studies "
-        f"recorded outcome_selected and/or timepoint_selected. These "
-        f"fields document WHICH outcome and WHICH timepoint each run "
-        f"drew from - a run whose numbers change between executions "
-        f"(#11) will show the change here without opening the CSV.")
-    for x in _op_rows:
-        logger.info(
-            f"[OUTCOME/TIMEPOINT]   {x['author']} ({x['year']}): "
-            f"outcome={x['outcome_selected'] if x['outcome_selected'] is not None else '(not recorded)'} "
-            f"| timepoint={x['timepoint_selected'] if x['timepoint_selected'] is not None else '(not recorded)'}")
-
     if len(rows) < 2:
         logger.error("< 2 studies with usable data. Aborting meta-analysis.")
+        _write_no_pool_html(layout.html, cfg, er, sr, rob, meta_audit,
+                            args.effect_measure, args.model)
         layout.mirror_all()
         return
 
@@ -995,6 +1177,7 @@ def main():
     logger.info(f"  Extracts -> {layout.extracted_csv}")
     logger.info(f"  RoB2     -> {layout.rob2_csv}")
     logger.info(f"  Results  -> {layout.results_csv}")
+    detach_run_log(_run_log)
 
 if __name__ == "__main__":
     main()

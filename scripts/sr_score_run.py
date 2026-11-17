@@ -53,10 +53,23 @@ def _truthy(value):
 
 
 def _find_truth(author, truth):
+    """Find the truth entry for a run's first_author.
+
+    Exact name first (case-insensitive). Otherwise a whole word of the
+    author must equal a truth surname, so "Dennis C. Ang" finds "Ang"
+    (Session 41, bug 4b). Two or more matching surnames: no guess.
+    """
+    import re
     a = str(author or "").strip().casefold()
-    for name, entry in truth["studies"].items():
+    studies = truth["studies"]
+    for name, entry in studies.items():
         if name.casefold() == a:
             return name, entry
+    words = set(re.findall(r"[^\W\d_]+(?:['-][^\W\d_]+)*", a))
+    hits = [(name, entry) for name, entry in studies.items()
+            if name.casefold() in words]
+    if len(hits) == 1:
+        return hits[0]
     return None, None
 
 

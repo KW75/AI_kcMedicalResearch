@@ -53,17 +53,22 @@ def _caps(host, name):
     return {"completion", "vision"} if name == "gemma4:e4b" else {"completion"}
 
 
-def _run(launcher, inputs, *, exe=EXE, version="0.40.11", rc=0, run_exc=None):
+def _run(launcher, inputs, *, exe=EXE, version="0.40.11", rc=0, run_exc=None,
+         models=None, caps=None):
+    """Run local_ai_menu with everything faked. models / caps default to
+    MODELS / _caps; pass them to fake a different set of pulled models."""
     result = MagicMock(returncode=rc)
     with patch.object(launcher, "_ollama_exe", return_value=exe), \
          patch.object(launcher, "ollama_version", return_value=version), \
-         patch.object(launcher, "list_ollama_models", return_value=MODELS), \
-         patch.object(launcher, "model_capabilities", side_effect=_caps), \
+         patch.object(launcher, "list_ollama_models",
+                      return_value=MODELS if models is None else models), \
+         patch.object(launcher, "model_capabilities", side_effect=caps or _caps), \
          patch.object(launcher, "safe_input", side_effect=inputs) as fake_input, \
          patch.object(launcher.subprocess, "run", return_value=result,
                       side_effect=run_exc) as fake_run:
         launcher.local_ai_menu()
     return fake_input, fake_run
+
 
 
 def _default(path):
@@ -183,3 +188,44 @@ def test_ctrl_c_during_download_is_handled(launcher, env_path, capsys):
     assert "stopped" in capsys.readouterr().out.lower()
     assert fake_input.call_count == 4
     assert not env_path.exists()
+
+
+# --- vision models for SR / OCR (Session 42) ---------------------------------
+
+def test_status_lists_pulled_vision_models(launcher, capsys):
+    _run(launcher, ["0"])
+    assert "Vision models (SR/OCR): gemma4:e4b" in capsys.readouterr().out
+
+
+def test_status_says_none_when_no_vision_model_is_pulled(launcher, capsys):
+    _run(launcher, ["0"], caps=lambda host, name: {"completion"})
+    out = capsys.readouterr().out
+    assert "Vision models (SR/OCR): none - use 2 to pull one" in out
+
+
+def test_pull_prompt_points_to_vision_models(launcher, capsys):
+    _run(launcher, ["2", "", "0"])
+    assert "https://ollama.com/search?c=vision" in capsys.readouterr().out
+
+
+def test_pull_of_vision_model_says_sr_and_ocr_will_list_it(launcher, capsys):
+    _run(launcher, ["2", "gemma4:e4b", "y", "", "0"])
+    out = capsys.readouterr().out
+    assert "gemma4:e4b can read images - SR and OCR will list it." in out
+
+
+def test_pull_of_text_model_says_sr_and_ocr_will_not_list_it(launcher, capsys):
+    _run(launcher, ["2", "qwen3:4b", "y", "", "0"])
+    out = capsys.readouterr().out
+    assert "qwen3:4b cannot read images - SR and OCR will not list it." in out
+
+
+def test_failed_pull_does_not_report_vision(launcher, capsys):
+    _run(launcher, ["2", "nosuch:model", "y", "0"], rc=1)
+    assert "read images" not in capsys.readouterr().out
+
+
+def test_make_default_prompt_says_it_applies_to_all_modes(launcher):
+    fake_input, _ = _run(launcher, ["2", "qwen3:4b", "y", "", "0"])
+    assert "all modes" in _prompts(fake_input)
+

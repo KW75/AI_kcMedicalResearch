@@ -113,3 +113,27 @@ def test_domain4_rule_is_high_outright_for_unblinded_self_report():
     assert 'judge "High"' in p
     assert "4.5 Probably yes" in p
     assert 'or "High" if' not in p, "old Some concerns/High split still in the rule"
+
+def test_labels_mean_risk_of_bias_not_quality():
+    """Session 41 rerun 20261114_184026: gemma4:e4b rated randomisation High
+    for all 5 while describing adequate methods ('sealed envelopes, which
+    meets criteria for high risk') and reported_result High because results
+    were 'clearly reported'. It read High as high quality."""
+    p = rt.rob2_prompt(OUTCOME)
+    assert "RISK OF BIAS, not study quality" in p
+    assert '"Low" = low risk' in p and '"High" = high risk' in p
+    assert "label must match its justification" in p
+
+
+def test_adequate_methods_map_to_low():
+    p = rt.rob2_prompt(OUTCOME)
+    assert "sealed opaque envelopes" in p and 'Domain 1 "Low"' in p
+    assert 'Domain 5 "Low"' in p
+    assert '"clearly reported" is never a reason for "High"' in p
+
+
+def test_label_rule_keeps_template_and_domain4_rule():
+    p = rt.rob2_prompt(OUTCOME)
+    assert '"randomisation":"Low|Some concerns|High"' in p
+    assert 'judge "High"' in p and 'or "High" if' not in p
+    assert "{" not in rt._ROB2_RULES and "}" not in rt._ROB2_RULES

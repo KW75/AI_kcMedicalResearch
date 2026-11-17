@@ -187,3 +187,26 @@ def test_report_with_no_records_names_no_folder(tmp_path):
                 tmp_path, logs.append)
     assert not any(line.startswith("Done:") for line in logs)
     assert any("No records written" in line for line in logs)
+
+
+# --- shared vision picker (Session 42, decision A) ---------------------------
+
+def test_no_vision_model_message_points_to_setup(tmp_path):
+    logs = []
+    result = cli.run(_base(tmp_path), input_fn=_answers(),
+                     list_fn=fake_list, caps_fn=lambda host, name: {"completion"},
+                     log=logs.append)
+    assert result is None
+    assert any("ollama pull gemma4:e4b" in line for line in logs)
+    assert any("10 Setup -> 2 Local AI" in line for line in logs)
+
+
+def test_model_question_uses_shared_picker_lines(tmp_path, monkeypatch):
+    monkeypatch.delenv("OLLAMA_MODEL", raising=False)
+    logs = []
+    eng = FakeEngine()
+    cli.run(_base(tmp_path), input_fn=_answers("Scan", ""),
+            list_fn=fake_list, caps_fn=fake_caps,
+            run_single=eng.single, run_set=eng.set, log=logs.append)
+    assert any("gemma4:e4b  7.5B  6.6 GB  Image/OCR: yes" in line for line in logs)
+    assert eng.calls[0][4] == "gemma4:e4b"

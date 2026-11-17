@@ -194,10 +194,11 @@ PROVIDERS = [
     ('6', 'Anthropic', 'Claude vision',           '--provider anthropic'),
 ]
 
-VISION_PROVIDERS  = {'qwen', 'openai', 'anthropic', 'groq'}
-BLOCKED_FOR_SR    = {'ollama', 'deepseek'}
 OCR_PROVIDERS     = {'ollama', 'qwen', 'openai'}
 BLOCKED_FOR_OCR   = {'groq', 'deepseek', 'anthropic'}
+# Session 40: SR uses the same lists as OCR (local Ollama first).
+SR_PROVIDERS      = OCR_PROVIDERS
+BLOCKED_FOR_SR    = BLOCKED_FOR_OCR
 
 
 _MODE_INPUT_MAP = {
@@ -493,7 +494,7 @@ def pick_provider(mode_flag: str = '') -> str:
                 prow  = (f'  {FRAME}│{RESET}  {INFO}{key}{RESET}  '
                          f'{INFO}{name:<12}{RESET}  {INFO}{desc:<26}{RESET}'
                          f'{badge}{FRAME}│{RESET}')
-            elif (is_sr and prov_id in VISION_PROVIDERS) or (is_ocr and prov_id in OCR_PROVIDERS):
+            elif (is_sr and prov_id in SR_PROVIDERS) or (is_ocr and prov_id in OCR_PROVIDERS):
                 badge = f'{GOOD}{"+ vision":<{BADGE_W}}{RESET}'
                 prow  = (f'  {FRAME}│{RESET}  {ACCENT}{key}{RESET}  '
                          f'{TEXT}{name:<12}{RESET}  {INFO}{desc:<26}{RESET}'
@@ -507,9 +508,9 @@ def pick_provider(mode_flag: str = '') -> str:
         print()
 
         if is_sr:
-            print(f'  {WARN}⚠  SR Pipeline requires a vision-capable provider.{RESET}')
-            print(f'  {INFO}   Supported: {GOOD}qwen, openai, anthropic, groq{RESET}')
-            print(f'  {INFO}   Blocked:   {ERR}ollama, deepseek{RESET}')
+            print(f'  {WARN}!  SR needs a provider that can read page images.{RESET}')
+            print(f'  {INFO}   Supported: {GOOD}ollama (vision model), qwen, openai{RESET}')
+            print(f'  {INFO}   Blocked:   {ERR}groq, deepseek, anthropic{RESET}')
             print()
 
         if is_ocr:
@@ -541,13 +542,8 @@ def pick_provider(mode_flag: str = '') -> str:
 
         if is_sr and prov_id in BLOCKED_FOR_SR:
             print()
-            print(f'  {ERR}x  "{prov_id}" does not support the vision API.{RESET}')
-            print(f'  {INFO}  The SR pipeline extracts data from PDF images -{RESET}')
-            print(f'  {INFO}  a vision-capable model is required.{RESET}')
-            print()
-            print(f'  {GOOD}  Supported vision providers:{RESET}')
-            for p in sorted(VISION_PROVIDERS):
-                print(f'     {GOOD}.{RESET}  {TEXT}{p}{RESET}')
+            print(f'  {ERR}x  {prov_id} cannot read page images for SR.{RESET}')
+            print(f'  {GOOD}  Use: ollama (local), qwen or openai.{RESET}')
             print()
             safe_input(f'  {INFO}Press Enter to choose again...{RESET}')
             continue
@@ -560,7 +556,7 @@ def pick_provider(mode_flag: str = '') -> str:
             safe_input(f'  {INFO}Press Enter to choose again...{RESET}')
             continue
 
-        if prov_id == 'ollama' and not is_ocr:
+        if prov_id == 'ollama' and not (is_ocr or is_sr):
             model = pick_ollama_model()
             if model:
                 return f'{prov_flag} --model {model}'
@@ -583,11 +579,21 @@ def _find_move_destination(mode: str) -> Path:
     return fallback
 
 
+# Session 43: run settings stay in input/<mode>/ - moving study_overrides.yaml
+# out would pool numbers the reviewer never checked.
+_KEEP_IN_INPUT = {'study_overrides.yaml', 'prisma_criteria.yaml'}
+
+
+def _keep_in_input(name: str) -> bool:
+    """Run settings never move: overrides, criteria, pico_*.json (Session 43)."""
+    return name in _KEEP_IN_INPUT or (name.startswith('pico_') and name.endswith('.json'))
+
+
 def check_input_folder(mode: str) -> None:
     input_dir = BASE / "input" / mode
     if not input_dir.exists():
         return
-    files = [f for f in input_dir.iterdir() if f.is_file()]
+    files = [f for f in input_dir.iterdir() if f.is_file() and not _keep_in_input(f.name)]
     if not files:
         return
 
@@ -600,12 +606,18 @@ def check_input_folder(mode: str) -> None:
     print()
     print(f'  {TEXT}Were these files intentionally placed here for this run?{RESET}')
 
+    # Session 43: drop keys typed while busy; Enter keeps, only N moves.
+    try:
+        import ollama_models
+        ollama_models.flush_keyboard()
+    except Exception:
+        pass
     ans = safe_input(
-        f'  {ACCENT}>> Keep them? [Y = keep  /  N = move out]: {RESET}',
-        default='N',
+        f'  {ACCENT}>> Keep them? [Enter/Y = keep  /  N = move out]: {RESET}',
+        default='Y',
     ).strip().upper()
 
-    if ans == 'Y':
+    if ans != 'N':
         print(f'  {GOOD}✓  Files kept - they will be used in this session.{RESET}')
         return
 
@@ -827,6 +839,7 @@ def _change_default_model(models: list) -> None:
 def _pull_model(exe: str) -> None:
     print()
     print(f'  {INFO}Find model names at https://ollama.com/search (e.g. qwen3:4b).{RESET}')
+    print(f'  {INFO}Vision models (needed for SR and OCR): https://ollama.com/search?c=vision{RESET}')
     name = safe_input(f'  {ACCENT}>> Model to pull (Enter to cancel): {RESET}')
     if not name:
         print(f'  {INFO}Cancelled.{RESET}')
@@ -852,7 +865,11 @@ def _pull_model(exe: str) -> None:
         print(f'  {ERR}Download failed (ollama exit code {rc}). Check the name at https://ollama.com/search.{RESET}')
         return
     print(f'  {ACCENT}{name} is ready.{RESET}')
-    answer = safe_input(f'  {ACCENT}>> Make {name} the default model? [y/N]: {RESET}')
+    if 'vision' in model_capabilities(None, name):
+        print(f'  {ACCENT}{name} can read images - SR and OCR will list it.{RESET}')
+    else:
+        print(f'  {WARN}{name} cannot read images - SR and OCR will not list it.{RESET}')
+    answer = safe_input(f'  {ACCENT}>> Make {name} the default model for all modes (incl. Writing)? [y/N]: {RESET}')
     if answer.lower() in ('y', 'yes'):
         _save_default_model(name)
 
@@ -883,6 +900,11 @@ def local_ai_menu() -> None:
         print()
         print(f'  {TEXT}Ollama {version} - running{RESET}')
         print(f'  {TEXT}Default model: {default} ({state}){RESET}')
+        vision = [m['name'] for m in models if 'vision' in model_capabilities(None, m['name'])]
+        if vision:
+            print(f'  {TEXT}Vision models (SR/OCR): {", ".join(vision)}{RESET}')
+        else:
+            print(f'  {WARN}Vision models (SR/OCR): none - use 2 to pull one{RESET}')
         _warn_if_system_ollama_model()
         print()
         print(f'  {ACCENT}1{RESET}  {TEXT}Change default model{RESET}')

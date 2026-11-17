@@ -61,6 +61,12 @@ NONDET_FLAG_SINGLE_RUN = "single_run"
 # like no_majority. Three-of-four alone is NOT enough: the 1-s2.0 paper
 # jittered three fields by one digit (0.85/0.95, 0.92/0.82) with no shift.
 NONDET_FLAG_TABLE_SHIFT = "table_shift"
+# `mixed_runs` (Session 41): each field is voted on its own, so majorities from
+# different pairs of runs can build a set no single run read (20261114_184026
+# Karlsson: mean_control 48.8 from run 1, the rest ~3.6 from runs 2-3). Added
+# when no run holds every chosen numeric value; the F4 gate treats it like
+# table_shift. no_majority still keeps run 1's value.
+NONDET_FLAG_MIXED_RUNS = "mixed_runs"
 
 
 def _sampling_defaults_from_env():
@@ -193,6 +199,12 @@ SOURCE_QUOTE_WARNING_BRANCHES = (
     "verbatim_mismatch",
 )
 
+# Session 41 bug a: only one of the N runs returned any mean/SD, so nothing
+# was compared. Mandatory like table_shift (audit_logger), cleared by all four
+# means/SDs in study_overrides.yaml.
+NONDET_FLAG_TOO_FEW_RUNS = "too_few_runs"
+
+
 class DataExtractor:
     def __init__(self, pico_criteria: Optional[dict] = None,
                  pico_outcome: Optional[str] = None,
@@ -219,37 +231,35 @@ class DataExtractor:
         self.pico = pico_criteria or {}
         self.outcome = pico_outcome or self.pico.get("outcome")
 
-        # --- Vision support check ---
-        # Only these providers support vision API
-        vision_providers = ["qwen", "openai", "anthropic", "groq"]
-        if self.provider not in vision_providers:
+        # --- Provider check (Session 40): same list as OCR / main.SR_PROVIDERS ---
+        sr_providers = ("ollama", "qwen", "openai")
+        if self.provider not in sr_providers:
             raise ValueError(
-                f" - Provider '{self.provider}' does NOT support vision API.\n"
-                "The SR pipeline requires vision-based extraction (images of PDF pages).\n\n"
-                "Supported providers for SR mode:\n"
-                "   - qwen     (recommended) - Qwen vision model\n"
-                "   - openai   - GPT-4 vision\n"
-                "   - anthropic - Claude vision\n"
-                "   - groq     - Vision models available\n\n"
-                "Please use one of the supported providers:\n"
-                "  python src/main.py --mode sr --provider qwen"
+                f"Provider '{self.provider}' cannot be used for SR extraction. "
+                "Use --provider ollama (local vision model), qwen or openai."
             )
 
         if not self.outcome:
             logger.warning("DataExtractor: no review outcome specified")
 
-        if self.provider == "anthropic":
-            self.client = anthropic.Anthropic(
-                api_key=api_key or os.environ["ANTHROPIC_API_KEY"])
+        if self.provider == "ollama":
+            # Local: every call goes through providers.call_ollama_provider.
+            self.client = None
         else:
             from openai import OpenAI
             from ..screening.rob2_tool import _openai_compat_creds
             _key, _base = _openai_compat_creds(self.provider, api_key)
             self.client = OpenAI(api_key=_key, base_url=_base)
 
+        # Session 41 (4c): Ollama calls send OLLAMA_TEMPERATURE (providers),
+        # not self.temperature; log the value that is actually sent.
+        _log_temp = self.temperature
+        if self.provider == "ollama":
+            import providers
+            _log_temp = providers.ollama_temperature()
         logger.info("[SAMPLING] provider=%s model=%s temperature=%s seed=%s "
                     "n_agreement=%s",
-                    self.provider, self.model, self.temperature, self.seed,
+                    self.provider, self.model, _log_temp, self.seed,
                     self.n_agreement)
 
     def _sampling_kwargs(self) -> dict:
@@ -1251,7 +1261,8 @@ class DataExtractor:
         return None
 
     def _flag_suspect_source_quotes(self, result: dict,
-                                    source_text: str = None) -> dict:
+                                    source_text: str = None,
+                                    require_source_text: bool = False) -> dict:
         """Deterministic tripwire for Known Issue #48."""
         if not isinstance(result, dict):
             return result
@@ -1327,7 +1338,13 @@ class DataExtractor:
                         f"from the intended timepoint (#64)")
 
 
-            if source_text:
+            # Session 41 empty-text gap: production calls require paper text;
+            # without it the quote is unverified, not clean (branch 5).
+            if require_source_text and not str(source_text or "").strip():
+                warnings_found.append(
+                    f"{arm} source quote could not be checked against the "
+                    f"paper text - no paper text was available")
+            elif source_text:
                 if not self._quote_in_source(quote, source_text):
                     warnings_found.append(
                         f"{arm} source quote was not found verbatim in the "
@@ -1442,7 +1459,13 @@ class DataExtractor:
         return x is not None and abs(x - target) <= tol
 
     def _mirror_study_metadata(self, result: dict) -> None:
-        """Copy resolved first_author/year into the nested study_metadata block."""
+        """Copy resolved first_author/year into the nested study_metadata block.
+
+        Session 41 (bug 4a): the resolved top-level value (reviewer override,
+        PDF lookup or paper block) replaces a different model value in
+        study_metadata, which is what the pooled row reads. Rule: reviewer >
+        PDF lookup > model. A replacement is logged as [METADATA].
+        """
         if not isinstance(result, dict):
             return
 
@@ -1451,9 +1474,43 @@ class DataExtractor:
             sm = {}
             result["study_metadata"] = sm
 
+        overridden = str(result.get("override_fields") or "").split("; ")
         for field in ("first_author", "year"):
-            if self._missing_like_value(sm.get(field)) and not self._missing_like_value(result.get(field)):
-                sm[field] = result[field]
+            top = result.get(field)
+            if self._missing_like_value(top):
+                continue
+            old = sm.get(field)
+            if self._missing_like_value(old):
+                sm[field] = top
+            elif not self._same_meta_value(old, top):
+                source = ("study_overrides.yaml" if field in overridden
+                          else result.get("metadata_source") or "resolved value")
+                logger.warning(
+                    "[METADATA] %s: %s %r from the model replaced by %r (%s)",
+                    result.get("filename", "?"), field, old, top, source)
+                sm[field] = top
+
+        # Session 43 (item 22, F13 c): labels use the surname only; the full
+        # name stays in study_metadata["first_author_full"].
+        from .study_overrides import _first_author_from_string
+        full = sm.get("first_author")
+        if not self._missing_like_value(full):
+            short = _first_author_from_string(full)
+            if short and short != str(full).strip():
+                sm["first_author_full"] = full
+                sm["first_author"] = short
+                if self._same_meta_value(result.get("first_author"), full):
+                    result["first_author"] = short
+                logger.info("[AUTHOR] %s: label %r -> %r (full name kept)",
+                            result.get("filename", "?"), full, short)
+
+    @staticmethod
+    def _same_meta_value(a, b) -> bool:
+        """2017, "2017" and 2017.0 are the same; names compare case-insensitively."""
+        try:
+            return float(a) == float(b)
+        except (TypeError, ValueError):
+            return str(a).strip().casefold() == str(b).strip().casefold()
 
     @property
     def _study_overrides(self):
@@ -1491,6 +1548,13 @@ class DataExtractor:
                     result["year"] = paper.get(key)
                     break
 
+        # Session 41 (bug 4a): reviewer overrides first, so a reviewer's
+        # first_author / year fills the field before the PDF lookup does.
+        try:
+            self._study_overrides.apply(result, filename or result.get("filename") or "")
+        except Exception as exc:
+            logger.warning("Study override application failed for %s: %s", filename, exc)
+
         needs_meta = (
             self._missing_like_value(result.get("first_author"))
             or self._missing_like_value(result.get("year"))
@@ -1510,11 +1574,6 @@ class DataExtractor:
                         )
             except Exception as exc:
                 logger.warning("PDF metadata resolution failed for %s: %s", filename, exc)
-
-        try:
-            self._study_overrides.apply(result, filename or result.get("filename") or "")
-        except Exception as exc:
-            logger.warning("Study override application failed for %s: %s", filename, exc)
 
         self._mirror_study_metadata(result)
         return result
@@ -1745,7 +1804,11 @@ for that field - NOT the quoted string "null".
         )
 
     def _call_chat_api_with_prompt(self, prompt: str, max_tokens: int = 256) -> str:
-        """Send an arbitrary text-only prompt via the OpenAI-compatible client."""
+        """Send a text-only prompt (Ollama, or the OpenAI-compatible client)."""
+        if self.provider == "ollama":
+            import providers  # lazy
+            return providers.call_ollama_provider(
+                prompt, model=self.model, max_tokens=max_tokens).strip()
         resp = self.client.chat.completions.create(
             model=self.model,
             messages=[{"role": "user", "content": prompt}],
@@ -1797,7 +1860,12 @@ for that field - NOT the quoted string "null".
         return result
 
     def _call_text_api(self, extracted_text: str, filename: str = "") -> str:
-        """Send extracted PDF text to the chat-completions client as a fallback."""
+        """Send extracted PDF text to the AI as a fallback (Ollama or cloud)."""
+        if self.provider == "ollama":
+            import providers  # lazy
+            return providers.call_ollama_provider(
+                self._text_extraction_prompt(extracted_text, filename),
+                model=self.model, max_tokens=4096).strip()
         resp = self.client.chat.completions.create(
             model=self.model,
             messages=[
@@ -1891,6 +1959,11 @@ for that field - NOT the quoted string "null".
 
         if self._looks_like_table_shift(keys, chosen_idx, detail, n):
             flag.append(NONDET_FLAG_TABLE_SHIFT)
+        # Session 41: no single run holds every chosen number -> mixed_runs.
+        num = [f for f in AGREEMENT_NUMERIC_FIELDS if f in chosen_idx]
+        if num and not any(all(keys[f][j] == keys[f][chosen_idx[f]] for f in num)
+                           for j in range(n)):
+            flag.append(NONDET_FLAG_MIXED_RUNS)
 
         # Base run = the one that already holds the chosen value most often.
         score = [sum(1 for f, i in chosen_idx.items() if keys[f][i] == keys[f][j])
@@ -1928,16 +2001,31 @@ for that field - NOT the quoted string "null".
             if isinstance(r, dict) and self._has_usable_extraction_result(r):
                 runs.append(r)
             else:
-                logger.info("[AGREEMENT] %s run %d/%d unusable",
-                            filename, i + 1, self.n_agreement)
+                logger.info("[AGREEMENT] %s run %d/%d unusable (%s)",
+                            filename, i + 1, self.n_agreement, answer_snippet(raw))
         if not runs:
             return None, [], {}, 0
+        # Session 41 bug a: a run with no mean/SD (only outcome_match / Ns)
+        # counted as usable and its Nones broke the vote (Lami, run
+        # 20261114_202253: [13.68, None, None] -> no_majority + table_shift,
+        # usable_runs 3). Vote only runs with numbers; if none has numbers,
+        # keep the old behaviour (Stage 4 skips the study for missing data).
+        numeric = [r for r in runs if any(
+            self._agreement_key(f, r.get(f)) is not None
+            for f in ("mean_intervention", "sd_intervention",
+                      "mean_control", "sd_control"))]
+        if numeric and len(numeric) < len(runs):
+            logger.info("[AGREEMENT] %s: %d run(s) without any mean/SD left "
+                        "out of the vote", filename, len(runs) - len(numeric))
+            runs = numeric
         if self.n_agreement == 1:
             return runs[0], [NONDET_FLAG_SINGLE_RUN], {}, 1
 
         result, flag, detail = self._vote_runs(runs)
         if len(runs) < self.n_agreement:
             flag.append(f"usable_runs:{len(runs)}/{self.n_agreement}")
+        if len(runs) < 2:
+            flag.append(NONDET_FLAG_TOO_FEW_RUNS)
         logger.info("[AGREEMENT] %s: %d/%d usable runs, nondet_flag=%s",
                     filename, len(runs), self.n_agreement, flag or "[]")
         for f, d in detail.items():
@@ -1948,10 +2036,18 @@ for that field - NOT the quoted string "null".
 
     def _call_vision_api(self, base64_images: list, prompt: str) -> str:
         """Send images to vision API."""
-        if self.provider not in ["qwen", "openai", "anthropic", "groq"]:
+        if self.provider == "ollama":
+            # Session 40: local vision model via providers.call_ollama_provider
+            # (sets num_ctx from OLLAMA_CONTEXT). It takes PNG bytes; max 5 pages.
+            import base64 as _b64
+            import providers  # lazy, like pipelines/ocr/engine.py
+            pngs = [_b64.b64decode(img) for img in base64_images[:5]]
+            return providers.call_ollama_provider(
+                prompt, model=self.model, max_tokens=4096, images=pngs).strip()
+        if self.provider not in ["qwen", "openai"]:
             raise RuntimeError(
-                f" - Provider '{self.provider}' does NOT support vision API.\n"
-                "Please use --provider qwen (recommended), openai, anthropic, or groq."
+                f"Provider '{self.provider}' cannot read page images for SR. "
+                "Use --provider ollama (local), qwen or openai."
             )
 
         content = [{"type": "text", "text": prompt}]
@@ -2090,7 +2186,7 @@ for that field - NOT the quoted string "null".
                     result.pop(key, None)
 
             result = self._flag_suspect_source_quotes(
-                result, source_text=text_payload or paper_text)
+                result, source_text=text_payload or paper_text, require_source_text=True)
 
             result.update({
                 "file_id": None,
@@ -2113,10 +2209,48 @@ for that field - NOT the quoted string "null".
                 "participants": {}
             }
 
+    def _reviewer_excluded_row(self, filename):
+        """Session 47 (item i): row for a study the reviewer excluded
+        (exclude_from_meta), built without calling the model.
+
+        Run 20261117_201642 spent ~10.6 min extracting Ang, then left it out
+        of the meta-analysis. apply() stays the only writer of
+        reviewer_exclusion; author/year are copied into study_metadata, which
+        is where the pooling loop reads them. Any error -> None, and the
+        study is extracted as usual: overrides must never stop a run.
+        """
+        try:
+            ov = self._study_overrides
+            entry = ov.lookup(filename) if ov is not None else None
+            if not entry or not str(entry.get("exclude_from_meta") or "").strip():
+                return None
+            result = {"filename": filename,
+                      "extraction_method": "skipped_reviewer_exclusion"}
+            ov.apply(result, filename)
+            if not result.get("reviewer_exclusion"):
+                return None
+            result["study_metadata"] = {"first_author": result.get("first_author"),
+                                        "year": result.get("year")}
+        except Exception as e:
+            logger.warning(f"[EXCLUDED] could not check {filename} for "
+                           f"exclude_from_meta ({e}); extracting as usual")
+            return None
+        a, y = result.get("first_author"), result.get("year")
+        label = f"{a} ({y})" if a and y else (str(a) if a else filename)
+        logger.warning(f"[EXCLUDED] {label}: skipped AI extraction "
+                       f"(exclude_from_meta in study_overrides.yaml)")
+        return result
+
     def extract_batch(self, included_records, delay_seconds=2.0) -> list[dict]:
         results = []
         for i, r in enumerate(included_records, 1):
             logger.info(f"[EXTRACT {i}/{len(included_records)}] {r['filename']}")
+
+            # Session 47 (item i): reviewer-excluded study -> no model call.
+            skipped = self._reviewer_excluded_row(r["filename"])
+            if skipped is not None:
+                results.append(skipped)
+                continue
 
             if self.provider == "anthropic":
                 results.append(self._extract_anthropic(
@@ -2225,10 +2359,18 @@ for that field - NOT the quoted string "null".
 
             result.setdefault("extraction_method", "anthropic_file")
 
-            result = self._flag_suspect_source_quotes(result, source_text=paper_text)
+            result = self._flag_suspect_source_quotes(result, source_text=paper_text, require_source_text=True)
 
             result.update({"file_id": file_id, "filename": filename,
                            "extraction_error": None})
             return result
         except Exception as e:
             return {"file_id": file_id, "filename": filename, "extraction_error": str(e)}
+
+
+def answer_snippet(raw) -> str:
+    """Length and first 200 characters of a model answer, for the
+    [AGREEMENT] 'unusable' line (Session 42: run 20261115_230933 said
+    'unusable' 21 times without showing what came back)."""
+    text = raw if isinstance(raw, str) else ("" if raw is None else str(raw))
+    return f"answer {len(text)} chars: {text[:200]!r}"

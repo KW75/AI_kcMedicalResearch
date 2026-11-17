@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 # error rows and on the Anthropic path where no vote runs.
 NONDET_CELL_UNANIMOUS = "unanimous"
 NONDET_CELL_NOT_CHECKED = "not_checked"
-NONDET_MANDATORY_MARKERS = ("no_majority", "table_shift")
+NONDET_MANDATORY_MARKERS = ("no_majority", "table_shift", "mixed_runs", "too_few_runs")
 
 
 def nondet_flag_to_cell(flag) -> str:
@@ -58,31 +58,209 @@ def _overridden_fields(override_fields) -> set:
     return names
 
 
-def review_skip_reason(cell, override_fields=None):
+# Session 41 option B (quote gate): page-image numbers whose source quote is
+# not in the paper text need review. Run 20261114_202253 pooled Karlsson with
+# a misread all N=3 runs agreed on; a vote cannot catch that.
+QUOTE_NOT_FOUND_MARKER = "was not found verbatim"
+# Session 41 empty-text gap: a missing quote, or one that could not be checked
+# because no paper text was available, is as unverified as one not found.
+QUOTE_GATE_MARKERS = (QUOTE_NOT_FOUND_MARKER,
+                      "no source quote provided",
+                      "could not be checked against the paper text")
+QUOTE_GATE_TOKEN = "quote_not_found"
+QUOTE_GATE_REASON = ("needs review: source quote not found (quote_not_found) - "
+                     "numbers read from page images; verify all four means/SDs "
+                     "against the PDF and enter them in "
+                     "input/sr/study_overrides.yaml with a source-page note")
+# Session 43 (item 6): the other two quote-gate cases get their own wording;
+# same token (quote_not_found), same tail, cleared the same way.
+QUOTE_MISSING_MARKER = "no source quote provided"
+QUOTE_UNCHECKED_MARKER = "could not be checked against the paper text"
+_QUOTE_TAIL = ("numbers read from page images; verify all four means/SDs "
+               "against the PDF and enter them in "
+               "input/sr/study_overrides.yaml with a source-page note")
+QUOTE_MISSING_REASON = ("needs review: no source quote given (quote_not_found) - "
+                        + _QUOTE_TAIL)
+QUOTE_UNCHECKED_REASON = ("needs review: source quote not checked - no paper "
+                          "text (quote_not_found) - " + _QUOTE_TAIL)
+# Session 42 item 3: a mean/SD that is not in its own source quote, although
+# the quote itself was found. Run 20261114_224231: Ang's control mean/SD; only
+# table_shift kept Ang out. The marker is the tail of the mean/SD warning
+# (data_extractor branch 2), which the F8 N warning does not contain:
+# overriding means/SDs cannot fix an N.
+NUMBER_NOT_IN_QUOTE_MARKER = "the quote does not support this number"
+NUMBER_GATE_TOKEN = "number_not_in_quote"
+NUMBER_GATE_REASON = ("needs review: a mean/SD is not in its own source quote "
+                      "(number_not_in_quote) - numbers read from page images; verify "
+                      "all four means/SDs against the PDF and enter them in "
+                      "input/sr/study_overrides.yaml with a source-page note")
+
+# Session 42: too_few_runs has its own reason - with one usable run nothing
+# could disagree (run 20261115_213016, Lami). Cleared like table_shift.
+TOO_FEW_RUNS_REASON = ("needs review: too few usable runs (too_few_runs) - only one "
+                       "reading returned numbers, so nothing could be compared; "
+                       "verify against the PDF, or enter all four means/SDs in "
+                       "input/sr/study_overrides.yaml with a source-page note")
+
+
+def means_sds_overridden(override_fields) -> bool:
+    """True when a reviewer entered all four means/SDs (same rule as the gate)."""
+    done = _overridden_fields(override_fields)
+    return all(f in done for f in _REVIEW_NUMERIC_FIELDS)
+
+
+# Session 47 (item f): code-side outcome check. The model set outcome_match
+# True for PCS, FIQ, NFR and MPQ in runs 20261116_214126, 20261116_230750 and
+# 20261117_232734, so the "outcome_match is False" gate never fired.
+import re as _oc_re
+
+OUTCOME_MISMATCH_TOKEN = "outcome_mismatch"
+_OC_OTHER = _oc_re.compile(
+    r"catastroph|\bpcs\b|\bnfr\b|threshold|toleran|interfer|disabilit|"
+    r"depress|anxi|sleep|fatigue|quality of life|\bqol\b|physical function|\bmood\b",
+    _oc_re.I)
+_OC_FIQ = _oc_re.compile(r"\bfiq\b|fibromyalgia impact", _oc_re.I)
+_OC_PAIN = _oc_re.compile(r"\bpain\b", _oc_re.I)
+_OC_QUAL = _oc_re.compile(
+    r"intensit|severit|\bvas\b|\bnrs\b|\bscore\b|\b0\s*[-\u2013]\s*100?\b", _oc_re.I)
+
+
+def outcome_check(selected, pico_outcome):
+    """(status, detail) for outcome_selected against the PICO outcome.
+
+    match: names pain AND how it was measured (intensity, severity, VAS, NRS,
+    score, 0-10/0-100). mismatch: another measure (checked first, so "Pain
+    catastrophizing" is not a match), or the whole FIQ without its pain item.
+    unclear: bare "Pain", MPQ, or nothing recorded. not_checked: the PICO
+    outcome is not pain intensity/severity.
+    """
+    pico = str(pico_outcome or "")
+    if not (_OC_PAIN.search(pico) and _oc_re.search(r"intensit|severit", pico, _oc_re.I)):
+        return "not_checked", "review outcome is not pain intensity/severity"
+    sel = str(selected or "").strip()
+    if not sel:
+        return "unclear", "outcome_selected not recorded"
+    m = _OC_OTHER.search(sel)
+    if m:
+        return "mismatch", f"'{sel}' looks like another measure ({m.group(0).lower()}), not pain intensity"
+    if _OC_FIQ.search(sel) and not _OC_PAIN.search(sel):
+        return "mismatch", f"'{sel}' is the whole FIQ, not its pain item"
+    if _OC_PAIN.search(sel) and _OC_QUAL.search(sel):
+        return "match", ""
+    return "unclear", f"'{sel}' does not say how pain was measured"
+
+
+def outcome_mismatch_reason(selected, pico_outcome, override_fields=None):
+    """Gate reason for a mismatch; None otherwise or when all four means/SDs were overridden."""
+    status, detail = outcome_check(selected, pico_outcome)
+    if status != "mismatch":
+        return None
+    if override_fields and means_sds_overridden(override_fields):
+        return None
+    return (f"needs review: outcome does not match the review outcome "
+            f"({OUTCOME_MISMATCH_TOKEN}) - {detail}; verify against the PDF, or enter "
+            f"all four means/SDs in input/sr/study_overrides.yaml with a source-page note")
+
+
+def split_quote_flagged(rows):
+    """Rows with a source-quote warning -> (still flagged, cleared by override).
+
+    Session 42: run 20261115_213016 still asked to verify Karlsson after the
+    reviewer override of all four means/SDs had cleared quote_not_found.
+    """
+    flagged, cleared = [], []
+    for r in rows:
+        if not r.get("source_quote_warning"):
+            continue
+        if means_sds_overridden(r.get("override_fields")):
+            cleared.append(r)
+        else:
+            flagged.append(r)
+    return flagged, cleared
+
+
+def split_agreement_cleared(rows):
+    """Rows with a mandatory nondet flag -> (still mandatory, cleared by override).
+
+    Session 46 (item h): same rule as the pooling gate - review_skip_reason
+    with the flag and override_fields only (quote warnings are
+    [SOURCE QUOTE CHECK]'s job). Run 20261117_201642 pooled Lami (2018) with
+    reviewer values, but the [AGREEMENT] summary still listed it [MANDATORY].
+    Rows with only majority flags are never cleared: the gate never held
+    them back.
+    """
+    still, cleared = [], []
+    for r in rows:
+        cell = r.get("nondet_flag")
+        if not nondet_cell_is_mandatory(cell):
+            continue
+        if review_skip_reason(cell, r.get("override_fields")) is None:
+            cleared.append(r)
+        else:
+            still.append(r)
+    return still, cleared
+
+
+def skip_label(row) -> str:
+    """'Author (year)' for log lines; the file name when author/year are
+    missing (run 20261115_230933 printed 'Skip study: None (None)').
+    Session 42."""
+    author, year = row.get("first_author"), row.get("year")
+    if author and year:
+        return f"{author} ({year})"
+    if author:
+        return str(author)
+    return row.get("filename") or "unknown study"
+
+
+def review_skip_reason(cell, override_fields=None, quote_warning=None,
+                       extraction_method=None):
     """F4 gate: None = may be pooled; str = keep OUT of the pooled estimate.
 
     A mandatory nondet flag (no_majority / table_shift) means the N runs read
     different table cells; baseline 20261110_120707 pooled Jensen and Lami
     with numbers that are not in the PDFs. The row passes only if a reviewer
-    overrode every flagged field (table_shift: all four means/SDs).
+    overrode every flagged field (table_shift / mixed_runs: all four means/SDs).
     """
     cell = cell or ""
-    if not nondet_cell_is_mandatory(cell):
-        return None
     done = _overridden_fields(override_fields)
-    still_open = []
-    for tok in (t.strip() for t in cell.split("|")):
-        if tok == "table_shift":
-            if not all(f in done for f in _REVIEW_NUMERIC_FIELDS):
-                still_open.append(tok)
-        elif tok.endswith(":no_majority"):
-            if tok.split(":", 1)[0] not in done:
-                still_open.append(tok)
-    if not still_open:
-        return None
-    return ("needs review: runs disagree (" + "|".join(still_open) + ") - "
-            "verify against the PDF, or enter the values in "
-            "input/sr/study_overrides.yaml with a source-page note")
+    reasons = []
+    if nondet_cell_is_mandatory(cell):
+        still_open = []
+        too_few = False
+        for tok in (t.strip() for t in cell.split("|")):
+            if tok == "too_few_runs":
+                if not all(f in done for f in _REVIEW_NUMERIC_FIELDS):
+                    too_few = True
+            elif tok in ("table_shift", "mixed_runs"):
+                if not all(f in done for f in _REVIEW_NUMERIC_FIELDS):
+                    still_open.append(tok)
+            elif tok.endswith(":no_majority"):
+                if tok.split(":", 1)[0] not in done:
+                    still_open.append(tok)
+        if still_open:
+            reasons.append(
+                "needs review: runs disagree (" + "|".join(still_open) + ") - "
+                "verify against the PDF, or enter the values in "
+                "input/sr/study_overrides.yaml with a source-page note")
+        if too_few:
+            reasons.append(TOO_FEW_RUNS_REASON)
+    # Quote gates (quote_not_found, number_not_in_quote): text-path studies
+    # keep today's behaviour; a missing method counts as page images (safe
+    # side). Both are cleared by all four means/SDs.
+    page_images = not str(extraction_method or "").startswith("text")
+    all_four = all(f in done for f in _REVIEW_NUMERIC_FIELDS)
+    warn = str(quote_warning or "")
+    if page_images and not all_four:
+        if QUOTE_NOT_FOUND_MARKER in warn:
+            reasons.append(QUOTE_GATE_REASON)
+        if QUOTE_MISSING_MARKER in warn:
+            reasons.append(QUOTE_MISSING_REASON)
+        if QUOTE_UNCHECKED_MARKER in warn:
+            reasons.append(QUOTE_UNCHECKED_REASON)
+        if NUMBER_NOT_IN_QUOTE_MARKER in warn:
+            reasons.append(NUMBER_GATE_REASON)
+    return "; also: ".join(reasons) or None
 
 
 def _write_csv(path: Path, rows: list[dict], fieldnames: list[str]) -> None:
