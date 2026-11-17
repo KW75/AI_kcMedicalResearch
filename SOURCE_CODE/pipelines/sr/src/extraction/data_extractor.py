@@ -2209,10 +2209,48 @@ for that field - NOT the quoted string "null".
                 "participants": {}
             }
 
+    def _reviewer_excluded_row(self, filename):
+        """Session 47 (item i): row for a study the reviewer excluded
+        (exclude_from_meta), built without calling the model.
+
+        Run 20261117_201642 spent ~10.6 min extracting Ang, then left it out
+        of the meta-analysis. apply() stays the only writer of
+        reviewer_exclusion; author/year are copied into study_metadata, which
+        is where the pooling loop reads them. Any error -> None, and the
+        study is extracted as usual: overrides must never stop a run.
+        """
+        try:
+            ov = self._study_overrides
+            entry = ov.lookup(filename) if ov is not None else None
+            if not entry or not str(entry.get("exclude_from_meta") or "").strip():
+                return None
+            result = {"filename": filename,
+                      "extraction_method": "skipped_reviewer_exclusion"}
+            ov.apply(result, filename)
+            if not result.get("reviewer_exclusion"):
+                return None
+            result["study_metadata"] = {"first_author": result.get("first_author"),
+                                        "year": result.get("year")}
+        except Exception as e:
+            logger.warning(f"[EXCLUDED] could not check {filename} for "
+                           f"exclude_from_meta ({e}); extracting as usual")
+            return None
+        a, y = result.get("first_author"), result.get("year")
+        label = f"{a} ({y})" if a and y else (str(a) if a else filename)
+        logger.warning(f"[EXCLUDED] {label}: skipped AI extraction "
+                       f"(exclude_from_meta in study_overrides.yaml)")
+        return result
+
     def extract_batch(self, included_records, delay_seconds=2.0) -> list[dict]:
         results = []
         for i, r in enumerate(included_records, 1):
             logger.info(f"[EXTRACT {i}/{len(included_records)}] {r['filename']}")
+
+            # Session 47 (item i): reviewer-excluded study -> no model call.
+            skipped = self._reviewer_excluded_row(r["filename"])
+            if skipped is not None:
+                results.append(skipped)
+                continue
 
             if self.provider == "anthropic":
                 results.append(self._extract_anthropic(
