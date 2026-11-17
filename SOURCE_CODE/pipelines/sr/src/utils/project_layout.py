@@ -114,6 +114,22 @@ class SRProjectLayout:
         shutil.copy2(src, dst_dir / src.name)
 
     def mirror_all(self) -> None:
-        r"""Mirror every finished output file to output\sr\."""
+        r"""Mirror every finished output file to output\sr\.
+
+        Session 47 (item e): a file this run did not produce is removed from
+        the mirror, so output\sr\ never mixes an old DOCX/PDF/plot with a new
+        HTML (run 20261116_214126). Only these four names are touched.
+        """
+        import logging
+        log = logging.getLogger(__name__)
         for f in (self.forest_png, self.docx, self.html, self.pdf):
-            self.mirror(f)
+            if f.exists():
+                self.mirror(f)
+                continue
+            dst = (OUTPUT_FIGURES if f.suffix.lower() == ".png" else OUTPUT_REPORTS) / f.name
+            if dst.exists():
+                try:
+                    dst.unlink()
+                    log.info(f"[MIRROR] removed stale {dst} (not produced by this run)")
+                except OSError as e:
+                    log.warning(f"[MIRROR] could not remove stale {dst}: {e}")
