@@ -262,6 +262,33 @@ def _log_review_sensitivity(rows, review_rows, effect_measure, resolved=None):
     return ma
 
 
+OVERRIDES_COPY_NAME = "study_overrides_used.yaml"
+
+
+def _save_overrides_used(layout, overrides):
+    """Session 45 (item c): keep a copy of the overrides file this run used
+    in data/extracted/, next to extracted_data.csv. No entries = no copy.
+    A failed copy warns; it must not stop the run."""
+    import shutil
+    entries = getattr(overrides, "entries", None) or {}
+    path = getattr(overrides, "path", None)
+    if not entries or not path:
+        logger.info("[OVERRIDES] none loaded - AI values only; "
+                    "no overrides copy in the run folder.")
+        return None
+    dst = Path(layout.extracted) / OVERRIDES_COPY_NAME
+    try:
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(path, dst)
+    except OSError as exc:
+        logger.warning(f"[OVERRIDES] could not copy {path} to the run "
+                       f"folder: {exc}")
+        return None
+    logger.info(f"[OVERRIDES] copied {path} ({len(entries)} entries) "
+                f"to {dst}")
+    return dst
+
+
 _POOLED_TARGET = "this pooled estimate"
 _NOT_POOLED_TARGET = "these values (no pooled estimate in this run)"
 
@@ -766,18 +793,21 @@ def main():
 
     # Stage 3: Extraction
     logger.info("=== STAGE 3: Extraction ===")
-    er = DataExtractor(
+    extractor = DataExtractor(
         pico_criteria = cfg.get("pico", {}),
         model         = args.model,
         provider      = args.provider,
         n_agreement   = args.n_agreement,
-    ).extract_batch(included)
+    )
+    er = extractor.extract_batch(included)
 
     for _r in er:
         if isinstance(_r, dict):
             _r.setdefault("run_id", _run_id)
 
     write_extracts(layout.extracted_csv, er)
+    # Session 45 (item c): record the reviewer values this run used.
+    _save_overrides_used(layout, getattr(extractor, "_study_overrides", None))
 
     # Stage 3.5: RoB 2.0
     logger.info("=== STAGE 3.5: RoB 2.0 Assessment ===")
