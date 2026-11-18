@@ -19,8 +19,8 @@ pytest-cov>=4.0.0
 pywin32>=312; platform_system == "Windows"
 
 # --- OCR is OPTIONAL and NOT installed here -------------------------------
-# document_reader.py and rag.py import pytesseract / easyocr / cv2 /
-# pdf2image inside try/except and degrade gracefully when absent.
+# rag.py and the SR pipeline import pytesseract. The base install
+# runs without the OCR stack.
 #
 # The OCR stack pulls PyTorch via easyocr (~2 GB) and also needs system
 # binaries that pip cannot install (Tesseract, Poppler).

@@ -77,7 +77,6 @@ sys.path.insert(0, str(SOURCE_CODE_DIR))
 try:
     # Now imports work from SOURCE_CODE/
     from utils.path_utils import PATH_MANAGER, get_input_dir, get_output_dir
-    # from utils.rag import RAGUtils (functions imported directly)
 
     # NOTE: run_coding, run_writing, run_search, and run_sr used to be imported
     # here unconditionally, but nothing in this file ever calls them - every
