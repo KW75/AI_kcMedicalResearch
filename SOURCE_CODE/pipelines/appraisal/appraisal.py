@@ -259,7 +259,7 @@ def _appraiser_user_prompt(
         "## Task\n"
         "Produce a complete critical appraisal report following the mandatory "
         "7-section structure defined in your guidelines. "
-        "End with a plain-language summary of  - 200 words. "
+        "End with a plain-language summary of at most 200 words. "
         "Append the disclosure statement at the very end."
     )
 
@@ -318,10 +318,19 @@ def _write_session_summary(
 # ---------------------------------------------------------------------------
 # Public entry point
 # ---------------------------------------------------------------------------
+# Ollama's context (num_ctx, default 32768 tokens) holds prompt + answer.
+# Same budget as writing.SYNOPSIS_LOCAL_MAX_CHARS: 8192 tokens kept for the
+# answer leaves ~90,000 characters; the guidelines (~3,300) and the task
+# fit in the rest. One AI call per article, so a local run skips only the
+# article that is too large (Session 48). Cloud runs are not limited.
+APPRAISAL_LOCAL_MAX_CHARS = 80_000
+
+
 def run_appraisal(
     direct_instructions: list,
     call_llm_fn: Callable,
     verbose: bool = True,
+    local: bool = False,
 ) -> None:
     root      = _project_root()
     paths     = _paths(root)
@@ -340,7 +349,15 @@ def run_appraisal(
 
     print(f"\n  [APPRAISAL] Found {len(input_files)} article(s) to appraise.\n")
 
+    skipped: list[str] = []
     for stem, content, suffix in input_files:
+        if local and len(content) > APPRAISAL_LOCAL_MAX_CHARS:
+            print(f"  [APPRAISAL] {stem}{suffix}: {len(content):,} characters"
+                  f" - too large for local AI (limit "
+                  f"{APPRAISAL_LOCAL_MAX_CHARS:,}). Skipped.")
+            print("  Use a cloud provider for this article, or shorten it.")
+            skipped.append(f"{stem}{suffix}")
+            continue
         if verbose:
             print(f"  {'='*56}")
             print(f"  Appraising: {stem}{suffix}")
@@ -371,7 +388,11 @@ def run_appraisal(
         session_log.append({"stem": stem, "ts": timestamp})
 
     _write_session_summary(paths["reports"], timestamp, session_log)
-    print(f"\n  [APPRAISAL] Done. {len(session_log)} article(s) processed.")
+    msg = f"\n  [APPRAISAL] Done. {len(session_log)} article(s) processed"
+    if skipped:
+        msg += (f", {len(skipped)} skipped (too large for local AI): "
+                + ", ".join(skipped))
+    print(msg + ".")
     print("  Check output/appraisal/ for reports and reports/appraisal/ for logs.\n")
 
 
