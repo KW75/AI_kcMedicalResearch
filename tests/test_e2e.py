@@ -56,7 +56,7 @@ class TestE2EWritingReport:
     def _run(tmp_path, **kwargs):
         """Input and output both point into tmp_path, so the test never reads
         input/writing/ or docs/writing/ and never writes output/writing/
-        (Session 48: OUTPUT_WRITING was not patched and reports_dir is unused)."""
+        (Session 48: OUTPUT_WRITING is the only output folder)."""
         in_dir = tmp_path / "input"
         in_dir.mkdir()
         (in_dir / "note.txt").write_text("Short test document.", encoding="utf-8")
@@ -66,7 +66,6 @@ class TestE2EWritingReport:
              patch("SOURCE_CODE.main.OUTPUT_WRITING", out_dir):
             md_path = generate_writing_report(
                 docs_dir=tmp_path / "docs",
-                reports_dir=tmp_path,
                 provider="ollama",
                 input_dir=in_dir,
                 **kwargs,

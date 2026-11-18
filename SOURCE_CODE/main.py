@@ -974,7 +974,6 @@ def _ranked_articles_to_docx(
 
 def generate_writing_report(
     docs_dir: Path = DOCS_WRITING,
-    reports_dir: Path = REPORTS_DIR,
     provider: str = "deepseek",
     model: str | None = None,
     input_dir: Path | None = None,
