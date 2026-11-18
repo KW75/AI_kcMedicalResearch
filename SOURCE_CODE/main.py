@@ -2692,6 +2692,7 @@ def run_cli(args: argparse.Namespace) -> None:
             BASE_DIR, model=args.model, provider=args.provider,
             confirm=lambda p: confirm_data_destinations(
                 "ocr", p, confirm_cloud=args.confirm_cloud),
+            kind="ask",  # Session 48: several files -> Papers / Synopsis
         )
     elif args.mode == "appraisal":
         handle_appraisal_mode(
