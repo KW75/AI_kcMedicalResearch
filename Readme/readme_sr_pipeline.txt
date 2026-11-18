@@ -68,9 +68,10 @@ pipeline is built around one rule:
       Word/HTML report. Nothing disappears without a recorded reason
       (PRISMA 2020 item 13a).
 
-  P2. Repeat, then compare. Extraction is run several times on the same
-      paper. Agreement is evidence; disagreement is a flag, never averaged
-      away.
+  P2. Repeat, then compare - but agreement alone is not proof.
+      Extraction is run several times on the same paper. Disagreement is
+      a flag, never averaged away. A model can also make the same misread
+      in every run, so agreed numbers still pass the code checks (P3).
 
   P3. Deterministic checks around a non-deterministic model. The model does
       the reading; plain code (no AI) checks the result: does the number
@@ -146,6 +147,9 @@ pipeline is built around one rule:
   Why the bias toward INCLUDE: an excluded study is lost for good; a wrongly
   included study is caught later, at extraction and at the pooling gate.
   When in doubt, the screener includes.
+  Results never decide eligibility: a trial with a null or unfavourable
+  result is still included if it measured the outcome. Excluding trials
+  on their results would bias the review.
   No silent drops: a paper that failed for a technical reason (API error) or
   was left UNCERTAIN is not treated as excluded. It is counted in a separate
   [SCREENING] block, and the pooled estimate carries a reminder that papers
@@ -162,12 +166,12 @@ pipeline is built around one rule:
   printed.
   Why repeated runs: the same model, asked the same question, can give
   different numbers. Extraction is therefore run several times (default 3)
-  and each field is decided by majority. The disagreement itself is
-  recorded as a flag:
-    no_majority  - the runs gave different values for a field
-    table_shift  - a run read the neighbouring row of a table (for example
-                   "Interference" instead of "Pain severity")
-    single_run   - only one usable answer, so no agreement was possible
+  and each field is decided by majority. Any disagreement - different
+  values, a neighbouring table row, a set of numbers no single run read,
+  or too few usable runs - is recorded as a flag, not hidden.
+  Which model: the app's general default (gemma4:e4b) is too small for
+  reliable SR extraction, so a local SR run uses its own larger vision
+  model by default (qwen3-vl:30b-a3b-instruct).
   Why a verbatim quote: it binds each number to a place in the paper, so
   both code (3.5) and a reviewer can check where it came from.
 
@@ -185,6 +189,10 @@ pipeline is built around one rule:
        tolerates case, punctuation, spacing and OCR marks; a table row
        counts as found if its numbers appear in the same order nearby. A
        reworded sentence still warns. (Catches the invented Lami quotes.)
+    6. Outcome check - the outcome the model chose is compared with the
+       review outcome by plain word rules, because the model's own
+       "outcome matches" answer was wrong on several papers (for example
+       it accepted pain catastrophizing as pain intensity).
   Plus: possible SE-reported-as-SD detection from the size of the SD
   relative to N, and missing Ns derived from the text where possible.
   Why: these errors are the most common ways a correct-looking extraction
@@ -199,6 +207,10 @@ pipeline is built around one rule:
   The pipeline records each entry as changed (AI value -> reviewer value),
   confirmed (reviewer agreed with the AI), or a decision without a value
   (for example "leave out of the meta-analysis" with the reason).
+  A copy of the corrections used is saved with each run, so every result
+  can be traced to the corrections behind it. A study the reviewer has
+  already excluded is not sent to the model at all. Study author and year
+  follow a fixed priority: reviewer, then the PDF, then the model.
   Why: the reviewer's work becomes part of the run's data, is version
   controlled, and is reproducible. The reports list reviewer-entered values
   separately, so a published review can state honestly which numbers were
@@ -208,11 +220,13 @@ pipeline is built around one rule:
   Ang 2010, reported narratively).
 
 3.7 The pooling gate: which studies enter the estimate
-  What: a study whose runs disagreed (no_majority, table_shift) is kept OUT
-  of the primary pooled estimate, unless the reviewer has entered every
-  flagged field. Such a study still gets its effect size calculated, and the
-  log shows a second, comparison-only estimate that includes it
-  ([SENSITIVITY]). Studies released by a reviewer's override are named.
+  What: a study is kept OUT of the primary pooled estimate until a human
+  resolves it, when its runs disagreed, too few runs were usable, a
+  number could not be tied to a quote in the paper, or its outcome does
+  not match the review outcome. The reviewer releases it by entering the
+  values checked against the PDF; released studies are named in the log.
+  A held-back study still gets its effect size, and the log shows a
+  second, comparison-only estimate that includes it.
   Why: this gate exists because of a real failure. Before it, run
   20261110_120707 pooled Jensen and Lami with numbers that do not appear in
   the PDFs. Both carried disagreement flags, but flags were only logged.
@@ -296,6 +310,8 @@ pipeline is built around one rule:
       [SENSITIVITY] and [SUBGROUP] line
   If a report format cannot be produced (for example PDF without its
   library), the run summary states why instead of silently skipping it.
+  Reports are also copied to output/sr. A report left there by an earlier
+  run is removed, so old and new results are never mixed.
 
 
 ------------------------------------------------------------------------------
@@ -315,10 +331,14 @@ pipeline is built around one rule:
     - Before the pooling gate (run 20261110_120707): the hand-checked
       studies that were pooled were all wrong; values not in the PDFs
       entered the estimate. This is what a pipeline without checks does.
-    - Current pipeline (run 20261112_222233): 4 studies checked, 4 fully
-      correct, 0 pooled with a wrong value; 4 of 5 pooled (Ang left out by
-      a recorded reviewer decision).
-    - The model alone on the same run: 0 of 4 studies fully correct.
+    - Earlier reference run (20261112_222233): 4 studies checked, 4 fully
+      correct, 0 pooled with a wrong value; the model alone 0 of 4.
+    - Current pipeline (runs 20261117_155621, 20261117_201642 and
+      20261117_232734): the same result in all three runs - 4 of 4
+      correct, 0 pooled with a wrong value, 4 of 5 pooled (Ang left out
+      by a recorded reviewer decision). The model alone: 1 of 4.
+    - The model's misreads repeat from run to run, which is why agreement
+      between runs is not trusted on its own (P2).
 
   How to read this: the model on its own was not reliable on these papers.
   The pipeline's value is that it found where the model was wrong, kept
@@ -377,17 +397,21 @@ pipeline is built around one rule:
     intensity after treatment). Accuracy on other topics is not yet
     measured.
   - A human reviewer is still required. On the test papers, the model alone
-    got no study fully right; correct pooled values depended on reviewer
-    checks that the pipeline asked for.
+    got at most 1 of 4 studies fully right; correct pooled values depended
+    on reviewer checks that the pipeline asked for.
   - Extraction reads page images. Corrections made in the shared paper text
     do not change extraction; use study_overrides.yaml.
   - Screening reads the start of each paper only (up to 6000 characters).
   - Subgroup results with few studies are exploratory.
-  - SR runs on a local Ollama vision model (default gemma4:e4b), or on qwen /
-    openai after the cloud warning. Local accuracy is not yet checked against
-    the reference set; check every value against the PDF.
-    If the local model cannot read images, the launcher offers qwen / openai
-    (API key set) behind the [CLOUD] banner and a typed y.
+  - SR runs locally on a larger vision model by default
+    (qwen3-vl:30b-a3b-instruct, about 20 GB, slow on a normal PC), or on
+    qwen / openai after the cloud warning. The app's general default,
+    gemma4:e4b, is too small for reliable SR extraction. Check every
+    value against the PDF.
+  - Runs can agree on the same wrong number; agreement lowers the risk
+    but does not remove it.
+  - The outcome check is written for pain intensity outcomes; for other
+    review questions the reviewer checks the outcome by hand.
   - PDF reports need an extra library; Word and HTML reports are always
     produced.
 
@@ -412,7 +436,8 @@ What happened at each step (reference run 20261112_222233):
 
   Screening   5 of 5 INCLUDE; identical decisions in 4 separate runs.
 
-  Extraction  The model alone got 0 of 4 hand-checked studies fully right.
+  Extraction  The model alone got 0 of 4 hand-checked studies fully right
+              (1 of 4 in later runs).
               The errors were found by the checks in section 3.5 or by the
               pooling gate (3.7), and corrected by the reviewer from the PDF:
     Ang       NOT POOLED (reviewer decision). Table 2 is the NFR pain rating
@@ -435,6 +460,7 @@ What happened at each step (reference run 20261112_222233):
   Result      4 of 5 pooled. Hedges g: Jensen -0.437, Karlsson 0.226,
               Lami -0.029, McCrae -0.227. Pooled SMD -0.103
               [-0.365, 0.159], I2 = 0.0%, k = 4. The 95% CI includes zero.
+              Same pooled result in the three later runs.
 
   The gate at work: the earlier run 20261111_190839, made before the
   reviewer had verified Jensen, pooled only 3 studies (SMD -0.042
@@ -444,11 +470,11 @@ What happened at each step (reference run 20261112_222233):
   Accuracy    Scored against the hand-checked truth file (section 4):
               4 checked, 4 fully correct, 0 pooled with a wrong value.
 
-  RoB 2       Overall High for all 5 trials, the same in 4 runs.
+  RoB 2       Overall High for all 5 trials (domain 4, measurement of the
+              outcome, is High for each); reviewer to confirm.
 
-  Subgroups   Added after this run (Session 39), not yet seen in a run.
-              Expected on these data: waiting list (Jensen, Karlsson,
-              McCrae) k = 3, pooled; usual care (Lami) k = 1, not pooled;
-              Ang in no group (not pooled).
+  Subgroups   Waiting list (Jensen, Karlsson, McCrae) k = 3, SMD -0.132
+              [-0.488, 0.224], I2 = 21.7%; usual care (Lami) k = 1, not
+              pooled; Ang in no group.
 
 How to rerun the example: see the Help page (Readme/flashcard-help.html).
