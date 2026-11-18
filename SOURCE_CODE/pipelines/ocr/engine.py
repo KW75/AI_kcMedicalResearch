@@ -455,6 +455,24 @@ def _vote_pages(done, hybrid, log):
                                "hybrid_unresolved" if left == total else "hybrid_partial")
 
 
+def _keep_full_text(out_dir, header: str, source_name: str, summary: str,
+                    full: str):
+    """Session 48: last resort when the record cannot be saved - keep the
+    pages read and [?] filled in a plain <header>_FULLTEXT.txt (short name,
+    no Word). Returns the path, or None if even this fails."""
+    try:
+        out = Path(out_dir)
+        out.mkdir(parents=True, exist_ok=True)
+        p, n = out / f"{header}_FULLTEXT.txt", 2
+        while p.exists():  # Synopsis: files share one header
+            p, n = out / f"{header}_FULLTEXT_{n}.txt", n + 1
+        p.write_text(f"Source: {source_name}\n\n## Summary\n{summary}\n\n"
+                     f"## Full text\n{full}\n", encoding="utf-8")
+        return p
+    except Exception:
+        return None
+
+
 def _process_file(path: Path, out_dir, header: str, model: str, call, log,
                   rec_dir=None) -> str:
     """Read one file, transcribe image pages, summarise, write the record."""
@@ -506,8 +524,18 @@ def _process_file(path: Path, out_dir, header: str, model: str, call, log,
         summary = (f"[Summary not written: {exc}. The full text below is "
                    "complete. Raise OLLAMA_CONTEXT or use a model with a "
                    "larger context.]")
-    output.write_record(out_dir, header, path.name, summary, done, model,
-                        rec_dir=rec_dir)
+    except Exception as exc:  # Session 48: timeout etc. must not lose the fills
+        log(f"    WARNING: summary not written: {exc}")
+        summary = (f"[Summary not written: {exc}. The full text below is "
+                   "complete.]")
+    try:
+        output.write_record(out_dir, header, path.name, summary, done, model,
+                            rec_dir=rec_dir)
+    except Exception:
+        kept = _keep_full_text(out_dir, header, path.name, summary, full)
+        if kept:
+            log(f"    WARNING: record not saved; full text kept in {kept}")
+        raise
     return summary
 
 
@@ -563,12 +591,12 @@ def run_set(folder, out_dir, name: str, model: str, call=None, now=None,
     body = "\n\n".join(f"### {n}\n{s}" for n, s in summaries)
     try:
         synopsis = _summarise(SYNOPSIS_PROMPT, body, call, log)
-    except TooLongError as exc:
+    except Exception as exc:  # Session 48: TooLongError, timeout, lost connection
         log(f"    WARNING: synopsis not written: {exc}")
         synopsis = (f"[Synopsis not written: {exc}. The summary of each "
                     f"file follows.]\n\n{body}")
     if result["failed"]:
-        synopsis += ("\n\nNot included (could not be read): "
+        synopsis += ("\n\nNot included (failed): "
                      + ", ".join(n for n, _ in result["failed"]))
     result["summary"] = output.write_summary(out_dir, header, "SYNOPSIS",
                                              synopsis, model)
