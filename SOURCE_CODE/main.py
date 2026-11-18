@@ -798,9 +798,8 @@ def show_stats(reports_dir: str = str(REPORTS_DIR)) -> None:
 def _read_docx(path: Path) -> str:
     """Extract plain text from a .docx file using python-docx."""
     try:
-        import docx as _docx
-        doc = _docx.Document(str(path))
-        return "\n".join(p.text for p in doc.paragraphs if p.text.strip())
+        from pipelines.shared.doc_reader import read_docx  # Session 48: + tables
+        return read_docx(path)
     except Exception as exc:  # noqa: BLE001
         return f"[Could not read DOCX: {exc}]"
 
@@ -812,7 +811,14 @@ def _read_pdf_pymupdf(path: Path, max_chars: int = 30_000) -> str:
         doc  = fitz.open(str(path))
         text = "\n\n".join(page.get_text() for page in doc)
         doc.close()
-        return text[:max_chars]
+        if len(text) > max_chars:
+            # Session 48: no silent cut - say how much was not read.
+            more = len(text) - max_chars
+            print(f"WARNING: {Path(path).name}: text cut at {max_chars} "
+                  f"characters ({more} more not read).")
+            return (text[:max_chars] + f"\n\n[Text cut at {max_chars} "
+                    f"characters: {more} more not read]")
+        return text
     except Exception as exc:  # noqa: BLE001
         return f"[Could not read PDF: {exc}]"
 

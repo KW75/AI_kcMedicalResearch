@@ -209,8 +209,8 @@ def _load_input_files(input_dir: Path) -> list:
         stem   = f.stem
         if suffix == ".docx":
             try:
-                doc = Document(str(f))
-                content = "\n".join(p.text for p in doc.paragraphs)
+                from pipelines.shared.doc_reader import read_docx  # S48: + tables
+                content = read_docx(f)
             except Exception:
                 content = f"[Could not read {f.name}]"
         elif suffix == ".pdf":
