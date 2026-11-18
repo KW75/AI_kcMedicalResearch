@@ -18,8 +18,6 @@ SOURCE_CODE_DIR = PROJECT_ROOT / "SOURCE_CODE"
 sys.path.insert(0, str(SOURCE_CODE_DIR))
 
 from utils.path_utils import PATH_MANAGER, get_input_dir, get_output_dir
-from utils.document_reader import DocumentReader
-from utils.rag import RAGUtils
 
 # Project paths
 BASE = PROJECT_ROOT
