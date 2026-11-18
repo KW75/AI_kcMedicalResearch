@@ -71,14 +71,14 @@ files. Above 80,000 characters it stops before sending anything,
 writes nothing, and says so on screen. Unreadable files are skipped.
 A cloud provider has no such check.
 
-Topic, Article and Report have NO size check at present. On a local
-AI the whole prompt must fit the model's context window
-(OLLAMA_CONTEXT, 32,768 tokens by default) together with room for the
-answer. A very long input file (roughly above 80,000 characters) may
-not fit. Ollama then drops the start of the prompt without an error,
-and the guidelines come first. The draft can look normal while
-ignoring them. Until a check is added, use a cloud provider or a
-shorter file for long inputs.
+Topic, Article and Report on a local AI check each input file on its
+own against the same 80,000-character limit. The whole prompt must
+fit the model's context window (OLLAMA_CONTEXT, 32,768 tokens by
+default) together with room for the answer; if it does not, Ollama
+drops the start of the prompt without an error, and the guidelines
+come first. A file over the limit is therefore skipped with a message
+on screen, and the other files are still written. A cloud provider
+has no such check. Writing from instructions alone is not affected.
 
 The separate --report option reads input through the general reader,
 which cuts a PDF at 30,000 characters. The cut is marked in the text
@@ -115,7 +115,8 @@ is correct.
 2. Check every number, name, date and claim against the source.
 3. Check that every reference exists and says what the draft says.
 4. For PDFs, check that tables and symbols came through (section 4).
-5. On local AI, keep one-pass input files short (section 5).
+5. On local AI, a one-pass file over 80,000 characters is skipped
+   (section 5); check the screen for Skipped lines.
 6. The named human author is responsible for the final text.
 
 Legacy note: an older three-step chain (writer, editor, QA) is still

@@ -841,6 +841,7 @@ def run_one_pass(
     word_limit: int | None = None,
     verbose: bool = True,
     use_files: bool = True,
+    local: bool = False,
 ) -> None:
     
     """Write (or revise) and review in a single AI call per input.
@@ -850,6 +851,9 @@ def run_one_pass(
     instructions alone (files are ignored, never moved or deleted).
     Saves to output/writing/: the document (.docx + .md) and the review
     (_REVIEW.md). Nothing is written to reports/writing/.
+    local=True (Ollama): a file larger than SYNOPSIS_LOCAL_MAX_CHARS is
+    skipped with a message, so the guidelines are not pushed out of the
+    context window; the other files are still written.
     """
     root      = _project_root()
     paths     = _paths(root)
@@ -867,6 +871,12 @@ def run_one_pass(
     subprojects = [("new_doc", "", ".md")] if is_scratch else input_files
 
     for stem, original_content, _suffix in subprojects:
+        if local and len(original_content) > SYNOPSIS_LOCAL_MAX_CHARS:
+            print(f"\n  [WRITING | {track.upper()}] {stem}: "
+                  f"{len(original_content):,} characters - too large for "
+                  f"local AI (limit {SYNOPSIS_LOCAL_MAX_CHARS:,}). Skipped. "
+                  "Use a cloud provider or a shorter file.")
+            continue
         if verbose:
             print(f"\n{'='*60}")
             print(f"  [WRITING | {track.upper()}] {stem}")
