@@ -1951,7 +1951,8 @@ def handle_appraisal_mode(
         lines.append(line)
 
     direct = _pdi("\n".join(lines))
-    run_appraisal(direct, _call_llm_fn, verbose=True)
+    run_appraisal(direct, _call_llm_fn, verbose=True,
+                  local=(provider == "ollama"))  # Session 48: size limit
 
 
 # ---------------------------------------------------------------------------
