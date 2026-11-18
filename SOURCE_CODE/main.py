@@ -1880,18 +1880,21 @@ def handle_coding_mode(
             direct_instructions=direct_instructions,
             call_llm_fn=_call_llm_fn,
             verbose=True,
+            local=(provider == "ollama"),
         )
     elif sub_mode == "Reviewer":
         run_reviewer(
             direct_instructions=direct_instructions,
             call_llm_fn=_call_llm_fn,
             verbose=True,
+            local=(provider == "ollama"),
         )
     elif sub_mode == "Tester":
         run_tester(
             direct_instructions=direct_instructions,
             call_llm_fn=_call_llm_fn,
             verbose=True,
+            local=(provider == "ollama"),
         )
 
     # Clear checkpoint on successful completion
