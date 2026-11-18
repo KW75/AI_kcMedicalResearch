@@ -4,7 +4,7 @@ A multi-mode AI assistant for medical research, critical appraisal, systematic r
 
 
     Version: 2.6.0
-    Tests: 1634 passed, 10 deselected
+    Tests: 1638 passed, 10 deselected
            (reproduce with `python -m pytest -m "not live" --tb=short -q`)
     CI: GitHub Actions - Green
     GitHub: https://github.com/KW75/AI_kcMedicalResearch
@@ -214,8 +214,8 @@ reported - agreement is stability, not correctness.
 Run directly (not via the launcher menu) so the interactive PICO prompts get a
 real TTY. Outputs:
 
-    reports/sr/<run_id>/    # systematic_review.docx/.html, forest_plot.png, audit CSVs
-    output/sr/figures/      # mirror of forest_plot.png
+    reports/sr/<run_id>/    # systematic_review.docx/.html, forest_plot.png, forest_plot_subgroups.png, audit CSVs
+    output/sr/figures/      # mirror of forest_plot.png, forest_plot_subgroups.png
     output/sr/reports/      # mirror of report files
 
 ### Tripwire columns in `results_csv`
