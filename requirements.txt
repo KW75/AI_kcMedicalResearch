@@ -22,8 +22,8 @@ pywin32>=312; platform_system == "Windows"
 # rag.py and the SR pipeline import pytesseract. The base install
 # runs without the OCR stack.
 #
-# The OCR stack pulls PyTorch via easyocr (~2 GB) and also needs system
-# binaries that pip cannot install (Tesseract, Poppler).
+# The OCR stack needs system binaries that pip cannot install
+# (Tesseract, Poppler).
 #
 # To enable OCR:
 #     pip install -r requirements-ocr.txt
