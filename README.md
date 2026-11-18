@@ -125,6 +125,14 @@ The launcher asks for it after the model (Enter = 15 minutes).
 | Appraisal  | `--mode appraisal`  | Appraiser, Methodologist, Summariser |
 | SR         | `--mode sr`         | SR Methodologist                     |
 
+Input files for Writing and Appraisal: Word `.docx` tables are read (each
+row as `cell | cell | cell`, in document order); save old `.doc` files as
+`.docx` first. PDF tables arrive as plain text, so their columns can mix
+(PyMuPDF `find_tables` found no usable table in the five SR papers,
+Session 48). For a table whose numbers matter, take a screenshot of it,
+run it through OCR (menu 8, qwen3-vl), put the record next to the paper,
+and check the key numbers against the PDF.
+
 ## Providers
 
 | Provider           | Flag                   | Env variable         | Notes                                       |
