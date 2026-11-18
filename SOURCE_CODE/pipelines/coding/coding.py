@@ -488,6 +488,21 @@ def _build_standalone_report(
 
 MAX_ITERATIONS = 3
 
+# Local AI (Ollama): OLLAMA_CONTEXT 32,768 tokens minus the 8,192-token
+# answer reserve leaves ~24,576 tokens for the prompt. A Builder round
+# carries guidelines (~2,500 tokens with the fixed text), the whole file
+# and up to a full Reviewer/Tester answer (8,192) as feedback. Code is
+# ~3 chars/token, so 40,000 chars (~13,300 tokens) fits. Larger input
+# files are skipped on local runs instead of Ollama silently dropping
+# the start of the prompt (guidelines and instructions).
+CODING_LOCAL_MAX_CHARS = 40_000
+
+
+def _too_large(tag: str, stem: str, n: int) -> str:
+    return (f"[{tag}] {stem}: {n:,} characters - too large for local AI "
+            f"(limit {CODING_LOCAL_MAX_CHARS:,}). Skipped. "
+            "Split the file or use a cloud provider.")
+
 
 # ---------------------------------------------------------------------------
 # Extension detection
@@ -600,6 +615,7 @@ def run_builder(
     direct_instructions: list[str],
     call_llm_fn,
     verbose: bool = True,
+    local: bool = False,
 ) -> None:
     """
     Run the Builder pipeline sub-mode.
@@ -639,6 +655,9 @@ def run_builder(
         ts = _ts()
         if verbose:
             print(f"\n[BUILDER] Subproject {idx}/{len(subprojects)}: {stem}")
+        if local and initial_code is not None and len(initial_code) > CODING_LOCAL_MAX_CHARS:
+            print(_too_large("BUILDER", stem, len(initial_code)))
+            continue
 
         current_code = initial_code
         reviewer_iters_used = 0
@@ -833,6 +852,7 @@ def run_reviewer(
     direct_instructions: list[str],
     call_llm_fn,
     verbose: bool = True,
+    local: bool = False,
 ) -> None:
     """
     Run the Reviewer standalone sub-mode.
@@ -862,6 +882,9 @@ def run_reviewer(
         ts = _ts()
         if verbose:
             print(f"\n[REVIEWER] File {idx}/{len(code_files)}: {stem}")
+        if local and len(code_content) > CODING_LOCAL_MAX_CHARS:
+            print(_too_large("REVIEWER", stem, len(code_content)))
+            continue
 
         user_prompt = _build_reviewer_user_prompt(
             direct_instructions=direct_instructions,
@@ -906,6 +929,7 @@ def run_tester(
     direct_instructions: list[str],
     call_llm_fn,
     verbose: bool = True,
+    local: bool = False,
 ) -> None:
     """
     Run the Tester standalone sub-mode.
@@ -935,6 +959,9 @@ def run_tester(
         ts = _ts()
         if verbose:
             print(f"\n[TESTER] File {idx}/{len(code_files)}: {stem}")
+        if local and len(code_content) > CODING_LOCAL_MAX_CHARS:
+            print(_too_large("TESTER", stem, len(code_content)))
+            continue
 
         user_prompt = _build_tester_user_prompt(
             direct_instructions=direct_instructions,

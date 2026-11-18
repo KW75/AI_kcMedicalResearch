@@ -87,20 +87,29 @@ the content. Files in input/coding/ are never changed.
 
 6. Size limits
 --------------
-There is NO size check in coding mode. Each call sends the guidelines,
-your instructions and the whole file, and Builder must send the whole
-file back.
+Each call sends the guidelines, your instructions and the whole file,
+and Builder must send the whole file back.
 
 On local AI (Ollama) the window is OLLAMA_CONTEXT, 32,768 tokens by
-default. If a prompt is longer, Ollama drops the START of it with no
-message - that is the guidelines and your instructions. A long answer
-can also run out of room; the continuation step (section 2) only
-partly repairs that.
+default, and holds both the prompt and the answer (up to 8,192 tokens).
+If a prompt is longer, Ollama drops the START of it with no message -
+that is the guidelines and your instructions.
 
-Appraisal (PR #20) and writing (PR #26) skip files over 80,000
-characters on local AI. Coding does not yet; this is an open item.
-Until then, on local AI keep input files small (split large modules)
-or use a cloud provider.
+So on local AI, an input file over 40,000 characters is skipped with a
+message ("too large for local AI (limit 40,000). Skipped."); the other
+files still run. Why 40,000, not 80,000 as in appraisal and writing:
+code is about 3 characters per token, and from round 2 a Builder prompt
+carries the whole file plus the last Reviewer/Tester answer (up to
+8,192 tokens). Cloud providers are not limited by this check.
+
+Not covered by the check:
+- Builder's code can grow over the rounds; only the input size is
+  checked.
+- A file over about 24,000 characters cannot come back in one answer.
+  Builder then asks the AI to go on (section 2), and each of those
+  calls sees only the last 800 characters, so the joins can be wrong.
+  Check them.
+- Builder from scratch (no input file) is not checked.
 
 
 7. Known limits
@@ -125,7 +134,7 @@ or use a cloud provider.
    environment - never first on live or patient data.
 4. Never use a _MAXITER_WARNING file as if it had passed.
 5. REVIEW_PASS and TEST_PASS are AI opinions, not proof.
-6. On local AI, keep input files small (section 6).
+6. On local AI, files over 40,000 characters are skipped (section 6).
 7. Keep patient data, passwords and API keys out of input/coding/ and
    docs/coding/, above all with a cloud provider.
 8. The person who uses the code is responsible for it.
