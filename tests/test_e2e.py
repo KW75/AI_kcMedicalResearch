@@ -52,28 +52,46 @@ def _fake_input(responses: list[str]):
 
 class TestE2EWritingReport:
 
-    def test_writing_report_dry_run_creates_output(self, tmp_path):
-        """Writing --report mode reads docs/writing/ and saves a report."""
-        with patch("SOURCE_CODE.main.call_ai", return_value="[MOCK] Writing report content."):
+    @staticmethod
+    def _run(tmp_path, **kwargs):
+        """Input and output both point into tmp_path, so the test never reads
+        input/writing/ or docs/writing/ and never writes output/writing/
+        (Session 48: OUTPUT_WRITING was not patched and reports_dir is unused)."""
+        in_dir = tmp_path / "input"
+        in_dir.mkdir()
+        (in_dir / "note.txt").write_text("Short test document.", encoding="utf-8")
+        out_dir = tmp_path / "output"
+        with patch("SOURCE_CODE.main.call_ai",
+                   return_value="[MOCK] Writing report content."), \
+             patch("SOURCE_CODE.main.OUTPUT_WRITING", out_dir):
             md_path = generate_writing_report(
-                docs_dir=PROJECT_ROOT / "docs" / "writing",
+                docs_dir=tmp_path / "docs",
                 reports_dir=tmp_path,
                 provider="ollama",
-                model=None,
+                input_dir=in_dir,
+                **kwargs,
             )
+        return md_path, out_dir
 
+    def test_writing_report_dry_run_creates_output(self, tmp_path):
+        """Writing --report mode reads the input folder and saves a report."""
+        md_path, _ = self._run(tmp_path, model=None)
         assert md_path.exists(), "Writing report .md file was not created"
         assert md_path.stat().st_size > 0, "Writing report .md file is empty"
 
     def test_writing_report_returns_md_path(self, tmp_path):
         """generate_writing_report returns a Path ending in .md."""
-        with patch("SOURCE_CODE.main.call_ai", return_value="[MOCK] Writing report content."):
-            result = generate_writing_report(
-                docs_dir=PROJECT_ROOT / "docs" / "writing",
-                reports_dir=tmp_path,
-                provider="ollama",
-            )
+        result, _ = self._run(tmp_path)
         assert str(result).endswith(".md")
+
+    def test_writing_report_stays_in_tmp_path(self, tmp_path):
+        """The report is saved under tmp_path; real output/writing/ is untouched."""
+        real = PROJECT_ROOT / "output" / "writing"
+        before = set(real.glob("writing_report_*")) if real.exists() else set()
+        md_path, out_dir = self._run(tmp_path)
+        after = set(real.glob("writing_report_*")) if real.exists() else set()
+        assert md_path.parent == out_dir
+        assert after == before
 
 
 # ---------------------------------------------------------------------------
