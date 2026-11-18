@@ -1113,7 +1113,7 @@ def main():
             ma_result      = ma,
             subgroups      = subgroups,
             effect_measure = args.effect_measure,
-            output_path    = str(layout.figures / "forest_plot_subgroups.png"))
+            output_path    = str(layout.forest_subgroups_png))
     except Exception as _e:
         logger.warning(f"[SUBGROUP] forest plot (all pooled / excluding "
                        f"waiting-list) not drawn ({type(_e).__name__}: {_e})")

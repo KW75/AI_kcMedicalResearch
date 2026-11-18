@@ -6,14 +6,14 @@ Single source of truth for all runtime paths used by the SR pipeline.
 
 Directory contract
 input\sr\                           - user drops PDFs + PICO here
-output\sr\figures\                  - mirror: latest forest plot
+output\sr\figures\                  - mirror: latest forest plots
 output\sr\reports\                  - mirror: latest DOCX / HTML
 reports\sr\<RUN_ID>\
     uploads\                        - copy of every input PDF
     data\screened\                  - screening_log.csv
     data\extracted\                 - extracted_data.csv, rob2_assessment.csv
     data\results\                   - meta_analysis_results.csv
-    output\figures\                 - forest plot (primary copy)
+    output\figures\                 - forest plots (primary copy)
     output\reports\                 - DOCX, HTML (primary copy)
 """
 
@@ -77,6 +77,7 @@ class SRProjectLayout:
         self.rob2_csv       = self.extracted / "rob2_assessment.csv"
         self.results_csv    = self.results   / "meta_analysis_results.csv"
         self.forest_png     = self.figures   / "forest_plot.png"
+        self.forest_subgroups_png = self.figures / "forest_plot_subgroups.png"
         self.docx           = self.reports   / "systematic_review.docx"
         self.html           = self.reports   / "systematic_review.html"
         self.pdf            = self.reports   / "systematic_review.pdf"
@@ -118,11 +119,12 @@ class SRProjectLayout:
 
         Session 47 (item e): a file this run did not produce is removed from
         the mirror, so output\sr\ never mixes an old DOCX/PDF/plot with a new
-        HTML (run 20261116_214126). Only these four names are touched.
+        HTML (run 20261116_214126). Only these five names are touched.
         """
         import logging
         log = logging.getLogger(__name__)
-        for f in (self.forest_png, self.docx, self.html, self.pdf):
+        for f in (self.forest_png, self.forest_subgroups_png,
+                  self.docx, self.html, self.pdf):
             if f.exists():
                 self.mirror(f)
                 continue
