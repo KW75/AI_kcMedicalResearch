@@ -7,8 +7,11 @@ Overview for readers. How to run the pipeline: Readme/flashcard-help.html.
 
 The OCR pipeline turns documents into plain text that can be searched,
 quoted and reused: PDFs, page images (photos, scans, screenshots), .txt
-and .docx files. Each file becomes a text record; the job also writes a
-short summary (one file) or a synopsis (several files).
+and .docx files. Each file becomes a text record. With one file the job
+also writes a short SUMMARY. With several files you choose:
+  - Papers: each file is its own paper, with its own record and SUMMARY.
+  - Synopsis: one record per file plus one SYNOPSIS summarising all
+    papers in the input folder.
 
 The aim is a faithful copy of what is printed, not an interpretation. The
 main risk with AI reading is a confident error: a number, sign or word

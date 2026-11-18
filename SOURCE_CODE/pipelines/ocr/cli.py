@@ -2,7 +2,9 @@
 
 input/ocr/ decides what runs:
   one file      -> function 1: record + <header>_SUMMARY
-  several files -> function 2: every file -> one record each + <header>_SYNOPSIS
+  several files -> menu 8 asks (kind="ask", Session 48):
+    1 Papers   -> function 1 per file: own record + <file name>_SUMMARY
+    2 Synopsis -> function 2: one record each + <header>_SYNOPSIS of all
 Then two questions: scan title/name (header of the output files) and the
 vision model. Checks that need no typing run first, so a job that cannot run
 never asks a question.
@@ -113,9 +115,54 @@ def _offer_cloud(choices, confirm, input_fn, log):
     return provider
 
 
+KIND_MENU = (
+    "  1  Papers   - each file is its own paper: own record + own SUMMARY",
+    "  2  Synopsis - one record each + one SYNOPSIS summarising all papers "
+    "in input/ocr",
+)
+
+
+def _ask_kind(input_fn, log):
+    """Session 48: several files -> Papers or Synopsis. Enter / no keyboard
+    = Synopsis; Ctrl+C or a bad answer = None (job not run)."""
+    log("Several files: write them as")
+    for line in KIND_MENU:
+        log(line)
+    try:
+        answer = input_fn("Papers or Synopsis (number, Enter = 2): ").strip()
+    except EOFError:
+        log("No keyboard: Synopsis.")
+        return "synopsis"
+    except KeyboardInterrupt:
+        log("Cancelled. Job not run.")
+        return None
+    if answer in ("", "2"):
+        return "synopsis"
+    if answer == "1":
+        return "papers"
+    log("Not a valid number. Job not run.")
+    return None
+
+
+def _run_papers(files, out_dir, label, log, rep_dir, run_single, extra):
+    """Session 48 Papers: each file is its own paper - run_single per file,
+    header = the file's name (_2, _3 if used). No SYNOPSIS."""
+    combined = {"header": None, "records": [], "failed": [], "summary": None,
+                "papers": []}
+    for i, f in enumerate(files, start=1):
+        log(f"Paper {i}/{len(files)}: {f.name}")
+        res = run_single(f, out_dir, f.stem, label, log=log,
+                         records_root=rep_dir, **extra)
+        _report(res, rep_dir, log)
+        combined["papers"].append(res)
+        combined["records"] += res["records"]
+        combined["failed"] += res["failed"]
+    return combined
+
+
 def run(base_dir, model=None, *, provider="ollama", confirm=None,
         input_fn=input, list_fn=None, caps_fn=None,
-        run_single=None, run_set=None, log=print):
+        run_single=None, run_set=None, log=print, kind="synopsis"):
     """Ask the questions, run the engine, return its result (None = not run)."""
     run_single = run_single or engine.run_single
     run_set = run_set or engine.run_set
@@ -167,8 +214,18 @@ def run(base_dir, model=None, *, provider="ollama", confirm=None,
         for f in files:
             log(f"  {f.name}")
 
-    name = input_fn("Scan title/name (header of the output files; "
-                    "Enter = OCR_<date>_<time>): ").strip()
+    papers = False
+    if len(files) > 1 and kind != "synopsis":
+        if kind == "ask":
+            kind = _ask_kind(input_fn, log)
+            if kind is None:
+                return None
+        papers = kind == "papers"
+
+    name = ""
+    if not papers:
+        name = input_fn("Scan title/name (header of the output files; "
+                        "Enter = OCR_<date>_<time>): ").strip()
 
     if models:
         model = _pick_local_model(models, input_fn=input_fn, log=log)
@@ -183,6 +240,9 @@ def run(base_dir, model=None, *, provider="ollama", confirm=None,
         extra["call"] = engine.cloud_call(provider, real)
 
     log(f"Model: {label}. Output: {out_dir}")
+    if papers:
+        return _run_papers(files, out_dir, label, log, rep_dir, run_single,
+                           extra)
     if len(files) == 1:
         result = run_single(files[0], out_dir, name, label, log=log,
                             records_root=rep_dir, **extra)
