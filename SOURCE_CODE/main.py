@@ -2187,6 +2187,7 @@ def handle_writing_mode(
         use_files=use_files,
         word_limit=word_limit,
         verbose=True,
+        local=(provider == "ollama"),
     )
 
     print(f"\n  [WRITING | {track.upper()}] Done. "
