@@ -4,7 +4,7 @@ A multi-mode AI assistant for medical research, critical appraisal, systematic r
 
 
     Version: 2.6.0
-    Tests: 1638 passed, 10 deselected
+    Tests: 1646 passed, 10 deselected
            (reproduce with `python -m pytest -m "not live" --tb=short -q`)
     CI: GitHub Actions - Green
     GitHub: https://github.com/KW75/AI_kcMedicalResearch
@@ -85,10 +85,19 @@ Option A - Free / local (Ollama), no API key:
    have pulled with their size and whether they read images (Image/OCR).
    Embedding models are hidden. Press Enter for your default (OLLAMA_MODEL in
    .env, else gemma4:e4b) or type a number to use another model for this job.
+6. For SR and OCR (reading page images and scans), also pull:
+       ollama pull qwen3-vl:30b-a3b-instruct   (about 20 GB; runs CPU-only
+                                               and is slow)
+   SR and OCR use it by default when it is pulled. If it is not, they warn
+   and use a smaller vision model (gemma4:e4b), which misses or misreads
+   more symbols and table values. The vision model may guess text that is
+   covered or unreadable and can drop small print: check obscured labels
+   and values against the original page.
 
 
 Note: v2.5 changed the default from qwen2.5:14b-instruct to gemma4:e4b. It is
-smaller (6.6 GB vs 9.0 GB) and reads images (for the planned OCR mode).
+smaller (6.6 GB vs 9.0 GB) and reads images (SR and OCR prefer qwen3-vl,
+see step 6).
 qwen2.5:14b-instruct still works if you already have it: set OLLAMA_MODEL to
 its name.
 
@@ -125,7 +134,7 @@ The launcher asks for it after the model (Enter = 15 minutes).
 | OpenAI             | `--provider openai`    | `OPENAI_API_KEY`     | GPT-4 vision                                |
 | Anthropic          | `--provider anthropic` | `ANTHROPIC_API_KEY`  | Claude - not available for SR or OCR (they use ollama, qwen or openai). |
 | Groq               | `--provider groq`      | `GROQ_API_KEY`       | Fast inference                              |
-| Ollama (default)   | `--provider ollama`    | `OLLAMA_HOST`, `OLLAMA_MODEL` | Free, offline. SR and OCR need a vision model (default gemma4:e4b); SR on Ollama is new in v2.11, not yet checked against the reference set. Set OLLAMA_MODEL (default gemma4:e4b). |
+| Ollama (default)   | `--provider ollama`    | `OLLAMA_HOST`, `OLLAMA_MODEL` | Free, offline. SR and OCR need a vision model (default qwen3-vl:30b-a3b-instruct, about 20 GB, CPU-only; not pulled -> warning, gemma4:e4b); SR results need reviewer checks (Readme/readme_sr_pipeline.txt). Set OLLAMA_MODEL (default gemma4:e4b). |
 
 
 **Confidentiality gate.** Ollama runs entirely on your machine and starts without any prompt. If you choose a cloud provider, the app first lists every external service your input could be sent to (the chosen provider plus any `FALLBACK_PROVIDERS` backups) and asks `Continue? [y/N]`. Pressing Enter cancels. For scripted or non-interactive runs, add `--confirm-cloud` to accept explicitly; without it, a run with no keyboard attached is refused. Search modes always contact PubMed / Europe PMC (and DuckDuckGo for Search) with your search terms, even when the AI model is local.

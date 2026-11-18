@@ -4,7 +4,8 @@ means/SDs wrong, all runs agreeing); the instruct model read all six values
 right, AI alone (run k20261116_070736).
 
 SR: the SR model wins when pulled, even over OLLAMA_MODEL in .env; not pulled
--> old rule plus a too-small warning. OCR, text modes and .env unchanged.
+-> old rule plus a too-small warning. Text modes and .env unchanged.
+Session 48: OCR prefers the same model (test_ocr_s48_vision_default.py).
 """
 from __future__ import annotations
 
@@ -92,7 +93,9 @@ def test_sr_typed_model_kept_without_asking():
     assert got == "gemma4:e4b"
 
 
-def test_ocr_default_is_still_gemma():
+def test_shared_picker_without_preference_is_gemma():
+    """No preferred model -> gemma. OCR passes one since Session 48 (its own
+    name, not SR_VISION_MODEL; see test_ocr_s48_vision_default.py)."""
     logs = []
     got = OM.pick_vision_model([dict(GEMMA), dict(QWEN)], input_fn=lambda p: "",
                                log=logs.append)
