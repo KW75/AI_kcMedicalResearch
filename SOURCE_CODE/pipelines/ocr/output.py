@@ -8,6 +8,7 @@ Every file ends with a note naming the model and saying it is AI-produced.
 """
 from __future__ import annotations
 
+import hashlib
 import re
 from datetime import datetime
 from pathlib import Path
@@ -82,13 +83,32 @@ def strip_latex(text):
     return _latex_symbols(_LATEX_MATH.sub(_math, text))
 
 
+# Session 48: NTFS and ext4 refuse any single file or folder name over 255
+# characters, even with Windows long paths on. Papers mode uses each file's
+# own name as header and the record name repeats the source name, so a long
+# paper title (Ang 2010: 121 chars) gave ~260 and [Errno 22] at the last
+# write, losing all AI work. Cap each part; short names are unchanged.
+NAME_MAX = 40
+
+
+def _shorten(text: str, limit: int) -> str:
+    """Cut text to at most limit characters, at an '_' if one is near."""
+    if len(text) <= limit:
+        return text
+    cut = text[:limit]
+    i = cut.rfind("_")
+    if i >= limit // 2:
+        cut = cut[:i]
+    return cut.rstrip("_-") or text[:limit]
+
+
 def make_header(name: str, now: datetime | None = None) -> str:
     """'<name>_<YYYY-MM-DD>' from the typed name; blank -> 'OCR_<date>_<HHMM>'."""
     now = now or datetime.now()
     safe = _UNSAFE.sub("", re.sub(r"\s+", "_", (name or "").strip()))
     if not safe.strip("_"):
         return f"OCR_{now:%Y-%m-%d_%H%M}"
-    return f"{safe}_{now:%Y-%m-%d}"
+    return f"{_shorten(safe, NAME_MAX)}_{now:%Y-%m-%d}"
 
 
 def ai_note(model: str) -> str:
@@ -99,6 +119,10 @@ def ai_note(model: str) -> str:
 def _record_stem(header: str, source_name: str) -> str:
     src = Path(source_name)
     stem = _UNSAFE_STEM.sub("_", src.stem)
+    if len(stem) > NAME_MAX:  # Session 48: short name; the hash of the full
+        # file name keeps two long names that start alike apart
+        tag = hashlib.sha1(src.name.encode("utf-8")).hexdigest()[:6]
+        stem = f"{_shorten(stem, NAME_MAX)}_{tag}"
     ext = src.suffix.lower().lstrip(".")
     return f"{header}_{stem}_{ext}" if ext else f"{header}_{stem}"
 

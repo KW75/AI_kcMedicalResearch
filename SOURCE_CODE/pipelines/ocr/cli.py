@@ -74,7 +74,7 @@ def _report(result: dict, rep_dir: Path, log) -> None:
     else:
         log("No records written.")
     for name, err in result["failed"]:
-        log(f"  Could not read {name}: {err}")
+        log(f"  Not written: {name}: {err}")  # Session 48: read may be fine
     if result["summary"]:
         log(f"Summary file: {result['summary'][0]}")
 
