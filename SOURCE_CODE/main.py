@@ -66,10 +66,10 @@ SOURCE_CODE_DIR = PROJECT_ROOT / "SOURCE_CODE"
 sys.path.insert(0, str(SOURCE_CODE_DIR))
 
 # --- Heavy imports -----------------------------------------------------
-# document_reader (-> pytesseract -> pandas) and the pipeline modules below
-# are the slow part of startup (~7s cold). If Ctrl+C lands while one of
-# these is still loading, Python raises KeyboardInterrupt from wherever the
-# import chain happens to be (e.g. deep inside pandas/_libs), producing an
+# The pipeline modules below are the slow part of startup. If Ctrl+C lands
+# while one of these is still loading, Python raises KeyboardInterrupt from
+# wherever the import chain happens to be (e.g. deep inside pandas/_libs),
+# producing an
 # alarming traceback even though nothing actually failed. The real
 # entry-point handler at the bottom of this file only covers code that runs
 # after imports finish, so it can't catch this. Catch it here too and print
@@ -77,7 +77,6 @@ sys.path.insert(0, str(SOURCE_CODE_DIR))
 try:
     # Now imports work from SOURCE_CODE/
     from utils.path_utils import PATH_MANAGER, get_input_dir, get_output_dir
-    from utils.document_reader import DocumentReader
     # from utils.rag import RAGUtils (functions imported directly)
 
     # NOTE: run_coding, run_writing, run_search, and run_sr used to be imported
