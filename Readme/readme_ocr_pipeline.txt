@@ -91,6 +91,13 @@ the current model:
 Treat Route C text as a draft to be checked, especially numbers, signs,
 table headers and anything near a fold, finger, stamp or blur.
 
+Route C is also the only route that reads a table's layout. Routes A and
+B keep the PDF's text layer, where table columns are flattened into plain
+text, and the writing and appraisal pipelines read PDFs the same way. For
+a table whose numbers matter, take a screenshot of it, run it through
+menu 8, use the record next to the paper and check its numbers against
+the PDF.
+
 
 5. Which AI model reads the pages
 
