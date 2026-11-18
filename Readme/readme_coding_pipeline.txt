@@ -118,8 +118,9 @@ Not covered by the check:
   did not ask about. Only a diff against the input shows this.
 - Each file is handled alone. The AI does not see the other files, so
   names and imports across files are not checked.
-- The end line "Done. Check output/coding/ and reports/coding/" is
-  shown even when nothing was written.
+- The end line counts files: "Done: N processed, M skipped" or
+  "Nothing processed: ...". Processed means the AI was called, not
+  that the result passed.
 - With a cloud provider, your code and guidelines are sent to it.
 - --dry-run gives placeholder answers, not real ones.
 - generate_code_revision in main.py (reports/code_revision_*) is a

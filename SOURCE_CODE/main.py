@@ -101,6 +101,7 @@ try:
             run_reviewer,
             run_tester,
             parse_direct_instructions,
+            coding_done_line,
         )
     except ModuleNotFoundError:
         from pipelines.coding.coding import (
@@ -108,6 +109,7 @@ try:
             run_reviewer,
             run_tester,
             parse_direct_instructions,
+            coding_done_line,
         )
 
     # Import RCT Search with fallback
@@ -1875,22 +1877,23 @@ def handle_coding_mode(
     auto_load_input_files("coding")
     print()
 
+    result = None
     if sub_mode == "Builder":
-        run_builder(
+        result = run_builder(
             direct_instructions=direct_instructions,
             call_llm_fn=_call_llm_fn,
             verbose=True,
             local=(provider == "ollama"),
         )
     elif sub_mode == "Reviewer":
-        run_reviewer(
+        result = run_reviewer(
             direct_instructions=direct_instructions,
             call_llm_fn=_call_llm_fn,
             verbose=True,
             local=(provider == "ollama"),
         )
     elif sub_mode == "Tester":
-        run_tester(
+        result = run_tester(
             direct_instructions=direct_instructions,
             call_llm_fn=_call_llm_fn,
             verbose=True,
@@ -1905,8 +1908,10 @@ def handle_coding_mode(
     except Exception:
         pass
 
-    print(f"\n{colour}[{sub_mode.upper()}]{RESET} Done. "
-          "Check output/coding/ and reports/coding/ for results.\n")
+    processed, skipped = result if isinstance(result, tuple) else (0, 0)
+    print(f"\n{colour}"
+          + coding_done_line(sub_mode.upper(), processed, skipped)
+          + f"{RESET}\n")
 
 # ---------------------------------------------------------------------------
 # Appraisal mode dispatcher

@@ -504,6 +504,22 @@ def _too_large(tag: str, stem: str, n: int) -> str:
             "Split the file or use a cloud provider.")
 
 
+def coding_done_line(tag: str, processed: int, skipped: int) -> str:
+    """End line for menu 1: how many files were processed and skipped.
+
+    'Processed' means the AI was called for the file, not that it passed.
+    """
+    if processed == 0 and skipped == 0:
+        return f"[{tag}] Nothing processed: no files in input/coding/."
+    if processed == 0:
+        return (f"[{tag}] Nothing processed: {skipped} file(s) skipped "
+                "(too large for local AI). See the messages above.")
+    where = ("output/coding/ and reports/coding/" if tag == "BUILDER"
+             else "reports/coding/")
+    return (f"[{tag}] Done: {processed} processed, {skipped} skipped. "
+            f"Check {where} for results.")
+
+
 # ---------------------------------------------------------------------------
 # Extension detection
 # ---------------------------------------------------------------------------
@@ -616,7 +632,7 @@ def run_builder(
     call_llm_fn,
     verbose: bool = True,
     local: bool = False,
-) -> None:
+) -> tuple[int, int]:
     """
     Run the Builder pipeline sub-mode.
 
@@ -649,6 +665,7 @@ def run_builder(
             print(f"[BUILDER] Found {len(subprojects)} subproject(s) to process.")
 
     session_results = []
+    skipped = 0
 
     # --- Process each subproject sequentially ---
     for idx, (stem, initial_code, original_ext) in enumerate(subprojects, start=1):
@@ -657,6 +674,7 @@ def run_builder(
             print(f"\n[BUILDER] Subproject {idx}/{len(subprojects)}: {stem}")
         if local and initial_code is not None and len(initial_code) > CODING_LOCAL_MAX_CHARS:
             print(_too_large("BUILDER", stem, len(initial_code)))
+            skipped += 1
             continue
 
         current_code = initial_code
@@ -842,6 +860,7 @@ def run_builder(
 
     if verbose:
         print(f"\n[BUILDER] Session complete. {len(session_results)} subproject(s) processed.")
+    return len(session_results), skipped
 
 
 # ---------------------------------------------------------------------------
@@ -853,7 +872,7 @@ def run_reviewer(
     call_llm_fn,
     verbose: bool = True,
     local: bool = False,
-) -> None:
+) -> tuple[int, int]:
     """
     Run the Reviewer standalone sub-mode.
     Reviews each file in input/coding/ independently. No pipeline looping.
@@ -871,12 +890,13 @@ def run_reviewer(
 
     if not code_files:
         print("[REVIEWER] No code files found in input/coding/  - nothing to review.")
-        return
+        return 0, 0
 
     if verbose:
         print(f"[REVIEWER] Found {len(code_files)} file(s) to review.")
 
     session_results = []
+    skipped = 0
 
     for idx, (stem, code_content, _ext) in enumerate(code_files, start=1):
         ts = _ts()
@@ -884,6 +904,7 @@ def run_reviewer(
             print(f"\n[REVIEWER] File {idx}/{len(code_files)}: {stem}")
         if local and len(code_content) > CODING_LOCAL_MAX_CHARS:
             print(_too_large("REVIEWER", stem, len(code_content)))
+            skipped += 1
             continue
 
         user_prompt = _build_reviewer_user_prompt(
@@ -919,6 +940,7 @@ def run_reviewer(
 
     if verbose:
         print(f"\n[REVIEWER] Session complete. {len(session_results)} file(s) reviewed.")
+    return len(session_results), skipped
 
 
 # ---------------------------------------------------------------------------
@@ -930,7 +952,7 @@ def run_tester(
     call_llm_fn,
     verbose: bool = True,
     local: bool = False,
-) -> None:
+) -> tuple[int, int]:
     """
     Run the Tester standalone sub-mode.
     Tests each file in input/coding/ independently. No pipeline looping.
@@ -948,12 +970,13 @@ def run_tester(
 
     if not code_files:
         print("[TESTER] No code files found in input/coding/  - nothing to test.")
-        return
+        return 0, 0
 
     if verbose:
         print(f"[TESTER] Found {len(code_files)} file(s) to test.")
 
     session_results = []
+    skipped = 0
 
     for idx, (stem, code_content, _ext) in enumerate(code_files, start=1):
         ts = _ts()
@@ -961,6 +984,7 @@ def run_tester(
             print(f"\n[TESTER] File {idx}/{len(code_files)}: {stem}")
         if local and len(code_content) > CODING_LOCAL_MAX_CHARS:
             print(_too_large("TESTER", stem, len(code_content)))
+            skipped += 1
             continue
 
         user_prompt = _build_tester_user_prompt(
@@ -996,6 +1020,7 @@ def run_tester(
 
     if verbose:
         print(f"\n[TESTER] Session complete. {len(session_results)} file(s) tested.")
+    return len(session_results), skipped
 
 
 # ---------------------------------------------------------------------------
