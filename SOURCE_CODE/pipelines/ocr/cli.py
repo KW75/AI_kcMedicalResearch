@@ -116,8 +116,8 @@ def _offer_cloud(choices, confirm, input_fn, log):
 
 
 KIND_MENU = (
-    "  1  Papers   - each file is its own paper: own record + own SUMMARY",
-    "  2  Synopsis - one record each + one SYNOPSIS summarising all papers "
+    "1. Papers   - each file is its own paper: own record + own SUMMARY",
+    "2. Synopsis - one record each + one SYNOPSIS summarising all papers "
     "in input/ocr",
 )
 
@@ -125,7 +125,7 @@ KIND_MENU = (
 def _ask_kind(input_fn, log):
     """Session 48: several files -> Papers or Synopsis. Enter / no keyboard
     = Synopsis; Ctrl+C or a bad answer = None (job not run)."""
-    log("Several files: write them as")
+    log("Write them as")
     for line in KIND_MENU:
         log(line)
     try:
@@ -210,7 +210,10 @@ def run(base_dir, model=None, *, provider="ollama", confirm=None,
     if len(files) == 1:
         log(f"1 file: {files[0].name} -> record + SUMMARY")
     else:
-        log(f"{len(files)} files in {in_dir} -> one record each + SYNOPSIS:")
+        if kind == "ask":  # Session 48: menu 8 asks Papers / Synopsis next
+            log(f"{len(files)} files in {in_dir}")
+        else:
+            log(f"{len(files)} files in {in_dir} -> one record each + SYNOPSIS:")
         for f in files:
             log(f"  {f.name}")
 
