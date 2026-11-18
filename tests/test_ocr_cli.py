@@ -126,7 +126,7 @@ def test_no_vision_model_pulled_says_what_to_pull(tmp_path):
                      list_fn=lambda host=None: PULLED[:2], caps_fn=fake_caps,
                      run_single=eng.single, run_set=eng.set, log=logs.append)
     assert result is None and eng.calls == []
-    assert any("ollama pull gemma4:e4b" in line for line in logs)
+    assert any("ollama pull qwen3-vl:30b-a3b-instruct" in line for line in logs)
 
 
 def test_empty_input_folder_asks_nothing(tmp_path):
@@ -197,7 +197,7 @@ def test_no_vision_model_message_points_to_setup(tmp_path):
                      list_fn=fake_list, caps_fn=lambda host, name: {"completion"},
                      log=logs.append)
     assert result is None
-    assert any("ollama pull gemma4:e4b" in line for line in logs)
+    assert any("ollama pull qwen3-vl:30b-a3b-instruct" in line for line in logs)
     assert any("10 Setup -> 2 Local AI" in line for line in logs)
 
 

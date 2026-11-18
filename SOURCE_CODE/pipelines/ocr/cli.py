@@ -24,7 +24,10 @@ from pathlib import Path
 
 from . import engine, reader
 
-DEFAULT_VISION_MODEL = "gemma4:e4b"
+# Session 48: OCR prefers the shared vision model (ollama_models.VISION_MODEL;
+# test_ocr_s48_vision_default.py checks the two names match). gemma4:e4b
+# left most [?] unfilled and misread table values; qwen3-vl read them right.
+DEFAULT_VISION_MODEL = "qwen3-vl:30b-a3b-instruct"
 CLOUD_KEYS = {"qwen": "DASHSCOPE_API_KEY", "openai": "OPENAI_API_KEY"}
 
 
@@ -35,9 +38,24 @@ def vision_models(list_fn, caps_fn, host=None) -> list[dict]:
 
 
 def _default_model(names: list[str]) -> str:
-    """Default vision model: the shared rule in ollama_models."""
+    """Default vision model: DEFAULT_VISION_MODEL if pulled, else the shared
+    rule in ollama_models (Session 48)."""
     import ollama_models  # lazy
-    return ollama_models.default_vision_model(names)
+    return ollama_models.default_vision_model(names, preferred=DEFAULT_VISION_MODEL)
+
+
+def _pick_local_model(models: list[dict], input_fn=input, log=print):
+    """Session 48: ask which pulled vision model reads the pages. Enter =
+    DEFAULT_VISION_MODEL if pulled; not pulled -> warning, then the old rule
+    (OLLAMA_MODEL, gemma4:e4b, first). None = job not run."""
+    import ollama_models  # lazy
+    pulled = {ollama_models._with_tag(m["name"]) for m in models}
+    if ollama_models._with_tag(DEFAULT_VISION_MODEL) not in pulled:
+        log(f"WARNING: {DEFAULT_VISION_MODEL} is not pulled; OCR uses a "
+            f"smaller vision model, which misses or misreads more symbols "
+            f"and table values. Run: ollama pull {DEFAULT_VISION_MODEL}")
+    return ollama_models.pick_vision_model(models, input_fn=input_fn, log=log,
+                                           preferred=DEFAULT_VISION_MODEL)
 
 
 def _pick(options: list, answer: str):
@@ -153,8 +171,7 @@ def run(base_dir, model=None, *, provider="ollama", confirm=None,
                     "Enter = OCR_<date>_<time>): ").strip()
 
     if models:
-        import ollama_models  # lazy, as above; shared with SR (Session 42)
-        model = ollama_models.pick_vision_model(models, input_fn=input_fn, log=log)
+        model = _pick_local_model(models, input_fn=input_fn, log=log)
         if model is None:
             return None
 
