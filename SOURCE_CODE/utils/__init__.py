@@ -7,7 +7,6 @@ from .path_utils import PATH_MANAGER, get_input_dir, get_output_dir, get_reports
 # rather than at package import. "from utils.path_utils import ..." previously
 # pulled in the entire RAG and document stack, costing ~2s on every run.
 _LAZY = {
-    "DocumentReader": ".document_reader",
     "chunk_text": ".rag",
     "get_embeddings": ".rag",
     "index_uploads": ".rag",
@@ -36,7 +35,6 @@ __all__ = [
     "get_output_dir",
     "get_reports_dir",
     "get_rag_db",
-    "DocumentReader",
     "chunk_text",
     "get_embeddings",
     "index_uploads",

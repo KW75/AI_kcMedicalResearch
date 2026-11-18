@@ -25,8 +25,8 @@ pdf2image>=1.16.0
 opencv-python>=4.10.0
 
 # Alternative OCR engine. WARNING: pulls PyTorch, roughly 2 GB.
-# Used only as a fallback when pytesseract returns under 50 characters
-# (document_reader.py:240). Drop this line if disk space matters.
+# No code imports it since Session 48: its only user,
+# the old document reader module, was removed. Candidate to drop.
 easyocr>=1.7.1
 
 # Legacy .doc extraction on non-Windows. textract 1.6.5 has broken metadata
