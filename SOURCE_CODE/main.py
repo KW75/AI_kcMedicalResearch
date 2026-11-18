@@ -2040,14 +2040,14 @@ def handle_writing_mode(
             run_one_pass, list_input_names, run_synopsis, input_file_sizes,
             parse_direct_instructions as _pdi,
             TRACK_TOPIC, TRACK_ARTICLE, TRACK_REPORT, TRACK_SYNOPSIS,
-            DEFAULT_WORDS, SYNOPSIS_LOCAL_MAX_CHARS,
+            DEFAULT_WORDS, SYNOPSIS_LOCAL_MAX_CHARS, one_pass_done_line,
         )
     except ModuleNotFoundError:
         from pipelines.writing.writing import (
             run_one_pass, list_input_names, run_synopsis, input_file_sizes,
             parse_direct_instructions as _pdi,
             TRACK_TOPIC, TRACK_ARTICLE, TRACK_REPORT, TRACK_SYNOPSIS,
-            DEFAULT_WORDS, SYNOPSIS_LOCAL_MAX_CHARS,
+            DEFAULT_WORDS, SYNOPSIS_LOCAL_MAX_CHARS, one_pass_done_line,
         )
 
 
@@ -2180,7 +2180,7 @@ def handle_writing_mode(
               "output/writing/.\n")
         return
 
-    run_one_pass(
+    result = run_one_pass(
         direct_instructions=direct_instructions,
         call_llm_fn=_call_llm_fn,
         track=track,
@@ -2190,8 +2190,7 @@ def handle_writing_mode(
         local=(provider == "ollama"),
     )
 
-    print(f"\n  [WRITING | {track.upper()}] Done. "
-          "Check output/writing/ for the document and its review.\n")
+    print(one_pass_done_line(track, result))
 
 
 # ---------------------------------------------------------------------------

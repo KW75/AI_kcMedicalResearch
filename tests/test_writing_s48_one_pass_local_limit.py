@@ -87,6 +87,6 @@ def test_local_scratch_still_writes(tmp_path, monkeypatch):
 
 def test_menu_2_passes_local_flag():
     src = (PROJECT_ROOT / "SOURCE_CODE" / "main.py").read_text(encoding="utf-8")
-    start = src.index("\n    run_one_pass(\n")
+    start = src.index("run_one_pass(\n        direct_instructions")
     block = src[start:src.index("\n    )\n", start)]
     assert 'local=(provider == "ollama")' in block

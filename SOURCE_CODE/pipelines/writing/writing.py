@@ -842,7 +842,7 @@ def run_one_pass(
     verbose: bool = True,
     use_files: bool = True,
     local: bool = False,
-) -> None:
+) -> tuple[int, int]:
     
     """Write (or revise) and review in a single AI call per input.
 
@@ -870,12 +870,14 @@ def run_one_pass(
     is_scratch  = len(input_files) == 0
     subprojects = [("new_doc", "", ".md")] if is_scratch else input_files
 
+    written = skipped = 0
     for stem, original_content, _suffix in subprojects:
         if local and len(original_content) > SYNOPSIS_LOCAL_MAX_CHARS:
             print(f"\n  [WRITING | {track.upper()}] {stem}: "
                   f"{len(original_content):,} characters - too large for "
                   f"local AI (limit {SYNOPSIS_LOCAL_MAX_CHARS:,}). Skipped. "
                   "Use a cloud provider or a shorter file.")
+            skipped += 1
             continue
         if verbose:
             print(f"\n{'='*60}")
@@ -902,11 +904,29 @@ def run_one_pass(
         _write_text(doc_md, document)
         _write_docx(doc_docx, document, title=f"{track.upper()} -- {stem}")
         _write_text(rev_md, f"# Review ({track.upper()}) -- {stem}\n\n{review}\n")
+        written += 1
 
         if verbose:
             print(f"\n  Done: {stem}")
             print(f"    Document: output/writing/{doc_docx.name}")
             print(f"    Review:   output/writing/{rev_md.name}")
+
+    return written, skipped
+
+
+def one_pass_done_line(track: str, result) -> str:
+    """End line for menu 2 from run_one_pass's (written, skipped).
+    Anything else (e.g. a test mock) gives the plain Done line."""
+    written, skipped = result if isinstance(result, tuple) else (None, 0)
+    label = f"\n  [WRITING | {track.upper()}]"
+    if written == 0:
+        return (f"{label} Nothing written: {skipped} file(s) skipped "
+                "(too large for local AI). See the messages above.\n")
+    counts = "" if written is None else f": {written} written"
+    if skipped:
+        counts += f", {skipped} skipped"
+    return (f"{label} Done{counts}. "
+            "Check output/writing/ for the document and its review.\n")
 
 
 # ---------------------------------------------------------------------------
