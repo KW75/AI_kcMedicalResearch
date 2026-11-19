@@ -20,7 +20,6 @@ debug/
 patch_main.py
 dist/
 build/
-chroma_db/
 htmlcov/
 # Local scratch/data folder - not used by repo
 data/

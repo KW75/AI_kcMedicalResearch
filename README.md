@@ -4,7 +4,7 @@ A multi-mode AI assistant for medical research, critical appraisal, systematic r
 
 
     Version: 2.7.0
-    Tests: 1818 passed, 10 deselected
+    Tests: 1834 passed, 10 deselected
            (reproduce with `python -m pytest -m "not live" --tb=short -q`)
     CI: GitHub Actions - Green
     GitHub: https://github.com/KW75/AI_kcMedicalResearch
@@ -65,21 +65,18 @@ The app runs after Step 1 but needs a model to produce output.
 
 Option A - Free / local (Ollama), no API key:
 1. Install Ollama:  https://ollama.com/download
-2. Pull the two models the app uses:
+2. Pull the chat model the app uses:
        ollama pull gemma4:e4b             (the chat model - used by all modes;
                                            about 6.6 GB; needs Ollama 0.30.9 or
                                            newer. On older or slower machines
                                            use qwen3:4b, about 2.5 GB)
-       ollama pull nomic-embed-text       (the embedding model - needed for the
-                                           appraisal and SR pipelines / RAG)
 3. Copy `.env.example` to `.env` and confirm this line matches the model you
    pulled (already set by default):
        OLLAMA_MODEL=gemma4:e4b
    (If you pulled a different chat model, put its exact name here. If the
     line is commented out, the app uses gemma4:e4b. It never switches model
     on its own: if the model is not pulled, the job stops and tells you to
-    run `ollama pull <model>`. The embedding model must stay nomic-embed-text
-    unless you change EMBEDDING_MODEL.)
+    run `ollama pull <model>`.)
 4. Ollama runs in the background after install; the app connects automatically.
 5. When you choose Ollama in the CLI launcher, it lists the chat models you
    have pulled with their size and whether they read images (Image/OCR).
@@ -187,8 +184,6 @@ Copy `.env.example` to `.env`. `.env` is gitignored.
 
     SR_STUDY_OVERRIDES=input/sr/study_overrides.yaml
 
-    EMBEDDING_PROVIDER=ollama
-    EMBEDDING_MODEL=nomic-embed-text
     CLI_THEME=dark
 
 If you used the old Streamlit web interface before v2.4.7 (the interface was

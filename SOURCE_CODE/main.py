@@ -9,7 +9,7 @@ Coding mode: Builder (pipeline), Reviewer (standalone), Tester (standalone).
 from __future__ import annotations
 
 # --- Supported Python versions ---------------------------------------------
-# This gate must run BEFORE any third-party import (dotenv, numpy, chromadb).
+# This gate must run BEFORE any third-party import (dotenv, numpy).
 # Otherwise an unsupported interpreter produces a ModuleNotFoundError or a
 # pip build failure instead of an actionable message.
 #
@@ -257,8 +257,6 @@ from providers import (
     QWEN_MODEL, QWEN_VISION_MODEL, DEFAULT_PROVIDER, _resolve_ollama_model,
     sr_default_model,
 )
-EMBEDDING_PROVIDER = os.getenv("EMBEDDING_PROVIDER", "ollama")
-EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "nomic-embed-text")
 
 
 

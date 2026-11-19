@@ -1,6 +1,6 @@
 """Guards: the Streamlit UI and Render deploy are removed (Session 33 commit 3).
 
-Local-first CLI only. pyarrow==12.0.1 stays pinned because chromadb needs it.
+Local-first CLI only. chromadb and its pyarrow pin went in Session 48 (step A2).
 """
 import sys
 from pathlib import Path
@@ -82,11 +82,6 @@ def test_requirements_have_no_streamlit():
             if line.strip().lower().startswith("streamlit"):
                 offenders.append(f"{name}:{n}")
     assert offenders == []
-
-
-def test_pyarrow_pin_is_kept_for_chromadb():
-    text = (ROOT / "requirements-local.txt").read_text(encoding="utf-8")
-    assert "pyarrow==12.0.1" in text.splitlines()
 
 
 def test_gitignore_has_no_streamlit_line():

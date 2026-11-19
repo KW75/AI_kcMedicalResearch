@@ -55,7 +55,6 @@ Three-agent pipeline for building systematic review search strategies.
 ### 6. Systematic Review (SR) Mode
 Self-contained pipeline for full systematic review workflow.
 - Screening, data extraction, risk-of-bias assessment, forest plots
-- Separate UI (Streamlit-based)
 
 ## AI Provider Support
 
@@ -76,7 +75,6 @@ Provider selection: --provider ollama|qwen|deepseek|openai|anthropic|groq
 - Session transcripts saved to reports/ folder
 - Cross-platform: Windows, macOS, Linux
 - Interactive launcher menu (scripts/launcher.py)
-- Web UI available via Streamlit (SOURCE_CODE/ui/app.py)
 - Docker support for deployment
 
 ## Non-Goals (current version)

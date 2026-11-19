@@ -45,7 +45,6 @@ h1{text-align:center;font-size:1.8rem;font-weight:800;color:#f1f5f9;margin-botto
 .h-appraisal{background:linear-gradient(135deg,#7c2d12,#1e293b)}
 .h-sr{background:linear-gradient(135deg,#134e4a,#1e293b)}
 .h-provider{background:linear-gradient(135deg,#1c1917,#1e293b)}
-.h-deploy{background:linear-gradient(135deg,#064e3b,#1e293b)}
 footer{text-align:center;margin-top:48px;font-size:.76rem;color:#475569}
 </style>
 </head>
@@ -370,8 +369,6 @@ DASHSCOPE_BASE_URL=https://dashscope-intl.aliyuncs.com/compatible-mode/v1
 QWEN_MODEL=qwen-plus-latest
 OPENAI_API_KEY=sk-...
 ANTHROPIC_API_KEY=sk-ant-...
-EMBEDDING_PROVIDER=ollama
-EMBEDDING_MODEL=nomic-embed-text
 CLI_THEME=dark</pre>
   <div class="section-label">Common CLI flags</div>
   <table>
@@ -385,34 +382,8 @@ CLI_THEME=dark</pre>
     <tr><td><code>--list-sessions</code></td><td>List saved transcripts</td></tr>
     <tr><td><code>--help-guide</code></td><td>Open this HTML guide</td></tr>
     <tr><td><code>--report</code></td><td>Generate writing report</td></tr>
-    <tr><td><code>--ui</code></td><td>Launch Streamlit UI</td></tr>
     <tr><td><code>--version</code></td><td>Show version number</td></tr>
   </table>
-</div></div>
-
-<!-- DEPLOYMENT -->
-<div class="card" onclick="toggle(this)">
-<div class="card-header h-deploy">
-  <div class="card-icon" style="background:#064e3b">&#9729;&#65039;</div>
-  <div><div class="card-title">Deployment &amp; Monitoring</div><div class="card-badge">Render + UptimeRobot</div></div>
-</div>
-<div class="card-body">
-  <div class="section-label">Live App</div>
-  <table>
-    <tr><th>Item</th><th>URL</th></tr>
-    <tr><td>Web App</td><td><code>https://ai-kcmedicalresearch.onrender.com</code></td></tr>
-    <tr><td>Health Check</td><td><code>https://ai-kcmedicalresearch.onrender.com/_stcore/health</code></td></tr>
-  </table>
-  <div class="section-label">Render (Free Tier)</div>
-  <table>
-    <tr><th>Setting</th><th>Value</th></tr>
-    <tr><td>Auto-deploy</td><td>Push to main triggers deploy</td></tr>
-    <tr><td>Build</td><td><code>pip install --no-cache-dir --prefer-binary -r requirements-render.txt</code></td></tr>
-    <tr><td>Health check</td><td><code>/_stcore/health</code> (Streamlit built-in)</td></tr>
-    <tr><td>Zero-downtime</td><td>Waits for health before routing traffic</td></tr>
-  </table>
-  <div class="section-label">UptimeRobot</div>
-  <div class="ok">&#9989; Pings health endpoint every 5 minutes. Prevents free-tier cold starts (30-60s sleep). 100% uptime.</div>
 </div></div>
 
 </div><!-- end grid -->
