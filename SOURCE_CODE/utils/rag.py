@@ -39,14 +39,39 @@ N_RESULTS: int     = 5     # chunks returned per retrieval query
 
 # Persistent ChromaDB client (in-memory for tests; file-backed at runtime)
 _chroma_client: Optional[chromadb.Client] = None
+# Session 48: project-root chroma_db; emptied once before the client opens it
+_DB_PATH = Path(__file__).resolve().parent.parent.parent / "chroma_db"
+
+
+def _clear_db_folder(db_path: Path) -> None:
+    """Session 48: empty chroma_db once, before the client opens it.
+
+    Each run uses a new random session_id, so no run reads the collection
+    of an earlier run. Leftovers (collections of crashed or closed runs,
+    segment folders that delete_collection leaves on disk) are removed
+    here. A failed delete (e.g. a file locked by another window) prints
+    a warning and the run goes on.
+    """
+    import shutil
+    if not db_path.is_dir():
+        return
+    items = list(db_path.iterdir())
+    if not items:
+        return
+    try:
+        shutil.rmtree(db_path)
+    except OSError as exc:
+        print(f"[RAG] Could not clear old chroma_db: {exc}")
+        return
+    print(f"[RAG] Cleared old chroma_db ({len(items)} items).")
 
 
 def _get_client() -> chromadb.Client:
     """Return (or lazily create) the module-level ChromaDB client."""
     global _chroma_client
     if _chroma_client is None:
-        # Updated path: go up 3 levels from SOURCE_CODE/utils/ to project root
-        db_path = Path(__file__).resolve().parent.parent.parent / "chroma_db"
+        db_path = _DB_PATH
+        _clear_db_folder(db_path)
         db_path.mkdir(parents=True, exist_ok=True)
         import chromadb  # lazy: only loaded when RAG is actually used (Session 31)
         _chroma_client = chromadb.PersistentClient(path=str(db_path))
