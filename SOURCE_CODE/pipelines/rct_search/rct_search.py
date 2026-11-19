@@ -275,6 +275,43 @@ def merge_search_results(
     return merged
 
 
+# Session 48: Ollama's window (num_ctx = OLLAMA_CONTEXT, default 32768
+# tokens) holds prompt + answer and drops what does not fit. main.call_ai
+# passes no max_tokens, so the answer limit is call_ollama_provider's
+# default 8192. Same cautious 3 chars/token as ocr/engine.py.
+RANK_CHARS_PER_TOKEN = 3
+RANK_ANSWER_TOKENS = 8192
+RANK_MARGIN_TOKENS = 1000
+RANK_LINE_TOKENS = 60
+
+
+def _rank_batches(blocks, head_chars, provider):
+    """Session 48: split article blocks into batches (index lists).
+
+    Cloud providers: one batch. Ollama: each batch prompt (head + blocks)
+    fits the character budget, and its rating lines (60 tokens each)
+    fit 80% of the answer limit. A block too big on its own gets a
+    batch of its own. Order is kept; every block is in one batch.
+    """
+    if provider != "ollama":
+        return [list(range(len(blocks)))] if blocks else []
+    import os
+    ctx = int(os.getenv("OLLAMA_CONTEXT", "32768"))
+    budget = (ctx - RANK_ANSWER_TOKENS - RANK_MARGIN_TOKENS) * RANK_CHARS_PER_TOKEN
+    room = max(2000, budget - head_chars)
+    max_n = max(1, RANK_ANSWER_TOKENS * 8 // 10 // RANK_LINE_TOKENS)
+    batches, cur, size = [], [], 0
+    for i, block in enumerate(blocks):
+        if cur and (size + len(block) > room or len(cur) >= max_n):
+            batches.append(cur)
+            cur, size = [], 0
+        cur.append(i)
+        size += len(block)
+    if cur:
+        batches.append(cur)
+    return batches
+
+
 _VERDICT_HEAD = re.compile(r"overall\s+decision\W*", re.IGNORECASE)
 
 
@@ -835,7 +872,7 @@ def run_rct_search_pipeline(
         print(f"[RCT Search] Ranking {len(articles)} articles by PICO relevance...")
         
         # Build abstracts block with clear source information
-        abstracts_block = ""
+        blocks = []
         for idx, art in enumerate(articles, 1):
             source = art.get("source", "PubMed")
             pmid = art.get("pmid", "N/A")
@@ -843,7 +880,7 @@ def run_rct_search_pipeline(
             url = art.get("url", "")
             abstract = art.get("abstract", "No abstract available.")
             
-            abstracts_block += (
+            block = (
                 f"\n### Article {idx}\n"
                 f"Source: {source}\n"
                 f"PMID: {pmid}\n"
@@ -851,11 +888,12 @@ def run_rct_search_pipeline(
                 f"URL: {url}\n"
                 f"Abstract: {abstract}\n"
             )
+            blocks.append(block)
         
         # Session 48: the Formulator's PICO, not the last stage output
         # (the Validator). Topic + typed P/I/C/O if the Formulator failed.
         rank_pico = formulator_response or (topic + pico_manual_context)
-        rank_prompt = (
+        rank_head = (
             "You are a systematic review expert. Your ONLY task is to rate articles.\n\n"
             "PICO Question:\n" + rank_pico + "\n\n"
             "INSTRUCTIONS:\n"
@@ -872,9 +910,14 @@ def run_rct_search_pipeline(
             "ARTICLE_RANK: 2 | SCORE: 7 | PMID: 22222222 | SOURCE: Europe PMC | TITLE: Mindfulness for chronic pain | URL: https://pubmed.ncbi.nlm.nih.gov/22222222/\n"
             "ARTICLE_RANK: 3 | SCORE: 3 | PMID: 33333333 | SOURCE: Europe PMC | TITLE: Ketamine infusion study | URL: https://pubmed.ncbi.nlm.nih.gov/33333333/\n\n"
             "NOW RATE THESE ARTICLES - output rating lines ONLY:\n\n"
-            + abstracts_block
         )
         
+        # Session 48: local AI gets batches that fit its window
+        batches = _rank_batches(blocks, len(rank_head), provider)
+        if len(batches) > 1:
+            print(f"[RCT Search] Local AI: {len(articles)} records ranked in "
+                  f"{len(batches)} batches (OLLAMA_CONTEXT window).")
+
         if dry_run:
             rank_response = "\n".join(
                 "ARTICLE_RANK: " + str(i) + " | SCORE: " + str(10 - i) + " | "
@@ -883,12 +926,31 @@ def run_rct_search_pipeline(
                 for i, art in enumerate(articles, 1)
             )
         else:
-            try:
-                rank_response = call_ai(
-                    prompt=rank_prompt, provider=provider, model=model
-                )
-            except RuntimeError as exc:
-                rank_response = "[ERROR ranking articles: " + str(exc) + "]"
+            # Session 48: one call per batch; a failed batch leaves only
+            # its own records unscored (_match_ranked lists them as "-")
+            answers = []
+            errors = []
+            for b_no, batch in enumerate(batches, 1):
+                rank_prompt = rank_head + "".join(blocks[i] for i in batch)
+                try:
+                    answer = call_ai(
+                        prompt=rank_prompt, provider=provider, model=model
+                    )
+                    failed, why = answer.startswith("[ERROR"), answer
+                except RuntimeError as exc:
+                    failed, why = True, str(exc)
+                if failed:
+                    errors.append(why)
+                    if len(batches) > 1:
+                        print(f"[RCT Search] Ranking batch {b_no} of "
+                              f"{len(batches)} failed: {why}")
+                else:
+                    answers.append(answer)
+            if answers:
+                rank_response = "\n".join(answers)
+            else:
+                rank_response = ("[ERROR ranking articles: "
+                                 + "; ".join(errors) + "]")
         
         ranked = []
         if rank_response.startswith("[ERROR"):
