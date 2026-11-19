@@ -125,9 +125,11 @@ Checked in SOURCE_CODE/pipelines/rct_search/rct_search.py at e72820d
   listed at the end with score "-"; no position-based scores. One screen
   line "Ranking check: N of K records scored by the AI; ... invented,
   ... repeated, ... left out" gives the counts.
-- AI not reachable: GAP. If call_ai cannot use main.call_ai it returns
-  "[MOCK] ..." text as if the AI had answered (lines 288-308); the
-  ranking error check looks only for "[ERROR" (line 817).
+- AI call: fixed (Session 48). call_ai no longer returns a made-up
+  "[MOCK] ..." answer when main cannot be imported or the AI call
+  raises ImportError or AttributeError. It raises RuntimeError: the
+  stage then shows "[ERROR in <role>: ...]", and a ranking error
+  lists every record unscored ("-").
 - Saved PICO: up to 5 saved pico_*.json files are offered, from
   input/rct_search/ if it has any, else output/rct_search/ (lines
   528-570). The chosen file fills P, I, C, O and the topic; it is not

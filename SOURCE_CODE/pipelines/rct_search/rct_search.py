@@ -289,26 +289,14 @@ def call_ai(prompt: str, provider: str = "deepseek", model: Optional[str] = None
         sys.path.insert(0, str(source_code_dir))
     
     try:
-        # Import from main module
         from main import call_ai as _call_ai
+    except ImportError as exc:
+        # Session 48: no made-up answer; both callers catch RuntimeError
+        raise RuntimeError(f"main.call_ai not available: {exc}") from exc
+    try:
         return _call_ai(prompt=prompt, provider=provider, model=model)
-    except (ImportError, AttributeError) as e:
-        # Try alternative import
-        try:
-            from ..main import call_ai as _call_ai
-            return _call_ai(prompt=prompt, provider=provider, model=model)
-        except ImportError:
-            # Fallback for testing: mock response
-            if provider == "ollama":
-                return f"[MOCK] Ollama response for: {prompt[:50]}..."
-            elif provider == "qwen":
-                return f"[MOCK] Qwen response for: {prompt[:50]}..."
-            elif provider == "openai":
-                return f"[MOCK] OpenAI response for: {prompt[:50]}..."
-            elif provider == "anthropic":
-                return f"[MOCK] Anthropic response for: {prompt[:50]}..."
-            else:
-                return f"[MOCK] {provider} response for: {prompt[:50]}..."
+    except (ImportError, AttributeError) as exc:
+        raise RuntimeError(f"{provider} call failed: {exc}") from exc
 
 def _add_hyperlink(paragraph, text: str, url: str):
     """Add a clickable hyperlink to a paragraph."""
