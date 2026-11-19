@@ -23,7 +23,6 @@ sys.path.insert(0, str(PROJECT_ROOT))
 from SOURCE_CODE.main import (
     generate_writing_report,
     run_rct_search_pipeline,
-    _read_article_files,
     generate_code_revision,
     parse_args,
     validate_api_keys,
@@ -134,57 +133,6 @@ class TestE2ERctSearch:
         assert "Searcher" in content
         assert "Validator" in content
         assert "Final Status" in content
-
-
-# ---------------------------------------------------------------------------
-# Appraisal mode ??article injection
-# ---------------------------------------------------------------------------
-
-class TestE2EAppraisal:
-
-    def test_appraisal_reads_article_files(self, tmp_path):
-        """_read_article_files returns content for .txt files under size limit."""
-        appraisal_dir = tmp_path / "appraisal"
-        appraisal_dir.mkdir()
-        (appraisal_dir / "article1.txt").write_text(
-            "This is a test article about metformin.",
-            encoding="utf-8",
-        )
-
-        results = _read_article_files(appraisal_dir)
-
-        assert len(results) == 1
-        assert results[0]["name"] == "article1.txt"
-        assert "metformin" in results[0]["content"]
-
-    def test_appraisal_skips_large_files(self, tmp_path, capsys):
-        """_read_article_files skips files over 8000 chars and prints a warning."""
-        appraisal_dir = tmp_path / "appraisal"
-        appraisal_dir.mkdir()
-        (appraisal_dir / "large.txt").write_text(
-            "x" * 9000,
-            encoding="utf-8",
-        )
-
-        results = _read_article_files(appraisal_dir)
-        captured = capsys.readouterr()
-
-        assert len(results) == 0
-        assert "RAG" in captured.out
-
-    def test_appraisal_multiple_files(self, tmp_path):
-        """_read_article_files loads multiple files and labels each."""
-        appraisal_dir = tmp_path / "appraisal"
-        appraisal_dir.mkdir()
-        (appraisal_dir / "article1.txt").write_text("First article content.", encoding="utf-8")
-        (appraisal_dir / "article2.txt").write_text("Second article content.", encoding="utf-8")
-
-        results = _read_article_files(appraisal_dir)
-
-        assert len(results) == 2
-        names = [r["name"] for r in results]
-        assert "article1.txt" in names
-        assert "article2.txt" in names
 
 
 # ---------------------------------------------------------------------------

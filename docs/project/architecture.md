@@ -21,9 +21,7 @@ inference (Ollama) and multiple cloud providers.
     │   │   ├── sr/                          <- Systematic Review (self-contained)
     │   │   └── shared/                      <- Cross-pipeline utilities
     │   ├── utils/
-    │   │   ├── path_utils.py              <- PATH_MANAGER, directory resolution
-    │   │   ├── document_reader.py         <- PDF/DOCX/TXT file reading
-    │   │   └── rag.py                      <- RAG embedding and retrieval
+    │   │   └── path_utils.py              <- PATH_MANAGER, directory resolution
     │   └── ui/
     │       └── app.py                       <- Streamlit web interface
     ├── scripts/
@@ -56,7 +54,7 @@ The central engine containing:
   call_groq_provider
 - Ollama auto-detection: _ollama_detect_best_model() queries /api/tags at startup
 - Mode routing: dispatches to the appropriate pipeline based on --mode flag
-- CLI argument parsing and interactive session management
+- CLI argument parsing (parse_args)
 - Environment variable loading (.env via python-dotenv)
 
 ### Pipeline Pattern

@@ -98,60 +98,15 @@ class TestMainHelpers:
         result = main.read_text_file(tmp_path / "missing.txt")
         assert result == ""
 
-    def test_truncate_context_within_limit(self):
-        text = "Short text" * 10
-        result = main.truncate_context(text, max_chars=1000)
-        assert result == text
-
-    def test_truncate_context_exceeds_limit(self):
-        text = "x" * 3000
-        result = main.truncate_context(text, max_chars=2000)
-        assert len(result) <= 2001
-
     def test_role_color_returns_ansi(self):
         assert main.role_color("Builder").startswith("\033[")
         assert main.role_color("Reviewer").startswith("\033[")
         assert main.role_color("Tester").startswith("\033[")
         assert main.role_color("Unknown") == main.RESET
 
-    def test_choose_role(self, monkeypatch):
-        monkeypatch.setattr("builtins.input", lambda _: "1")
-        role_name, config = main.choose_role("coding")
-        assert role_name in main.ALL_MODES["coding"]
-        assert isinstance(config, dict)
-
-    def test_choose_role_invalid_input_then_valid(self, monkeypatch):
-        calls = [0]
-        def mock_input(prompt):
-            calls[0] += 1
-            if calls[0] == 1:
-                return "99"
-            return "1"
-        
-        monkeypatch.setattr("builtins.input", mock_input)
-        role_name, config = main.choose_role("coding")
-        assert role_name in main.ALL_MODES["coding"]
-
 
 class TestMainSessionManagement:
     """Test session management functions."""
-
-    def test_start_session_transcript(self, tmp_path):
-        path = main.start_session_transcript(tmp_path)
-        assert path.exists()
-        content = path.read_text(encoding="utf-8")
-        assert "# Session Transcript" in content
-        assert "Started:" in content
-
-    def test_append_to_transcript(self, tmp_path):
-        transcript = main.start_session_transcript(tmp_path)
-        main.append_to_transcript(transcript, "TestRole", 1, "Test Task", "Test Response")
-        
-        content = transcript.read_text(encoding="utf-8")
-        assert "## Step 1" in content
-        assert "TestRole" in content
-        assert "Test Task" in content
-        assert "Test Response" in content
 
     def test_save_report(self, tmp_path):
         report_path = tmp_path / "report.md"

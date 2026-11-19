@@ -45,7 +45,6 @@ h1{text-align:center;font-size:1.8rem;font-weight:800;color:#f1f5f9;margin-botto
 .h-appraisal{background:linear-gradient(135deg,#7c2d12,#1e293b)}
 .h-sr{background:linear-gradient(135deg,#134e4a,#1e293b)}
 .h-provider{background:linear-gradient(135deg,#1c1917,#1e293b)}
-.h-rag{background:linear-gradient(135deg,#312e81,#1e293b)}
 .h-deploy{background:linear-gradient(135deg,#064e3b,#1e293b)}
 footer{text-align:center;margin-top:48px;font-size:.76rem;color:#475569}
 </style>
@@ -389,41 +388,6 @@ CLI_THEME=dark</pre>
     <tr><td><code>--ui</code></td><td>Launch Streamlit UI</td></tr>
     <tr><td><code>--version</code></td><td>Show version number</td></tr>
   </table>
-</div></div>
-
-<!-- RAG -->
-<div class="card" onclick="toggle(this)">
-<div class="card-header h-rag">
-  <div class="card-icon" style="background:#312e81">&#129504;</div>
-  <div><div class="card-title">RAG - File Indexing</div><div class="card-badge">Automatic at session start</div></div>
-</div>
-<div class="card-body">
-  <p style="font-size:.82rem;color:#cbd5e1;margin-bottom:12px;">Files placed in input folders are automatically chunked, embedded, and stored in a per-session ChromaDB collection.</p>
-  <div class="section-label">Supported file types</div>
-  <span class="pill pill-purple">.txt</span>
-  <span class="pill pill-purple">.md</span>
-  <span class="pill pill-purple">.pdf</span>
-  <span class="pill pill-purple">.py</span>
-  <span class="pill pill-purple">.js</span>
-  <span class="pill pill-purple">.ts</span>
-  <span class="pill pill-purple">.json</span>
-  <span class="pill pill-purple">.yaml</span>
-  <span class="pill pill-purple">.sql</span>
-  <span class="pill pill-purple">.sh</span>
-  <div class="section-label" style="margin-top:12px">Input folders by mode</div>
-  <table>
-    <tr><th>Mode</th><th>Input folder</th></tr>
-    <tr><td>coding</td><td><code>input/coding/</code></td></tr>
-    <tr><td>writing</td><td><code>input/writing/</code></td></tr>
-    <tr><td>rct_search</td><td><code>input/rct_search/</code></td></tr>
-    <tr><td>appraisal</td><td><code>input/appraisal/</code></td></tr>
-    <tr><td>search</td><td><code>input/search/</code></td></tr>
-    <tr><td>sr</td><td><code>input/sr/</code> (PDFs + pico_*.json)</td></tr>
-  </table>
-  <div class="section-label">Embedding setup (.env)</div>
-  <pre>EMBEDDING_PROVIDER=ollama
-EMBEDDING_MODEL=nomic-embed-text</pre>
-  <div class="info">&#128161; Pull the embedding model: <code>ollama pull nomic-embed-text</code></div>
 </div></div>
 
 <!-- DEPLOYMENT -->

@@ -2,7 +2,7 @@
 main.py  - AI Automation Tool (version: see VERSION below)
 Supports six workflow modes: coding, writing, rct_search, appraisal, search, sr.
 Supports six AI providers: deepseek (default), openai, anthropic, ollama, groq, qwen.
-RAG layer: per-session, mode-specific input/ folder indexing via rag.py.
+Each --mode is sent by run_cli() to its own handler or pipeline.
 Coding mode: Builder (pipeline), Reviewer (standalone), Tester (standalone).
 """
 
@@ -54,7 +54,6 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from urllib.request import urlopen
-import uuid
 from datetime import datetime
 from pathlib import Path
 from dotenv import load_dotenv
@@ -509,47 +508,6 @@ def confirm_data_destinations(
 
 
 # ---------------------------------------------------------------------------
-# Context builder (with optional RAG)
-# ---------------------------------------------------------------------------
-def build_project_context(
-    role_name: str,
-    query: str = "",
-    mode: str = "",
-    session_id: str = "",
-) -> str:
-    """
-    Build the project context string injected into every AI prompt.
-    Reads small docs/ files for the role, then optionally appends RAG chunks.
-    """
-    doc_files = DOC_FILES_BY_ROLE.get(role_name, [])
-    sections: list[str] = []
-
-    for doc_path in doc_files:
-        if doc_path.exists():
-            content = doc_path.read_text(encoding="utf-8", errors="replace").strip()
-            if content:
-                sections.append(f"### {doc_path.name}\n{content}")
-
-    if query and mode and session_id:
-        try:
-            from utils import rag
-            rag_context = rag.retrieve(query, mode, session_id)
-            if rag_context:
-                sections.append(rag_context)
-        except Exception as exc:  # noqa: BLE001
-            print(f"[RAG] Retrieval warning: {exc}")
-
-    return "\n\n".join(sections)
-
-
-def truncate_context(text: str, max_chars: int = 2000) -> str:
-    """Return text unchanged if within max_chars, otherwise truncate with ellipsis."""
-    if len(text) <= max_chars:
-        return text
-    return text[:max_chars] + "\u2026"
-
-
-# ---------------------------------------------------------------------------
 # File utilities
 # ---------------------------------------------------------------------------
 def read_text_file(path: Path) -> str:
@@ -579,55 +537,6 @@ def save_report(
         fh.write(entry)
 
 
-def start_session_transcript(reports_dir: Path) -> Path:
-    """Create a new timestamped session transcript file. Returns its Path."""
-    reports_dir.mkdir(parents=True, exist_ok=True)
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    path      = reports_dir / f"session_{timestamp}.md"
-    path.write_text(
-        f"# Session Transcript\nStarted: {timestamp}\n",
-        encoding="utf-8",
-    )
-    return path
-
-
-def append_to_transcript(
-    path: Path,
-    role_name: str,
-    step: int,
-    task: str,
-    response: str,
-) -> None:
-    """Append one interaction step to an existing transcript file."""
-    entry = (
-        f"\n## Step {step}  - {role_name}\n"
-        f"**Task:** {task}\n\n"
-        f"**Response:**\n{response}\n"
-    )
-    with path.open("a", encoding="utf-8") as fh:
-        fh.write(entry)
-
-
-def print_session_summary(
-    transcript_path: Path,
-    step_count: int,
-    role_counts: dict[str, int],
-) -> None:
-    """Print a summary of the completed session to stdout."""
-    print(f"\n{'='*55}")
-    print(f"  Session complete")
-    print(f"  Transcript : {transcript_path.name}")
-    print(f"  Total steps: {step_count}")
-    if step_count == 0:
-        print("  No steps recorded.")
-    else:
-        print("\n  Role usage:")
-        for role, count in role_counts.items():
-            if count > 0:
-                print(f"    {role}: {count} step(s)")
-    print(f"{'='*55}\n")
-
-
 # ---------------------------------------------------------------------------
 # Colour helpers
 # ---------------------------------------------------------------------------
@@ -651,28 +560,6 @@ RESET = "\033[0m"
 
 def role_color(role_name: str) -> str:
     return COLOURS.get(role_name, RESET)
-
-
-def choose_role(mode: str = "coding") -> tuple[str, dict]:
-    """Prompt the user to pick a role and return (role_name, role_config)."""
-    roles      = ALL_MODES[mode]
-    role_names = list(roles.keys())
-
-    print(f"\nSelect a role for {mode} mode:")
-    for i, name in enumerate(role_names, start=1):
-        colour = role_color(name)
-        print(f"  {colour}{i}. {name}{RESET}")
-
-    while True:
-        try:
-            choice = input("Enter number: ").strip()
-        except (EOFError, KeyboardInterrupt):
-            choice = "1"
-            print("[no input detected - defaulting to role 1]")
-        if choice.isdigit() and 1 <= int(choice) <= len(role_names):
-            name = role_names[int(choice) - 1]
-            return name, roles[name]
-        print(f"Please enter a number between 1 and {len(role_names)}.")
 
 
 # ---------------------------------------------------------------------------
@@ -1193,38 +1080,8 @@ def generate_code_revision(
 
 
 # ---------------------------------------------------------------------------
-# Article helpers (appraisal mode)
+# Topic file and RCT search helpers
 # ---------------------------------------------------------------------------
-ARTICLE_EXTENSIONS = {".txt", ".md", ".pdf", ".docx"}
-ARTICLE_SIZE_LIMIT = 8000
-
-
-def _read_article_files(input_appraisal: Path) -> list[dict]:
-    """Read appraisal article files from input/appraisal/."""
-    results = []
-    if not input_appraisal.exists():
-        return results
-    for f in sorted(input_appraisal.iterdir()):
-        if f.suffix.lower() not in ARTICLE_EXTENSIONS:
-            continue
-        try:
-            if f.suffix.lower() == ".pdf":
-                text = _read_pdf_pymupdf(f)
-            elif f.suffix.lower() == ".docx":
-                text = _read_docx(f)
-            else:
-                text = f.read_text(encoding="utf-8", errors="replace")
-            if not text.strip():
-                continue
-            if len(text) <= ARTICLE_SIZE_LIMIT:
-                results.append({"name": f.name, "content": text})
-            else:
-                print(f"[Appraisal] {f.name} exceeds {ARTICLE_SIZE_LIMIT} chars  - passed to RAG.")
-        except Exception as exc:  # noqa: BLE001
-            print(f"[Appraisal] Could not read {f.name}: {exc}")
-    return results
-
-
 def _read_topic_file(topic_path: Path) -> str:
     if not topic_path.exists():
         return ""
@@ -1255,42 +1112,6 @@ def rct_search_reminder() -> None:
     if confirm != "y":
         print("Please edit the PICO file first, then re-run rct_search mode.")
         sys.exit(0)
-
-
-def save_rct_search_links(
-    response: str,
-    reports_dir: Path = REPORTS_DIR,
-) -> Path:
-    """
-    Extract URLs from an AI response and save them as a markdown link list.
-    Returns the path of the saved file.
-    """
-    urls = re.findall(r'https?://\S+', response)
-    urls = [u.rstrip(".,);\"'") for u in urls]
-
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    out_path  = reports_dir / f"rct_search_{timestamp}.md"
-    reports_dir.mkdir(parents=True, exist_ok=True)
-
-    lines = [
-        "# RCT Search Links",
-        f"Generated: {timestamp}",
-        "",
-        "Download this file from the `reports/` folder.",
-        "",
-        "## Search Result Links",
-        "",
-    ]
-    if urls:
-        for url in urls:
-            lines.append(f"- [{url}]({url})")
-    else:
-        lines.append("_No URLs found in the AI response._")
-
-    out_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
-    print(f"\n[RCT Search] Links saved to: {out_path.name}")
-    print(f"[RCT Search] Open reports\\{out_path.name} to download your links.\n")
-    return out_path
 
 
 # ---------------------------------------------------------------------------
@@ -2196,156 +2017,6 @@ def handle_writing_mode(
     )
 
     print(one_pass_done_line(track, result))
-
-
-# ---------------------------------------------------------------------------
-# Main interactive session loop
-# ---------------------------------------------------------------------------
-def main(
-    model_override: str | None = None,
-    dry_run: bool = False,
-    mode: str = "coding",
-    provider: str = "deepseek",
-) -> None:
-    """Run an interactive AI session."""
-    session_id  = uuid.uuid4().hex[:8]
-    transcript  = start_session_transcript(REPORTS_DIR)
-    step_count  = 0
-    role_counts: dict[str, int] = {
-        r: 0 for mode_roles in ALL_MODES.values() for r in mode_roles
-    }
-
-    print(f"\n{'='*55}")
-    print(f"  AI Automation Tool  v{VERSION}")
-    print(f"  Mode    : {mode}")
-    print(f"  Provider: {provider}")
-    print(f"  Session : {session_id}")
-    if dry_run:
-        print("  DRY RUN -- AI calls will be skipped")
-    print(f"{'='*55}\n")
-
-    input_files  = auto_load_input_files(mode)
-    rag_enabled  = False
-    input_folder = INPUT_DIR / mode
-    input_folder.mkdir(parents=True, exist_ok=True)
-
-    if not dry_run:
-        try:
-            from utils import rag as rag_module
-            n_chunks = rag_module.index_uploads(
-                mode=mode,
-                session_id=session_id,
-                upload_base=str(INPUT_DIR),
-            )
-            if n_chunks > 0:
-                rag_enabled = True
-                print(f"[RAG] Indexed {n_chunks} chunk(s) from input/{mode}/\n")
-        except Exception as exc:  # noqa: BLE001
-            print(f"[RAG] Indexing skipped: {exc}\n")
-
-    role_name, role_cfg = choose_role(mode)
-    colour      = role_color(role_name)
-    prompt_path = Path(role_cfg["prompt"])
-
-    if not prompt_path.exists():
-        print(f"Prompt file not found: {prompt_path}")
-        sys.exit(1)
-
-    role_prompt = prompt_path.read_text(encoding="utf-8", errors="replace")
-    print(f"\n{colour}Starting session as {role_name}{RESET}")
-    print("Type your task below. Press Ctrl+C to end the session.\n")
-
-    previous_response = ""
-
-    article_context = ""
-    if mode == "appraisal":
-        articles = _read_article_files(INPUT_APPRAISAL)
-        if articles:
-            parts_art = [
-                f"### Article: {art['name']}\n{art['content']}"
-                for art in articles
-            ]
-            article_context = "\n\n".join(parts_art)
-            print(f"[Appraisal] {len(articles)} article(s) loaded from input/appraisal/.")
-        else:
-            print("[Appraisal] No articles in input/appraisal/ -- using RAG only.")
-
-    try:
-        while True:
-            try:
-                task = input(f"{colour}{role_name} >{RESET} ").strip()
-            except (EOFError, KeyboardInterrupt):
-                print()
-                break
-            if not task:
-                continue
-
-            context = build_project_context(
-                role_name=role_name,
-                query=task if rag_enabled else "",
-                mode=mode,
-                session_id=session_id,
-            )
-
-            parts = [role_prompt]
-            if mode == "appraisal" and article_context:
-                parts.append(f"## Articles for Appraisal\n{article_context}")
-            if context:
-                parts.append(f"## Project Context\n{context}")
-            if previous_response:
-                parts.append(
-                    f"## Previous Response\n{truncate_context(previous_response)}"
-                )
-            parts.append(f"## Task\n{task}")
-            full_prompt = "\n\n".join(parts)
-
-            start = time.time()
-            if dry_run:
-                response = f"[DRY RUN] {role_name} would respond here."
-            else:
-                try:
-                    response = call_ai(
-                        prompt=full_prompt,
-                        provider=provider,
-                        model=model_override,
-                        stream=(not getattr(args, 'no_stream', False)) if 'args' in dir() else True,
-                    )
-                except RuntimeError as exc:
-                    response = f"[ERROR] {exc}"
-
-            elapsed     = time.time() - start
-            step_count += 1
-            role_counts[role_name] = role_counts.get(role_name, 0) + 1
-
-            print(f"\n{colour}--- {role_name} response ({elapsed:.1f}s) ---{RESET}")
-            print(response)
-            print()
-
-            append_to_transcript(
-                path=transcript,
-                role_name=role_name,
-                step=step_count,
-                task=task,
-                response=response,
-            )
-            previous_response = response
-
-            if mode == "rct_search" and not dry_run:
-                save_rct_search_links(response=response, reports_dir=REPORTS_DIR / "rct_search")
-
-
-    except KeyboardInterrupt:
-        print(f"\n\n{colour}Session ended.{RESET}")
-
-    finally:
-        print_session_summary(transcript, step_count, role_counts)
-        if rag_enabled and not dry_run:
-            try:
-                from utils import rag as rag_module
-                rag_module.clear_session(mode=mode, session_id=session_id)
-                print("[RAG] Session collection cleared.")
-            except Exception as exc:  # noqa: BLE001
-                print(f"[RAG] Clear warning: {exc}")
 
 
 # ---------------------------------------------------------------------------
