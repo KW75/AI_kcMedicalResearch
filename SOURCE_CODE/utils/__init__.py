@@ -1,7 +1,7 @@
 """
 Utility modules for AI kcMedicalResearch
 """
-from .path_utils import PATH_MANAGER, get_input_dir, get_output_dir, get_reports_dir, get_rag_db
+from .path_utils import PATH_MANAGER, get_input_dir, get_output_dir, get_reports_dir
 
 # Heavy dependencies (chromadb, pymupdf, docx2txt) are imported on first use
 # rather than at package import. "from utils.path_utils import ..." previously
@@ -34,7 +34,6 @@ __all__ = [
     "get_input_dir",
     "get_output_dir",
     "get_reports_dir",
-    "get_rag_db",
     "chunk_text",
     "get_embeddings",
     "index_uploads",
