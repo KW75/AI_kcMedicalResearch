@@ -1,9 +1,10 @@
 readme_rct_search_pipeline.txt
 ==============================
 RCT Search pipeline (launcher menu 5, --mode rct_search): how it works
-and what makes its results valid. Session 48, 2026-11-18. Checked
-against SOURCE_CODE/pipelines/rct_search/rct_search.py. Points not
-checked are listed in section 7.
+and what makes its results valid. Session 48, updated 2026-11-19 after
+the menu 5 fixes (PRs #48-#55). Checked against
+SOURCE_CODE/pipelines/rct_search/rct_search.py; section 7 lists what
+was checked and fixed.
 
 Short version: an AI writes the search strategy, two databases are
 searched (at most 100 records each), and an AI scores each record for
@@ -15,7 +16,8 @@ The scores are AI opinions, not screening decisions.
 -------------------------
   1-3. Three AI stages - Formulator, Searcher, Validator - build a
        PICO search strategy. Each stage gets the answer of the stage
-       before it. The strategy is saved as pico_<time>.json.
+       before it. The Formulator's PICO is saved as pico_<time>.json
+       (not in a dry run, and not if the Formulator is skipped).
   4.   PubMed and Europe PMC are searched, the results are merged,
        duplicates are removed, and an AI ranks the records.
 
@@ -42,8 +44,8 @@ PubMed query: the cleaned PICO terms joined with AND (or the topic
 alone if no terms were found), plus this RCT filter:
   AND (randomized controlled trial[pt] OR clinical trial[pt]
        OR random*[tiab] OR RCT[tiab])
-The full PubMed query is printed on screen and saved in the
-pico_<time>.json file (pubmed_query_cleaned).
+The full PubMed query is printed on screen and saved in this run's
+pico_<time>.json file (pubmed_query_cleaned), if one was saved.
 
 Limits:
 - At most 100 records from PubMed and 100 from Europe PMC. Anything
@@ -73,10 +75,20 @@ that column is a real PMID; use the Link column for those records.
 
 5. AI ranking
 -------------
-The AI gets the merged list and returns one line per record:
+The merged list is shuffled (except in a dry run) so that position
+does not bias the AI, and sent with each abstract and the
+Formulator's PICO. The AI returns one line per record:
   ARTICLE_RANK | SCORE | PMID | SOURCE | TITLE | URL
-SCORE runs from 1 to 10 (10 = most relevant to the PICO). The program
-reads these lines back with a text pattern.
+SCORE runs from 1 to 10 (10 = most relevant to the PICO); larger
+numbers are scaled down to 1-10. The program reads the lines back
+with a text pattern and matches them to the fetched records by PMID:
+title, link and source always come from the database record, each
+record is kept once, and lines with a PMID that was not fetched are
+dropped. Records the AI did not score are listed last with score
+"-". The screen line "Ranking check: N of K records scored by the
+AI; ... invented, ... repeated, ... left out" gives the counts.
+With local AI (Ollama) the records are ranked in batches that fit
+the model's window (section 7); cloud AI gets one prompt.
 
 What the score is NOT:
 - not an inclusion or exclusion decision;
@@ -89,21 +101,27 @@ Two runs, or two models, can rank the same records differently.
 ---------
 output/rct_search/
   rct_search_<time>.md     ranked table (Rank, Score, Source, Title,
-                           PMID, Link)
-  rct_search_<time>.docx   the same table, with links
-  rct_search_<time>.csv    the same columns, for a spreadsheet
-  pico_<time>.json         strategy, PubMed query
+                           PMID, Link); unscored records last ("-")
+  rct_search_<time>.docx   the same table, with links (a .csv with the
+                           same columns only if python-docx is missing)
+  pico_<time>.json         the Formulator's PICO, the PubMed query and
+                           the ranked list - this run's file only
 reports/rct_search/
   rct_search_<time>.md / .docx   full report with every stage's
                                  output (Formulator, Searcher,
                                  Validator, ranking)
---dry-run sends no searches and lists one fake test record.
+At the end you are asked whether to copy this run's pico_<time>.json
+to input/sr/ for the SR pipeline (not asked if no file was saved).
+--dry-run sends no searches, calls no AI, saves no pico_<time>.json
+and lists one fake test record; its count line reads "0 PubMed + 0
+Europe PMC = 1" (a known screen-text slip).
 
 
 7. Checked in the code (Session 48)
 -----------------------------------
-Checked in SOURCE_CODE/pipelines/rct_search/rct_search.py at e72820d
-(line numbers at that commit). All gaps found then are fixed (Session 48).
+Checked in SOURCE_CODE/pipelines/rct_search/rct_search.py (Session 48,
+first at e72820d). Every gap found was fixed in PRs #48-#55; function
+names are given instead of line numbers, which change.
 - Validator gate: fixed (Session 48). Stage 4 (search and ranking)
   still always runs; "REQUIRES REFINEMENT" is only printed and written
   in the report. Approval needs one clear verdict in the Validator's
@@ -116,8 +134,8 @@ Checked in SOURCE_CODE/pipelines/rct_search/rct_search.py at e72820d
   Validator's answer). If the Formulator fails or is skipped, the topic
   and any typed P/I/C/O are sent instead.
 - Abstracts: sent. Each record goes to the AI with source, PMID, title,
-  URL and abstract, or "No abstract available." (lines 763-779).
-  Europe PMC asks for full records (resultType=core, line 158).
+  URL and abstract, or "No abstract available." Europe PMC asks for
+  full records (resultType=core, fetch_europepmc_articles).
 - Failed searches: fixed for PubMed (Session 48). Europe PMC and PubMed
   both print a line and give 0 records: "[Europe PMC] Search failed:
   ...", "[PubMed] Search failed: ...", "[PubMed] Fetch failed: ..." or
@@ -158,13 +176,15 @@ Checked in SOURCE_CODE/pipelines/rct_search/rct_search.py at e72820d
 1. Use menu 5 for scoping, not as the search for a systematic review.
 2. Rerun the printed PubMed query yourself on pubmed.ncbi.nlm.nih.gov
    and note the date and the total number of hits.
-3. Check that the row count equals K (section 4); if not, find the
-   missing records in the report.
+3. The table always has K rows (section 4). Read the "Ranking check"
+   line: records the AI did not score are listed last with "-";
+   screen them like the rest.
 4. Screen ALL records yourself. Never drop a record because of a low
    AI score.
 5. Do not use the results if the Validator said REQUIRES REFINEMENT
    until you have reviewed and fixed the strategy.
-6. Open the link for every study you keep; the AI can copy a title or
-   PMID wrongly.
+6. Open the link for every study you keep. Title and link come from
+   the database record, but a record without a PMID shows a DOI or a
+   generated code in the PMID column (section 4).
 7. Search the other databases and registries (section 3) yourself.
 8. The reviewer who reports the search is responsible for it.
