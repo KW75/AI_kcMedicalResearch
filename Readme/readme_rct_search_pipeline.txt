@@ -143,9 +143,13 @@ Checked in SOURCE_CODE/pipelines/rct_search/rct_search.py at e72820d
   that file, and only that file is offered for copying to input/sr/.
   If no file was saved (formulator-prompt.md missing, or a dry run),
   the screen says so and no older run's file is changed or offered.
-- Local AI size: GAP. No size check. Up to 200 records with abstracts
-  can be far longer than Ollama's window (OLLAMA_CONTEXT); the effect
-  on the ranking has not been measured.
+- Local AI size: fixed (Session 48). For provider ollama the records are
+  ranked in batches: each prompt fits OLLAMA_CONTEXT (3 characters per
+  token, 8192 tokens kept for the answer) and holds at most 109 records,
+  so every rating line fits the answer limit. Abstracts are not cut.
+  More than one batch prints "Local AI: N records ranked in K batches".
+  A failed batch prints a line and leaves only its records unscored
+  ("-"). Cloud providers get one prompt, as before.
 
 
 8. Rules for valid use
