@@ -87,9 +87,10 @@ def fetch_pubmed_articles(
     )
 
     try:
-        with urllib.request.urlopen(search_url) as resp:
+        with urllib.request.urlopen(search_url, timeout=30) as resp:
             data = json.loads(resp.read().decode("utf-8"))
-    except Exception:
+    except Exception as e:
+        print(f"[PubMed] Search failed: {e}")
         return []
 
     ids = data.get("esearchresult", {}).get("idlist", [])
@@ -103,14 +104,16 @@ def fetch_pubmed_articles(
     )
 
     try:
-        with urllib.request.urlopen(fetch_url) as resp:
+        with urllib.request.urlopen(fetch_url, timeout=30) as resp:
             xml_data = resp.read().decode("utf-8")
-    except Exception:
+    except Exception as e:
+        print(f"[PubMed] Fetch failed: {e}")
         return []
 
     try:
         root = ET.fromstring(xml_data)
-    except ET.ParseError:
+    except ET.ParseError as e:
+        print(f"[PubMed] XML could not be read: {e}")
         return []
 
     articles = []

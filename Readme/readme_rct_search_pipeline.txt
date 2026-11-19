@@ -113,10 +113,11 @@ Checked in SOURCE_CODE/pipelines/rct_search/rct_search.py at e72820d
 - Abstracts: sent. Each record goes to the AI with source, PMID, title,
   URL and abstract, or "No abstract available." (lines 763-779).
   Europe PMC asks for full records (resultType=core, line 158).
-- Failed searches: Europe PMC prints "[Europe PMC] Search failed: ..."
-  and gives 0 records (lines 167-169). GAP: PubMed gives 0 records with
-  no message on any search, fetch or XML error, and has no time limit
-  (lines 89-114). If PubMed shows 0, rerun before trusting that.
+- Failed searches: fixed for PubMed (Session 48). Europe PMC and PubMed
+  both print a line and give 0 records: "[Europe PMC] Search failed:
+  ...", "[PubMed] Search failed: ...", "[PubMed] Fetch failed: ..." or
+  "[PubMed] XML could not be read: ...". All requests have a 30 s time
+  limit. If a source shows 0 with an error line, rerun before trusting it.
 - Ranking lines: fixed (Session 48). Only records that were fetched are
   kept, once each; title, URL and source come from the fetched record,
   not from the AI line. Every record the AI did not score (left out, or
