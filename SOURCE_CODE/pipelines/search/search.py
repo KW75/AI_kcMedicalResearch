@@ -306,6 +306,17 @@ def _call_llm(
         return f"[ERROR] {exc}"
 
 
+def _ai_failed(text: str) -> bool:
+    """True if the AI call gave no usable answer (error text or empty)."""
+    t = (text or "").strip()
+    return not t or t.startswith("[ERROR]")
+
+
+def _ai_failed_line(tag: str, text: str) -> str:
+    reason = (text or "").strip() or "empty answer"
+    return f"  [{tag}] AI call failed - no file written. {reason[:300]}"
+
+
 # ---------------------------------------------------------------------------
 # Output writers
 # ---------------------------------------------------------------------------
@@ -534,6 +545,9 @@ def run_topic_search(
         system_prompt, user_prompt, call_llm_fn,
         spinner_message="Generating synopsis",
     )
+    if _ai_failed(synopsis):
+        print(_ai_failed_line("TOPIC SEARCH", synopsis))
+        return
 
     # Strip LLM-generated References section and replace with ground-truth URLs
     synopsis = re.sub(
@@ -640,6 +654,9 @@ def run_article_search(
         system_prompt, user_prompt, call_llm_fn,
         spinner_message="Generating article summary",
     )
+    if _ai_failed(summary):
+        print(_ai_failed_line("ARTICLE SEARCH", summary))
+        return
 
     # Sanitise stem
     stem = re.sub(r"[^\w\-]", "_", f"{article_type}_{query}"[:60]).strip("_")
