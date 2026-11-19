@@ -69,9 +69,14 @@ uses other wording.
   NOT reduced here).
 - Their abstracts are fetched and given to the AI, which writes a
   summary and comparison.
-- Abstracts are matched to records by their position in PubMed's
-  reply. If that reply splits differently, an abstract can end up
-  under the wrong record. If the fetch fails, no message is shown.
+- Abstracts are matched to records by PMID, from PubMed's XML reply
+  (since Session 48; before, by position, which could put an
+  abstract under the wrong record). A record without an abstract
+  gets "[Abstract not available]". The abstract is only the
+  abstract text (structured parts keep labels such as "BACKGROUND:");
+  title, authors and journal are listed separately. If the fetch
+  fails, "PubMed abstract fetch error: ... - summary uses titles
+  only." is printed and the run continues.
 - Unlike Topic Search, the AI's text - including any reference list -
   is saved as written. Links, PMIDs and DOIs in it are not replaced by
   the real ones; check each one.
