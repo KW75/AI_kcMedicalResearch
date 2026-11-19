@@ -122,8 +122,9 @@ reports/search/
 The query part of a name is cut short and odd characters become "_".
 Without python-docx installed, the .docx is skipped with a warning.
 The last screen line names both files (the .docx only if written).
-The AI's text may contain LaTeX such as $\text{FeNO}$; Search does not
-remove it (the OCR pipeline does).
+The AI's text may contain LaTeX such as $\text{FeNO}$; Search turns known
+commands into plain symbols before saving (strip_latex, shared with OCR).
+Money such as $5 and unknown commands stay as they are.
 
 
 6. Privacy and size
