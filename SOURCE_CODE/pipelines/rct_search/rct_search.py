@@ -867,7 +867,11 @@ def run_rct_search_pipeline(
         random.shuffle(articles)
         print(f"[RCT Search] Shuffled {len(articles)} articles for unbiased ranking")
 
-    print(f"[RCT Search] Found {len(pubmed_articles)} PubMed + {len(europepmc_articles)} Europe PMC = {len(articles)} unique articles")
+    # Session 48: a dry run sends no searches; its fake record is not "found"
+    if dry_run:
+        print(f"[RCT Search] Dry run: no searches sent, {len(articles)} fake test record.")
+    else:
+        print(f"[RCT Search] Found {len(pubmed_articles)} PubMed + {len(europepmc_articles)} Europe PMC = {len(articles)} unique articles")
 
     if articles:
         print(f"[RCT Search] Ranking {len(articles)} articles by PICO relevance...")
