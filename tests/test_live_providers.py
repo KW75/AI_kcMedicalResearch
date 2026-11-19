@@ -97,7 +97,7 @@ def test_deepseek():
     import openai
     client = openai.OpenAI(api_key=key, base_url="https://api.deepseek.com")
     resp = client.chat.completions.create(
-        model="deepseek-v4-flash",
+        model="deepseek-flash",
         messages=[{"role": "user", "content": PROMPT}],
         max_tokens=20,
         extra_body={"thinking": {"type": "disabled"}},

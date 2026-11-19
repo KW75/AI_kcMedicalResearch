@@ -62,7 +62,7 @@ Self-contained pipeline for full systematic review workflow.
 |----------|------|---------------|-----------------|
 | Ollama | Local | Auto-detected (largest non-embedding model) | No |
 | Qwen/DashScope | Cloud | qwen-plus-latest | DASHSCOPE_API_KEY |
-| DeepSeek | Cloud | deepseek-chat | DEEPSEEK_API_KEY |
+| DeepSeek | Cloud | deepseek-flash | DEEPSEEK_API_KEY |
 | OpenAI | Cloud | gpt-4o-mini | OPENAI_API_KEY |
 | Anthropic | Cloud | claude-sonnet-4-20250514 | ANTHROPIC_API_KEY |
 | Groq | Cloud | llama-3.1-8b-instant | GROQ_API_KEY |
