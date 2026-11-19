@@ -113,8 +113,8 @@ reports/rct_search/
 At the end you are asked whether to copy this run's pico_<time>.json
 to input/sr/ for the SR pipeline (not asked if no file was saved).
 --dry-run sends no searches, calls no AI, saves no pico_<time>.json
-and lists one fake test record; its count line reads "0 PubMed + 0
-Europe PMC = 1" (a known screen-text slip).
+and lists one fake test record; its screen line reads "Dry run: no
+searches sent, 1 fake test record."
 
 
 7. Checked in the code (Session 48)
