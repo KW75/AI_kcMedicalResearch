@@ -97,20 +97,45 @@ reports/rct_search/
 --dry-run sends no searches and lists one fake test record.
 
 
-7. Not checked for this readme
-------------------------------
-These points were not checked in the code. Check them on your own run
-before you rely on the results:
-- Whether stage 4 still runs after "REQUIRES REFINEMENT" (section 2).
-- Whether a failed Europe PMC search shows an error, or just gives
-  0 records. If one source shows 0, rerun before trusting that.
-- Whether the ranking prompt includes abstracts or only titles.
-- What happens to a record the AI leaves out of its ranking lines.
-  Compare the number of rows with K from section 4.
-- How an existing pico_*.json (input/rct_search/ or
-  output/rct_search/) is reused.
-- There is no size check for local AI. A long ranking prompt (up to
-  200 records) has not been measured against Ollama's window.
+7. Checked in the code (Session 48)
+-----------------------------------
+Checked in SOURCE_CODE/pipelines/rct_search/rct_search.py at e72820d
+(line numbers at that commit). Items marked GAP are not fixed yet.
+- Validator gate: stage 4 (search and ranking) always runs.
+  "REQUIRES REFINEMENT" is only printed and written in the report
+  (lines 708-723). A Validator AI error also counts as REQUIRES
+  REFINEMENT. GAP: the check is a plain text search, so any answer that
+  contains "APPROVED FOR DOWNLOAD" counts as approved (line 709).
+- Ranking prompt: GAP. The "PICO Question" it sends is the last stage
+  output, which is the Validator's answer, not the Formulator's PICO
+  (lines 665 and 783).
+- Abstracts: sent. Each record goes to the AI with source, PMID, title,
+  URL and abstract, or "No abstract available." (lines 763-779).
+  Europe PMC asks for full records (resultType=core, line 158).
+- Failed searches: Europe PMC prints "[Europe PMC] Search failed: ..."
+  and gives 0 records (lines 167-169). GAP: PubMed gives 0 records with
+  no message on any search, fetch or XML error, and has no time limit
+  (lines 89-114). If PubMed shows 0, rerun before trusting that.
+- Ranking lines: GAP. PMID, title and URL are copied from the AI's line
+  and not matched to the fetched records, so an invented or repeated
+  record can appear in the list (lines 833-864). Records the AI leaves
+  out are dropped without a message, as long as at least half are
+  ranked. Below half, all records are listed in the (shuffled) fetch
+  order with position-based scores, not AI scores (lines 905-911),
+  under the same "ordered by PICO relevance score" heading. Compare the
+  number of rows with K from section 4.
+- AI not reachable: GAP. If call_ai cannot use main.call_ai it returns
+  "[MOCK] ..." text as if the AI had answered (lines 288-308); the
+  ranking error check looks only for "[ERROR" (line 817).
+- Saved PICO: up to 5 saved pico_*.json files are offered, from
+  input/rct_search/ if it has any, else output/rct_search/ (lines
+  528-570). The chosen file fills P, I, C, O and the topic; it is not
+  changed. Each run saves a new pico_<time>.json in output/rct_search/
+  after the Formulator (lines 670-704); the ranking is added to the
+  newest file there (lines 948-961), i.e. this run's file.
+- Local AI size: GAP. No size check. Up to 200 records with abstracts
+  can be far longer than Ollama's window (OLLAMA_CONTEXT); the effect
+  on the ranking has not been measured.
 
 
 8. Rules for valid use
