@@ -103,7 +103,7 @@ reports/rct_search/
 7. Checked in the code (Session 48)
 -----------------------------------
 Checked in SOURCE_CODE/pipelines/rct_search/rct_search.py at e72820d
-(line numbers at that commit). Items marked GAP are not fixed yet.
+(line numbers at that commit). All gaps found then are fixed (Session 48).
 - Validator gate: fixed (Session 48). Stage 4 (search and ranking)
   still always runs; "REQUIRES REFINEMENT" is only printed and written
   in the report. Approval needs one clear verdict in the Validator's
@@ -145,7 +145,8 @@ Checked in SOURCE_CODE/pipelines/rct_search/rct_search.py at e72820d
   the screen says so and no older run's file is changed or offered.
 - Local AI size: fixed (Session 48). For provider ollama the records are
   ranked in batches: each prompt fits OLLAMA_CONTEXT (3 characters per
-  token, 8192 tokens kept for the answer) and holds at most 109 records,
+  token, OLLAMA_NUM_PREDICT tokens kept for the answer, default 8192) and
+  holds at most 109 records (scaled with OLLAMA_NUM_PREDICT),
   so every rating line fits the answer limit. Abstracts are not cut.
   More than one batch prints "Local AI: N records ranked in K batches".
   A failed batch prints a line and leaves only its records unscored

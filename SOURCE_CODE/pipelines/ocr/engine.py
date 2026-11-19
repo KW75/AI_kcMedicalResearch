@@ -82,7 +82,8 @@ def _budget_chars() -> int:
     """How many characters of document text fit in one prompt."""
     import os
     ctx = int(os.getenv("OLLAMA_CONTEXT", "32768"))
-    return max(2000, (ctx - ANSWER_TOKENS - PROMPT_TOKENS) * CHARS_PER_TOKEN)
+    answer = int(os.getenv("OLLAMA_NUM_PREDICT", str(ANSWER_TOKENS)))
+    return max(2000, (ctx - answer - PROMPT_TOKENS) * CHARS_PER_TOKEN)
 
 
 def _split(text: str, limit: int) -> list[str]:
