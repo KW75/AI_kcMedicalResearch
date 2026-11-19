@@ -25,6 +25,7 @@ SOURCE_CODE_DIR = PROJECT_ROOT / "SOURCE_CODE"
 sys.path.insert(0, str(SOURCE_CODE_DIR))
 
 from utils.path_utils import PATH_MANAGER, get_input_dir, get_output_dir
+from pipelines.shared.latex import strip_latex
 
 try:
     from docx import Document
@@ -577,6 +578,7 @@ def run_topic_search(
         synopsis,
         flags=re.IGNORECASE,
     ).rstrip()
+    synopsis = strip_latex(synopsis)
     synopsis = synopsis + "\n\n" + ground_truth_refs
 
 
@@ -680,6 +682,8 @@ def run_article_search(
     if _ai_failed(summary):
         print(_ai_failed_line("ARTICLE SEARCH", summary))
         return
+
+    summary = strip_latex(summary)
 
     # Sanitise stem
     stem = re.sub(r"[^\w\-]", "_", f"{article_type}_{query}"[:60]).strip("_")
