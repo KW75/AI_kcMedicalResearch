@@ -49,14 +49,18 @@ You pick an article type; it becomes a PubMed filter:
   2 Meta-analysis      meta-analysis[pt]
   3 RCT                randomized controlled trial[pt]
   4 Guideline          guideline[pt]
-  5 Protocol           research support[pt]   <- WRONG, see below
+  5 Protocol           ("clinical trial protocol"[pt] OR protocol[ti])
   6 Review Article     review[pt]
   7 Clinical Trial     clinical trial[pt]
   8 Custom             your word, searched in title/abstract [tiab]
 An invalid choice gives Review Article.
 
-Choice 5 does not find protocols: "research support[pt]" marks funded
-research. Do not use it (open item).
+Choice 5 finds records tagged "clinical trial protocol" in PubMed or
+with "protocol" in the title (since Session 48; it used to be
+"research support[pt]", which marks funded research). It misses
+untagged protocols without "protocol" in the title (older records
+are less often tagged), and it can include titles such as "a new
+treatment protocol for ..." that are not study protocols.
 
 - PubMed is searched; the first 15 records are used (small models are
   NOT reduced here).
@@ -135,5 +139,6 @@ Without python-docx installed, the .docx is skipped with a warning.
 5. Check every statement against the article itself; Topic text rests
    on 300-character snippets.
 6. In Article output, check every link, PMID and DOI.
-7. Do not use article type 5 (Protocol).
+7. For type 5 (Protocol), check that each record is a study
+   protocol.
 8. The person who uses the summary is responsible for it.
