@@ -1,9 +1,10 @@
 readme_search_pipeline.txt
 ==========================
 Search pipeline (launcher menu 4, --mode search): how it works and what
-makes its results valid. Session 48, 2026-11-18. Checked against
-SOURCE_CODE/pipelines/search/search.py and handle_search_mode in
-SOURCE_CODE/main.py. Points not checked are listed in section 7.
+makes its results valid. Session 48, 2026-11-18, updated 2026-11-19
+after PRs #39 to #43. Checked against SOURCE_CODE/pipelines/search/
+search.py and handle_search_mode in SOURCE_CODE/main.py. Points not
+checked are listed in section 7.
 
 Short version: one database is searched (Europe PMC for Topic, PubMed
 for Article), only the first 5 to 15 records are used, and an AI writes
@@ -25,6 +26,13 @@ you type is joined with spaces into ONE search query. Do not type
 instructions such as "summarise in 200 words" - they are sent to the
 database as search words. (Topic Search also removes leading digits
 and dots from the query.)
+
+The query is matched against all fields, including journal names: in
+a live check, "asthma" also found angioedema and osteoarthritis
+papers from the "Iranian journal of allergy, asthma, and immunology".
+In Article Search, asthma[tiab] limits it to title and abstract (and
+may miss records that use other words). Field tags for Europe PMC
+(Topic) were not checked.
 
 
 2. Topic Search
@@ -114,6 +122,8 @@ reports/search/
 The query part of a name is cut short and odd characters become "_".
 Without python-docx installed, the .docx is skipped with a warning.
 The last screen line names both files (the .docx only if written).
+The AI's text may contain LaTeX such as $\text{FeNO}$; Search does not
+remove it (the OCR pipeline does).
 
 
 6. Privacy and size
@@ -131,8 +141,7 @@ The last screen line names both files (the .docx only if written).
 
 7. Not checked for this readme
 ------------------------------
-- The full Article prompt, and what the AI gets if the abstract fetch
-  failed.
+- The full Article prompt.
 - Which records come first: the program uses each service's default
   order; whether a sort is set for PubMed was not checked.
 - How the search guidelines folder is found and read.
@@ -144,12 +153,16 @@ The last screen line names both files (the .docx only if written).
 ----------------------
 1. Use menu 4 for orientation only, never as a literature search.
 2. Type only search words.
-3. After "No results", run again and try the query on europepmc.org
-   or pubmed.ncbi.nlm.nih.gov before concluding there is nothing.
+3. After "No results" with no error line above it, try the query on
+   europepmc.org or pubmed.ncbi.nlm.nih.gov before concluding there
+   is nothing. If an error line is shown, the service failed: run
+   again later.
 4. If the screen says "AI call failed", no file was written; run
    again. Any output that starts with "[ERROR]" is not a result.
 5. Check every statement against the article itself; Topic text rests
-   on 300-character snippets.
+   on 300-character snippets. The AI can miscount or misstate: in a
+   live check it said "eight RCTs" for 15 records, and "in the lungs"
+   where its own article summary said systemically.
 6. In Article output, check every link, PMID and DOI.
 7. For type 5 (Protocol), check that each record is a study
    protocol.
