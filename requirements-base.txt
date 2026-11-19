@@ -28,6 +28,3 @@ pillow>=10.4.0
 anthropic>=0.18.0
 openai>=1.0.0
 groq>=0.4.0
-
-# --- RAG / vector store ---
-chromadb>=0.4.0

@@ -4,12 +4,5 @@
 
 -r requirements-base.txt
 
-# chromadb pinned to a version with pre-built wheels for linux/py311.
-# This overrides the floor in requirements-base.txt.
-chromadb==0.5.23
-
-# ChromaDB needs a newer sqlite3 than the CI image provides.
-pysqlite3-binary>=0.5.2
-
 pytest>=7.0.0
 pytest-cov>=4.0.0

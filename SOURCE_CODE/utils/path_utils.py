@@ -40,7 +40,6 @@ class PathManager:
         self.input_dir = self.project_root / "input"
         self.output_dir = self.project_root / "output"
         self.reports_dir = self.project_root / "reports"
-        self.chroma_db_dir = self.project_root / "chroma_db"
  
         # Tests
         self.tests_dir = self.project_root / "tests"
@@ -58,7 +57,7 @@ class PathManager:
             self.scripts_dir,
             self.scripts_windows_dir, self.scripts_macos_dir,
             self.input_dir, self.output_dir,
-            self.reports_dir, self.chroma_db_dir,
+            self.reports_dir,
             self.tests_dir
         ]
         

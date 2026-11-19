@@ -20,10 +20,8 @@ inference (Ollama) and multiple cloud providers.
     │   │   ├── rct_search/rct_search.py    <- Formulator->Searcher->Validator
     │   │   ├── sr/                          <- Systematic Review (self-contained)
     │   │   └── shared/                      <- Cross-pipeline utilities
-    │   ├── utils/
-    │   │   └── path_utils.py              <- PATH_MANAGER, directory resolution
-    │   └── ui/
-    │       └── app.py                       <- Streamlit web interface
+    │   └── utils/
+    │       └── path_utils.py              <- PATH_MANAGER, directory resolution
     ├── scripts/
     │   ├── launcher.py                      <- Interactive CLI menu
     │   ├── windows/                         <- Windows setup scripts

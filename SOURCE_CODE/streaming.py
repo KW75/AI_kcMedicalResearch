@@ -314,7 +314,7 @@ def tee_stream(
     and return the complete buffered response.
 
     If display_fn is None, prints to stdout.
-    Useful for Streamlit: pass st.write_stream or a container.write method.
+    Pass any callable that takes a text chunk, e.g. a container.write method.
     """
     if display_fn is None:
         display_fn = lambda chunk: (sys.stdout.write(chunk), sys.stdout.flush())

@@ -2,8 +2,8 @@
 
 PathManager.get_rag_db_path(mode) and get_rag_db(mode) built
 chroma_db/<mode>_rag_db, but rag.py opens chroma_db directly
-(_get_client) and nothing called them. chroma_db_dir stays: the folder
-list created on import still uses it.
+(_get_client) and nothing called them. chroma_db_dir was removed later
+in Session 48 together with chromadb (step A2).
 """
 import sys
 from pathlib import Path
@@ -28,5 +28,5 @@ def test_utils_package_does_not_export_get_rag_db():
     assert "get_rag_db" not in getattr(utils, "__all__", [])
 
 
-def test_chroma_db_dir_kept():
-    assert pu.PATH_MANAGER.chroma_db_dir.name == "chroma_db"
+def test_chroma_db_dir_removed():
+    assert not hasattr(pu.PATH_MANAGER, "chroma_db_dir")
