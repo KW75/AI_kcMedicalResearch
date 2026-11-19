@@ -701,6 +701,7 @@ def run_rct_search_pipeline(
     previous_response = ""
     formulator_response = ""
     validator_response = ""
+    saved_pico_path = None
 
     for stage in stages:
         role = stage["role"]
@@ -775,6 +776,7 @@ def run_rct_search_pipeline(
                 encoding="utf-8",
             )
             print(f"[RCT Search] PICO saved to: {pico_json_path.name}")
+            saved_pico_path = pico_json_path
 
         # ----------------------------------------------------------------------
 
@@ -1008,16 +1010,18 @@ def run_rct_search_pipeline(
         top = ranked[0]["title"] if ranked else "N/A"
         print("[RCT Search] Ranking complete. Top article: " + top)
         
-        # Update PICO JSON
-        pico_files = sorted(OUTPUT_RCT_SEARCH.glob("pico_*.json"), reverse=True)
-        if pico_files:
-            pico_data = json.loads(pico_files[0].read_text(encoding="utf-8"))
+        # Update PICO JSON - Session 48: only the file this run saved
+        if saved_pico_path is None:
+            print("[RCT Search] No PICO JSON saved in this run - "
+                  "ranking not added to any file.")
+        else:
+            pico_data = json.loads(saved_pico_path.read_text(encoding="utf-8"))
             pico_data["ranked_articles"] = ranked
             pico_data["pubmed_query_raw"] = " AND ".join(
                 [t for t in [pico_population, pico_intervention, pico_outcome] if t]
             ) if any([pico_population, pico_intervention, pico_outcome]) else topic
             pico_data["pubmed_query_cleaned"] = _pubmed_query
-            pico_files[0].write_text(
+            saved_pico_path.write_text(
                 json.dumps(pico_data, indent=2, ensure_ascii=False),
                 encoding="utf-8",
             )
@@ -1068,9 +1072,9 @@ def run_rct_search_pipeline(
 
     # -- Auto-copy PICO JSON to input/sr/ -------------------------------------
     if not dry_run:
-        pico_files = sorted(OUTPUT_RCT_SEARCH.glob("pico_*.json"), reverse=True)
-        if pico_files:
-            latest_pico = pico_files[0]
+        # Session 48: offer only the pico_*.json this run saved
+        if saved_pico_path is not None:
+            latest_pico = saved_pico_path
             print()
             print(f"[RCT Search] Latest PICO JSON: {latest_pico.name}")
             try:

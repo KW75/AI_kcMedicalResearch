@@ -135,14 +135,14 @@ Checked in SOURCE_CODE/pipelines/rct_search/rct_search.py at e72820d
   raises ImportError or AttributeError. It raises RuntimeError: the
   stage then shows "[ERROR in <role>: ...]", and a ranking error
   lists every record unscored ("-").
-- Saved PICO: up to 5 saved pico_*.json files are offered, from
-  input/rct_search/ if it has any, else output/rct_search/ (lines
-  528-570). The chosen file fills P, I, C, O and the topic; it is not
-  changed. Each run saves a new pico_<time>.json in output/rct_search/
-  after the Formulator (lines 670-704); the ranking is added to the
-  newest file there (lines 948-961). GAP: if formulator-prompt.md is
-  missing, no file is saved, so the ranking goes into an older run's
-  file, which is also the one offered for copying to input/sr/.
+- Saved PICO: fixed (Session 48). Up to 5 saved pico_*.json files are
+  offered, from input/rct_search/ if it has any, else output/rct_search/.
+  The chosen file fills P, I, C, O and the topic; it is not changed.
+  Each run (not a dry run) saves a new pico_<time>.json in
+  output/rct_search/ after the Formulator. The ranking is added only to
+  that file, and only that file is offered for copying to input/sr/.
+  If no file was saved (formulator-prompt.md missing, or a dry run),
+  the screen says so and no older run's file is changed or offered.
 - Local AI size: GAP. No size check. Up to 200 records with abstracts
   can be far longer than Ollama's window (OLLAMA_CONTEXT); the effect
   on the ranking has not been measured.
