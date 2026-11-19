@@ -83,9 +83,11 @@ uses other wording.
 - No records: the run stops ("No results found" / "No articles
   found"). No AI call, no file.
 - Network error: an error line is printed, then the same stop.
-- Europe PMC answers with an HTTP error (for example 500 or 503): NO
-  error line, only "No results found". So "no results" can mean the
-  server failed. Try again before concluding there is nothing.
+- Europe PMC answers with an HTTP error (for example 429, 500 or 503):
+  the line "Europe PMC error: HTTP <code> - no records read. Try
+  again later." is printed, then the same stop (since Session 48;
+  before, only "No results found" was shown). PubMed HTTP errors
+  (Article Search) already print an error line.
 - The AI call fails, times out or returns nothing: no file and no
   report are written. The screen shows "AI call failed - no file
   written." with the error, and not "Complete." (Since Session 48.
