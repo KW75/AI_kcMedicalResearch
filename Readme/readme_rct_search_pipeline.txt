@@ -114,7 +114,9 @@ At the end you are asked whether to copy this run's pico_<time>.json
 to input/sr/ for the SR pipeline (not asked if no file was saved).
 --dry-run sends no searches, calls no AI, saves no pico_<time>.json
 and lists one fake test record; its screen line reads "Dry run: no
-searches sent, 1 fake test record."
+searches sent, 1 fake test record." It prints no "Searching PubMed /
+Europe PMC" lines, and its ranking line reads "Dry run: fake ranking,
+no AI call." instead of "Ranking check: ...".
 
 
 7. Checked in the code (Session 48)

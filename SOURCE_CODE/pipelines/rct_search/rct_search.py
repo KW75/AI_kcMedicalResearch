@@ -442,14 +442,16 @@ def _score_text(score) -> str:
     return "-" if score is None else f"{score}/10"
 
 
-def _match_ranked(ranked: list[dict], articles: list[dict]) -> list[dict]:
+def _match_ranked(ranked: list[dict], articles: list[dict],
+                  dry_run: bool = False) -> list[dict]:
     """Session 48: match the AI ranking lines to the fetched records.
 
     Only PMIDs that were fetched are kept, once each (first line wins);
     title, URL and source come from the fetched record, not the AI line.
     Every fetched record the AI did not score is added with score None
     (shown as "-"). One screen line counts invented, repeated and
-    left-out records.
+    left-out records. A dry run (fake ranking, no AI call) prints one
+    dry-run line instead.
     """
     by_pmid = {}
     for a in articles:
@@ -479,9 +481,12 @@ def _match_ranked(ranked: list[dict], articles: list[dict]) -> list[dict]:
         matched.append({"rank": 0, "score": None, "pmid": pmid,
                         "title": a.get("title", ""), "url": a.get("url", ""),
                         "source": a.get("source", "Unknown")})
-    print(f"[RCT Search] Ranking check: {scored} of {len(by_pmid)} records "
-          f"scored by the AI; {invented} invented, {repeated} repeated, "
-          f"{left_out} left out (listed as unscored).")
+    if dry_run:
+        print("[RCT Search] Dry run: fake ranking, no AI call.")
+    else:
+        print(f"[RCT Search] Ranking check: {scored} of {len(by_pmid)} records "
+              f"scored by the AI; {invented} invented, {repeated} repeated, "
+              f"{left_out} left out (listed as unscored).")
     return matched
 
 
@@ -844,13 +849,15 @@ def run_rct_search_pipeline(
     # Broadened RCT filter for PubMed
     _pubmed_query = _pubmed_query + " AND (randomized controlled trial[pt] OR clinical trial[pt] OR random*[tiab] OR RCT[tiab])"
     print(f"[RCT Search] PubMed query: {_pubmed_query}")
-    print("[RCT Search] Searching PubMed for relevant articles...")
+    if not dry_run:
+        print("[RCT Search] Searching PubMed for relevant articles...")
 
     # Search PubMed
     pubmed_articles = fetch_pubmed_articles(_pubmed_query, max_results=100) if not dry_run else []
 
     # Search Europe PMC
-    print("[RCT Search] Searching Europe PMC for relevant articles...")
+    if not dry_run:
+        print("[RCT Search] Searching Europe PMC for relevant articles...")
     _europe_query = f"{pico_population} {pico_intervention} {pico_outcome}" if pico_population else topic
     europepmc_articles = fetch_europepmc_articles(_europe_query, max_results=100) if not dry_run else []
 
@@ -1041,7 +1048,7 @@ def run_rct_search_pipeline(
                         })
         
         # Session 48: only fetched records, once each; unscored listed last
-        ranked = _match_ranked(ranked, articles)
+        ranked = _match_ranked(ranked, articles, dry_run=dry_run)
         
         # Sort by score (highest first)
         ranked.sort(key=lambda x: (x["score"] is None, -(x["score"] or 0)))
