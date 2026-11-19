@@ -117,14 +117,13 @@ Checked in SOURCE_CODE/pipelines/rct_search/rct_search.py at e72820d
   and gives 0 records (lines 167-169). GAP: PubMed gives 0 records with
   no message on any search, fetch or XML error, and has no time limit
   (lines 89-114). If PubMed shows 0, rerun before trusting that.
-- Ranking lines: GAP. PMID, title and URL are copied from the AI's line
-  and not matched to the fetched records, so an invented or repeated
-  record can appear in the list (lines 833-864). Records the AI leaves
-  out are dropped without a message, as long as at least half are
-  ranked. Below half, all records are listed in the (shuffled) fetch
-  order with position-based scores, not AI scores (lines 905-911),
-  under the same "ordered by PICO relevance score" heading. Compare the
-  number of rows with K from section 4.
+- Ranking lines: fixed (Session 48). Only records that were fetched are
+  kept, once each; title, URL and source come from the fetched record,
+  not from the AI line. Every record the AI did not score (left out, or
+  all of them after an AI error or an answer that cannot be read) is
+  listed at the end with score "-"; no position-based scores. One screen
+  line "Ranking check: N of K records scored by the AI; ... invented,
+  ... repeated, ... left out" gives the counts.
 - AI not reachable: GAP. If call_ai cannot use main.call_ai it returns
   "[MOCK] ..." text as if the AI had answered (lines 288-308); the
   ranking error check looks only for "[ERROR" (line 817).
