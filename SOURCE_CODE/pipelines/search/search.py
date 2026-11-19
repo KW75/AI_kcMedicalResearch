@@ -47,7 +47,10 @@ ARTICLE_TYPES = {
     "2": ("Meta-analysis",      "meta-analysis[pt]"),
     "3": ("RCT",                "randomized controlled trial[pt]"),
     "4": ("Guideline",          "guideline[pt]"),
-    "5": ("Protocol",           "research support[pt]"),
+    "5": ("Protocol",           '("clinical trial protocol"[pt]'
+                                ' OR "study protocol"[ti] OR "trial protocol"[ti]'
+                                ' OR "review protocol"[ti] OR "protocol for a"[ti]'
+                                ' OR "protocol design"[ti])'),
     "6": ("Review Article",     "review[pt]"),
     "7": ("Clinical Trial",     "clinical trial[pt]"),
     "8": ("Custom",             ""),
