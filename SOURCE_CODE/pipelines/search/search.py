@@ -257,7 +257,14 @@ def _pubmed_fetch_abstracts(
     articles: list[dict],
     api_key: str = "",
 ) -> list[dict]:
-    """Fetch abstracts for a list of articles (adds 'abstract' key)."""
+    """Fetch abstracts for a list of articles (adds 'abstract' key).
+
+    Asks PubMed for XML and matches each abstract to its record by PMID,
+    so an abstract never lands under the wrong record. A record with no
+    abstract keeps "". A failed fetch prints an error line.
+    """
+    import xml.etree.ElementTree as ET
+
     if not articles:
         return articles
     ids = [a["uid"] for a in articles]
@@ -265,19 +272,32 @@ def _pubmed_fetch_abstracts(
         "db":       "pubmed",
         "id":       ",".join(ids),
         "rettype":  "abstract",
-        "retmode":  "text",
+        "retmode":  "xml",
     }
     if api_key:
         params["api_key"] = api_key
     try:
         r = requests.get(PUBMED_EFETCH, params=params, timeout=30)
         r.raise_for_status()
-        # Split by double newline blocks  - each article separated by blank lines
-        blocks = re.split(r"\n{3,}", r.text.strip())
-        for i, article in enumerate(articles):
-            article["abstract"] = blocks[i].strip() if i < len(blocks) else ""
-    except Exception:
-        pass
+        root = ET.fromstring(r.content)
+        by_pmid: dict = {}
+        for art in root:
+            pmid_el = art.find(".//PMID")
+            abs_el = art.find(".//Abstract")
+            if pmid_el is None or abs_el is None:
+                continue
+            parts = []
+            for at in abs_el.iter("AbstractText"):
+                text = " ".join("".join(at.itertext()).split())
+                label = at.get("Label")
+                if text:
+                    parts.append(f"{label}: {text}" if label else text)
+            by_pmid[(pmid_el.text or "").strip()] = "\n".join(parts)
+        for article in articles:
+            article["abstract"] = by_pmid.get(str(article["uid"]), "")
+    except Exception as exc:
+        print(f"  [SEARCH] PubMed abstract fetch error: {exc}"
+              " - summary uses titles only.")
     return articles
 
 # ---------------------------------------------------------------------------
