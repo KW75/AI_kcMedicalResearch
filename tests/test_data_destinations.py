@@ -115,8 +115,9 @@ class TestConfirmDataDestinations:
         ok, _ = _ask("search", "ollama")
         out = capsys.readouterr().out.lower()
         assert ok is True
-        for service in ("pubmed", "europe pmc", "duckduckgo"):
+        for service in ("pubmed", "europe pmc"):
             assert service in out
+        assert "duckduckgo" not in out  # Topic uses Europe PMC
 
     def test_local_rct_search_names_its_search_services_only(self, capsys):
         ok, _ = _ask("rct_search", "ollama")
