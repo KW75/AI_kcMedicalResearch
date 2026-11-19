@@ -168,6 +168,9 @@ def _europepmc_search(query: str, max_results: int = MAX_RESULTS_TOPIC) -> list[
                     })
                 if len(results) >= max_results:
                     break
+        else:
+            print(f"  [SEARCH] Europe PMC error: HTTP {r.status_code}"
+                  " - no records read. Try again later.")
     except Exception as exc:
         print(f"  [SEARCH] Europe PMC error: {exc}")
     return results[:max_results]
