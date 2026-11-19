@@ -163,7 +163,7 @@ def _stream_ollama(prompt: str, model: str = None) -> Generator[str, None, None]
         "stream": True,
         "think": False,  # qwen3/gemma4 think by default; see TestOllamaThinkOff
         "options": {
-            "num_predict": 8192,
+            "num_predict": int(os.getenv("OLLAMA_NUM_PREDICT", "8192")),
             "num_ctx": int(os.getenv("OLLAMA_CONTEXT", "32768")),
             "temperature": float(os.getenv("OLLAMA_TEMPERATURE", "0.3")),
         },

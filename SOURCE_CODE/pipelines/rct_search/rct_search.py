@@ -277,8 +277,8 @@ def merge_search_results(
 
 # Session 48: Ollama's window (num_ctx = OLLAMA_CONTEXT, default 32768
 # tokens) holds prompt + answer and drops what does not fit. main.call_ai
-# passes no max_tokens, so the answer limit is call_ollama_provider's
-# default 8192. Same cautious 3 chars/token as ocr/engine.py.
+# passes no max_tokens, so the answer limit is OLLAMA_NUM_PREDICT
+# (default 8192). Same cautious 3 chars/token as ocr/engine.py.
 RANK_CHARS_PER_TOKEN = 3
 RANK_ANSWER_TOKENS = 8192
 RANK_MARGIN_TOKENS = 1000
@@ -297,9 +297,10 @@ def _rank_batches(blocks, head_chars, provider):
         return [list(range(len(blocks)))] if blocks else []
     import os
     ctx = int(os.getenv("OLLAMA_CONTEXT", "32768"))
-    budget = (ctx - RANK_ANSWER_TOKENS - RANK_MARGIN_TOKENS) * RANK_CHARS_PER_TOKEN
+    answer = int(os.getenv("OLLAMA_NUM_PREDICT", str(RANK_ANSWER_TOKENS)))
+    budget = (ctx - answer - RANK_MARGIN_TOKENS) * RANK_CHARS_PER_TOKEN
     room = max(2000, budget - head_chars)
-    max_n = max(1, RANK_ANSWER_TOKENS * 8 // 10 // RANK_LINE_TOKENS)
+    max_n = max(1, answer * 8 // 10 // RANK_LINE_TOKENS)
     batches, cur, size = [], [], 0
     for i, block in enumerate(blocks):
         if cur and (size + len(block) > room or len(cur) >= max_n):

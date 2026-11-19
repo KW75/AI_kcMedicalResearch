@@ -289,10 +289,17 @@ def ollama_temperature() -> float:
     return float(os.getenv("OLLAMA_TEMPERATURE", "0.3"))
 
 
+def ollama_num_predict() -> int:
+    """OLLAMA_NUM_PREDICT (default 8192): the answer limit (num_predict) of
+    Ollama calls that pass no max_tokens - menus, OCR and streaming. SR
+    stages pass their own fixed limits (Session 48)."""
+    return int(os.getenv("OLLAMA_NUM_PREDICT", "8192"))
+
+
 def call_ollama_provider(
     prompt: str,
     model: str | None = None,
-    max_tokens: int = 8192,
+    max_tokens: int | None = None,
     images: list[bytes] | None = None,
 ) -> str:
     """Send a prompt to the local Ollama generate endpoint.
@@ -309,7 +316,7 @@ def call_ollama_provider(
         "stream": False,
         "think": False,  # qwen3/gemma4 think by default; see TestOllamaThinkOff
         "options": {
-            "num_predict": max_tokens,
+            "num_predict": max_tokens if max_tokens is not None else ollama_num_predict(),
             "num_ctx": int(os.getenv("OLLAMA_CONTEXT", "32768")),
             "temperature": ollama_temperature(),
             "top_p": 0.9,
@@ -341,7 +348,8 @@ def call_ollama_provider(
                     f"done_reason={data.get('done_reason')}). It is a "
                     f"thinking model that ignores think=false. Choose a "
                     f"vision model whose tag ends in -instruct (launcher "
-                    f"10 Setup -> 2 Local AI), or raise OLLAMA_NUM_PREDICT.")
+                    f"10 Setup -> 2 Local AI), or raise OLLAMA_NUM_PREDICT "
+                    f"(menus and OCR; SR stages use fixed limits).")
             raise RuntimeError("Ollama returned an empty response.")
         # Session 42: thinking text + done_reason=length = the answer was
         # cut off mid-JSON; it would only fail to parse ("unusable").
@@ -352,7 +360,8 @@ def call_ollama_provider(
                 f"done_reason=length). It is a thinking model that ignores "
                 f"think=false. Choose a vision model whose tag ends in "
                 f"-instruct (launcher 10 Setup -> 2 Local AI), or raise "
-                f"OLLAMA_NUM_PREDICT.")
+                f"OLLAMA_NUM_PREDICT (menus and OCR; SR stages use fixed "
+                f"limits).")
         return response_text
     except urllib.error.HTTPError as exc:
         # 404 = the model has not been pulled yet. Give a plain-language fix
