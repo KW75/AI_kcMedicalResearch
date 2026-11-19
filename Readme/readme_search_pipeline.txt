@@ -106,6 +106,7 @@ reports/search/
       log with article type and number of records
 The query part of a name is cut short and odd characters become "_".
 Without python-docx installed, the .docx is skipped with a warning.
+The last screen line names both files (the .docx only if written).
 
 
 6. Privacy and size
@@ -114,8 +115,9 @@ Without python-docx installed, the .docx is skipped with a warning.
   over the internet, even with local AI. Keep patient details out.
 - With a cloud AI, the records and your query also go to that
   provider.
-- The cloud confirmation prompt still lists DuckDuckGo, but menu 4 no
-  longer contacts it (Topic Search moved to Europe PMC).
+- The [LOCAL AI] notice and the cloud confirmation prompt name
+  PubMed and Europe PMC. (Until Session 48 they also named
+  DuckDuckGo, which menu 4 no longer contacts.)
 - There is no local size check. Prompts are small (at most 10
   snippets, or 15 abstracts), but this was not measured (section 7).
 

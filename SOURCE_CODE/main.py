@@ -419,7 +419,7 @@ def call_ai(
 # Where a job's data goes: banner and cloud consent (v2.5 local-first)
 # ---------------------------------------------------------------------------
 SEARCH_SERVICES = {
-    "search":     ["PubMed", "Europe PMC", "DuckDuckGo"],
+    "search":     ["PubMed", "Europe PMC"],
     "rct_search": ["PubMed", "Europe PMC"],
 }
 
@@ -1970,7 +1970,7 @@ def handle_search_mode(provider: str, model: str, sub_mode: str = None) -> None:
     from pipelines.search.search import run_topic_search, run_article_search
 
     print("\n=== SEARCH MODE ===")
-    print("  1. Topic Search  (web synopsis with reference links)")
+    print("  1. Topic Search  (Europe PMC synopsis with reference links)")
     print("  2. Article Search (PubMed by article type + comparison)")
     
     # Determine sub-mode   

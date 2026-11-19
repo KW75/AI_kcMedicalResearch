@@ -4,7 +4,7 @@ A multi-mode AI assistant for medical research, critical appraisal, systematic r
 
 
     Version: 2.6.0
-    Tests: 1749 passed, 10 deselected
+    Tests: 1755 passed, 10 deselected
            (reproduce with `python -m pytest -m "not live" --tb=short -q`)
     CI: GitHub Actions - Green
     GitHub: https://github.com/KW75/AI_kcMedicalResearch
@@ -145,7 +145,7 @@ and check the key numbers against the PDF.
 | Ollama (default)   | `--provider ollama`    | `OLLAMA_HOST`, `OLLAMA_MODEL` | Free, offline. SR and OCR need a vision model (default qwen3-vl:30b-a3b-instruct, about 20 GB, CPU-only; not pulled -> warning, gemma4:e4b); SR results need reviewer checks (Readme/readme_sr_pipeline.txt). Set OLLAMA_MODEL (default gemma4:e4b). |
 
 
-**Confidentiality gate.** Ollama runs entirely on your machine and starts without any prompt. If you choose a cloud provider, the app first lists every external service your input could be sent to (the chosen provider plus any `FALLBACK_PROVIDERS` backups) and asks `Continue? [y/N]`. Pressing Enter cancels. For scripted or non-interactive runs, add `--confirm-cloud` to accept explicitly; without it, a run with no keyboard attached is refused. Search modes always contact PubMed / Europe PMC (and DuckDuckGo for Search) with your search terms, even when the AI model is local.
+**Confidentiality gate.** Ollama runs entirely on your machine and starts without any prompt. If you choose a cloud provider, the app first lists every external service your input could be sent to (the chosen provider plus any `FALLBACK_PROVIDERS` backups) and asks `Continue? [y/N]`. Pressing Enter cancels. For scripted or non-interactive runs, add `--confirm-cloud` to accept explicitly; without it, a run with no keyboard attached is refused. Search modes always contact PubMed / Europe PMC with your search terms, even when the AI model is local.
 
 On transient errors (timeout, 429, 502, 503) the system tries the next
 provider. Default chain: DeepSeek -> Qwen -> Groq (`FALLBACK_PROVIDERS`).

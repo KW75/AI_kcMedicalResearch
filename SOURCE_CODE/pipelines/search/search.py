@@ -3,7 +3,7 @@ src/modes/search.py
 Search mode engine for AI kcMedicalResearch.
 
 Sub-modes:
-  - Topic Search  : DuckDuckGo web search  - LLM synopsis with reference links
+  - Topic Search  : Europe PMC search  - LLM synopsis with reference links
   - Article Search: PubMed search by article type  - LLM summary + comparison
 """
 from __future__ import annotations
@@ -39,8 +39,6 @@ except ImportError:
 PUBMED_ESEARCH = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi"
 PUBMED_EFETCH  = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi"
 PUBMED_ESUM    = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi"
-DDG_API        = "https://api.duckduckgo.com/"
-DDG_HTML       = "https://html.duckduckgo.com/html/"
 
 ARTICLE_TYPES = {
     "1": ("Systematic Review",  "systematic[sb]"),
@@ -129,10 +127,7 @@ def _load_guidelines(docs_path: Path) -> str:
     return "\n\n".join(parts)
 
 # ---------------------------------------------------------------------------
-# DuckDuckGo web search
-# ---------------------------------------------------------------------------
-# ---------------------------------------------------------------------------
-# Europe PMC search (replaces DuckDuckGo for Topic Search)
+# Europe PMC search (Topic Search)
 # ---------------------------------------------------------------------------
 EUROPEPMC_SEARCH = "https://www.ebi.ac.uk/europepmc/webservices/rest/search"
 
@@ -521,12 +516,12 @@ def run_topic_search(
 
     print(f"\n  [TOPIC SEARCH] Query: {query}")
 
-    # Web search
+    # Europe PMC search
     topic_limit, _ = _result_limits(model)
     with _Spinner("Searching Europe PMC"):
         results = _europepmc_search(query, max_results=topic_limit)
 
-    print(f"  [SEARCH] Found {len(results)} web results.")
+    print(f"  [SEARCH] Found {len(results)} Europe PMC record(s).")
 
     if not results:
         print("  [SEARCH] No results found. Try a different query.")
@@ -579,7 +574,9 @@ def run_topic_search(
     )
 
     print(f"\n  [TOPIC SEARCH] Complete.")
-    print(f"  Output : output/search/TOPIC_{stem}_{ts}.md")
+    print(f"  Output : output/search/{md_path.name}")
+    if docx_path.exists():
+        print(f"           output/search/{docx_path.name}")
 
 
 def run_article_search(
@@ -678,6 +675,8 @@ def run_article_search(
     )
 
     print(f"\n  [ARTICLE SEARCH] Complete.")
-    print(f"  Output : output/search/ARTICLE_{stem}_{ts}.md")
+    print(f"  Output : output/search/{md_path.name}")
+    if docx_path.exists():
+        print(f"           output/search/{docx_path.name}")
 
 
