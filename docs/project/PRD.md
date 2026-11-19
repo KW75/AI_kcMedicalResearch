@@ -73,7 +73,6 @@ Provider selection: --provider ollama|qwen|deepseek|openai|anthropic|groq
 ## Key Features
 - Ollama auto-detection: queries /api/tags, selects largest local model
 - All model names configurable via .env (no hard-coded versions)
-- RAG support via document reader and embedding utilities
 - Session transcripts saved to reports/ folder
 - Cross-platform: Windows, macOS, Linux
 - Interactive launcher menu (scripts/launcher.py)

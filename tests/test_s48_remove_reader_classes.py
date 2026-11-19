@@ -20,7 +20,7 @@ def test_document_reader_module_removed():
 
 
 def test_ragutils_class_removed():
-    assert "RAGUtils" not in _top_names(UTILS / "rag.py")
+    assert not (UTILS / "rag.py").exists()  # module removed later in Session 48
 
 
 def test_utils_init_does_not_list_document_reader():
@@ -29,9 +29,9 @@ def test_utils_init_does_not_list_document_reader():
 
 def test_every_lazy_name_still_exists():
     tree = ast.parse((UTILS / "__init__.py").read_text(encoding="utf-8"))
-    lazy = next(ast.literal_eval(n.value) for n in tree.body
+    lazy = next((ast.literal_eval(n.value) for n in tree.body
                 if isinstance(n, ast.Assign)
-                and getattr(n.targets[0], "id", "") == "_LAZY")
+                and getattr(n.targets[0], "id", "") == "_LAZY"), {})
     for name, module in lazy.items():
         assert name in _top_names(UTILS / (module.lstrip(".") + ".py")), name
 

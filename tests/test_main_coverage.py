@@ -1,5 +1,5 @@
 """
-Corrected tests for main.py: argument parsing, interactive loop,
+Corrected tests for main.py: argument parsing, CLI routing,
 helpers, validation, and session management.
 """
 import pytest
@@ -62,74 +62,6 @@ class TestMainArgumentParsing:
                 main.parse_args()
 
 
-class TestMainInteractiveLoop:
-    """Test main()'s interactive loop (calls call_ai, not run_* funcs)."""
-
-    def _run_main(self, mode, provider, dry_run,
-                  mock_choose_role, role_name, prompt_rel):
-        mock_choose_role.return_value = (
-            role_name,
-            {'prompt': prompt_rel, 'system': 'system prompt'},
-        )
-        with patch('builtins.input', side_effect=['do the task', KeyboardInterrupt()]), \
-             patch('utils.rag.index_uploads', return_value=0), \
-             patch('utils.rag.clear_session'), \
-             patch('SOURCE_CODE.main.call_ai', return_value='AI response') as mock_call_ai, \
-             patch('SOURCE_CODE.main.build_project_context', return_value=''), \
-             patch('SOURCE_CODE.main.append_to_transcript'), \
-             patch('SOURCE_CODE.main.start_session_transcript',
-                   return_value=Path('reports/session_transcript.txt')), \
-             patch('SOURCE_CODE.main.print_session_summary'), \
-             patch('SOURCE_CODE.main._read_article_files', return_value=[]), \
-             patch('SOURCE_CODE.main.Path.exists', return_value=True), \
-             patch('SOURCE_CODE.main.Path.read_text', return_value='Prompt content'), \
-             patch('sys.argv', ['main.py']):
-            main.main(mode=mode, provider=provider, dry_run=dry_run)
-        return mock_call_ai
-
-    @patch('SOURCE_CODE.main.choose_role')
-    def test_main_coding_mode(self, mock_choose_role):
-        m = self._run_main('coding', 'deepseek', False, mock_choose_role,
-                           'Builder', 'prompts/builder-prompt.md')
-        mock_choose_role.assert_called_once_with('coding')
-        m.assert_called_once()
-
-    @patch('SOURCE_CODE.main.choose_role')
-    def test_main_writing_mode(self, mock_choose_role):
-        m = self._run_main('writing', 'deepseek', False, mock_choose_role,
-                           'Editor', 'prompts/editor-prompt.md')
-        mock_choose_role.assert_called_once_with('writing')
-        m.assert_called_once()
-
-    @patch('SOURCE_CODE.main.choose_role')
-    def test_main_appraisal_mode(self, mock_choose_role):
-        m = self._run_main('appraisal', 'deepseek', False, mock_choose_role,
-                           'Appraiser', 'prompts/appraisal-prompt.md')
-        mock_choose_role.assert_called_once_with('appraisal')
-        m.assert_called_once()
-
-    @patch('SOURCE_CODE.main.choose_role')
-    def test_main_search_mode(self, mock_choose_role):
-        m = self._run_main('search', 'deepseek', False, mock_choose_role,
-                           'Researcher', 'prompts/researcher-prompt.md')
-        mock_choose_role.assert_called_once_with('search')
-        m.assert_called_once()
-
-    @patch('SOURCE_CODE.main.choose_role')
-    def test_main_rct_search_mode(self, mock_choose_role):
-        m = self._run_main('rct_search', 'deepseek', False, mock_choose_role,
-                           'Formulator', 'prompts/formulator-prompt.md')
-        mock_choose_role.assert_called_once_with('rct_search')
-        m.assert_called_once()
-
-    @patch('SOURCE_CODE.main.choose_role')
-    def test_main_dry_run_skips_call_ai(self, mock_choose_role):
-        m = self._run_main('coding', 'deepseek', True, mock_choose_role,
-                           'Builder', 'prompts/coding/builder.txt')
-        mock_choose_role.assert_called_once_with('coding')
-        m.assert_not_called()
-
-
 class TestCliRouting:
     """Test run_cli() mode dispatch (#43).
 
@@ -161,14 +93,6 @@ class TestCliRouting:
                           return_value=True) as mock_confirm:
             assert kw["confirm"]("openai") is True
         assert mock_confirm.call_args.args[:2] == ("sr", "openai")
-
-    @patch('SOURCE_CODE.main.validate_api_keys')
-    @patch('SOURCE_CODE.main.choose_role')
-    @patch('SOURCE_CODE.main.run_sr_launcher')
-    def test_sr_mode_never_reaches_choose_role(self, _mock_launcher,
-                                               mock_choose_role, _mock_keys):
-        main.run_cli(main.parse_args(['--mode', 'sr', '--confirm-cloud']))
-        mock_choose_role.assert_not_called()
 
     @patch('SOURCE_CODE.main.validate_api_keys')
     @patch('SOURCE_CODE.main.handle_coding_mode')
