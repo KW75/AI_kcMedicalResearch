@@ -8,7 +8,12 @@ from pathlib import Path
 
 from pipelines.search import search as s
 
-NEW_FILTER = '("clinical trial protocol"[pt] OR protocol[ti])'
+NEW_FILTER = (
+    '("clinical trial protocol"[pt]'
+    ' OR "study protocol"[ti] OR "trial protocol"[ti]'
+    ' OR "review protocol"[ti] OR "protocol for a"[ti]'
+    ' OR "protocol design"[ti])'
+)
 
 
 def test_protocol_filter_finds_protocols():
