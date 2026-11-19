@@ -103,10 +103,6 @@ class PathManager:
         """Get reports path for a specific mode"""
         return self.reports_dir / mode
     
-    def get_rag_db_path(self, mode: str) -> Path:
-        """Get RAG database path for a specific mode"""
-        return self.chroma_db_dir / f"{mode}_rag_db"
-    
     def get_docs_mode_path(self, mode: str) -> Path:
         """Get docs path for a specific mode"""
         return self.docs_dir / mode
@@ -147,9 +143,6 @@ def get_reports_dir(mode: Optional[str] = None) -> Path:
     if mode:
         return PATH_MANAGER.get_reports_path(mode)
     return PATH_MANAGER.reports_dir
-
-def get_rag_db(mode: str) -> Path:
-    return PATH_MANAGER.get_rag_db_path(mode)
 
 def get_docs_mode(mode: str) -> Path:
     return PATH_MANAGER.get_docs_mode_path(mode)
