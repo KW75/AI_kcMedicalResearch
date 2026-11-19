@@ -79,8 +79,11 @@ research. Do not use it (open item).
 - Europe PMC answers with an HTTP error (for example 500 or 503): NO
   error line, only "No results found". So "no results" can mean the
   server failed. Try again before concluding there is nothing.
-- The AI call fails or times out: the text "[ERROR] ..." is saved as
-  the synopsis or summary, and the screen still says "Complete."
+- The AI call fails, times out or returns nothing: no file and no
+  report are written. The screen shows "AI call failed - no file
+  written." with the error, and not "Complete." (Since Session 48.
+  Limit: an error returned without the "[ERROR]" prefix is not
+  caught and would still be saved.)
   Open the output before using it.
 
 
@@ -127,7 +130,8 @@ Without python-docx installed, the .docx is skipped with a warning.
 2. Type only search words.
 3. After "No results", run again and try the query on europepmc.org
    or pubmed.ncbi.nlm.nih.gov before concluding there is nothing.
-4. Open the output: if it starts with "[ERROR]", it is not a result.
+4. If the screen says "AI call failed", no file was written; run
+   again. Any output that starts with "[ERROR]" is not a result.
 5. Check every statement against the article itself; Topic text rests
    on 300-character snippets.
 6. In Article output, check every link, PMID and DOI.
