@@ -25,8 +25,11 @@ internet, even when the AI runs locally (Ollama).
 
 2. The Validator stage
 ----------------------
-If the Validator's answer contains "APPROVED FOR DOWNLOAD", the
-strategy is accepted. If not, the screen shows:
+The strategy is accepted only if the Validator gives one clear verdict:
+the first line after its last "Overall decision:" (or the whole answer
+if there is none) says "APPROVED FOR DOWNLOAD" without "REQUIRES
+REFINEMENT" or "NOT APPROVED". Otherwise (also after an AI error or
+when the Validator is skipped) the screen shows:
   "Search strategy REQUIRES REFINEMENT - see Validator output."
 Treat that message as a warning about the strategy: read the
 Validator output in reports/rct_search/ before you use any results.
@@ -101,11 +104,13 @@ reports/rct_search/
 -----------------------------------
 Checked in SOURCE_CODE/pipelines/rct_search/rct_search.py at e72820d
 (line numbers at that commit). Items marked GAP are not fixed yet.
-- Validator gate: stage 4 (search and ranking) always runs.
-  "REQUIRES REFINEMENT" is only printed and written in the report
-  (lines 708-723). A Validator AI error also counts as REQUIRES
-  REFINEMENT. GAP: the check is a plain text search, so any answer that
-  contains "APPROVED FOR DOWNLOAD" counts as approved (line 709).
+- Validator gate: fixed (Session 48). Stage 4 (search and ranking)
+  still always runs; "REQUIRES REFINEMENT" is only printed and written
+  in the report. Approval needs one clear verdict in the Validator's
+  own answer (_validator_verdict): the line after the last "Overall
+  decision:" must say APPROVED FOR DOWNLOAD without REQUIRES REFINEMENT
+  or NOT APPROVED. The echoed prompt template, an AI error or a skipped
+  Validator all count as REQUIRES REFINEMENT.
 - Ranking prompt: fixed (Session 48). The "PICO Question" it sends is
   the Formulator's answer; before, it was the last stage output (the
   Validator's answer). If the Formulator fails or is skipped, the topic
@@ -135,7 +140,9 @@ Checked in SOURCE_CODE/pipelines/rct_search/rct_search.py at e72820d
   528-570). The chosen file fills P, I, C, O and the topic; it is not
   changed. Each run saves a new pico_<time>.json in output/rct_search/
   after the Formulator (lines 670-704); the ranking is added to the
-  newest file there (lines 948-961), i.e. this run's file.
+  newest file there (lines 948-961). GAP: if formulator-prompt.md is
+  missing, no file is saved, so the ranking goes into an older run's
+  file, which is also the one offered for copying to input/sr/.
 - Local AI size: GAP. No size check. Up to 200 records with abstracts
   can be far longer than Ollama's window (OLLAMA_CONTEXT); the effect
   on the ranking has not been measured.

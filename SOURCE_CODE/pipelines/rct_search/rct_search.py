@@ -275,6 +275,34 @@ def merge_search_results(
     return merged
 
 
+_VERDICT_HEAD = re.compile(r"overall\s+decision\W*", re.IGNORECASE)
+
+
+def _validator_verdict(text) -> str:
+    """Session 48: APPROVED FOR DOWNLOAD only for one clear verdict.
+
+    Reads the first line after the last "Overall decision:" (the format
+    in validator-prompt.md), else the whole answer. Not approved if that
+    also names REQUIRES REFINEMENT (template echoed), says NOT APPROVED,
+    is empty, or is an error / dry-run placeholder.
+    """
+    text = (text or "").strip()
+    if text.startswith("[ERROR") or text.startswith("[DRY RUN"):
+        return "REQUIRES REFINEMENT"
+    found = list(_VERDICT_HEAD.finditer(text))
+    if found:
+        rest = text[found[-1].end():]
+        scope = next((ln for ln in rest.splitlines() if ln.strip()), "")
+    else:
+        scope = text
+    scope = scope.upper()
+    if ("APPROVED FOR DOWNLOAD" in scope
+            and "REQUIRES REFINEMENT" not in scope
+            and not re.search(r"\bNOT\s+APPROVED", scope)):
+        return "APPROVED FOR DOWNLOAD"
+    return "REQUIRES REFINEMENT"
+
+
 def call_ai(prompt: str, provider: str = "deepseek", model: Optional[str] = None) -> str:
     """
     Call AI provider with prompt.
@@ -672,6 +700,7 @@ def run_rct_search_pipeline(
 
     previous_response = ""
     formulator_response = ""
+    validator_response = ""
 
     for stage in stages:
         role = stage["role"]
@@ -705,6 +734,8 @@ def run_rct_search_pipeline(
         previous_response = response
         if role == "Formulator" and not response.startswith("[ERROR"):
             formulator_response = response
+        if role == "Validator":
+            validator_response = response
         report_parts.append(f"## {role} Output\n\n{response}\n")
         print(f"{colour}{role} complete.{RESET}\n")
 
@@ -747,12 +778,11 @@ def run_rct_search_pipeline(
 
         # ----------------------------------------------------------------------
 
-    validator_output = previous_response.upper()
-    if "APPROVED FOR DOWNLOAD" in validator_output:
-        status = "APPROVED FOR DOWNLOAD"
+    # Session 48: one clear verdict, from the Validator answer itself
+    status = _validator_verdict(validator_response)
+    if status == "APPROVED FOR DOWNLOAD":
         print("\n Search strategy APPROVED FOR DOWNLOAD.")
     else:
-        status = "REQUIRES REFINEMENT"
         print("\n Search strategy REQUIRES REFINEMENT - see Validator output.")
 
     report_parts.append(f"## Final Status\n\n**{status}**\n")
