@@ -632,6 +632,7 @@ def run_rct_search_pipeline(
     ]
 
     previous_response = ""
+    formulator_response = ""
 
     for stage in stages:
         role = stage["role"]
@@ -663,6 +664,8 @@ def run_rct_search_pipeline(
                 response = f"[ERROR in {role}: {exc}]"
 
         previous_response = response
+        if role == "Formulator" and not response.startswith("[ERROR"):
+            formulator_response = response
         report_parts.append(f"## {role} Output\n\n{response}\n")
         print(f"{colour}{role} complete.{RESET}\n")
 
@@ -778,9 +781,12 @@ def run_rct_search_pipeline(
                 f"Abstract: {abstract}\n"
             )
         
+        # Session 48: the Formulator's PICO, not the last stage output
+        # (the Validator). Topic + typed P/I/C/O if the Formulator failed.
+        rank_pico = formulator_response or (topic + pico_manual_context)
         rank_prompt = (
             "You are a systematic review expert. Your ONLY task is to rate articles.\n\n"
-            "PICO Question:\n" + previous_response + "\n\n"
+            "PICO Question:\n" + rank_pico + "\n\n"
             "INSTRUCTIONS:\n"
             "- Rate each article for relevance to the PICO question on a scale of 1-10.\n"
             "- 10 = highly relevant RCT directly matching the PICO.\n"
