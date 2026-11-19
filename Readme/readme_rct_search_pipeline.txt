@@ -106,9 +106,10 @@ Checked in SOURCE_CODE/pipelines/rct_search/rct_search.py at e72820d
   (lines 708-723). A Validator AI error also counts as REQUIRES
   REFINEMENT. GAP: the check is a plain text search, so any answer that
   contains "APPROVED FOR DOWNLOAD" counts as approved (line 709).
-- Ranking prompt: GAP. The "PICO Question" it sends is the last stage
-  output, which is the Validator's answer, not the Formulator's PICO
-  (lines 665 and 783).
+- Ranking prompt: fixed (Session 48). The "PICO Question" it sends is
+  the Formulator's answer; before, it was the last stage output (the
+  Validator's answer). If the Formulator fails or is skipped, the topic
+  and any typed P/I/C/O are sent instead.
 - Abstracts: sent. Each record goes to the AI with source, PMID, title,
   URL and abstract, or "No abstract available." (lines 763-779).
   Europe PMC asks for full records (resultType=core, line 158).
