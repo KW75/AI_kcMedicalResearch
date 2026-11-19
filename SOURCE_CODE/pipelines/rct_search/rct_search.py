@@ -380,6 +380,54 @@ def _md_to_docx(md_content: str, title: str, out_path: Path) -> None:
         out_path.with_suffix(".txt").write_text(md_content, encoding="utf-8")
 
 
+def _score_text(score) -> str:
+    """Score cell: "9/10", or "-" for a record the AI did not score."""
+    return "-" if score is None else f"{score}/10"
+
+
+def _match_ranked(ranked: list[dict], articles: list[dict]) -> list[dict]:
+    """Session 48: match the AI ranking lines to the fetched records.
+
+    Only PMIDs that were fetched are kept, once each (first line wins);
+    title, URL and source come from the fetched record, not the AI line.
+    Every fetched record the AI did not score is added with score None
+    (shown as "-"). One screen line counts invented, repeated and
+    left-out records.
+    """
+    by_pmid = {}
+    for a in articles:
+        by_pmid.setdefault(a["pmid"], a)
+    seen = set()
+    matched = []
+    invented = repeated = 0
+    for r in ranked:
+        pmid = r["pmid"]
+        if pmid not in by_pmid:
+            invented += 1
+            continue
+        if pmid in seen:
+            repeated += 1
+            continue
+        seen.add(pmid)
+        a = by_pmid[pmid]
+        matched.append({"rank": 0, "score": r["score"], "pmid": pmid,
+                        "title": a.get("title", ""), "url": a.get("url", ""),
+                        "source": a.get("source", "Unknown")})
+    scored = len(seen)
+    left_out = 0
+    for pmid, a in by_pmid.items():
+        if pmid in seen:
+            continue
+        left_out += 1
+        matched.append({"rank": 0, "score": None, "pmid": pmid,
+                        "title": a.get("title", ""), "url": a.get("url", ""),
+                        "source": a.get("source", "Unknown")})
+    print(f"[RCT Search] Ranking check: {scored} of {len(by_pmid)} records "
+          f"scored by the AI; {invented} invented, {repeated} repeated, "
+          f"{left_out} left out (listed as unscored).")
+    return matched
+
+
 def _ranked_articles_to_docx(
     ranked: list[dict],
     title: str,
@@ -425,7 +473,7 @@ def _ranked_articles_to_docx(
         cap = doc.add_paragraph()
         cap.add_run(
             f"All {len(ranked)} articles retrieved from {source_text}, "
-            "ordered by PICO relevance score (10 = most relevant)."
+            "ordered by PICO relevance score (10 = most relevant); unscored records (-) last."
         ).italic = True
 
         doc.add_paragraph()
@@ -447,7 +495,7 @@ def _ranked_articles_to_docx(
         for r in ranked:
             row = table.add_row().cells
             row[0].text = str(r["rank"])
-            row[1].text = f"{r['score']}/10"
+            row[1].text = _score_text(r["score"])
             row[2].text = r.get("source", "Unknown")
             row[3].text = r["title"]
             row[4].text = r["pmid"]
@@ -479,7 +527,7 @@ def _ranked_articles_to_docx(
             writer = csv.writer(f)
             writer.writerow(["Rank", "Score", "Source", "Title", "PMID", "URL"])
             for r in ranked:
-                writer.writerow([r["rank"], r["score"], r.get("source", "Unknown"), r["title"], r["pmid"], r.get("url", "")])
+                writer.writerow([r["rank"], r["score"] if r["score"] is not None else "-", r.get("source", "Unknown"), r["title"], r["pmid"], r.get("url", "")])
 
 
 def run_rct_search_pipeline(
@@ -822,12 +870,7 @@ def run_rct_search_pipeline(
         ranked = []
         if rank_response.startswith("[ERROR"):
             print(f"[RCT Search] Ranking error: {rank_response}")
-            # Fallback: use articles in fetch order
-            ranked = [
-                {"rank": i, "score": min(10, len(articles) - i + 1),
-                 "pmid": a["pmid"], "title": a["title"], "url": a["url"], "source": a.get("source", "Unknown")}
-                for i, a in enumerate(articles, 1)
-            ]
+            # Session 48: no AI scores; _match_ranked lists all as unscored
         else:
             # Parse the AI response
             for ln in rank_response.splitlines():
@@ -907,24 +950,18 @@ def run_rct_search_pipeline(
                             "url": m2.group(5).strip(),
                         })
         
-        # If no articles were parsed or less than expected, use fallback
-        if not ranked or len(ranked) < len(articles) * 0.5:
-            print(f"[RCT Search] Warning: Only {len(ranked)} articles parsed from AI response. Using fallback ranking.")
-            ranked = [
-                {"rank": i, "score": min(10, len(articles) - i + 1),
-                 "pmid": a["pmid"], "title": a["title"], "url": a["url"], "source": a.get("source", "Unknown")}
-                for i, a in enumerate(articles, 1)
-            ]
+        # Session 48: only fetched records, once each; unscored listed last
+        ranked = _match_ranked(ranked, articles)
         
         # Sort by score (highest first)
-        ranked.sort(key=lambda x: x["score"], reverse=True)
+        ranked.sort(key=lambda x: (x["score"] is None, -(x["score"] or 0)))
         for new_rank, r in enumerate(ranked, 1):
             r["rank"] = new_rank
         
         # Build the table
         table_lines = [
             "## Ranked Article List\n",
-            f"_All {len(ranked)} articles retrieved from PubMed and Europe PMC, ordered by PICO relevance score (10 = most relevant)._\n",
+            f"_All {len(ranked)} articles retrieved from PubMed and Europe PMC, ordered by PICO relevance score (10 = most relevant); unscored records (-) last._\n",
             "| Rank | Score | Source | Title | PMID | Link |",
             "|------|-------|--------|-------|------|------|",
         ]
@@ -932,7 +969,7 @@ def run_rct_search_pipeline(
             source = r.get("source", "Unknown")
             url_display = r["url"] if r["url"] else "#"
             table_lines.append(
-                "| " + str(r["rank"]) + " | " + str(r["score"]) + "/10 | "
+                "| " + str(r["rank"]) + " | " + _score_text(r["score"]) + " | "
                 + source + " | "
                 + r["title"][:60] + ("..." if len(r["title"]) > 60 else "") + " | " 
                 + r["pmid"] + " | [Link](" + url_display + ") |"
