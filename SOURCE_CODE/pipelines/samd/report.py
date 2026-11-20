@@ -29,7 +29,7 @@ _SYMBOLS = str.maketrans({
 # Session 49: report notes that look like rows (accreditation number,
 # percentile notes, "Smoker: Upto 6.5 ug/L") are not results.
 _NOT_RESULT = re.compile(r"\bup\s?to\b|\bpercentile\b|^HO?KLAS$", re.I)
-STATUS_ORDER = {"HIGH": 0, "LOW": 0, "unclear": 1, "see bands": 1, "normal": 2, "no range": 3}
+STATUS_ORDER = {"HIGH": 0, "LOW": 0, "ABNORMAL": 0, "unclear": 1, "see bands": 1, "normal": 2, "no range": 3}
 
 
 def _num(s: str) -> float:
@@ -165,17 +165,21 @@ _DESCRIPTIVE = re.compile(
     r"(?P<value>" + _DESC_WORDS + r")(?:\s+-)?\s*$")
 
 
+_DESC_ABNORMAL = {"RED", "BROWN", "TURBID"}  # user decision, Session 49
+
+
 def _parse_descriptive(line: str):
     """Session 49: urinalysis Colour / Clarity / Appearance rows
     ("Colour 順色 YELLOW -"). Only these names and a fixed list of upper-case
-    words. The report prints no reference, so the status is 'no range' for
-    every word: the program does not judge RED or TURBID; the clinician does."""
+    words. The report prints no reference: RED, BROWN and TURBID are
+    ABNORMAL (user decision, Session 49); every other word is 'no range'."""
     m = _DESCRIPTIVE.match(line.strip().translate(_SYMBOLS))
     if not m:
         return None
+    value = re.sub(r"\s+", " ", m.group("value")).strip()
     return {"test": re.sub(r"\s+", " ", m.group("name")).strip(),
-            "value": re.sub(r"\s+", " ", m.group("value")).strip(),
-            "unit": "", "ref": "", "flag": "", "status": "no range"}
+            "value": value, "unit": "", "ref": "", "flag": "",
+            "status": "ABNORMAL" if value in _DESC_ABNORMAL else "no range"}
 
 
 def parse_line(line: str):
@@ -383,7 +387,7 @@ def build_markdown(*, run_id, intended_use, doctor_text, rows, warnings,
         md += ["| Test | Result | Unit | Reference range | Report flag | Status | Source |",
                "|---|---|---|---|---|---|---|"]
         for r in sorted(rows, key=lambda r: STATUS_ORDER.get(r["status"], 9)):
-            st = f"**{r['status']}**" if r["status"] in ("HIGH", "LOW") else r["status"]
+            st = f"**{r['status']}**" if r["status"] in ("HIGH", "LOW", "ABNORMAL") else r["status"]
             md.append("| " + " | ".join(_cell(c) for c in (
                 r["test"], r["value"], r["unit"] or "-", r["ref"] or "-",
                 r["flag"] or "-", st, r["source"])) + " |")
