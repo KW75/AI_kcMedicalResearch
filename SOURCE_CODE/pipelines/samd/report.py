@@ -290,14 +290,19 @@ def _parse_nameless(lines: list[str], i: int):
 
 
 _PER_FIELD = re.compile(r"/\s*[HL]PF\b", re.I)
+_URINE_START = re.compile(r"^\s*URINALYSIS\b")  # upper case: not "Urinalysis CLAB-..."
+_URINE_END = re.compile(r"Released By", re.I)
+_URINE_MAX = 60  # lines; guard when no "Released By" follows
 
 
-def _mark_urine(row: dict) -> None:
-    """Session 49: a urine microscopy row (unit per field, /HPF or /LPF) gets
+def _mark_urine(row: dict, in_urine: bool = False) -> None:
+    """Session 49: a urine row - unit per field (/HPF, /LPF), or any row inside
+    the URINALYSIS ... Released By section (Casts, Colour, Specific Gravity) - gets
     ' - Urine' after its English name, so 'WBC 白血球' NIL cell/HPF differs from
     the blood 'WBC 白血球' 4.9 x10e9/L in the same file. The Chinese part is kept
     (lab style 'pH - Urine 酸鹼度'); names already saying Urine are left alone."""
-    if not _PER_FIELD.search(row["unit"]) or re.search(r"\burine\b", row["test"], re.I):
+    if ((not in_urine and not _PER_FIELD.search(row["unit"]))
+            or re.search(r"\burine\b", row["test"], re.I)):
         return
     m = re.match(r"([\x00-\x7f]+?)\s*([^\x00-\x7f].*)?$", row["test"])
     if not m or not m.group(1).strip():
@@ -313,10 +318,16 @@ def parse_results(described) -> list[dict]:
         if kind == "photo description":
             continue
         lines = (body or "").splitlines()
+        urine_from = None
         for i, line in enumerate(lines):
+            if _URINE_START.match(line):
+                urine_from = i
+            elif urine_from is not None and (_URINE_END.search(line)
+                                             or i - urine_from > _URINE_MAX):
+                urine_from = None
             row = parse_line(line) or _parse_nameless(lines, i)
             if row:
-                _mark_urine(row)
+                _mark_urine(row, urine_from is not None)
                 if not row["ref"] and re.fullmatch(r"(?:[<>]=?)?" + _NUM, row["value"]):
                     _add_bands(row, lines[i + 1:])
                 row["source"] = name
