@@ -23,6 +23,11 @@ NOW = datetime(2026, 11, 20, 16, 0, 0)
 RUN = "20261120_160000"
 
 
+@pytest.fixture(autouse=True)
+def _no_browser(monkeypatch):
+    # PR F: run() opens the report in the browser; never in tests.
+    monkeypatch.setattr(cli, "open_browser", lambda p, log=print: None, raising=False)
+
 def _full():
     return "\n".join(f"{h}\nx" for h in cli.HEADINGS)
 
@@ -100,7 +105,7 @@ def test_step_files(case, monkeypatch):
     assert res["answer"] == d / "reasoning.md"
     log = (d / "run.log").read_text(encoding="utf-8")
     assert "Step 3" in log and cli.INTENDED_USE in log
-    assert not (case / "output").exists()
+    assert (case / "output" / "samd" / RUN / "report.html").exists()
 
 
 def test_text_file_needs_no_ai_call(case, monkeypatch):
