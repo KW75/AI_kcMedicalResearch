@@ -1,6 +1,6 @@
 """Launcher main menu (Session 33).
 
-7 Data Analysis and 8 OCR are placeholders, 9 Dry Run, 10 Setup.
+7 Data Analysis is a placeholder, 8 OCR, 9 SaMD (was Dry Run), 10 Setup.
 Custom flags moved from 9 to C; H still opens Help. Setup -> Open Help
 opens Readme/flashcard-help.html, found relative to the launcher.
 The Streamlit UI (--ui) is no longer offered.
@@ -54,7 +54,7 @@ def test_menu_numbers_labels_and_flags(launcher):
     assert [k for k, _, _ in launcher.MODES] == [str(n) for n in range(1, 11)]
     assert table["7"] == ("Data Analysis", None)
     assert table["8"] == ("OCR", "--mode ocr")
-    assert table["9"] == ("Dry Run", "--dry-run")
+    assert table["9"] == ("SaMD", "--mode samd")
     assert table["10"] == ("Setup", "setup")
 
 
@@ -67,7 +67,7 @@ def test_streamlit_ui_is_not_offered(launcher):
 
 @pytest.mark.parametrize("typed, expected", [
     ("1", ("Coding", "--mode coding", False, False)),
-    ("9", ("Dry Run", "--dry-run", False, False)),
+    ("9", ("SaMD", "--mode samd", False, False)),
     ("10", ("Setup", "setup", False, False)),
     ("c", (None, None, True, False)),
     ("h", (None, None, False, True)),
@@ -159,3 +159,12 @@ def test_banner_box_lines_are_all_the_same_width(launcher, capsys):
              if l.strip()[:1] in ("║", "╔", "╠", "╚")]
     widths = {len(l) for l in lines}
     assert len(widths) == 1, sorted((len(l), l) for l in lines)
+
+def test_samd_provider_refuses_groq_and_skips_model_list(launcher):
+    # Session 49: SaMD reads images, so it uses the OCR lists; Groq is
+    # refused, Enter picks Ollama, and no text-model list is shown.
+    with _quiet(launcher), \
+         patch.object(launcher, "safe_input", side_effect=["3", "", ""]), \
+         patch.object(launcher, "pick_ollama_model") as pom:
+        assert launcher.pick_provider("--mode samd") == "--provider ollama"
+    pom.assert_not_called()
