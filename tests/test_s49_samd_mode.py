@@ -69,7 +69,8 @@ def test_stub_lists_input_and_prints_intended_use(tmp_path):
     for name in ("rash.jpg", "labs.png", "notes.txt", "ignore.exe"):
         (d / name).write_bytes(b"x")
     lines = []
-    res = samd_cli.run(tmp_path, log=lines.append)
+    res = samd_cli.run(tmp_path, log=lines.append,
+                       input_fn=lambda _p, a=iter(["", ""]): next(a))
     out = "\n".join(lines)
     assert "not a cleared or certified medical device" in out
     assert res["files"] == ["labs.png", "notes.txt", "rash.jpg"]
@@ -80,7 +81,8 @@ def test_stub_lists_input_and_prints_intended_use(tmp_path):
 def test_stub_creates_missing_input_folder(tmp_path):
     from SOURCE_CODE.pipelines.samd import cli as samd_cli
     lines = []
-    res = samd_cli.run(tmp_path, log=lines.append)
+    res = samd_cli.run(tmp_path, log=lines.append,
+                       input_fn=lambda _p, a=iter([""]): next(a))
     assert (tmp_path / "input" / "samd").is_dir()
-    assert res["files"] == []
+    assert res is None  # PR D: no files and no text = not run
     assert "input/samd" in "\n".join(lines).replace("\\", "/")
