@@ -26,6 +26,9 @@ _SYMBOLS = str.maketrans({
     "\u2264": "<=", "\u2266": "<=", "\u2265": ">=", "\u2267": ">=",
     "\uff1c": "<", "\uff1e": ">", "\u2013": "-", "\u2014": "-",
 })
+# Session 49: report notes that look like rows (accreditation number,
+# percentile notes, "Smoker: Upto 6.5 ug/L") are not results.
+_NOT_RESULT = re.compile(r"\bup\s?to\b|\bpercentile\b|^HO?KLAS$", re.I)
 STATUS_ORDER = {"HIGH": 0, "LOW": 0, "unclear": 1, "normal": 2, "no range": 3}
 
 
@@ -81,6 +84,8 @@ def parse_line(line: str):
     if (g["unit"].startswith("(") or name.endswith("-")
             or re.search(_NUM + r"\s*-\s*" + _NUM, name)):
         return None
+    if _NOT_RESULT.search(name):
+        return None
     value = re.sub(r"\s+", "", g["value"])
     ref = (g["ref"] or "").strip()
     if ref and ref[0].isdigit():
@@ -126,6 +131,20 @@ def _has_number(text: str, num: str) -> bool:
     return re.search(r"(?<![\d.])" + re.escape(num) + r"(?!\d)", text) is not None
 
 
+def _value_cited(text: str, num: str) -> bool:
+    """num appears in text as a value: not the end of a range ("3-6"), not
+    a time span ("6 months") and not part of a longer number ("6.5").
+    Session 49: "Repeat CBC in 3-6 months" was matched to Monocytes 6 %."""
+    for m in re.finditer(r"(?<![\d.])" + re.escape(num) + r"(?!\.?\d)", text):
+        if re.search(r"\d\s*[-\u2013\u2014]\s*$", text[:m.start()]):
+            continue
+        w = re.match(r"\s*([A-Za-z]+)\b", text[m.end():])
+        if w and w.group(1).lower() in _TIME_WORDS:
+            continue
+        return True
+    return False
+
+
 def check_answer(rows, answer: str, case: str) -> list[str]:
     """Warnings: an in-range result called abnormal; numbers with a unit in
     the answer that appear nowhere in the case (sources + doctor's notes)."""
@@ -135,7 +154,7 @@ def check_answer(rows, answer: str, case: str) -> list[str]:
         if r["status"] != "normal":
             continue
         for s in sentences:
-            if (_has_number(s, r["value"]) and _ABNORMAL.search(s)
+            if (_value_cited(s, r["value"]) and _ABNORMAL.search(s)
                     and not _NORMAL.search(s)):
                 short = s if len(s) <= 200 else s[:197] + "..."
                 warnings.append(
