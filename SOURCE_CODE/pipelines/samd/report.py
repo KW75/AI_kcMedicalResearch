@@ -225,6 +225,45 @@ def _add_bands(row: dict, following: list[str]) -> None:
     row["status"] = "see bands"
 
 
+_VALUE_FIRST = re.compile(r"(?:[<>]=?\s?)?" + _NUM + r"\s")
+_HEADER = re.compile(r"^(?:tests?|interpretation)\b|\bref\.?\s*range\b", re.I)
+
+
+def _name_above(lines: list[str], i: int) -> str:
+    """Session 49: name for a value row printed without one ("6.9 U <9.0"):
+    the nearest line above with ASCII letters, at most 2 lines up (a
+    Chinese-only name line is skipped). A blank line, a header, a report
+    note or a line that is itself a result gives no name. A trailing '#'
+    (not HOKLAS-accredited) is dropped."""
+    for line in reversed(lines[max(0, i - 2):i]):
+        text = line.strip().translate(_SYMBOLS)
+        if not text:
+            return ""
+        if not re.search(r"[A-Za-z]", text):
+            continue
+        name = re.sub(r"\s+", " ", text).rstrip("#").strip()
+        if (not name or _HEADER.search(name) or _NOT_RESULT.search(name)
+                or parse_line(text) or _VALUE_FIRST.match(text + " ")):
+            return ""
+        return name
+    return ""
+
+
+def _parse_nameless(lines: list[str], i: int):
+    """Session 49: parse a value-first line under a placeholder name, so the
+    value, unit, ref and status rules stay those of parse_line."""
+    text = lines[i].strip().translate(_SYMBOLS)
+    if not _VALUE_FIRST.match(text + " "):
+        return None
+    name = _name_above(lines, i)
+    if not name:
+        return None
+    row = parse_line("Result " + text)
+    if row:
+        row["test"] = name
+    return row
+
+
 def parse_results(described) -> list[dict]:
     """Rows from every transcription / text layer (photos are skipped)."""
     rows = []
@@ -233,7 +272,7 @@ def parse_results(described) -> list[dict]:
             continue
         lines = (body or "").splitlines()
         for i, line in enumerate(lines):
-            row = parse_line(line)
+            row = parse_line(line) or _parse_nameless(lines, i)
             if row:
                 if not row["ref"] and re.fullmatch(r"(?:[<>]=?)?" + _NUM, row["value"]):
                     _add_bands(row, lines[i + 1:])
