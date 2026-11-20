@@ -136,6 +136,30 @@ You have two choices. Pick whichever suits you.
 
 
 ------------------------------------------------------------
+ IF THE APP SHOWS "HTTP error" FROM AN AI SERVICE
+------------------------------------------------------------
+
+  The message shows the service's own reply and a hint.
+  What usually fixes it:
+
+  - Update the LLM to the latest model.
+      Local AI (Ollama): in the launcher choose
+      10 Setup -> 2 Local AI and pull your model again;
+      that downloads its newest version.
+      Cloud AI: download the latest version of the app
+      (STEP 2), then copy the lines ending in _MODEL from
+      the new .env.example into your own .env file.
+
+  - For cloud providers, make sure the API account has
+    enough tokens (credit) left. Log in to the
+    provider's website to check.
+
+  - "401" or "403" means the account key is missing or
+    wrong (see STEP 4, CHOICE B).
+
+  Copy model names from .env.example, not from another
+  company's website: each AI service uses its own names.
+------------------------------------------------------------
  DONE
 ------------------------------------------------------------
 

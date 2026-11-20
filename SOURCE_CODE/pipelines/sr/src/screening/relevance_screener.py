@@ -86,7 +86,7 @@ def _try_cmap_offset_decode(text: str, min_score: int = 15) -> tuple:
 
 class RelevanceScreener:
     def __init__(self, pico_criteria, inclusion_criteria, exclusion_criteria,
-                 model="claude-opus-4-7", api_key=None, provider="anthropic"):
+                 model="claude-opus-5-5", api_key=None, provider="anthropic"):
         self.pico      = pico_criteria
         self.inclusion = inclusion_criteria
         self.exclusion = exclusion_criteria

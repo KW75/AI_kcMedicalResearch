@@ -28,7 +28,7 @@ class PDFReportGenerator:
 
     def generate(self, title, authors, pico, inclusion_criteria, exclusion_criteria,
                  ma_result, extraction_results, screening_results, rob_results,
-                 forest_plot_path, effect_measure="OR", model_name="claude-opus-4-7",
+                 forest_plot_path, effect_measure="OR", model_name="claude-opus-5-5",
                  output_path="outputs/reports/systematic_review.pdf",
                  also_save_html=True, meta_audit=None, subgroups=None, subgroup_plot_path=None) -> dict:
         gen      = HTMLReportGenerator()

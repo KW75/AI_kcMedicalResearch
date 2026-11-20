@@ -32,6 +32,7 @@ load_dotenv()
 # Import config from providers module
 from providers import (
     OLLAMA_HOST, OLLAMA_MODEL, _resolve_ollama_model, ollama_model_missing_message,
+    api_error_message,
     OPENAI_API_KEY, OPENAI_MODEL,
     ANTHROPIC_API_KEY, ANTHROPIC_MODEL,
     DEEPSEEK_API_KEY, DEEPSEEK_MODEL,
@@ -102,7 +103,7 @@ def _stream_openai_compatible(
         yield from _parse_sse_lines(resp)
         resp.close()
     except urllib.error.HTTPError as exc:
-        raise RuntimeError(f"Streaming HTTP error {exc.code}: {exc.reason}") from exc
+        raise RuntimeError(api_error_message("Streaming HTTP error", exc)) from exc
     except urllib.error.URLError as exc:
         raise RuntimeError(f"Streaming connection error: {exc.reason}") from exc
 
@@ -148,7 +149,7 @@ def _stream_anthropic(prompt: str, model: str = None) -> Generator[str, None, No
                 continue
         resp.close()
     except urllib.error.HTTPError as exc:
-        raise RuntimeError(f"Anthropic streaming error {exc.code}: {exc.reason}") from exc
+        raise RuntimeError(api_error_message("Anthropic streaming error", exc)) from exc
     except urllib.error.URLError as exc:
         raise RuntimeError(f"Anthropic connection error: {exc.reason}") from exc
 
@@ -192,7 +193,7 @@ def _stream_ollama(prompt: str, model: str = None) -> Generator[str, None, None]
         # 404 = model not pulled yet; same plain-language message as providers.py.
         if exc.code == 404:
             raise RuntimeError(ollama_model_missing_message(model)) from exc
-        raise RuntimeError(f"Ollama streaming error {exc.code}: {exc.reason}") from exc
+        raise RuntimeError(api_error_message("Ollama streaming error", exc)) from exc
     except urllib.error.URLError as exc:
         raise RuntimeError(f"Ollama connection error: {exc.reason}") from exc
 

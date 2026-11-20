@@ -227,7 +227,7 @@ def call_openai_provider(
             raise RuntimeError("OpenAI returned an empty response.")
         return choices[0]["message"]["content"]
     except urllib.error.HTTPError as exc:
-        raise RuntimeError(f"OpenAI HTTP error {exc.code}: {exc.reason}") from exc
+        raise RuntimeError(api_error_message("OpenAI HTTP error", exc)) from exc
     except urllib.error.URLError as exc:
         raise RuntimeError(f"OpenAI connection error: {exc.reason}") from exc
 
@@ -264,9 +264,53 @@ def call_anthropic_provider(
             raise RuntimeError("Anthropic returned an empty response.")
         return content[0]["text"]
     except urllib.error.HTTPError as exc:
-        raise RuntimeError(f"Anthropic HTTP error {exc.code}: {exc.reason}") from exc
+        raise RuntimeError(api_error_message("Anthropic HTTP error", exc)) from exc
     except urllib.error.URLError as exc:
         raise RuntimeError(f"Anthropic connection error: {exc.reason}") from exc
+
+
+# Session 48: an HTTP error used to show only "HTTP error 400: Bad Request";
+# the provider reply (which named the valid DeepSeek models) was dropped.
+# api_error_message keeps that first part unchanged, then adds the reply and
+# a hint. _is_transient_error ignores everything after _REPLY_MARK, so the
+# reply text can never change fallback behaviour.
+_REPLY_MARK = "\n  Server reply: "
+_MODEL_HINT = ("The model name may be outdated or not valid for this provider: "
+               "compare the *_MODEL lines in .env with .env.example (a system "
+               "environment variable with the same name overrides .env).")
+_KEY_HINT = "The API key is missing, wrong or has no access to this model."
+_STATUS_HINTS = {
+    400: _MODEL_HINT, 404: _MODEL_HINT, 422: _MODEL_HINT,
+    401: _KEY_HINT, 403: _KEY_HINT,
+    402: "The API account may be out of credit.",
+    429: ("Too many requests, or the API account is out of credit or quota: "
+          "wait a minute, then check the balance."),
+}
+_ERROR_CLOSING = ("Update the LLM to the latest model; for cloud providers, "
+                  "make sure the API has enough tokens.")
+
+
+def api_error_message(label: str, exc) -> str:
+    """Error text for an HTTPError: '<label> <code>: <reason>' (unchanged,
+    fallback reads it), then the provider reply (one line, max 300 chars),
+    a hint for the status code and the closing advice."""
+    first = f"{label} {exc.code}: {exc.reason}"
+    try:
+        raw = exc.read()
+        body = raw.decode("utf-8", "replace") if isinstance(raw, bytes) else str(raw or "")
+    except Exception:
+        body = ""
+    body = " ".join(body.split())[:300] or "(none)"
+    code = exc.code if isinstance(exc.code, int) else 0
+    hint = _STATUS_HINTS.get(code, "")
+    if not hint and code >= 500:
+        hint = ("The provider has a problem on its side: try again later "
+                "or use another provider.")
+    parts = [first, _REPLY_MARK, body]
+    if hint:
+        parts += ["\n  Hint: ", hint]
+    parts += ["\n  ", _ERROR_CLOSING]
+    return "".join(parts)
 
 
 def ollama_model_missing_message(model: str) -> str:
@@ -369,7 +413,7 @@ def call_ollama_provider(
         # non-technical user on their first run.
         if exc.code == 404:
             raise RuntimeError(ollama_model_missing_message(model)) from exc
-        raise RuntimeError(f"Ollama HTTP error {exc.code}: {exc.reason}") from exc
+        raise RuntimeError(api_error_message("Ollama HTTP error", exc)) from exc
     except urllib.error.URLError as exc:
         # Connection refused = Ollama app isn't running.
         raise RuntimeError(
@@ -415,7 +459,7 @@ def call_deepseek_provider(
             raise RuntimeError("DeepSeek returned an empty response.")
         return content
     except urllib.error.HTTPError as exc:
-        raise RuntimeError(f"DeepSeek HTTP error {exc.code}: {exc.reason}") from exc
+        raise RuntimeError(api_error_message("DeepSeek HTTP error", exc)) from exc
     except urllib.error.URLError as exc:
         raise RuntimeError(f"DeepSeek connection error: {exc.reason}") from exc
 
@@ -452,7 +496,7 @@ def call_groq_provider(
             raise RuntimeError("Groq returned an empty response.")
         return choices[0]["message"]["content"]
     except urllib.error.HTTPError as exc:
-        raise RuntimeError(f"Groq HTTP error {exc.code}: {exc.reason}") from exc
+        raise RuntimeError(api_error_message("Groq HTTP error", exc)) from exc
     except urllib.error.URLError as exc:
         raise RuntimeError(f"Groq connection error: {exc.reason}") from exc
 
@@ -491,7 +535,7 @@ def call_qwen_provider(
             raise RuntimeError("Qwen returned an empty response.")
         return choices[0]["message"]["content"]
     except urllib.error.HTTPError as exc:
-        raise RuntimeError(f"Qwen HTTP error {exc.code}: {exc.reason}") from exc
+        raise RuntimeError(api_error_message("Qwen HTTP error", exc)) from exc
     except urllib.error.URLError as exc:
         raise RuntimeError(f"Qwen connection error: {exc.reason}") from exc
 
@@ -547,7 +591,8 @@ def _is_transient_error(error: Exception) -> bool:
     the more precise "connection error" phrase that this module's own
     URLError handlers actually produce.
     """
-    msg = str(error).lower()
+    # Session 48: ignore the reply and hint that api_error_message adds.
+    msg = str(error).lower().split(_REPLY_MARK.lower(), 1)[0]
 
     code_match = _HTTP_ERROR_RE.search(msg)
     if code_match:
