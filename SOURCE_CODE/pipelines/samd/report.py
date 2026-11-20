@@ -374,7 +374,8 @@ _NOT_NORMAL = re.compile(r"\b(?:not|no longer)\s+(?:normal|within)\b", re.I)
 def _row_named(s: str, r: dict) -> bool:
     """Session 49: sentence s names row r - a number value cited as a value,
     or (text values such as RED, 1+, TRACE) the first word of the test name
-    and the value both in the sentence."""
+    and the value both in the sentence; for a urine row also the test word
+    next to 'urine'/'urinary' ("urine protein", "protein in the urine")."""
     value = r["value"]
     if re.fullmatch(r"(?:[<>]=?)?" + _NUM, value):
         return _value_cited(s, value.lstrip("<>="))
@@ -383,8 +384,15 @@ def _row_named(s: str, r: dict) -> bool:
     if len(key) < 3:
         return False
     key_pat = r"colou?r" if key in ("colour", "color") else re.escape(key)
-    return (re.search(r"\b" + key_pat + r"\b", s, re.I) is not None
-            and re.search(r"(?<!\w)" + re.escape(value) + r"(?!\w)", s, re.I) is not None)
+    if re.search(r"\b" + key_pat + r"\b", s, re.I) is None:
+        return False
+    if re.search(r"(?<!\w)" + re.escape(value) + r"(?!\w)", s, re.I):
+        return True
+    if key == "urine" or not re.search(r"\burine\b", r["test"], re.I):
+        return False
+    return re.search(r"\burin(?:e|ary)\s+(?:\w+\s+)?" + key_pat + r"\b"
+                     r"|\b" + key_pat + r"\s+(?:in|on)\s+(?:the\s+)?urine\b",
+                     s, re.I) is not None
 
 
 def check_answer(rows, answer: str, case: str) -> list[str]:
