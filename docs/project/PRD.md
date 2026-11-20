@@ -1,24 +1,29 @@
 # Product Requirements Document
 
 ## Project Name
-AI kcMedicalResearch - Multi-Mode AI Pipeline for Medical Research
+AI kcMedicalResearch - Multi-Mode AI Pipeline for Medical Research and
+Clinical Decision Support
 
 ## Version
-2.3.1
+3.0.0 (target release with SaMD mode; the code reports 2.7.0 until then)
 
 ## Goal
-A local-first Python application that assists medical students and researchers
-with structured research workflows. The tool provides six specialised modes,
-each implementing a multi-agent AI pipeline where roles collaborate in sequence
-to produce high-quality, evidence-based output.
+A local-first Python application that helps medical students, researchers
+and doctors with structured research and clinical workflows. It provides
+eight modes, each built on an AI pipeline, with a ninth (Data Analysis)
+planned.
 
-The application runs locally with Ollama (no cloud required) but supports
-multiple cloud AI providers for enhanced quality when available.
+The application runs locally with Ollama by default, so confidential
+documents and patient data stay on the machine. Cloud providers are
+optional, chosen per job, and run only after the user confirms where the
+data will be sent.
 
 ## Target Users
 - Medical students learning research methodology
-- Clinical researchers performing literature searches and appraisals
+- Clinical researchers performing literature searches, appraisals and
+  systematic reviews
 - Academic writers producing evidence-based reports
+- Doctors seeking decision support on a clinical case (SaMD mode)
 
 ## Supported Modes
 
@@ -30,10 +35,10 @@ Three-agent pipeline for code generation and review.
 - Iterative loop: Builder > Reviewer > Tester (max 3 iterations)
 
 ### 2. Writing Mode
-Three-agent pipeline for medical writing.
-- Writer AI - generates articles, summaries, or reports from a project brief
-- Editor AI - reviews for clarity, structure, tone, accuracy, and referencing
-- QA AI - fact-checks, applies QA checklist, assesses publication readiness
+One AI pass that writes, edits and reviews.
+- Tracks: Topic (800 words), Article (3,500), Report (500), Synopsis (1,500,
+  one document from all files in input/writing/)
+- Output: the document (.docx and .md) and a separate review file
 
 ### 3. Appraisal Mode
 Three-agent pipeline for critical appraisal of research papers.
@@ -43,7 +48,8 @@ Three-agent pipeline for critical appraisal of research papers.
 
 ### 4. Search Mode
 Single-agent mode for medical literature searching.
-- Researcher AI - searches PubMed, produces structured citation reports
+- Researcher AI - searches PubMed and Europe PMC, produces structured
+  citation reports
 - Supports paper search (specific article) and clinical topic search (narrative)
 
 ### 5. RCT Search Mode
@@ -53,39 +59,69 @@ Three-agent pipeline for building systematic review search strategies.
 - Validator AI - checks PICO alignment and database coverage
 
 ### 6. Systematic Review (SR) Mode
-Self-contained pipeline for full systematic review workflow.
+Self-contained pipeline for the systematic review workflow.
 - Screening, data extraction, risk-of-bias assessment, forest plots
+- Reviewer-assisted: reviewer values are required before pooling
+
+### 7. OCR Mode
+Reads PDFs, images, .txt and .docx files from input/ocr/.
+- Text layer read directly; scanned pages sent to a local vision model
+- One record per file plus a SUMMARY (Papers) or one SYNOPSIS of all files
+
+### 8. SaMD Mode (Software as a Medical Device)
+Clinical decision support for doctors (launcher menu 9).
+- Input: clinical data, clinical questions, lab results and clinical
+  photos or photos of lab reports in input/samd/; the doctor can add
+  extra information in the terminal
+- Output: working diagnosis, ranked differential diagnoses with supporting
+  and contradicting findings, red flags, suggested next tests and other
+  clinically important information
+- Results shown in the browser (local .html file) and saved to
+  output/samd/ as .html, .md and .docx; intermediate steps saved to
+  reports/samd/
+- Every lab value cited must appear in the transcribed source, else it is
+  flagged
+- Intended use: decision support for a clinician, for research and
+  evaluation; not a cleared or certified medical device. The clinician
+  makes every decision, and every output says so
 
 ## AI Provider Support
 
 | Provider | Type | Default Model | API Key Required |
 |----------|------|---------------|-----------------|
-| Ollama | Local | Auto-detected (largest non-embedding model) | No |
+| Ollama | Local (default) | OLLAMA_MODEL in .env, else gemma4:e4b | No |
 | Qwen/DashScope | Cloud | qwen-plus-latest | DASHSCOPE_API_KEY |
 | DeepSeek | Cloud | deepseek-flash | DEEPSEEK_API_KEY |
 | OpenAI | Cloud | gpt-4o-mini | OPENAI_API_KEY |
-| Anthropic | Cloud | claude-sonnet-4-20250514 | ANTHROPIC_API_KEY |
-| Groq | Cloud | llama-3.1-8b-instant | GROQ_API_KEY |
+| Anthropic | Cloud | claude-sonnet-5 | ANTHROPIC_API_KEY |
+| Groq | Cloud | llama-3.3-70b-versatile | GROQ_API_KEY |
 
-Provider selection: --provider ollama|qwen|deepseek|openai|anthropic|groq
+Provider selection: --provider ollama|qwen|deepseek|openai|anthropic|groq.
+Vision modes (SR, OCR, SaMD) accept Ollama, Qwen and OpenAI only.
 
 ## Key Features
-- Ollama auto-detection: queries /api/tags, selects largest local model
-- All model names configurable via .env (no hard-coded versions)
-- Session transcripts saved to reports/ folder
+- Local first: Ollama is the default and never falls back to cloud
+- Cloud gate: every cloud job lists its destinations and needs a typed "y"
+  or --confirm-cloud; consent is never saved
+- Local model picker; shared vision picker for SR, OCR and SaMD
+- Time limit per AI call: 15, 30 or 60 minutes, or none
+- All model names configurable via .env
 - Cross-platform: Windows, macOS, Linux
-- Interactive launcher menu (scripts/launcher.py)
-- Docker support for deployment
+- Interactive launcher menu (scripts/launcher.py) with Setup for API keys,
+  local models and cloud models
 
 ## Non-Goals (current version)
 - Multi-agent parallel execution
-- Real-time clinical data feeds
+- Real-time clinical data feeds or EHR integration
 - Automated paper downloading (legal constraints)
-- GitHub Actions CI/CD (planned)
+- Regulatory clearance of SaMD mode, or any autonomous clinical decision
+- A hosted web service (removed Session 33)
 
 ## Success Criteria
 - All modes produce structured, standards-compliant output
-- 275+ tests passing with 0 warnings
+- Full test suite green: python -m pytest -m "not live"
 - Ollama demo completes Builder to Reviewer to Tester in under 15 minutes
 - Provider switching works cleanly via --provider flag
 - Guidelines from docs/ are injected into prompts automatically
+- SaMD: every output carries the intended-use statement, and no patient
+  data leaves the machine without the cloud gate

@@ -58,4 +58,37 @@ which are project-level, not coding-mode guidelines. They were incorrectly
 injected into coding prompts as if they were coding standards.
 **Decision:** Create docs/project/ for project docs. Keep docs/coding/ for
 actual coding standards injected into Builder/Reviewer/Tester prompts.
-**Status:** Pending commit
+**Status:** Done (2026-08-11)
+
+## 2026-11-20: SaMD mode replaces launcher menu 9 (Dry Run)
+**Context:** Menu 9 started `--dry-run`, which only simulates AI calls; it
+is a developer tool, not a user mode. Doctors need a mode that takes
+clinical data, clinical questions, lab results and clinical photos and
+returns a working diagnosis, differential diagnoses and other clinically
+important information.
+**Decision:**
+- New mode `--mode samd` (Software as a Medical Device), launcher menu 9.
+  `--dry-run` stays as a main.py flag (tests, C Custom flags); only the
+  menu entry goes.
+- Input: input/samd/ (clinical photos, photos of lab reports, .txt/.docx
+  notes, PDFs), listed when the mode starts; the doctor can add free text
+  in the terminal.
+- Intermediate steps: reports/samd/<run_id>/ (clinician input, image
+  transcriptions, structured case, run.log). Final answer:
+  output/samd/<run_id>/ as .html (opened in the browser as a local file,
+  no server), .md and .docx. All three folders are already in .gitignore
+  (input/*, reports/, output/).
+- Providers: Ollama by default, vision model from the shared SR/OCR
+  picker; never falls back to cloud. Qwen / OpenAI only behind the cloud
+  gate (typed "y"); the banner says clinical images and case text leave
+  the machine and asks the user to de-identify them. Same provider lists
+  as OCR.
+- Intended use: decision support for a clinician, for research and
+  evaluation; not a cleared or certified medical device. The clinician
+  makes every decision. Every output carries this statement. The name
+  SaMD names the regulatory category such software falls into; it is not
+  a claim of approval.
+- A lab value cited in the answer must appear in the transcribed source,
+  else it is flagged (same idea as the SR number gate).
+- Version 3.0.0 when the mode ships.
+**Commit:** Session 49 (docs first; code in the following PRs)
