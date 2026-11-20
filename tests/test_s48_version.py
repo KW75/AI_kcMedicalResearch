@@ -1,4 +1,4 @@
-"""Session 48: version 2.7.0, and every place that shows it agrees.
+"""Session 48: version 2.8.0, and every place that shows it agrees.
 
 The version is written in seven places: main.py VERSION (used by
 --version and the launcher banner), pipelines/__init__.py __version__,
@@ -9,7 +9,7 @@ import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-EXPECTED = "2.7.0"
+EXPECTED = "2.8.0"
 OLD = "2.6.0"
 LAUNCHERS = [
     ROOT / "scripts" / "windows" / "AI_kcMedicalResearch_CLI.bat",
