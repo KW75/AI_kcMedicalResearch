@@ -144,11 +144,12 @@ You have two choices. Pick whichever suits you.
 
   - Update the LLM to the latest model.
       Local AI (Ollama): in the launcher choose
-      10 Setup -> 2 Local AI and pull your model again;
-      that downloads its newest version.
+      10 Setup -> 2 Local AI -> 3 Update pulled models;
+      that downloads the newest version of each model.
       Cloud AI: download the latest version of the app
-      (STEP 2), then copy the lines ending in _MODEL from
-      the new .env.example into your own .env file.
+      (STEP 2), then choose 10 Setup -> 4 Cloud AI models.
+      It checks your model names with each service and
+      offers the name from the new .env.example.
 
   - For cloud providers, make sure the API account has
     enough tokens (credit) left. Log in to the

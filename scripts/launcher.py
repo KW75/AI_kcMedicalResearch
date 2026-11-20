@@ -36,6 +36,7 @@ from ollama_models import (  # noqa: E402
 )
 from time_limits import CHOICES as TIME_CHOICES, DEFAULT as TIME_DEFAULT, LABELS as TIME_LABELS  # noqa: E402
 import env_file  # noqa: E402
+import cloud_models  # noqa: E402
 
 
 def _project_meta() -> tuple[str, str]:
@@ -874,6 +875,44 @@ def _pull_model(exe: str) -> None:
         _save_default_model(name)
 
 
+def _update_pulled_models(exe: str, models: list) -> None:
+    """Session 48: pull every pulled model again (newest build of each)."""
+    print()
+    if not models:
+        print(f'  {WARN}No models pulled yet - use 2 to pull one first.{RESET}')
+        return
+    for m in models:
+        print(f'  {TEXT}{m["name"]}  ({m.get("size_gb", "?")} GB){RESET}')
+    print(f'  {INFO}Ollama downloads only the parts that changed since your last pull.{RESET}')
+    print(f'  {WARN}A newer build can change SR results slightly - note the date in your SR log.{RESET}')
+    answer = safe_input(f'  {ACCENT}>> Update all {len(models)} models? [y/N]: {RESET}')
+    if answer.lower() not in ('y', 'yes'):
+        print(f'  {INFO}Cancelled - nothing downloaded.{RESET}')
+        return
+    ok, failed = 0, []
+    for m in models:
+        name = m['name']
+        if not _MODEL_NAME_RE.match(name):
+            failed.append(name)
+            continue
+        print(f'  {INFO}Running: ollama pull {name}   (Ctrl+C to stop){RESET}')
+        try:
+            rc = subprocess.run([exe, 'pull', name]).returncode
+        except KeyboardInterrupt:
+            print(f'\n  {WARN}Update stopped. Run it again later to resume.{RESET}')
+            break
+        except OSError:
+            failed.append(name)
+            continue
+        if rc == 0:
+            ok += 1
+        else:
+            failed.append(name)
+    if failed:
+        print(f'  {ERR}Updated {ok} of {len(models)} models; {len(failed)} failed: {", ".join(failed)}{RESET}')
+    else:
+        print(f'  {ACCENT}Updated {ok} of {len(models)} models.{RESET}')
+
 def local_ai_menu() -> None:
     clear()
     section_header('SETUP - LOCAL AI (OLLAMA)')
@@ -909,23 +948,88 @@ def local_ai_menu() -> None:
         print()
         print(f'  {ACCENT}1{RESET}  {TEXT}Change default model{RESET}')
         print(f'  {ACCENT}2{RESET}  {TEXT}Pull a new model{RESET}')
+        print(f'  {ACCENT}3{RESET}  {TEXT}Update pulled models (newest build of each){RESET}')
         print(f'  {ACCENT}0{RESET}  {TEXT}Back{RESET}')
         print()
-        choice = safe_input(f'  {ACCENT}>> Enter choice [0-2]: {RESET}', default='0')
+        choice = safe_input(f'  {ACCENT}>> Enter choice [0-3]: {RESET}', default='0')
         if choice in ('0', ''):
             return
         if choice == '1':
             _change_default_model(models)
         elif choice == '2':
             _pull_model(exe)
+        elif choice == '3':
+            _update_pulled_models(exe, models)
         else:
-            print(f'\n  {ERR}Invalid choice - please enter 0-2.{RESET}')
+            print(f'\n  {ERR}Invalid choice - please enter 0-3.{RESET}')
 
+
+# -----------------------------------------------------------------------------
+#  Setup -> Cloud AI models  (Session 48)
+# -----------------------------------------------------------------------------
+def _save_env_model(var: str, name: str) -> None:
+    try:
+        env_file.set_value(ENV_FILE, var, name, template=ENV_TEMPLATE)
+    except ValueError as e:
+        print(f'  {ERR}{e} Nothing was saved.{RESET}')
+        return
+    except OSError as e:
+        print(f'  {ERR}Could not save .env ({e.strerror or type(e).__name__}). Nothing was changed.{RESET}')
+        return
+    print(f'  {ACCENT}Saved {var}={name} to .env.{RESET}')
+
+
+def cloud_models_menu() -> None:
+    """Check each *_MODEL name with its provider; never switches on its own."""
+    clear()
+    section_header('SETUP - CLOUD AI MODELS')
+    print()
+    print(f'  {INFO}Asks each provider that has a key for its model list (costs no tokens).{RESET}')
+    print(f'  {INFO}Nothing changes unless you answer y.{RESET}')
+    values = env_file.read_values(ENV_FILE) if ENV_FILE.exists() else {}
+    template = env_file.read_values(ENV_TEMPLATE) if ENV_TEMPLATE.exists() else {}
+    rows = cloud_models.check_all(values, template)
+    if not any(r['key_set'] for r in rows):
+        print()
+        print(f'  {WARN}No cloud API keys set - use 1 API keys first.{RESET}')
+        safe_input(f'  {INFO}Press Enter to return to menu...{RESET}')
+        return
+    for r in rows:
+        if not r['key_set']:
+            continue
+        print()
+        print(f'  {ACCENT}{r["label"]}{RESET}')
+        if r['error']:
+            print(f'  {ERR}Could not list models: {r["error"]}{RESET}')
+            print(f'  {INFO}Update the LLM to the latest model; for cloud providers, make sure the API has enough tokens.{RESET}')
+            continue
+        for m in r['models']:
+            where = f' ({m["source"]})' if m['source'] else ''
+            if m['listed']:
+                print(f'  {TEXT}{m["var"]}={m["value"]}{where} - listed, OK{RESET}')
+                continue
+            print(f'  {WARN}{m["var"]}={m["value"] or "(not set)"}{where} - NOT in the provider list{RESET}')
+            if m['source'] == cloud_models.SYSTEM:
+                print(f'  {WARN}A system environment variable sets this and wins over .env;{RESET}')
+                print(f'  {WARN}change or remove it (Windows: System Properties -> Environment Variables).{RESET}')
+                continue
+            if m['suggest']:
+                answer = safe_input(f'  {ACCENT}>> Save {m["var"]}={m["suggest"]} (from .env.example) to .env? [y/N]: {RESET}')
+                if answer.lower() in ('y', 'yes'):
+                    _save_env_model(m['var'], m['suggest'])
+                else:
+                    print(f'  {INFO}Not changed.{RESET}')
+        shown = ', '.join(r['names'][:30])
+        more = f' (+{len(r["names"]) - 30} more)' if len(r['names']) > 30 else ''
+        print(f'  {INFO}Provider lists: {shown}{more}{RESET}')
+    print()
+    safe_input(f'  {INFO}Press Enter to return to menu...{RESET}')
 
 SETUP_ITEMS = [
     ('1', 'API keys',          'saved to .env, typed hidden'),
     ('2', 'Local AI (Ollama)', 'check install, default model, pull models'),
     ('3', 'Open Help',         'help page in your browser'),
+    ('4', 'Cloud AI models',   'check model names with each provider'),
 ]
 
 
@@ -939,7 +1043,7 @@ def setup_menu() -> None:
             print(f'  {ACCENT}{key}{RESET}  {TEXT}{label:<20}{RESET}  {INFO}{desc}{RESET}')
         print(f'  {ACCENT}0{RESET}  {TEXT}Back to main menu{RESET}')
         print()
-        choice = safe_input(f'  {ACCENT}>> Enter choice [0-3]: {RESET}', default='0')
+        choice = safe_input(f'  {ACCENT}>> Enter choice [0-4]: {RESET}', default='0')
         if choice in ('0', ''):
             return
         if choice == '1':
@@ -948,8 +1052,10 @@ def setup_menu() -> None:
             local_ai_menu()
         elif choice == '3':
             open_help()
+        elif choice == '4':
+            cloud_models_menu()
         else:
-            print(f'\n  {ERR}Invalid choice - please enter 0-3.{RESET}')
+            print(f'\n  {ERR}Invalid choice - please enter 0-4.{RESET}')
             safe_input(f'  {INFO}Press Enter to try again...{RESET}')
 
 
