@@ -72,11 +72,96 @@ def status(value: str, ref: str) -> str:
     return "normal" if x >= b else "unclear"
 
 
+_TEXT_VALUES = r"NEGATIVE|POSITIVE|TRACE|NIL|NOT\s+SEEN|[1-4]\+"
+_RANGE = _NUM + r"\s*-\s*" + _NUM
+_OTHER = re.compile(
+    r"^(?P<name>[A-Za-z][^<>]*?)\s+"
+    r"(?P<value>" + _TEXT_VALUES + r"|" + _RANGE + r"|[<>]=?\s?" + _NUM
+    + r"|" + _NUM + r")"
+    r"(?:\s+(?P<flag>H|L))?"
+    r"(?:\s+(?!(?:NEGATIVE|UP\s?TO)\b)(?P<unit>(?=\S*[A-Za-z%])[^\s\d]\S*))?"
+    r"(?:\s+(?P<ref>NEGATIVE|UP\s?TO\s+TRACE|UP\s?TO\s+" + _NUM
+    + r"|[<>]=?\s?" + _NUM + r"|" + _RANGE + r"))?"
+    r"\s*$", re.I)
+
+
+def _text_status(value: str, ref: str) -> str:
+    """NEGATIVE/NIL/NOT SEEN are normal against any printed reference; TRACE
+    is normal against 'up to trace' and HIGH against 'negative'; 1+ to 4+
+    and POSITIVE are HIGH against either. Anything else: unclear."""
+    r = ref.lower()
+    if not r:
+        return "no range"
+    if value in ("NEGATIVE", "NIL", "NOT SEEN"):
+        return "normal"
+    if value == "TRACE":
+        return "normal" if "trace" in r else "HIGH" if r == "negative" else "unclear"
+    if r == "negative" or "trace" in r:
+        return "HIGH"
+    return "unclear"
+
+
+def _parse_other(line: str):
+    """Session 49: rows the main pattern skips - text results (NEGATIVE,
+    TRACE, NIL, NOT SEEN, 1+ to 4+, POSITIVE), count ranges (1-3 cell/HPF),
+    numbers without a unit but with a printed range (pH 5.5 5.0 - 8.0) and
+    'up to N' references. An up/down arrow is the report's H/L flag."""
+    text = line.strip().translate(_SYMBOLS)
+    text = re.sub(r"\s*\u2191\s*", " H ", text)
+    text = re.sub(r"\s*\u2193\s*", " L ", text).strip()
+    m = _OTHER.match(text)
+    if not m:
+        return None
+    g = m.groupdict()
+    name = re.sub(r"\s+", " ", g["name"]).strip()
+    unit = g["unit"] or ""
+    if (name.endswith("-") or _NOT_RESULT.search(name)
+            or re.search(r"(?<![\w.])\d", name)
+            or unit.startswith("(") or unit.lower().rstrip(".") in _TIME_WORDS):
+        return None
+    value = re.sub(r"\s+", " ", g["value"]).strip().upper()
+    ref = re.sub(r"\s+", " ", g["ref"] or "").strip()
+    is_text = re.fullmatch(_TEXT_VALUES, value) is not None
+    rng = re.fullmatch("(" + _NUM + r")\s*-\s*(" + _NUM + ")", value)
+    if is_text:
+        pass
+    elif rng:
+        if not unit:
+            return None
+        value = f"{rng.group(1)}-{rng.group(2)}"
+    elif not unit:
+        if not re.fullmatch(_NUM, value) or not re.fullmatch(_RANGE, ref):
+            return None
+    elif not ref.lower().startswith("up"):
+        return None
+    if not is_text:
+        value = value.replace(" ", "")
+    up = re.fullmatch(r"up\s?to\s+(" + _NUM + ")", ref, re.I)
+    rr = re.fullmatch("(" + _NUM + r")\s*-\s*(" + _NUM + ")", ref)
+    if up:
+        ref = "<=" + up.group(1)
+    elif rr:
+        ref = f"{rr.group(1)} - {rr.group(2)}"
+    elif ref[:1] in ("<", ">"):
+        ref = ref.replace(" ", "")
+    elif ref:
+        ref = ref[0].upper() + ref[1:].lower()
+    if is_text:
+        st = _text_status(value, ref)
+    elif rng:
+        a, b = status(rng.group(1), ref), status(rng.group(2), ref)
+        st = a if a == b else "no range" if "no range" in (a, b) else "unclear"
+    else:
+        st = status(value, ref)
+    return {"test": name, "value": value, "unit": unit, "ref": ref,
+            "flag": (g["flag"] or "").upper(), "status": st}
+
+
 def parse_line(line: str):
     """One result row (dict) or None if the line is not a lab result."""
     m = _LINE.match(line.strip().translate(_SYMBOLS))
     if not m:
-        return None
+        return _parse_other(line)
     g = m.groupdict()
     # Session 49: a reference-note line ("... 5.7 - 6.4 6.1 - 6.9 (IFG)") is
     # not a result: unit in brackets, or a range or dash left in the name.
@@ -150,7 +235,7 @@ def parse_results(described) -> list[dict]:
         for i, line in enumerate(lines):
             row = parse_line(line)
             if row:
-                if not row["ref"]:
+                if not row["ref"] and re.fullmatch(r"(?:[<>]=?)?" + _NUM, row["value"]):
                     _add_bands(row, lines[i + 1:])
                 row["source"] = name
                 rows.append(row)
@@ -196,7 +281,8 @@ def check_answer(rows, answer: str, case: str) -> list[str]:
     warnings = []
     sentences = _sentences(answer)
     for r in rows:
-        if r["status"] != "normal":
+        if (r["status"] != "normal"
+                or not re.fullmatch(r"(?:[<>]=?)?" + _NUM, r["value"])):
             continue
         for s in sentences:
             if (_value_cited(s, r["value"]) and _ABNORMAL.search(s)
@@ -239,7 +325,7 @@ def build_markdown(*, run_id, intended_use, doctor_text, rows, warnings,
         for r in sorted(rows, key=lambda r: STATUS_ORDER.get(r["status"], 9)):
             st = f"**{r['status']}**" if r["status"] in ("HIGH", "LOW") else r["status"]
             md.append("| " + " | ".join(_cell(c) for c in (
-                r["test"], r["value"], r["unit"], r["ref"] or "-",
+                r["test"], r["value"], r["unit"] or "-", r["ref"] or "-",
                 r["flag"] or "-", st, r["source"])) + " |")
         md += ["", "Status is computed from the reference range printed on "
                "the report, not by the AI. Results without a printed range "
