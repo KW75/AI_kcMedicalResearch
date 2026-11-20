@@ -19,6 +19,12 @@ from SOURCE_CODE.pipelines.samd import cli
 NOW = datetime(2026, 11, 20, 15, 30, 0)
 
 
+@pytest.fixture(autouse=True)
+def _no_ai(monkeypatch):
+    # PR E: run() goes on to the AI steps; these tests stop after step 1.
+    monkeypatch.setattr(cli, "choose_call", lambda *a, **k: None, raising=False)
+    monkeypatch.setattr(cli, "read_pages", lambda p: [], raising=False)
+
 def _answers(*items):
     it = iter(items)
     return lambda _prompt="": next(it)
