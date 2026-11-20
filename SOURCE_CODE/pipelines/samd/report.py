@@ -29,7 +29,7 @@ _SYMBOLS = str.maketrans({
 # Session 49: report notes that look like rows (accreditation number,
 # percentile notes, "Smoker: Upto 6.5 ug/L") are not results.
 _NOT_RESULT = re.compile(r"\bup\s?to\b|\bpercentile\b|^HO?KLAS$", re.I)
-STATUS_ORDER = {"HIGH": 0, "LOW": 0, "unclear": 1, "normal": 2, "no range": 3}
+STATUS_ORDER = {"HIGH": 0, "LOW": 0, "unclear": 1, "see bands": 1, "normal": 2, "no range": 3}
 
 
 def _num(s: str) -> float:
@@ -98,15 +98,60 @@ def parse_line(line: str):
             "status": status(value, ref)}
 
 
+_CRIT = re.compile(r"[<>]=?\s?" + _NUM + r"|" + _NUM + r"\s*-\s*" + _NUM)
+
+
+def _add_bands(row: dict, following: list[str]) -> None:
+    """Session 49: a result printed without a range (HbA1c 6.1 %) but with a
+    band table below it ("Interpretation  HbA1c (%)  FBS", then one band per
+    line) gets the printed bands of its own column as the reference, and the
+    value is marked in every band it falls in. Bands may overlap, so the
+    program does not pick one: status 'see bands'."""
+    key = row["test"].split()[0].lower()
+    if len(key) < 3:
+        return
+    for h, head in enumerate(following[:2]):
+        cols = re.split(r"\s{2,}", head.strip())
+        hits = [n for n, c in enumerate(cols[1:]) if key in c.lower()]
+        if hits:
+            break
+    else:
+        return
+    col, bands = hits[0], []
+    for line in following[h + 1:]:
+        text = line.strip().translate(_SYMBOLS)
+        if not text:
+            break
+        crits = _CRIT.findall(text)
+        if not crits:
+            if not bands or not text[0].islower():
+                break
+            bands[-1][0] += " " + text
+            continue
+        label = re.sub(r"\s+", " ", text[:_CRIT.search(text).start()]).strip()
+        if label and col < len(crits):
+            bands.append([label, re.sub(r"\s+", " ", crits[col])])
+    if not bands:
+        return
+    row["ref"] = "; ".join(
+        f"{label} {crit}"
+        + (" (value in band)" if status(row["value"], crit) == "normal" else "")
+        for label, crit in bands)
+    row["status"] = "see bands"
+
+
 def parse_results(described) -> list[dict]:
     """Rows from every transcription / text layer (photos are skipped)."""
     rows = []
     for name, kind, body in described:
         if kind == "photo description":
             continue
-        for line in (body or "").splitlines():
+        lines = (body or "").splitlines()
+        for i, line in enumerate(lines):
             row = parse_line(line)
             if row:
+                if not row["ref"]:
+                    _add_bands(row, lines[i + 1:])
                 row["source"] = name
                 rows.append(row)
     return rows
@@ -198,7 +243,8 @@ def build_markdown(*, run_id, intended_use, doctor_text, rows, warnings,
                 r["flag"] or "-", st, r["source"])) + " |")
         md += ["", "Status is computed from the reference range printed on "
                "the report, not by the AI. Results without a printed range "
-               "show 'no range'."]
+               "show 'no range'; 'see bands' means bands are printed below "
+               "the result and the value is marked in each band it falls in."]
     else:
         md.append("No lab result with a value and unit was found in the sources.")
     md += ["", "## Doctor's notes", "", doctor_text or "(none typed)", "",
