@@ -4,7 +4,7 @@ A multi-mode AI assistant for medical research, critical appraisal, systematic r
 
 
     Version: 2.7.0
-    Tests: 1848 passed, 10 deselected
+    Tests: 1866 passed, 10 deselected
            (reproduce with `python -m pytest -m "not live" --tb=short -q`)
     CI: GitHub Actions - Green
     GitHub: https://github.com/KW75/AI_kcMedicalResearch
@@ -342,6 +342,10 @@ providers, `git pull` (or download the latest release) and copy the
 sure the API has enough tokens. A system environment variable with the
 same name (for example `ANTHROPIC_MODEL` set by another tool) overrides
 `.env`.
+In the launcher, 10 Setup -> 4 Cloud AI models checks your model names with
+each provider (costs no tokens) and offers the `.env.example` name; and
+10 Setup -> 2 Local AI -> 3 Update pulled models pulls every local model
+again. Neither switches to a newer model on its own.
 ## Contributing
 
 1. Fork the repository
