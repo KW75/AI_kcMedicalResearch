@@ -8,7 +8,9 @@ described without a diagnosis -> step2_<nn>_<file>.txt.
 Step 3 (PR E): one reasoning call over the whole case -> case.md and
 reasoning.md (intended use on top).
 A failed or empty AI reply stops the job: no half answer is written.
-The browser report and output/samd/ come in PR F.
+Step 4 (PR F): report.py computes the lab table (status from the printed
+reference range, not the AI), checks the answer and writes
+output/samd/<run_id>/report.md, .html (opened in the browser) and .docx.
 pipelines.ocr and ollama_models are imported lazily (pillow, pymupdf).
 """
 from __future__ import annotations
@@ -331,6 +333,45 @@ def missing_headings(answer: str) -> list[str]:
     return [h for h in HEADINGS if h.lower() not in lines]
 
 
+def open_browser(path, log=print) -> None:
+    """Show the report in the default browser (a local file, no server)."""
+    try:
+        import webbrowser
+        webbrowser.open(Path(path).resolve().as_uri())
+    except Exception as e:
+        log(f"Could not open the browser ({e}); open the report file yourself.")
+
+
+def write_report_step(base_dir, run_id, run_dir, text, described, case,
+                      answer, miss, lines, say, result) -> None:
+    """Step 4: lab table computed by code, checks, report in
+    output/samd/<run_id>/ (.md, .html, .docx); HTML opened in the browser."""
+    from . import report
+    rows = report.parse_results(described)
+    warnings = report.check_answer(rows, answer, case)
+    for w in warnings:
+        say("WARNING: " + w)
+    if miss:
+        warnings.insert(0, "Headings missing from the answer: "
+                        + ", ".join(h[3:] for h in miss))
+    (run_dir / "results.json").write_text(
+        json.dumps(rows, indent=2, ensure_ascii=False) + "\n",
+        encoding="utf-8", newline="\n")
+    ai_line = next((m for m in reversed(lines) if m.startswith("AI: ")), "")
+    md = report.build_markdown(
+        run_id=run_id, intended_use=INTENDED_USE, doctor_text=text,
+        rows=rows, warnings=warnings, answer=answer,
+        sources=[(n, k) for n, k, _ in described], ai_line=ai_line)
+    out_dir = Path(base_dir) / "output" / "samd" / run_id
+    paths = report.write_report(out_dir, md, title=f"SaMD report {run_id}",
+                                log=say)
+    say(f"Report: output/samd/{run_id}/report.html (also .md"
+        + (", .docx)" if paths["docx"] else ")"))
+    result["report"] = paths["html"]
+    result["warnings"] = warnings
+    open_browser(paths["html"], say)
+
+
 def run(base_dir, model=None, *, provider="ollama", confirm=None,
         input_fn=input, log=print, now=None):
     """Steps 1-3. None = not run (nothing written); else a result dict."""
@@ -367,7 +408,8 @@ def run(base_dir, model=None, *, provider="ollama", confirm=None,
     save_step1(run_dir, run_id=run_id, folder=folder, files=files, text=text,
                provider=provider, model=model, log_lines=lines)
     result = {"run_id": run_id, "run_dir": run_dir, "files": files,
-              "ai_called": False, "answer": None}
+              "ai_called": False, "answer": None, "report": None,
+              "warnings": []}
     try:
         sources = read_sources(folder, files, say)
         if sources is None:
@@ -405,9 +447,14 @@ def run(base_dir, model=None, *, provider="ollama", confirm=None,
         if miss:
             say("WARNING: headings missing from the answer: "
                 + ", ".join(h[3:] for h in miss) + ". Check it carefully.")
-        say(f"Answer: reports/samd/{run_id}/reasoning.md "
-            f"(browser report comes in PR F).")
+        say(f"Answer: reports/samd/{run_id}/reasoning.md")
         result["answer"] = path
+        try:
+            write_report_step(base_dir, run_id, run_dir, text, described,
+                              case, answer, miss, lines, say, result)
+        except Exception as e:
+            say(f"Report not written ({e}); the answer is in "
+                f"reports/samd/{run_id}/reasoning.md.")
         return result
     finally:
         _write_log(run_dir, lines)
