@@ -289,6 +289,23 @@ def _parse_nameless(lines: list[str], i: int):
     return row
 
 
+_PER_FIELD = re.compile(r"/\s*[HL]PF\b", re.I)
+
+
+def _mark_urine(row: dict) -> None:
+    """Session 49: a urine microscopy row (unit per field, /HPF or /LPF) gets
+    ' - Urine' after its English name, so 'WBC 白血球' NIL cell/HPF differs from
+    the blood 'WBC 白血球' 4.9 x10e9/L in the same file. The Chinese part is kept
+    (lab style 'pH - Urine 酸鹼度'); names already saying Urine are left alone."""
+    if not _PER_FIELD.search(row["unit"]) or re.search(r"\burine\b", row["test"], re.I):
+        return
+    m = re.match(r"([\x00-\x7f]+?)\s*([^\x00-\x7f].*)?$", row["test"])
+    if not m or not m.group(1).strip():
+        return
+    rest = (m.group(2) or "").strip()
+    row["test"] = f"{m.group(1).strip()} - Urine" + (f" {rest}" if rest else "")
+
+
 def parse_results(described) -> list[dict]:
     """Rows from every transcription / text layer (photos are skipped)."""
     rows = []
@@ -299,6 +316,7 @@ def parse_results(described) -> list[dict]:
         for i, line in enumerate(lines):
             row = parse_line(line) or _parse_nameless(lines, i)
             if row:
+                _mark_urine(row)
                 if not row["ref"] and re.fullmatch(r"(?:[<>]=?)?" + _NUM, row["value"]):
                     _add_bands(row, lines[i + 1:])
                 row["source"] = name
