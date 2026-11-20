@@ -21,6 +21,7 @@
 *.css  text eol=lf
 *.js   text eol=lf
 *.txt  text eol=lf
+*.example text eol=lf
 
 # Never touch binaries.
 *.png  binary
