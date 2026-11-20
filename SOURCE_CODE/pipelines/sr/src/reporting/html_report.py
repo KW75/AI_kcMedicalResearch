@@ -234,7 +234,7 @@ def _no_pool_template(t: str) -> str:
 class HTMLReportGenerator:
     def generate(self, title, authors, pico, inclusion_criteria, exclusion_criteria,
                  ma_result, extraction_results, screening_results, rob_results,
-                 forest_plot_path, effect_measure="OR", model_name="claude-opus-4-7",
+                 forest_plot_path, effect_measure="OR", model_name="claude-opus-5-5",
                  output_path="outputs/reports/systematic_review.html", meta_audit=None, subgroups=None, subgroup_plot_path=None, no_pool=False) -> str:
         out = Path(output_path); out.parent.mkdir(parents=True, exist_ok=True)
         fields = dict(

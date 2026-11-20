@@ -4,7 +4,7 @@ A multi-mode AI assistant for medical research, critical appraisal, systematic r
 
 
     Version: 2.7.0
-    Tests: 1836 passed, 10 deselected
+    Tests: 1848 passed, 10 deselected
            (reproduce with `python -m pytest -m "not live" --tb=short -q`)
     CI: GitHub Actions - Green
     GitHub: https://github.com/KW75/AI_kcMedicalResearch
@@ -332,6 +332,16 @@ them; gaps are closed issues. Closed issues up to Session 40: `git show 2923cc3:
 tripwires above but still require the manual checks in `REVIEWER_GUIDE.md`
 sections 3.1 and 2.2.
 
+### API errors
+
+When a provider call fails, the app prints the provider's own reply and a
+hint (Session 48). Update the LLM to the latest model: for Ollama, choose
+launcher 10 Setup -> 2 Local AI and pull the model again; for cloud
+providers, `git pull` (or download the latest release) and copy the
+`*_MODEL` lines from `.env.example` into `.env`. For cloud providers, make
+sure the API has enough tokens. A system environment variable with the
+same name (for example `ANTHROPIC_MODEL` set by another tool) overrides
+`.env`.
 ## Contributing
 
 1. Fork the repository
@@ -382,5 +392,5 @@ Noted, not fixed:
 - main.call_ai swallows streaming errors (`except Exception: pass`), so an
   Ollama failure waits through two timeouts. Revisit with time limits.
 - RelevanceScreener defaults to provider="anthropic",
-  model="claude-opus-4-7"; rct_search and main.py functions default to
+  model="claude-opus-5-5"; rct_search and main.py functions default to
   provider="deepseek".
