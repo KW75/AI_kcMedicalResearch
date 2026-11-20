@@ -1,7 +1,7 @@
 """
 main.py  - AI Automation Tool (version: see VERSION below)
-Supports six workflow modes: coding, writing, rct_search, appraisal, search, sr.
-Supports six AI providers: deepseek (default), openai, anthropic, ollama, groq, qwen.
+Workflow modes (--mode): coding, writing, rct_search, appraisal, search, sr, ocr, samd.
+AI providers: ollama (default when .env sets none; local only), openai, anthropic, deepseek, groq, qwen.
 Each --mode is sent by run_cli() to its own handler or pipeline.
 Coding mode: Builder (pipeline), Reviewer (standalone), Tester (standalone).
 """
