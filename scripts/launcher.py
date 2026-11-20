@@ -286,7 +286,7 @@ def banner() -> None:
 
     print(f'  {FRAME}║{RESET}  {INFO}Modes  :{RESET}  '
           f'{TEXT}coding  writing  appraisal  search{RESET}{W(8)}{FRAME} ║{RESET}')
-    _modes2 = 'rct_search  sr  data_analysis  ocr'
+    _modes2 = 'rct_search  sr  data_analysis  ocr  samd'
     print(f'  {FRAME}║{RESET}  {INFO}         {RESET}  '
           f'{TEXT}{_modes2}{RESET}{W(42 - len(_modes2))}{FRAME}║{RESET}')
     print(f'  {FRAME}║{RESET}  {INFO}Providers:{RESET} '
