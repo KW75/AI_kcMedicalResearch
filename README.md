@@ -3,7 +3,7 @@
 A multi-mode AI assistant for medical research, critical appraisal, systematic review, coding, and writing. Local-first: uses Ollama on your own machine by default, so input stays local. Cloud providers (DeepSeek, Qwen, OpenAI, Anthropic, Groq) are available when you choose one for a job.
 
 
-    Version: 2.7.0
+    Version: 2.8.0
     Tests: 2038 passed, 10 deselected
            (reproduce with `python -m pytest -m "not live" --tb=short -q`)
     CI: GitHub Actions - Green
