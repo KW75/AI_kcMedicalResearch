@@ -18,6 +18,13 @@ import pytest
 from SOURCE_CODE import main
 
 
+@pytest.fixture(autouse=True)
+def _no_samd_ai(monkeypatch):
+    # PR E: SaMD run() goes on to the AI steps; these tests stop after step 1.
+    from SOURCE_CODE.pipelines.samd import cli as samd_cli
+    monkeypatch.setattr(samd_cli, "choose_call", lambda *a, **k: None, raising=False)
+    monkeypatch.setattr(samd_cli, "read_pages", lambda p: [], raising=False)
+
 def _parse(argv):
     with patch("sys.argv", ["main.py"] + argv):
         return main.parse_args()
