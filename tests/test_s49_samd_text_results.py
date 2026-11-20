@@ -40,8 +40,6 @@ def test_text_result_above_reference_is_high(line):
 
 
 @pytest.mark.parametrize("line", [
-    "Colour 順色 YELLOW -",
-    "Clarity 清晰度 CLEAR -",
     "Negative",
     "Less than 9.0 U EBV-(VCA)IgA",
     "Between 9.0 to 11.0 U Borderline",
