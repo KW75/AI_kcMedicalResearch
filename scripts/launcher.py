@@ -177,7 +177,7 @@ MODES = [
     ('6',  'SR Pipeline',   '--mode sr'),
     ('7',  'Data Analysis', None),        # coming soon
     ('8',  'OCR',           '--mode ocr'),
-    ('9',  'Dry Run',       '--dry-run'),
+    ('9',  'SaMD',          '--mode samd'),
     ('10', 'Setup',         'setup'),     # launcher sub-menu, not a main.py flag
 ]
 
@@ -474,7 +474,10 @@ def time_limit_flag(mode_flag: str) -> str:
 
 def pick_provider(mode_flag: str = '') -> str:
     is_sr = (mode_flag == '--mode sr')
-    is_ocr = (mode_flag == '--mode ocr')
+    is_samd = (mode_flag == '--mode samd')
+    # Session 49: SaMD reads images like OCR: same provider lists, own wording.
+    is_ocr = (mode_flag == '--mode ocr') or is_samd
+    job = 'SaMD' if is_samd else 'OCR'
 
     while True:
         print()
@@ -515,7 +518,7 @@ def pick_provider(mode_flag: str = '') -> str:
             print()
 
         if is_ocr:
-            print(f'  {WARN}!  OCR needs a provider that can read page images.{RESET}')
+            print(f'  {WARN}!  {job} needs a provider that can read page images.{RESET}')
             print(f'  {INFO}   Supported: {GOOD}ollama (vision model), qwen, openai{RESET}')
             print(f'  {INFO}   Blocked:   {ERR}groq, deepseek, anthropic{RESET}')
             print()
@@ -551,7 +554,7 @@ def pick_provider(mode_flag: str = '') -> str:
 
         if is_ocr and prov_id in BLOCKED_FOR_OCR:
             print()
-            print(f'  {ERR}x  {prov_id} cannot read page images for OCR.{RESET}')
+            print(f'  {ERR}x  {prov_id} cannot read page images for {job}.{RESET}')
             print(f'  {GOOD}  Use: ollama (local), qwen or openai.{RESET}')
             print()
             safe_input(f'  {INFO}Press Enter to choose again...{RESET}')

@@ -436,7 +436,7 @@ def data_destinations(mode: str, provider: str) -> list[str]:
     SR calls its provider directly (no fallback chain), so it lists only the
     chosen provider. Other modes go through call_ai -> call_ai_with_fallback.
     """
-    if mode in ("sr", "ocr"):
+    if mode in ("sr", "ocr", "samd"):
         return [provider]
     return provider_attempt_order(provider, _fallback_chain_from_env())
 
@@ -489,6 +489,10 @@ def confirm_data_destinations(
     if mode == "ocr":
         print("        For OCR this means page images and the text of your documents")
         print("        (the cloud AI also writes the summary).")
+    if mode == "samd":
+        print("        For SaMD this means clinical photos, photos of lab reports and")
+        print("        the case text you type. Remove names, faces, record numbers and")
+        print("        other identifiers before you continue.")
     print("        Do not use for patient-identifiable or confidential data.")
     if confirm_cloud:
         print("        Confirmed in advance with --confirm-cloud.")
@@ -2095,7 +2099,7 @@ def parse_args(args: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--model",          type=str, default=None)
     parser.add_argument("--mode",           type=str, default="coding",
                         choices=["coding", "writing", "rct_search",
-                                 "appraisal", "search", "sr", "ocr"])
+                                 "appraisal", "search", "sr", "ocr", "samd"])
     parser.add_argument("--report",         action="store_true", default=False,
                         help="Generate a writing report from input/writing/ files")
     parser.add_argument("--revise",         action="store_true", default=False,
@@ -2152,8 +2156,10 @@ def ocr_provider_error(mode: str, provider: str) -> str | None:
     """OCR needs a provider that can read page images: local Ollama (vision
     models), Qwen or OpenAI. Others are refused: DeepSeek has no image input;
     Groq/Anthropic are not wired for OCR yet."""
-    if mode == "ocr" and provider not in OCR_PROVIDERS:
-        return (f"OCR: {provider} cannot be used to read page images. "
+    if mode in ("ocr", "samd") and provider not in OCR_PROVIDERS:
+        label = "SaMD" if mode == "samd" else "OCR"
+        what = "clinical photos and lab images" if mode == "samd" else "page images"
+        return (f"{label}: {provider} cannot be used to read {what}. "
                 "Use --provider ollama (local), qwen or openai.")
     return None
 
@@ -2374,6 +2380,13 @@ def run_cli(args: argparse.Namespace) -> None:
             confirm=lambda p: confirm_data_destinations(
                 "ocr", p, confirm_cloud=args.confirm_cloud),
             kind="ask",  # Session 48: several files -> Papers / Synopsis
+        )
+    elif args.mode == "samd":
+        from pipelines.samd import cli as samd_cli
+        samd_cli.run(
+            BASE_DIR, model=args.model, provider=args.provider,
+            confirm=lambda p: confirm_data_destinations(
+                "samd", p, confirm_cloud=args.confirm_cloud),
         )
     elif args.mode == "appraisal":
         handle_appraisal_mode(
