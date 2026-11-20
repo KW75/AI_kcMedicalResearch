@@ -339,8 +339,28 @@ def _value_cited(text: str, num: str) -> bool:
     return False
 
 
+_NOT_NORMAL = re.compile(r"\b(?:not|no longer)\s+(?:normal|within)\b", re.I)
+
+
+def _row_named(s: str, r: dict) -> bool:
+    """Session 49: sentence s names row r - a number value cited as a value,
+    or (text values such as RED, 1+, TRACE) the first word of the test name
+    and the value both in the sentence."""
+    value = r["value"]
+    if re.fullmatch(r"(?:[<>]=?)?" + _NUM, value):
+        return _value_cited(s, value.lstrip("<>="))
+    words = r["test"].split()
+    key = re.sub(r"[^a-z]", "", words[0].lower()) if words else ""
+    if len(key) < 3:
+        return False
+    key_pat = r"colou?r" if key in ("colour", "color") else re.escape(key)
+    return (re.search(r"\b" + key_pat + r"\b", s, re.I) is not None
+            and re.search(r"(?<!\w)" + re.escape(value) + r"(?!\w)", s, re.I) is not None)
+
+
 def check_answer(rows, answer: str, case: str) -> list[str]:
-    """Warnings: an in-range result called abnormal; numbers with a unit in
+    """Warnings: an in-range result called abnormal; an out-of-range result
+    (HIGH, LOW, ABNORMAL) called normal; numbers with a unit in
     the answer that appear nowhere in the case (sources + doctor's notes)."""
     warnings = []
     sentences = _sentences(answer)
@@ -356,6 +376,19 @@ def check_answer(rows, answer: str, case: str) -> list[str]:
                     f"The answer may call an in-range result abnormal: "
                     f"{r['test']} {r['value']} {r['unit']} (range {r['ref']}): "
                     f"\"{short}\"")
+                break
+    for r in rows:
+        if r["status"] not in ("HIGH", "LOW", "ABNORMAL"):
+            continue
+        for s in sentences:
+            if (_row_named(s, r) and _NORMAL.search(s)
+                    and not _ABNORMAL.search(s) and not _NOT_NORMAL.search(s)):
+                short = s if len(s) <= 200 else s[:197] + "..."
+                what = " ".join(x for x in (r["test"], r["value"], r["unit"]) if x)
+                ref = f", range {r['ref']}" if r["ref"] else ""
+                warnings.append(
+                    f"The answer may call an out-of-range result normal: "
+                    f"{what} ({r['status']}{ref}): \"{short}\"")
                 break
     missing = []
     for m in _CITED.finditer(answer):
