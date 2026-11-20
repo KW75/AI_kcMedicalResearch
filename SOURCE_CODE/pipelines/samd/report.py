@@ -157,11 +157,32 @@ def _parse_other(line: str):
             "flag": (g["flag"] or "").upper(), "status": st}
 
 
+_DESC_NAME = r"(?:Colou?r|COLOU?R|Clarity|CLARITY|Appearance|APPEARANCE)"
+_DESC_WORDS = (r"PALE\s+YELLOW|DARK\s+YELLOW|YELLOW|STRAW|AMBER|ORANGE|RED|"
+               r"BROWN|COLOU?RLESS|SLIGHTLY\s+TURBID|TURBID|CLEAR|CLOUDY|HAZY")
+_DESCRIPTIVE = re.compile(
+    r"^(?P<name>" + _DESC_NAME + r"(?:\s+[^\x00-\x7f]+)?)\s+"
+    r"(?P<value>" + _DESC_WORDS + r")(?:\s+-)?\s*$")
+
+
+def _parse_descriptive(line: str):
+    """Session 49: urinalysis Colour / Clarity / Appearance rows
+    ("Colour 順色 YELLOW -"). Only these names and a fixed list of upper-case
+    words. The report prints no reference, so the status is 'no range' for
+    every word: the program does not judge RED or TURBID; the clinician does."""
+    m = _DESCRIPTIVE.match(line.strip().translate(_SYMBOLS))
+    if not m:
+        return None
+    return {"test": re.sub(r"\s+", " ", m.group("name")).strip(),
+            "value": re.sub(r"\s+", " ", m.group("value")).strip(),
+            "unit": "", "ref": "", "flag": "", "status": "no range"}
+
+
 def parse_line(line: str):
     """One result row (dict) or None if the line is not a lab result."""
     m = _LINE.match(line.strip().translate(_SYMBOLS))
     if not m:
-        return _parse_other(line)
+        return _parse_other(line) or _parse_descriptive(line)
     g = m.groupdict()
     # Session 49: a reference-note line ("... 5.7 - 6.4 6.1 - 6.9 (IFG)") is
     # not a result: unit in brackets, or a range or dash left in the name.
