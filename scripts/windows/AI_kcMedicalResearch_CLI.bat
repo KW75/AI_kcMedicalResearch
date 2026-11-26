@@ -1,7 +1,7 @@
 @echo off
 :: =============================================================================
 ::  AI_kcMedicalResearch_CLI.bat
-::  v2.8.1  |  Menu-driven CLI Launcher (scripts\launcher.py)
+::  v3.0.0  |  Menu-driven CLI Launcher (scripts\launcher.py)
 ::
 ::  Location: scripts\windows\   (resolves project root two levels up)
 :: =============================================================================
@@ -157,7 +157,8 @@ exit /b !RC!
 :print_header
 echo.
 echo   ============================================================
-echo    AI kcMedical Research  ^|  CLI Launcher  ^|  v2.8.1
+echo    AI kcMedical Research  ^|  CLI Launcher  ^|  v3.0.0
+echo    Dr. Keith KW CHAN  ^|  https://kw75.github.io/Credential/
 echo   ============================================================
 echo    Project : !PROJECT_DIR!
 echo   ============================================================

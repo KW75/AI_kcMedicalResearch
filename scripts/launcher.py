@@ -267,13 +267,19 @@ def banner() -> None:
     _ver = _ver[:23]
     print(f'  {FRAME}║{RESET}   {LOGO}█████╔╝ ██║{RESET}{W(9)}'
           f'{ACCENT}Version  {RESET}{HILITE}{_ver}{RESET}{W(23 - len(_ver))}{FRAME}║{RESET}')
-    _py = _py[:23]
+    _by = 'Dr. Keith KW CHAN'
     print(f'  {FRAME}║{RESET}   {LOGO}██╔═██╗ ██║{RESET}{W(9)}'
+          f'{ACCENT}By       {RESET}{HILITE}{_by}{RESET}{W(23 - len(_by))}{FRAME}║{RESET}')
+    _py = _py[:23]
+    print(f'  {FRAME}║{RESET}   {LOGO}██║  ██╗╚██████╗{RESET}{W(4)}'
           f'{ACCENT}Python   {RESET}{GOOD}{_py}{RESET}{W(23 - len(_py))}{FRAME}║{RESET}')
     _run = 'local first / cloud API'
-    print(f'  {FRAME}║{RESET}   {LOGO}██║  ██╗╚██████╗{RESET}{W(4)}'
+    print(f'  {FRAME}║{RESET}   {LOGO}╚═╝  ╚═╝ ╚═════╝{RESET}{W(4)}'
           f'{ACCENT}Runs     {RESET}{INFO}{_run}{RESET}{W(23 - len(_run))}{FRAME}║{RESET}')
-    print(f'  {FRAME}║{RESET}   {LOGO}╚═╝  ╚═╝ ╚═════╝{RESET}{W(36)}{FRAME}║{RESET}')
+    _web = 'https://kw75.github.io/Credential/'
+    _mag = ('\033[95m' if _BG == 'dark' else '\033[35m') if RESET else ''
+    print(f'  {FRAME}║{RESET}   {ACCENT}Credential {RESET}{_mag}{_web}{RESET}'
+          f'{W(41 - len(_web))}{FRAME}║{RESET}')
 
     print(f'  {FRAME}║{RESET}                                                       {FRAME}║{RESET}')
 
