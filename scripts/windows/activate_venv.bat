@@ -59,6 +59,7 @@ PowerShell.exe -NoExit -NoLogo -ExecutionPolicy RemoteSigned -Command ^
   "Write-Host '';" ^
   "Write-Host '  ============================================================';" ^
   "Write-Host ('   AI kcMedical Research  |  venv shell  |  v' + $v);" ^
+  "Write-Host '   Dr. Keith KW CHAN  |  ' -NoNewline; Write-Host 'https://kw75.github.io/Credential/' -ForegroundColor Magenta;" ^
   "Write-Host '  ============================================================';" ^
   "Write-Host ('   Project : ' + '!PROJECT_DIR!');" ^
   "Write-Host '  ============================================================';" ^

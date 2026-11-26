@@ -120,14 +120,15 @@ KIND_MENU = (
     "1. Papers   - each file is its own paper: own record + own SUMMARY",
     "2. Synopsis - one record each + one SYNOPSIS summarising all papers "
     "in input/ocr",
-    "3. Finance  - invoices: one finance table (CSV, HTML, DOCX, PDF) with "
-    "subtotals and a total in the local currency",
+    "3. Finance  - all invoices sum up to one table with subtotals + total "
+    "(CSV/HTML/DOCX/PDF)",
 )
 
 
 def _ask_kind(input_fn, log):
     """Session 48: several files -> Papers or Synopsis. Enter / no keyboard
     = Synopsis; Ctrl+C or a bad answer = None (job not run)."""
+    log("")  # Session 50: blank line after the file list
     log("Write them as")
     for line in KIND_MENU:
         log(line)

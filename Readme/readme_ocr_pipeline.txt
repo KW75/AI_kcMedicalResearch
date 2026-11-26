@@ -7,11 +7,14 @@ Overview for readers. How to run the pipeline: Readme/flashcard-help.html.
 
 The OCR pipeline turns documents into plain text that can be searched,
 quoted and reused: PDFs, page images (photos, scans, screenshots), .txt
-and .docx files. Each file becomes a text record. With one file the job
-also writes a short SUMMARY. With several files you choose:
+and .docx files, and .eml e-mail receipts. Each file becomes a text
+record. With one file the job also writes a short SUMMARY. With several
+files you choose:
   - Papers: each file is its own paper, with its own record and SUMMARY.
   - Synopsis: one record per file plus one SYNOPSIS summarising all
     papers in the input folder.
+  - Finance: invoices and receipts become one finance table with
+    subtotals and a total in the local currency (section 8).
 
 The aim is a faithful copy of what is printed, not an interpretation. The
 main risk with AI reading is a confident error: a number, sign or word
@@ -36,8 +39,9 @@ takes the safest route that works:
   Route C - no text layer. Scans, photos and screenshots have no text to
   copy. The AI reads the whole page from the image.
 
-.txt and .docx files are taken as text (Route A). Old .doc files are
-refused; save them as .docx first.
+.txt and .docx files are taken as text (Route A), and so are .eml e-mail
+receipts (see section 8; PDF and image attachments are read as pages).
+Old .doc files are refused; save them as .docx first.
 
 
 3. Checks on Route B (broken-font PDFs)
@@ -147,39 +151,60 @@ numbers, signs, units and table layout.
 
 8. Finance (option 3, several files)
 
-With several files, option 3 reads invoices and receipts into one finance
-table: date, particulars (the invoice header), category, currency, amount,
-exchange rate, amount in the local currency, a subtotal per category and
-the total. It is written as <header>_FINANCE.csv, .html, .docx and .pdf in
-output/ocr/. The OCR text of each invoice and the AI's reply are kept in
-reports/ocr/<header>/ for checking.
+With two or more files in input/ocr/, option 3 reads invoices and receipts
+into one finance table: date, particulars (the invoice header), category,
+currency, amount, exchange rate, amount in the local currency, a subtotal
+per category and the total. It is written as <header>_FINANCE.csv, .html,
+.docx and .pdf in output/ocr/, each with an "Exchange rates used" table
+that lists only the currencies the invoices use. The OCR text of each
+invoice and the AI's reply are kept in reports/ocr/<header>/ (one
+<file>_OCR.txt per invoice) for checking.
 
-  - Each file is read as in Synopsis (routes A-C). The AI then returns the
-    fields of each invoice as JSON; it does no arithmetic.
-  - Exchange rates come only from
-    reference/ocr_finance/Reference_exchange_rates.txt (kept out of git).
-    "local,HKD" names the currency of the totals; a line such as
-    "USD,7.80,2026-11-26" means 1 USD = 7.80 HKD, set on that date (the
-    date is optional; "USD 7.80" and "1 USD = 7.80 HKD" also work). If
-    the file is missing, an old input/ocr/finance_rates.csv is copied
+How to run it:
+  1. Put the invoices in input/ocr/ (PDF, images, .docx, .txt or .eml
+     e-mail receipts). Move other files out: every file there is read as
+     an invoice.
+  2. Launcher menu 8 (OCR), then 3 Finance. Type a name for the run (the
+     header of the output files) and choose the vision model.
+  3. Each invoice is read ([1/N], [2/N] ...).
+  4. The exchange rates of only the currencies used are listed with the
+     date each was set, or "no rate". Type CODE RATE (e.g. USD 7.82) to
+     change one, as often as needed; Enter = use these rates. Changes are
+     saved to the rates file with the day's date. Nothing is written
+     before this step; Ctrl+C here writes no table.
+  5. CHECK lines name every row that needs a look, then the total.
+
+Exchange rates
+  - Rates come only from reference/ocr_finance/Reference_exchange_rates.txt
+    (kept out of git, and skipped by check_no_bom, as Notepad may save it
+    with a BOM). "local,HKD" or "Local Currency: HKD" names the currency
+    of the totals. One rate per line, as the local currency for 1 unit:
+    "USD,7.80,2026-11-26" (the date is optional), "USD 7.80" or
+    "* 1 USD = 7.80 HKD" (an approximately-equal sign also works). Lines
+    starting with # are ignored.
+  - If the file is missing, an old input/ocr/finance_rates.csv is copied
     once, or a template is written.
-  - After every invoice is read, the rates of only the currencies they
-    use are listed with their dates. Type CODE RATE (e.g. USD 7.82) to
-    change one; Enter = use these rates. Changes are saved to the file
-    with the day's date. Nothing is written before this step, and Ctrl+C
-    here writes no table. Rates are never guessed and never looked up
-    online.
+  - Rates are never guessed and never looked up online. An invoice whose
+    currency still has no rate is shown but kept out of the total.
+
+Email receipts (.eml)
   - .eml receipts are read as text: the email date, sender, subject and
-    body (an HTML body is turned into text; PDF and image attachments
-    become extra pages). A .txt file that starts with email headers
-    (e.g. receipt.eml.txt) is read the same way.
-  - A date that is not a real calendar date (e.g. month 37) gets a CHECK
-    note with the email's own date; the row stays in the total.
-  - The program converts and adds up with exact decimals, rounded half up
-    to 2 places.
+    body. An HTML body is turned into text (non-breaking spaces become
+    plain spaces, so "HK$ 2.00" is found). PDF and image attachments
+    become extra pages.
+  - A .txt file that starts with email headers (e.g. receipt.eml.txt) is
+    read the same way. .eml files work in Papers and Synopsis too.
+
+Checks and totals
+  - The AI returns the fields of each invoice as JSON; it does no
+    arithmetic. The program converts and adds up with exact decimals,
+    rounded half up to 2 places.
   - A row is shown but marked "not in total" when the amount is not found
-    in the invoice text, there is no amount or currency, or the currency
-    has no rate. Fix the rate file or check the invoice, then run again.
+    in the invoice text, there is no amount or currency, the currency has
+    no rate, the AI reply was not JSON, or the file could not be read.
+  - A date that is not a real calendar date (e.g. month 37, as in some
+    Apple receipts) gets a CHECK note with the email's own date; the row
+    stays in the total.
   - Categories: Travel, Accommodation, Meals, Conference/registration,
     Equipment, Software/subscriptions, Publication fees, Other. A category
     outside this list becomes Other, with a note.

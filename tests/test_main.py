@@ -23,7 +23,7 @@ class TestMainConfiguration:
     def test_version_defined(self):
         assert hasattr(main, "VERSION")
         assert isinstance(main.VERSION, str)
-        assert main.VERSION.startswith("2.")
+        assert main.VERSION.startswith("3.")
 
     def test_providers_defined(self):
         assert hasattr(main, "PROVIDERS")
