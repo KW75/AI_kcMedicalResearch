@@ -5,6 +5,7 @@ input/ocr/ decides what runs:
   several files -> menu 8 asks (kind="ask", Session 48):
     1 Papers   -> function 1 per file: own record + <file name>_SUMMARY
     2 Synopsis -> function 2: one record each + <header>_SYNOPSIS of all
+    3 Finance  -> finance.run_finance: one finance table of all invoices
 Then two questions: scan title/name (header of the output files) and the
 vision model. Checks that need no typing run first, so a job that cannot run
 never asks a question.
@@ -24,7 +25,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from . import engine, reader
+from . import engine, finance, reader
 
 # Session 48: OCR prefers the shared vision model (ollama_models.VISION_MODEL;
 # test_ocr_s48_vision_default.py checks the two names match). gemma4:e4b
@@ -119,6 +120,8 @@ KIND_MENU = (
     "1. Papers   - each file is its own paper: own record + own SUMMARY",
     "2. Synopsis - one record each + one SYNOPSIS summarising all papers "
     "in input/ocr",
+    "3. Finance  - invoices: one finance table (CSV, HTML, DOCX, PDF) with "
+    "subtotals and a total in the local currency",
 )
 
 
@@ -129,7 +132,7 @@ def _ask_kind(input_fn, log):
     for line in KIND_MENU:
         log(line)
     try:
-        answer = input_fn("Papers or Synopsis (number, Enter = 2): ").strip()
+        answer = input_fn("Papers, Synopsis or Finance (number, Enter = 2): ").strip()
     except EOFError:
         log("No keyboard: Synopsis.")
         return "synopsis"
@@ -140,6 +143,8 @@ def _ask_kind(input_fn, log):
         return "synopsis"
     if answer == "1":
         return "papers"
+    if answer == "3":
+        return "finance"
     log("Not a valid number. Job not run.")
     return None
 
@@ -162,10 +167,12 @@ def _run_papers(files, out_dir, label, log, rep_dir, run_single, extra):
 
 def run(base_dir, model=None, *, provider="ollama", confirm=None,
         input_fn=input, list_fn=None, caps_fn=None,
-        run_single=None, run_set=None, log=print, kind="synopsis"):
+        run_single=None, run_set=None, log=print, kind="synopsis",
+        run_finance=None):
     """Ask the questions, run the engine, return its result (None = not run)."""
     run_single = run_single or engine.run_single
     run_set = run_set or engine.run_set
+    run_finance = run_finance or finance.run_finance
     in_dir = Path(base_dir) / "input" / "ocr"
     out_dir = Path(base_dir) / "output" / "ocr"
     rep_dir = Path(base_dir) / "reports" / "ocr"
@@ -243,6 +250,13 @@ def run(base_dir, model=None, *, provider="ollama", confirm=None,
         extra["call"] = engine.cloud_call(provider, real)
 
     log(f"Model: {label}. Output: {out_dir}")
+    if kind == "finance":  # Session 50: invoices -> one finance table
+        result = run_finance(in_dir, out_dir, name, label, log=log,
+                             records_root=rep_dir, **extra)
+        for p in (result.get("paths") or {}).values():
+            if p:
+                log(f"Finance table: {p}")
+        return result
     if papers:
         return _run_papers(files, out_dir, label, log, rep_dir, run_single,
                            extra)

@@ -143,3 +143,35 @@ The OCR pipeline reduces reading errors; it does not remove them. Before
 a value from an OCR record is used in a review, a report or a
 calculation, check it against the original page. This matters most for
 numbers, signs, units and table layout.
+
+
+8. Finance (option 3, several files)
+
+With several files, option 3 reads invoices and receipts into one finance
+table: date, particulars (the invoice header), category, currency, amount,
+exchange rate, amount in the local currency, a subtotal per category and
+the total. It is written as <header>_FINANCE.csv, .html, .docx and .pdf in
+output/ocr/. The OCR text of each invoice and the AI's reply are kept in
+reports/ocr/<header>/ for checking.
+
+  - Each file is read as in Synopsis (routes A-C). The AI then returns the
+    fields of each invoice as JSON; it does no arithmetic.
+  - Exchange rates come only from input/ocr/finance_rates.csv, which you
+    fill in: "local,HKD" names the currency of the totals, and a line such
+    as "USD,7.80" means 1 USD = 7.80 HKD. If the file is missing, a
+    template is written. Rates are never guessed and never looked up
+    online.
+  - The program converts and adds up with exact decimals, rounded half up
+    to 2 places.
+  - A row is shown but marked "not in total" when the amount is not found
+    in the invoice text, there is no amount or currency, or the currency
+    has no rate. Fix the rate file or check the invoice, then run again.
+  - Categories: Travel, Accommodation, Meals, Conference/registration,
+    Equipment, Software/subscriptions, Publication fees, Other. A category
+    outside this list becomes Other, with a note.
+  - The CSV has plain numbers (no thousands separators) and is UTF-8
+    without a BOM; if Excel shows Chinese text wrongly, open it with
+    Data > From Text/CSV and choose UTF-8.
+  - Check every row against its invoice before using the totals: the AI
+    can pick the wrong printed amount (for example a subtotal before tax),
+    and that passes the "amount found in the text" check.
