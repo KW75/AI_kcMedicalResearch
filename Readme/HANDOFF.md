@@ -49,7 +49,7 @@ so those catches happen at session open, not mid-work.
 | Component      | Status |
 |----------------|--------|
 | Tests | 2159 passed, 10 deselected (Session 51, +5 tests/test_s51_finance_categories.py) |
-| Branch | main = 7798d16 (PR #98 merged 2026-11-27 06:56 local, Session 51, docs only). Before it: PR #97 74acaff, PR #96 3e32b98 (tag v3.0.0), PR #95 04a32d6 |
+| Branch | main = 442a6ff (PR #99 merged 2026-11-27 07:37 local, Session 51, OCR Finance 19 categories). Before it: PR #98 7798d16, PR #97 74acaff, PR #96 3e32b98 (tag v3.0.0) |
 | CI | PR #9: green (2 of 2) at every Session 41 commit checked and at 545af00, 678fadc, 265fe63 and fc3e79e and b56845d and 569fbb8 and b0cd52a, 86d9a9c, 38ea78a (Session 42), 9b5bc25, e6eb7f6, 359d307, 111178c, cc09801, 1f871ab, d318293, 48a306d, 77c0a4f, 62f3fc5, 6f10383, f38c39b, a573c99, 3055352, 6a84f95, 84e8a6b, 431b9cc, d60aa4a, f7fb082, 6d8fd1b, 4e6ec48, c76dc0e, b9b7204, 87f753e, da71fd5, 932b2f1, 8ed5b11, 40e0fce, 769c51b, 2868e90, 8dc7213, fdc59f7, 3c8c4fb, ad97ab8 (Sessions 43-46; 4487f13 failed CI and was reverted by 3055352). Earlier red at 6d61ed2 (CI .env default reached the SR provider check; fixed via ns.provider_explicit). main: green at d5cdb05 (PR #9, 44147187803), 109d971 (44147671111), 34f710f (PR #10, 44200691154), 8ecbdda (PR #11, 44207187118), b0061b8 (PR #12, 44217821419); earlier aa929ec (PR #8, 1282 passed, 10 deselected, both jobs). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
 | Version | 3.0.0 (bumped Session 50 from 2.8.1 at the user's request: OCR -> Finance PR #94-#95, the OCR menu tweaks, and the author's signature 'Dr. Keith KW CHAN' + https://kw75.github.io/Credential/ (link in magenta) in the banners. Tag v3.0.0 on 3e32b98 (PR #96 merge); GitHub release 'v3.0.0 (Session 50)', Latest, published 2026-11-27 by D:\publish_v300.py after main showed VERSION 3.0.0. The user wrote '3.0'; 3.0.0 is the three-part form every version place uses. 2.8.1: tag v2.8.1 on 859834a, release 'v2.8.1 (Session 50)'.) |
 | SR docs | Readme/readme_sr_pipeline.txt = how the SR pipeline works and why (Appendix A worked example); no how-to. How-to = Readme/flashcard-help.html. study_overrides.yaml format = REVIEWER_GUIDE section 5; control-type subgroups = 5.2. docs/sr/REVIEWER_GUIDE.md = what reviewers check by hand (sections 2.2, 3.1, 3.5, 5, 6 are cited by code/tests/README, keep them; 2.2 item 5 covers the quote gate). Readme/RESOLVED_ISSUES.md and HANDOFF_archive_pre_S19.md removed in Session 41 (739b2ce): read with `git show 2923cc3:Readme/<name>`; local copy D:\AI_kcMedicalResearch_backups\2026-11-14\Readme\ |
@@ -3538,4 +3538,39 @@ pooled rows, forest plot and report; D4 'reviewer to confirm' in the RoB table;
   the new content itself.
 - Tests failed first (3 of 5); +5 tests/test_s51_finance_categories.py;
   2159 passed, 10 deselected.
+- Open: record this PR in HANDOFF in the next PR script.
+
+## Session 51 (cont. 2) - 2026-11-27 - main (docs only)
+
+- Recorded: PR #99 (584497e, merge 442a6ff, merged 2026-11-27 07:37
+  local; CI run 45911806364 green) - OCR Finance: 11 more categories
+  (19 in total, Other last). Failing-first 3 of 5; 2159 passed,
+  10 deselected. Local branch removed by gh pr merge --delete-branch.
+- User decisions (Session 51), closing the Session 50 (cont. 16) list:
+  - Finance offered only with 2+ files: confirmed ('1-3 ok').
+  - Version form 3.0.0 (user wrote '3.0'): confirmed.
+  - Banner layout (signature 'Dr. Keith KW CHAN' and the magenta
+    Credential link under the version line; launcher menu, .bat, .sh,
+    venv shell): confirmed.
+  - SaMD row rules (pipelines/samd/report.py), confirmed by the user
+    ('ok') after the assistant recommended keeping all five:
+    1 Colour/Clarity inside URINALYSIS named '- Urine' (_mark_urine);
+    2 nameless value row takes its name from at most 2 lines above
+      (_name_above; stops at blank, header, note or result);
+    3 URINALYSIS section ends at 'Released By' or after 60 lines
+      (_URINE_MAX = 60);
+    4 exception words: apart from, aside from, other than, besides,
+      save for, with the exception of, except (for) (_claim_part);
+      'but' deliberately not added ('Protein is high but blood is
+      normal' would hide blood);
+    5 an exception part ends at the next comma or semicolon, else at
+      the end of the sentence (known gap: no comma -> no warning).
+- Now no Session 50 assistant default is left unconfirmed. Still an
+  assistant default: the category spellings, order and overlaps of
+  PR #99 (Session 51 cont. 1).
+- Optional, not done: a read-only count of lines between 'URINALYSIS'
+  and 'Released By' in the user's reports (counts only, no names or
+  values) to check whether 60 can be tighter.
+- No code change; tests unchanged: 2159 passed, 10 deselected.
+- README Known Issues #2 and #3 and the older Next work unchanged.
 - Open: record this PR in HANDOFF in the next PR script.
