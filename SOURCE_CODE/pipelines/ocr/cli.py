@@ -252,7 +252,9 @@ def run(base_dir, model=None, *, provider="ollama", confirm=None,
     log(f"Model: {label}. Output: {out_dir}")
     if kind == "finance":  # Session 50: invoices -> one finance table
         result = run_finance(in_dir, out_dir, name, label, log=log,
-                             records_root=rep_dir, **extra)
+                             records_root=rep_dir, input_fn=input_fn,
+                             rates_path=Path(base_dir) / finance.RATES_REL,
+                             **extra)
         for p in (result.get("paths") or {}).values():
             if p:
                 log(f"Finance table: {p}")

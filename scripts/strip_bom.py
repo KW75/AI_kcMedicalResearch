@@ -13,6 +13,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
 IGNORE_DIRS = {
+    "ocr_finance",  # Session 50: local exchange-rate file; Notepad may add a BOM
     ".git",
     ".venv",
     "venv",

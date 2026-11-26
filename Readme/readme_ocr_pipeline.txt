@@ -156,11 +156,25 @@ reports/ocr/<header>/ for checking.
 
   - Each file is read as in Synopsis (routes A-C). The AI then returns the
     fields of each invoice as JSON; it does no arithmetic.
-  - Exchange rates come only from input/ocr/finance_rates.csv, which you
-    fill in: "local,HKD" names the currency of the totals, and a line such
-    as "USD,7.80" means 1 USD = 7.80 HKD. If the file is missing, a
-    template is written. Rates are never guessed and never looked up
+  - Exchange rates come only from
+    reference/ocr_finance/Reference_exchange_rates.txt (kept out of git).
+    "local,HKD" names the currency of the totals; a line such as
+    "USD,7.80,2026-11-26" means 1 USD = 7.80 HKD, set on that date (the
+    date is optional; "USD 7.80" and "1 USD = 7.80 HKD" also work). If
+    the file is missing, an old input/ocr/finance_rates.csv is copied
+    once, or a template is written.
+  - After every invoice is read, the rates of only the currencies they
+    use are listed with their dates. Type CODE RATE (e.g. USD 7.82) to
+    change one; Enter = use these rates. Changes are saved to the file
+    with the day's date. Nothing is written before this step, and Ctrl+C
+    here writes no table. Rates are never guessed and never looked up
     online.
+  - .eml receipts are read as text: the email date, sender, subject and
+    body (an HTML body is turned into text; PDF and image attachments
+    become extra pages). A .txt file that starts with email headers
+    (e.g. receipt.eml.txt) is read the same way.
+  - A date that is not a real calendar date (e.g. month 37) gets a CHECK
+    note with the email's own date; the row stays in the total.
   - The program converts and adds up with exact decimals, rounded half up
     to 2 places.
   - A row is shown but marked "not in total" when the amount is not found

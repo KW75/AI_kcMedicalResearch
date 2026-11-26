@@ -90,7 +90,8 @@ def _cli(tmp_path, *answers):
         asked.append(prompt)
         return next(it)
 
-    def fake_finance(folder, out_dir, name, model, log=print, records_root=None):
+    def fake_finance(folder, out_dir, name, model, log=print, records_root=None,
+                     **kw):
         calls.append(("finance", name))
         return {"header": name, "records": [], "failed": [], "summary": None, "paths": {}}
 
@@ -216,5 +217,6 @@ def test_html_escapes_text(tmp_path):
 def test_readme_describes_finance():
     text = " ".join((ROOT / "Readme" / "readme_ocr_pipeline.txt")
                     .read_text(encoding="utf-8").split())
-    for phrase in ("8. Finance", "finance_rates.csv", "rounded half up", "not in total"):
+    for phrase in ("8. Finance", "Reference_exchange_rates.txt", "rounded half up",
+                   "not in total"):
         assert phrase in text, phrase

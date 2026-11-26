@@ -5,12 +5,16 @@ invoice header), category, currency, amount, exchange rate, amount in the
 local currency, a subtotal per category and the total, written as
 <header>_FINANCE.csv, .html, .docx and .pdf in output/ocr/.
 
-The AI reads each invoice (the OCR step, as in Synopsis) and returns its
-fields as JSON; it does no arithmetic. Exchange rates come only from
-input/ocr/finance_rates.csv, typed by the user (never guessed, never looked
-up online). The program converts and adds up with Decimal, rounded half up
-to 2 places. A row whose amount is not found in the invoice text, or that
-has no amount, currency or rate, is shown but kept out of the totals.
+The AI reads each invoice (the OCR step, as in Synopsis; .eml receipts are
+read as text) and returns its fields as JSON; it does no arithmetic.
+Session 50 cont. 11: exchange rates come only from
+reference/ocr_finance/Reference_exchange_rates.txt. After all invoices are
+read, the rates of only the currencies they use are listed and can be
+changed before anything is written; changes are saved back with the day's
+date. Rates are never guessed or looked up online. The program converts and
+adds up with Decimal, rounded half up to 2 places. A row whose amount is not
+found in the invoice text, or that has no amount, currency or rate, is shown
+but kept out of the totals.
 """
 from __future__ import annotations
 
@@ -18,12 +22,15 @@ import csv
 import html
 import json
 import re
+from datetime import date as _date
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from pathlib import Path
 
 from . import engine, output, reader
 
-RATES_FILE = "finance_rates.csv"
+RATES_REL = Path("reference") / "ocr_finance" / "Reference_exchange_rates.txt"
+RATES_FILE = RATES_REL.name
+OLD_RATES_FILE = "finance_rates.csv"  # first version, in input/ocr; copied once
 DEFAULT_LOCAL = "HKD"
 CATEGORIES = ("Travel", "Accommodation", "Meals", "Conference/registration",
               "Equipment", "Software/subscriptions", "Publication fees", "Other")
@@ -32,8 +39,10 @@ MAX_PDF_PAGES = 500
 RATES_TEMPLATE = (
     "# Exchange rates for OCR -> Finance (launcher menu 8, option 3).\n"
     "# local = the currency the totals are shown in.\n"
-    "# Other lines: currency code,rate = local currency for 1 unit,\n"
-    "# e.g. USD,7.80 means 1 USD = 7.80 HKD. Lines starting with # are ignored.\n"
+    "# Other lines: code,rate,date - rate = local currency for 1 unit, date =\n"
+    "# when it was set (optional), e.g. USD,7.80,2026-11-26 means 1 USD = 7.80 HKD.\n"
+    "# Lines starting with # are ignored. Rates changed at the Finance prompt\n"
+    "# are saved here with the day's date.\n"
     "local,HKD\n"
 )
 FINANCE_PROMPT = (
@@ -52,47 +61,159 @@ FINANCE_PROMPT = (
 _KEEP_OUT = ("not read", "AI reply", "no amount", "amount not found",
              "currency not clear", "no exchange rate")
 _NUMBER = re.compile(r"\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?")
+_ISO_DATE = re.compile(r"\d{4}-\d{2}-\d{2}")
+_EMAIL_DATE = re.compile(r"^Email date: (\d{4}-\d{2}-\d{2})", re.M)
 _CSS = ("body{font-family:Arial,sans-serif;font-size:9pt}"
         "table{border-collapse:collapse;margin-bottom:12px}"
         "td,th{border:1px solid #888;padding:2px 4px;vertical-align:top}"
         "th{background:#eee}")
 
 
-def read_rates(path, log=print):
-    """(local currency, {code: rate}) from the rates file; a missing file gets
-    a template. The local currency always has rate 1."""
+def default_rates_path(folder) -> Path:
+    """reference/ocr_finance/Reference_exchange_rates.txt of the project whose
+    input/ocr folder is `folder`."""
+    return Path(folder).resolve().parents[1] / RATES_REL
+
+
+def _parse_rate_line(line):
+    """None (blank/comment), "bad", ("LOCAL", code, None) or (code, rate, date).
+    Accepts 'USD,7.80,2026-11-26', 'USD 7.80', 'USD = 7.80', '1 USD = 7.80 HKD'."""
+    s = line.split("#", 1)[0].strip().lstrip("*-\u2022 \t").strip()
+    if not s:
+        return None
+    s = re.sub(r"(?i)^local\s+currency\b", "local", s)
+    toks = [t for t in re.split(r"[,\s=:\u2248~]+", s) if t]
+    if toks and toks[0] == "1":
+        toks = toks[1:]
+    if len(toks) < 2:
+        return "bad"
+    key = toks[0].upper()
+    if key == "LOCAL":
+        if re.fullmatch(r"[A-Za-z]{3}", toks[1]):
+            return ("LOCAL", toks[1].upper(), None)
+        return "bad"
+    if not re.fullmatch(r"[A-Z]{3}", key):
+        return "bad"
+    try:
+        rate = Decimal(toks[1])
+    except InvalidOperation:
+        return "bad"
+    if not rate.is_finite() or rate <= 0:
+        return "bad"
+    when = next((t for t in toks[2:] if _ISO_DATE.fullmatch(t)), "")
+    return (key, rate, when)
+
+
+def load_rates(path, log=print, legacy=None) -> dict:
+    """{"local", "rates", "dates"} from the rates file. A missing file is
+    copied from an old input/ocr/finance_rates.csv (legacy) or gets the
+    template. The local currency always has rate 1."""
     path = Path(path)
     if not path.exists():
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(RATES_TEMPLATE, encoding="utf-8")
-        log(f"No exchange-rate file: template written to {path}. Only "
-            f"{DEFAULT_LOCAL} invoices count in the totals until rates are added.")
-    local, rates = DEFAULT_LOCAL, {}
-    for n, line in enumerate(path.read_text(encoding="utf-8-sig").splitlines(), 1):
-        line = line.strip()
-        if not line or line.startswith("#"):
+        if legacy is not None and Path(legacy).exists():
+            text = Path(legacy).read_bytes().decode("utf-8-sig", errors="replace")
+            path.write_bytes(text.encode("utf-8"))
+            log(f"Exchange rates copied from {legacy} to {path} "
+                f"(the old file is no longer read).")
+        else:
+            path.write_bytes(RATES_TEMPLATE.encode("utf-8"))
+            log(f"No exchange-rate file: template written to {path}. Type "
+                f"rates at the prompt or add them to the file.")
+    local, rates, dates = DEFAULT_LOCAL, {}, {}
+    text = path.read_bytes().decode("utf-8-sig", errors="replace")
+    for n, line in enumerate(text.splitlines(), 1):
+        p = _parse_rate_line(line)
+        if p is None:
             continue
-        parts = [p.strip() for p in line.split(",")]
-        if len(parts) < 2:
-            log(f"    WARNING: {path.name} line {n} skipped (need code,rate): {line}")
+        if p == "bad":
+            log(f"    WARNING: {path.name} line {n} skipped: {line.strip()}")
             continue
-        key, value = parts[0].upper(), parts[1]
+        key, value, when = p
         if key == "LOCAL":
-            if re.fullmatch(r"[A-Za-z]{3}", value):
-                local = value.upper()
-            else:
-                log(f"    WARNING: {path.name} line {n}: local currency not a 3-letter code")
+            local = value
             continue
-        try:
-            rate = Decimal(value)
-        except InvalidOperation:
-            rate = None
-        if not re.fullmatch(r"[A-Z]{3}", key) or rate is None or rate <= 0:
-            log(f"    WARNING: {path.name} line {n} skipped: {line}")
-            continue
-        rates[key] = rate
+        rates[key], dates[key] = value, when
     rates[local] = Decimal("1")
-    return local, rates
+    dates.pop(local, None)
+    return {"local": local, "rates": rates, "dates": dates}
+
+
+def read_rates(path, log=print, legacy=None):
+    """(local currency, {code: rate}) from the rates file."""
+    book = load_rates(path, log, legacy)
+    return book["local"], book["rates"]
+
+
+def save_rates(path, changes, today) -> None:
+    """Write changed rates back as code,rate,date; other lines are kept."""
+    path = Path(path)
+    if path.exists():
+        lines = path.read_bytes().decode("utf-8-sig", errors="replace").splitlines()
+    else:
+        lines = RATES_TEMPLATE.splitlines()
+    done = set()
+    for i, line in enumerate(lines):
+        p = _parse_rate_line(line)
+        if isinstance(p, tuple) and p[0] in changes:
+            lines[i] = f"{p[0]},{_rate(changes[p[0]])},{today}"
+            done.add(p[0])
+    for code in sorted(changes):
+        if code not in done:
+            lines.append(f"{code},{_rate(changes[code])},{today}")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(("\n".join(lines) + "\n").encode("utf-8"))
+
+
+def _rate_line(code, rate, when):
+    if rate is None:
+        return f"  {code}  no rate"
+    return f"  {code}  {_rate(rate)}  " + (f"set {when}" if when else "(no date)")
+
+
+def ask_rates(used, book, input_fn, log, path):
+    """List the rates of only the currencies used; CODE RATE changes one.
+    Returns {code: rate} changes, or None when cancelled (Ctrl+C)."""
+    local = book["local"]
+    if not used:
+        log(f"All amounts are in {local}: no exchange rate needed.")
+        return {}
+    log(f"Exchange rates ({local} for 1 unit) of the currencies in these "
+        f"invoices, from {path}:")
+    for code in used:
+        log(_rate_line(code, book["rates"].get(code), book["dates"].get(code, "")))
+    if input_fn is None:
+        log("  (no prompt: rates used as listed)")
+        return {}
+    changes = {}
+    while True:
+        try:
+            answer = input_fn("Change a rate as CODE RATE (e.g. USD 7.82); "
+                              "Enter = use these rates: ").strip()
+        except EOFError:
+            log("No keyboard: rates used as listed.")
+            return changes
+        except KeyboardInterrupt:
+            log("Cancelled.")
+            return None
+        if not answer:
+            return changes
+        toks = answer.replace(",", " ").replace("=", " ").split()
+        rate = None
+        if len(toks) == 2 and toks[0].upper() in used:
+            try:
+                rate = Decimal(toks[1])
+            except InvalidOperation:
+                rate = None
+            if rate is not None and (not rate.is_finite() or rate <= 0):
+                rate = None
+        if rate is None:
+            log(f"  Not understood: {answer!r} - type CODE RATE for a currency "
+                f"listed above, e.g. USD 7.82")
+            continue
+        code = toks[0].upper()
+        changes[code] = rate
+        log(f"  {code} = {_rate(rate)} {local} (will be saved)")
 
 
 def convert(amount, rate):
@@ -151,8 +272,17 @@ def _empty_row(name):
             "flags": [], "reply": "", "included": False}
 
 
-def extract_row(name, text, call, rates):
-    """One table row from the invoice text: AI fields, checks, conversion."""
+def _real_date(s):
+    try:
+        _date.fromisoformat(s)
+    except ValueError:
+        return False
+    return True
+
+
+def extract_row(name, text, call, rates=None):
+    """One table row from the invoice text: AI fields and checks; converted
+    too when rates are given (else apply_rate later)."""
     row = _empty_row(name)
     budget = engine._budget_chars()
     if len(text) > budget:
@@ -165,8 +295,14 @@ def extract_row(name, text, call, rates):
         row["flags"].append("AI reply was not a JSON object")
         return row
     row["date"] = str(data.get("date") or "").strip()
-    if row["date"] and not re.fullmatch(r"\d{4}-\d{2}-\d{2}", row["date"]):
+    if row["date"] and not _ISO_DATE.fullmatch(row["date"]):
         row["flags"].append("date not in YYYY-MM-DD form")
+    elif row["date"] and not _real_date(row["date"]):
+        note = f"date {row['date']} is not a real calendar date - check the invoice"
+        m = _EMAIL_DATE.search(text)
+        if m:
+            note += f" (email sent {m.group(1)})"
+        row["flags"].append(note)
     row["particulars"] = " ".join(str(data.get("particulars") or "").split())
     cat = str(data.get("category") or "").strip()
     match = next((c for c in CATEGORIES if c.lower() == cat.lower()), None)
@@ -186,6 +322,15 @@ def extract_row(name, text, call, rates):
         row["amount"] = amount
         if not amount_in_text(amount, text):
             row["flags"].append("amount not found in the invoice text")
+    if rates is not None:
+        apply_rate(row, rates)
+    return row
+
+
+def apply_rate(row, rates):
+    """Rate and amount in the local currency (or the no-rate flag)."""
+    row["rate"] = row["local"] = None
+    row["flags"] = [f for f in row["flags"] if not f.startswith("no exchange rate")]
     if row["currency"]:
         rate = rates.get(row["currency"])
         if rate is None:
@@ -194,7 +339,6 @@ def extract_row(name, text, call, rates):
             row["rate"] = rate
     if row["amount"] is not None and row["rate"] is not None:
         row["local"] = convert(row["amount"], row["rate"])
-    return row
 
 
 def included(row):
@@ -203,7 +347,7 @@ def included(row):
         f.startswith(k) for f in row["flags"] for k in _KEEP_OUT)
 
 
-def totals(rows, local):
+def totals(rows, local, rates_used=None):
     sub = {}
     for r in rows:
         if r["included"]:
@@ -211,7 +355,8 @@ def totals(rows, local):
     ordered = {c: sub[c] for c in CATEGORIES if c in sub}
     return {"local": local, "subtotals": ordered,
             "total": sum(ordered.values(), Decimal("0.00")),
-            "excluded": [r["file"] for r in rows if not r["included"]]}
+            "excluded": [r["file"] for r in rows if not r["included"]],
+            "rates": list(rates_used or [])}
 
 
 def _fmt(d):
@@ -248,11 +393,18 @@ def summary_rows(tot, plain=False):
             + [["Total", money(tot["total"])]])
 
 
+def rate_rows(tot):
+    """Rates used, only for the currencies in the invoices."""
+    return [[r["code"], _rate(r["rate"]) or "no rate", r["date"] or ""]
+            for r in tot.get("rates", [])]
+
+
 def _note(tot, model):
     text = (output.ai_note(model) + " Dates, particulars, currencies, amounts and "
-            "categories were read by AI; exchange rates come from " + RATES_FILE
-            + "; every sum was computed by the program. Rows marked 'not in total' "
-            "need checking against the invoice.")
+            "categories were read by AI; exchange rates come from "
+            + RATES_REL.as_posix() + " (shown for checking before this file was "
+            "written); every sum was computed by the program. Rows marked 'not in "
+            "total' need checking against the invoice.")
     if tot["excluded"]:
         text += " Not in total: " + ", ".join(tot["excluded"]) + "."
     return text
@@ -266,6 +418,9 @@ def write_csv(path, header, rows, tot, model, page):
         w.writerow([])
         w.writerow(["Subtotal by category", f"Amount ({tot['local']})"])
         w.writerows(summary_rows(tot, plain=True))
+        w.writerow([])
+        w.writerow(["Exchange rates used", f"{tot['local']} for 1 unit", "Set on"])
+        w.writerows(rate_rows(tot))
 
 
 def build_html(header, rows, tot, model):
@@ -276,12 +431,21 @@ def build_html(header, rows, tot, model):
                    for r in table_rows(rows))
     sub = "".join(f"<tr><td>{e(c)}</td><td>{e(v)}</td></tr>"
                   for c, v in summary_rows(tot))
+    rr = rate_rows(tot)
+    if rr:
+        rates = (f"<h2>Exchange rates used ({e(local)} for 1 unit)</h2><table>"
+                 "<tr><th>Currency</th><th>Rate</th><th>Set on</th></tr>"
+                 + "".join("<tr>" + "".join(f"<td>{e(c)}</td>" for c in r) + "</tr>"
+                           for r in rr) + "</table>")
+    else:
+        rates = f"<p>All amounts in {e(local)}: no exchange rate needed.</p>"
     return ("<!DOCTYPE html><html><head><meta charset='utf-8'><title>"
             + e(header) + " Finance</title><style>" + _CSS + "</style></head><body>"
             + f"<h1>{e(header)} - Finance</h1>"
             + f"<p>Total ({e(local)}): {e(_fmt(tot['total']))}</p>"
             + f"<table><tr>{head}</tr>{body}</table>"
             + f"<h2>Subtotal by category ({e(local)})</h2><table>{sub}</table>"
+            + rates
             + f"<p>{e(_note(tot, model))}</p></body></html>\n")
 
 
@@ -305,6 +469,18 @@ def write_docx(path, header, rows, tot, model, page):
     for cat, v in summary_rows(tot):
         cells = s.add_row().cells
         cells[0].text, cells[1].text = cat, v
+    d.add_heading(f"Exchange rates used ({tot['local']} for 1 unit)", level=1)
+    rr = rate_rows(tot)
+    if rr:
+        x = d.add_table(rows=1, cols=3)
+        x.style = "Table Grid"
+        for cell, text in zip(x.rows[0].cells, ("Currency", "Rate", "Set on")):
+            cell.text = text
+        for r in rr:
+            for cell, text in zip(x.add_row().cells, r):
+                cell.text = text
+    else:
+        d.add_paragraph(f"All amounts in {tot['local']}: no exchange rate needed.")
     d.add_paragraph(clean(_note(tot, model)))
     d.save(str(path))
 
@@ -347,24 +523,30 @@ def write_outputs(out_dir, header, rows, tot, model, log=print):
 
 
 def run_finance(folder, out_dir, name, model, call=None, now=None, log=print,
-                records_root=None, rates_path=None) -> dict:
-    """Option 3: every invoice in folder -> one finance table (4 files)."""
+                records_root=None, rates_path=None, input_fn=None,
+                today=None) -> dict:
+    """Option 3: every invoice in folder -> one finance table (4 files).
+    Reads every invoice first, then shows the rates of the currencies used
+    (input_fn may change them), then converts, adds up and writes."""
     folder = Path(folder)
-    files = [f for f in reader.list_inputs(folder) if f.name.lower() != RATES_FILE]
+    files = [f for f in reader.list_inputs(folder) if f.name.lower() != OLD_RATES_FILE]
     if not files:
         raise ValueError(f"No invoices in {folder}")
     call = call or engine.ollama_call(model)
-    local, rates = read_rates(Path(rates_path) if rates_path else folder / RATES_FILE, log)
+    rates_path = Path(rates_path) if rates_path else default_rates_path(folder)
+    today = today or _date.today().isoformat()
+    book = load_rates(rates_path, log, legacy=folder / OLD_RATES_FILE)
+    local = book["local"]
     header = engine.unique_header(name, out_dir, records_root, now)
     rec_dir = engine._rec_dir(records_root, header) or Path(out_dir) / "records" / header
     rec_dir.mkdir(parents=True, exist_ok=True)
     result = {"header": header, "records": [], "failed": [], "summary": None,
-              "rows": [], "totals": None, "paths": {}}
+              "rows": [], "totals": None, "paths": {}, "rates_file": rates_path}
     for i, path in enumerate(files, start=1):
         log(f"[{i}/{len(files)}] {path.name}")
         try:
             text = read_text(path, call, log)
-            row = extract_row(path.name, text, call, rates)
+            row = extract_row(path.name, text, call)
             (rec_dir / f"{path.stem}_OCR.txt").write_text(
                 text + "\n\n--- AI reply ---\n" + row["reply"] + "\n", encoding="utf-8")
             result["records"].append(path.name)
@@ -373,11 +555,30 @@ def run_finance(folder, out_dir, name, model, call=None, now=None, log=print,
             result["failed"].append((path.name, str(exc)))
             row = _empty_row(path.name)
             row["flags"].append(f"not read: {exc}")
-        row["included"] = included(row)
-        for f in row["flags"] + ([] if row["included"] else ["not in total"]):
-            log(f"    CHECK: {f}")
         result["rows"].append(row)
-    tot = totals(result["rows"], local)
+    used = sorted({r["currency"] for r in result["rows"]
+                   if r["currency"] and r["currency"] != local})
+    changes = ask_rates(used, book, input_fn, log, rates_path)
+    if changes is None:
+        log(f"Cancelled: no finance table written. OCR text and AI replies: {rec_dir}")
+        result["cancelled"] = True
+        return result
+    if changes:
+        book["rates"].update(changes)
+        book["dates"].update({c: today for c in changes})
+        save_rates(rates_path, changes, today)
+        log(f"Saved {len(changes)} rate(s) to {rates_path}")
+    for row in result["rows"]:
+        apply_rate(row, book["rates"])
+        row["included"] = included(row)
+        notes = row["flags"] + ([] if row["included"] else ["not in total"])
+        if notes:
+            log(f"  {row['file']}")
+            for f in notes:
+                log(f"    CHECK: {f}")
+    used_rates = [{"code": c, "rate": book["rates"].get(c),
+                   "date": book["dates"].get(c, "")} for c in used]
+    tot = totals(result["rows"], local, used_rates)
     result["totals"] = tot
     result["paths"] = write_outputs(out_dir, header, result["rows"], tot, model, log)
     log(f"Total ({local}): {_fmt(tot['total'])}; not in total: {len(tot['excluded'])} "
