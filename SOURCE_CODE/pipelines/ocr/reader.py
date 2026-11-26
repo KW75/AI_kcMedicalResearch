@@ -11,6 +11,9 @@ one of text/png is set:
 - .txt and .docx: one text page, no AI. .docx reads paragraphs and tables
   in document order (a row becomes "cell | cell"; a merged cell appears once).
 - .doc (old Word): refused with "save it as .docx" (no reliable reader yet).
+- .eml (Session 50): Email date / From / Subject and the text body; an
+  HTML-only body is turned into text. PDF and image attachments become
+  extra pages. A .txt file that starts with email headers is read the same.
 A file with no text raises ValueError, so the engine lists it as failed.
 Uses pymupdf (fitz), pillow and python-docx, all in requirements-local.txt.
 """
@@ -18,6 +21,10 @@ from __future__ import annotations
 
 import io
 import re
+from email import policy
+from email.parser import BytesParser
+from email.utils import parsedate_to_datetime
+from html.parser import HTMLParser
 from pathlib import Path
 
 import docx
@@ -31,7 +38,9 @@ IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".tif", ".tiff", ".bmp", ".gif", ".webp"}
 TEXT_EXTS = {".txt"}
 DOCX_EXTS = {".docx"}
 DOC_EXTS = {".doc"}
-SUPPORTED_EXTS = PDF_EXTS | IMAGE_EXTS | TEXT_EXTS | DOCX_EXTS | DOC_EXTS
+EML_EXTS = {".eml"}  # Session 50
+SUPPORTED_EXTS = (PDF_EXTS | IMAGE_EXTS | TEXT_EXTS | DOCX_EXTS | DOC_EXTS
+                  | EML_EXTS)
 MIN_TEXT_CHARS = 20
 PDF_RENDER_DPI = 200
 
@@ -54,7 +63,11 @@ def read_input(path) -> list[dict]:
         return _read_pdf(path)
     if ext in IMAGE_EXTS:
         return _read_image(path)
+    if ext in EML_EXTS:
+        return _read_eml(path)
     if ext in TEXT_EXTS:
+        if _looks_like_email(path.read_bytes()):  # e.g. receipt.eml.txt
+            return _read_eml(path)
         return _read_txt(path)
     if ext in DOCX_EXTS:
         return _read_docx(path)
@@ -152,31 +165,169 @@ def symbol_codes(page, text):
 
 
 def _read_pdf(path: Path) -> list[dict]:
-    pages = []
     with fitz.open(str(path)) as doc:
-        for number, page in enumerate(doc, start=1):
-            text = page.get_text().strip()
-            if len(text) >= MIN_TEXT_CHARS and not has_broken_symbols(text):
-                pages.append(_page(number, text=text))
-            else:
-                pix = page.get_pixmap(dpi=PDF_RENDER_DPI)
-                hint = mark_broken(text) if len(text) >= MIN_TEXT_CHARS else None
-                entry = _page(number, png=pix.tobytes("png"), hint=hint)
-                if hint:
-                    entry["codes"] = symbol_codes(page, text)
-                pages.append(entry)
+        return _pdf_pages(doc, 1)
+
+
+def _pdf_pages(doc, start: int) -> list[dict]:
+    """Pages of an open PDF, numbered from start (also email attachments)."""
+    pages = []
+    for number, page in enumerate(doc, start=start):
+        text = page.get_text().strip()
+        if len(text) >= MIN_TEXT_CHARS and not has_broken_symbols(text):
+            pages.append(_page(number, text=text))
+        else:
+            pix = page.get_pixmap(dpi=PDF_RENDER_DPI)
+            hint = mark_broken(text) if len(text) >= MIN_TEXT_CHARS else None
+            entry = _page(number, png=pix.tobytes("png"), hint=hint)
+            if hint:
+                entry["codes"] = symbol_codes(page, text)
+            pages.append(entry)
     return pages
 
 
 def _read_image(path: Path) -> list[dict]:
-    pages = []
     with Image.open(path) as img:
-        for number, frame in enumerate(ImageSequence.Iterator(img), start=1):
-            pages.append(_page(number, png=_to_png(frame)))
-    return pages
+        return _image_pages(img, 1)
+
+
+def _image_pages(img, start: int) -> list[dict]:
+    """One PNG page per frame, numbered from start (also email attachments)."""
+    return [_page(number, png=_to_png(frame))
+            for number, frame in enumerate(ImageSequence.Iterator(img), start=start)]
 
 
 def _to_png(frame: Image.Image) -> bytes:
     buf = io.BytesIO()
     frame.convert("RGB").save(buf, format="PNG")
     return buf.getvalue()
+
+
+# ---- Session 50: e-mail receipts (.eml, or a .txt that is an email) ----
+_HEADER_LINE = re.compile(r"([A-Za-z][A-Za-z0-9-]*):")
+_SPACES = re.compile(r"[ \t\u00a0\u2007\u202f\u3000]+")
+
+
+def _looks_like_email(raw: bytes) -> bool:
+    """True if the bytes start with email headers: From plus Content-Type or
+    MIME-Version before the first blank line."""
+    head = raw[:65536]
+    if head.startswith(b"\xef\xbb\xbf"):
+        head = head[3:]
+    text = head.decode("utf-8", errors="replace").replace("\r\n", "\n")
+    block = text.split("\n\n", 1)[0].split("\n")
+    if not block or not _HEADER_LINE.match(block[0]):
+        return False
+    names = set()
+    for line in block:
+        m = _HEADER_LINE.match(line)
+        if m:
+            names.add(m.group(1).lower())
+    return "from" in names and bool(names & {"content-type", "mime-version"})
+
+
+def _clean_text(text: str) -> str:
+    """Non-breaking and other wide spaces -> one space; no empty lines."""
+    lines = (_SPACES.sub(" ", line).strip()
+             for line in text.replace("\r\n", "\n").replace("\r", "\n").split("\n"))
+    return "\n".join(line for line in lines if line)
+
+
+class _HTMLText(HTMLParser):
+    BLOCK = {"br", "p", "div", "tr", "table", "li", "ul", "ol", "hr", "h1", "h2",
+             "h3", "h4", "h5", "h6", "section", "article", "header", "footer"}
+    SKIP = {"style", "script", "head", "title"}
+
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.parts = []
+        self.skip = 0
+
+    def handle_starttag(self, tag, attrs):
+        if tag in self.SKIP:
+            self.skip += 1
+        elif tag in self.BLOCK:
+            self.parts.append("\n")
+        elif tag in ("td", "th"):
+            self.parts.append(" ")
+
+    def handle_endtag(self, tag):
+        if tag in self.SKIP:
+            self.skip = max(0, self.skip - 1)
+        elif tag in self.BLOCK:
+            self.parts.append("\n")
+
+    def handle_data(self, data):
+        if not self.skip:
+            self.parts.append(data)
+
+
+def html_to_text(markup: str) -> str:
+    """Visible text of an HTML email body, one block per line."""
+    p = _HTMLText()
+    p.feed(markup)
+    p.close()
+    return _clean_text("".join(p.parts))
+
+
+def _email_date(value) -> str:
+    if not value:
+        return ""
+    try:
+        return parsedate_to_datetime(str(value)).date().isoformat()
+    except (TypeError, ValueError, IndexError, OverflowError):
+        return ""
+
+
+def _part_text(part) -> str:
+    try:
+        return part.get_content()
+    except (LookupError, ValueError, AssertionError):
+        data = part.get_payload(decode=True) or b""
+        return data.decode("utf-8", errors="replace")
+
+
+def _read_eml(path: Path) -> list[dict]:
+    raw = path.read_bytes()
+    if raw.startswith(b"\xef\xbb\xbf"):
+        raw = raw[3:]
+    msg = BytesParser(policy=policy.default).parsebytes(raw)
+    head = []
+    when = _email_date(msg.get("Date"))
+    if when:
+        head.append(f"Email date: {when}")
+    for name in ("From", "Subject"):
+        try:
+            value = msg.get(name)
+        except Exception:
+            value = None
+        if value:
+            head.append(f"{name}: {_clean_text(str(value))}")
+    body = ""
+    part = msg.get_body(preferencelist=("plain", "html"))
+    if part is not None:
+        body = _part_text(part)
+        if part.get_content_type() == "text/html":
+            body = html_to_text(body)
+        else:
+            body = _clean_text(body)
+    pages = []
+    if body.strip():
+        pages.append(_page(1, text="\n".join(head + ["", body]).strip()))
+    for att in msg.iter_attachments():
+        ext = Path(att.get_filename() or "").suffix.lower()
+        ctype = att.get_content_type()
+        data = att.get_payload(decode=True) or b""
+        if not data:
+            continue
+        start = len(pages) + 1
+        if ext in PDF_EXTS or ctype == "application/pdf":
+            with fitz.open(stream=data, filetype="pdf") as doc:
+                pages += _pdf_pages(doc, start)
+        elif att.get_content_disposition() == "attachment" and (
+                ext in IMAGE_EXTS or ctype.startswith("image/")):
+            with Image.open(io.BytesIO(data)) as img:
+                pages += _image_pages(img, start)
+    if not pages:
+        raise ValueError("no text found in the email")
+    return pages
