@@ -49,7 +49,7 @@ so those catches happen at session open, not mid-work.
 | Component      | Status |
 |----------------|--------|
 | Tests | 2154 passed, 10 deselected (Session 50, +6 tests/test_s50_v300_signature.py, +2 tests/test_s50_ocr_menu_lines.py) |
-| Branch | main = 3e32b98 (PR #96 merged 2026-11-27, Session 50; tag v3.0.0). Before it: PR #95 04a32d6, PR #94 4543f0e |
+| Branch | main = 74acaff (PR #97 merged 2026-11-27 06:10 local, Session 50 close, docs only). Before it: PR #96 3e32b98 (tag v3.0.0), PR #95 04a32d6, PR #94 4543f0e |
 | CI | PR #9: green (2 of 2) at every Session 41 commit checked and at 545af00, 678fadc, 265fe63 and fc3e79e and b56845d and 569fbb8 and b0cd52a, 86d9a9c, 38ea78a (Session 42), 9b5bc25, e6eb7f6, 359d307, 111178c, cc09801, 1f871ab, d318293, 48a306d, 77c0a4f, 62f3fc5, 6f10383, f38c39b, a573c99, 3055352, 6a84f95, 84e8a6b, 431b9cc, d60aa4a, f7fb082, 6d8fd1b, 4e6ec48, c76dc0e, b9b7204, 87f753e, da71fd5, 932b2f1, 8ed5b11, 40e0fce, 769c51b, 2868e90, 8dc7213, fdc59f7, 3c8c4fb, ad97ab8 (Sessions 43-46; 4487f13 failed CI and was reverted by 3055352). Earlier red at 6d61ed2 (CI .env default reached the SR provider check; fixed via ns.provider_explicit). main: green at d5cdb05 (PR #9, 44147187803), 109d971 (44147671111), 34f710f (PR #10, 44200691154), 8ecbdda (PR #11, 44207187118), b0061b8 (PR #12, 44217821419); earlier aa929ec (PR #8, 1282 passed, 10 deselected, both jobs). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
 | Version | 3.0.0 (bumped Session 50 from 2.8.1 at the user's request: OCR -> Finance PR #94-#95, the OCR menu tweaks, and the author's signature 'Dr. Keith KW CHAN' + https://kw75.github.io/Credential/ (link in magenta) in the banners. Tag v3.0.0 on 3e32b98 (PR #96 merge); GitHub release 'v3.0.0 (Session 50)', Latest, published 2026-11-27 by D:\publish_v300.py after main showed VERSION 3.0.0. The user wrote '3.0'; 3.0.0 is the three-part form every version place uses. 2.8.1: tag v2.8.1 on 859834a, release 'v2.8.1 (Session 50)'.) |
 | SR docs | Readme/readme_sr_pipeline.txt = how the SR pipeline works and why (Appendix A worked example); no how-to. How-to = Readme/flashcard-help.html. study_overrides.yaml format = REVIEWER_GUIDE section 5; control-type subgroups = 5.2. docs/sr/REVIEWER_GUIDE.md = what reviewers check by hand (sections 2.2, 3.1, 3.5, 5, 6 are cited by code/tests/README, keep them; 2.2 item 5 covers the quote gate). Readme/RESOLVED_ISSUES.md and HANDOFF_archive_pre_S19.md removed in Session 41 (739b2ce): read with `git show 2923cc3:Readme/<name>`; local copy D:\AI_kcMedicalResearch_backups\2026-11-14\Readme\ |
@@ -3477,3 +3477,29 @@ pooled rows, forest plot and report; D4 'reviewer to confirm' in the RoB table;
 - Session 50 (cont. 14): OCR menu tweaks on release-v3.0.0 before the 3.0.0 release was published (user request after a real run with 18 files): a blank line between the file list and 'Write them as' (cli._ask_kind), and the Finance choice on one line in the user's wording ('3. Finance  - all invoices sum up to one table with subtotals + total (CSV/HTML/DOCX/PDF)', 89 chars). Tests failed first (2 of 2); +2 tests/test_s50_ocr_menu_lines.py; 2154 passed, 10 deselected. User decisions: the blank line and the Finance wording.
 - Session 50 (cont. 15): PR #96 (9ecaacc, merge 3e32b98, merged 2026-11-27 (local 06:04); CI run 45902170582 green): release 3.0.0 - commits f01e39a (version 2.8.1 -> 3.0.0, signature + magenta Credential link in launcher menu, .bat, .sh and venv shell; tests/test_main.py now pins '3.'; OCR readme: .eml in the intro and Route A lines, Finance bullet, section 8 rewritten) and 9ecaacc (cont. 14, OCR menu). Tag v3.0.0 on 3e32b98; release 'v3.0.0 (Session 50)' Latest. 2154 passed, 10 deselected.
 - Session 50 (cont. 16): close-out. Lessons: a check run must stop by itself when the user's own data is not read (rates file all SKIPPED); one code block per script in chat (a stray fence cut a script in half); grep tests for the old major version before a major bump (test_main.py pinned '2.'); scripts/check_no_bom.py and strip_bom.py skip lists must stay equal (test_strip_bom.py); a fix script must be run with python, not only opened with code, and 'D:\x.py' without python only opens the file; an --apply script that stops leaves a local branch - undo it before the next try. Open: record this closing PR in HANDOFF in the next PR; user decisions this session: OCR Finance, rates file in reference/ocr_finance/, rates prompt, .eml input, version 3.0, signature + link in magenta, blank line and Finance wording in the OCR menu, OCR readme update. Assistant defaults, not confirmed: Finance - rates file git-ignored, CODE RATE prompt form, impossible-date rows kept in the total, the category list, Finance only with 2+ files, PDF via PyMuPDF Story (Chinese text in the PDF accepted by the user as 'ok', not checked row by row); 3.0.0 form and the banner layout; SaMD defaults as before (Colour/Clarity '- Urine', nameless value row looks up 2 lines, URINALYSIS ends after 60 lines, exception words and the comma/semicolon end). README Known Issues #2 (WeasyPrint) and #3 (Anthropic/Gemini geo-restricted) unchanged; older Next work unchanged.
+
+## Session 51 - 2026-11-27 - main (docs only)
+
+- Opening checks (D:\s51_look.py, read-only): main = origin/main =
+  74acaff, working tree clean; VERSION 3.0.0; tag v3.0.0 on 3e32b98;
+  release 'v3.0.0 (Session 50)' Latest. README 2154 = collected 2154
+  (10 deselected). Closed-issue citations: 56 numbers read from 2923cc3,
+  0 stale hits. Open Issues = Known Issues: #2 Medium, #3 Low.
+- Session 50 open item done: PR #97 (2e2aeed, merge 74acaff, merged
+  2026-11-27 06:10 local; CI run 45902841069 green) - docs: Session 50
+  close, HANDOFF records PR #96, tag v3.0.0 and the close-out. Current
+  State Branch row now names 74acaff.
+- Three leftover local branches deleted with D:\s51_branches.py (each
+  commit in main, branch gone from origin; git branch -d):
+  ocr-finance-rates ec6f8b9, release-v3.0.0 9ecaacc, s50-close2 2e2aeed.
+  Undo: git branch <name> <sha> (full SHAs printed by the script).
+  Remote branches untouched. Why gh pr merge --delete-branch left them
+  was not checked; from this PR on, the PR script deletes the local
+  branch itself after the merge if it is still there.
+- No code change; tests unchanged: 2154 passed, 10 deselected.
+- Still not confirmed by the user: the assistant defaults listed in
+  Session 50 (cont. 16) (Finance; 3.0.0 form and banner layout; SaMD row
+  rules). README Known Issues #2 and #3 and the older Next work unchanged.
+- Lesson: the opening look script lists local branches other than main,
+  so leftovers are caught at session open.
+- Open: record this PR in HANDOFF in the next PR script.
