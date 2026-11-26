@@ -369,6 +369,24 @@ def _value_cited(text: str, num: str) -> bool:
 
 
 _NOT_NORMAL = re.compile(r"\b(?:not|no longer)\s+(?:normal|within)\b", re.I)
+_EXCEPT_CLAUSE = re.compile(
+    r"\b(?:apart from|aside from|other than|besides|save for|"
+    r"with the exception of|except(?:\s+for)?)\b", re.I)
+
+
+def _claim_part(s: str) -> str:
+    """Session 50: sentence s without its exception clauses, so "Urinalysis
+    normal apart from protein 1+" does not call Protein 1+ normal. A clause runs
+    from 'apart from', 'aside from', 'other than', 'besides', 'save for',
+    'with the exception of' or 'except (for)' to the next comma or semicolon,
+    else to the end of the sentence. "Apart from protein 1+, urine blood is
+    normal" keeps ", urine blood is normal"."""
+    while True:
+        m = _EXCEPT_CLAUSE.search(s)
+        if m is None:
+            return s
+        end = re.search(r"[,;]", s[m.end():])
+        s = s[:m.start()] + (s[m.end() + end.start():] if end else "")
 
 
 def _row_named(s: str, r: dict) -> bool:
@@ -418,8 +436,9 @@ def check_answer(rows, answer: str, case: str) -> list[str]:
         if r["status"] not in ("HIGH", "LOW", "ABNORMAL"):
             continue
         for s in sentences:
-            if (_row_named(s, r) and _NORMAL.search(s)
-                    and not _ABNORMAL.search(s) and not _NOT_NORMAL.search(s)):
+            c = _claim_part(s)
+            if (_row_named(c, r) and _NORMAL.search(c)
+                    and not _ABNORMAL.search(c) and not _NOT_NORMAL.search(c)):
                 short = s if len(s) <= 200 else s[:197] + "..."
                 what = " ".join(x for x in (r["test"], r["value"], r["unit"]) if x)
                 ref = f", range {r['ref']}" if r["ref"] else ""
