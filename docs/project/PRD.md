@@ -5,7 +5,7 @@ AI kcMedicalResearch - Multi-Mode AI Pipeline for Medical Research and
 Clinical Decision Support
 
 ## Version
-2.8.0 (released Session 49 with SaMD mode; replaces the earlier 3.0.0 target)
+2.8.1 (released Session 50: Session 49-50 SaMD fixes and the SaMD readme, PR #83-#91; 2.8.0 released Session 49 with SaMD mode, replacing the earlier 3.0.0 target)
 
 ## Goal
 A local-first Python application that helps medical students, researchers
