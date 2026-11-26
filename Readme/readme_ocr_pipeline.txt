@@ -206,7 +206,10 @@ Checks and totals
     Apple receipts) gets a CHECK note with the email's own date; the row
     stays in the total.
   - Categories: Travel, Accommodation, Meals, Conference/registration,
-    Equipment, Software/subscriptions, Publication fees, Other. A category
+    Equipment, Software/subscriptions, Publication fees, Utilities,
+    Telecommunications, Maintenance, Cleaning, Miscellaneous,
+    Entertainments, Insurance, Transportation, Parking Fees, Petrol,
+    Car_maintenance, Other. A category
     outside this list becomes Other, with a note.
   - The CSV has plain numbers (no thousands separators) and is UTF-8
     without a BOM; if Excel shows Chinese text wrongly, open it with

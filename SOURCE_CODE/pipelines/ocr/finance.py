@@ -33,7 +33,10 @@ RATES_FILE = RATES_REL.name
 OLD_RATES_FILE = "finance_rates.csv"  # first version, in input/ocr; copied once
 DEFAULT_LOCAL = "HKD"
 CATEGORIES = ("Travel", "Accommodation", "Meals", "Conference/registration",
-              "Equipment", "Software/subscriptions", "Publication fees", "Other")
+              "Equipment", "Software/subscriptions", "Publication fees",
+              "Utilities", "Telecommunications", "Maintenance", "Cleaning",
+              "Miscellaneous", "Entertainments", "Insurance", "Transportation",
+              "Parking Fees", "Petrol", "Car_maintenance", "Other")
 CENT = Decimal("0.01")
 MAX_PDF_PAGES = 500
 RATES_TEMPLATE = (
