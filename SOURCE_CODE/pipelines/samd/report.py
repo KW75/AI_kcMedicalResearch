@@ -784,8 +784,9 @@ def check_answer(rows, answer: str, case: str) -> list[str]:
                 or not re.fullmatch(r"(?:[<>]=?)?" + _NUM, r["value"])):
             continue
         for s in sentences:
-            if (_cites_row(s, r, r["value"], trend=True) and _abnormal_claim(s)
-                    and not _NORMAL.search(s)):
+            if any(_clause_cites(c, r) and _abnormal_for_row(c, r)
+                   and not _NORMAL.search(c)
+                   for c in _clauses(s)):  # Session 51 (cont. 19)
                 short = s if len(s) <= 200 else s[:197] + "..."
                 warnings.append(
                     f"The answer may call an in-range result abnormal: "
@@ -1229,3 +1230,49 @@ def denied_urine_findings(rows, answer) -> list:
 _RATIO_PHRASE = re.compile(
     r"(?i)\b(?:albumin|protein)(?:\s*[-:/]\s*|\s+)(?:to(?:\s*-\s*|\s+))?creatinine\s+ratio\b")
 _PLURAL_ABBR = re.compile(r"\b([A-Z]{2,6})s\b")
+
+# Session 51 (cont. 19): check_answer judges 'in-range result called abnormal' per
+# clause ('... mild elevation in AFP (2.24 ng/ml), but ... within ...'). For a row
+# whose value is 10, the '10' of a power-of-ten unit ('x 10^12', 'x10e9') is not that
+# value ('GGT 10' vs '4.45 x 10(sup)12/L'); other rows read the clause unchanged so
+# 'WBC 4.9 x10e9/L' still matches its unit. For a one-sided range 'low' (range '<X')
+# or 'high' (range '>X') is not an abnormal claim ('CRP is low at 0.8 mg/L (<5.0)').
+_CONTRAST = re.compile(r"\s*;\s*|,?\s*\b(?:but|however|although|though|whereas)\b", re.I)
+_EXP_TEN = re.compile(r"([\u00d7xX]\s?)10(?=\s?\^\s?[-\u2212]?\d"
+                      r"|\s?[\u207b\u2070\u00b9\u00b2\u00b3\u2074-\u2079]|[eE]\d)")
+_LOW_WORDS = {"low", "decreased", "reduced"}
+_HIGH_WORDS = {"elevated", "elevation", "elevations", "raised", "high", "increased"}
+
+
+def _clauses(s: str) -> list:
+    """Session 51 (cont. 19): sentence s split at contrast words and semicolons."""
+    return [c for c in _CONTRAST.split(s) if c.strip()] or [s]
+
+
+def _clause_cites(c: str, r: dict) -> bool:
+    """Session 51 (cont. 19): clause c cites row r; for a row whose value is 10 the
+    '10' of a power-of-ten unit is not read as that value."""
+    try:
+        ten = float(r["value"].lstrip("<>=")) == 10
+    except ValueError:
+        ten = False
+    if ten:
+        c = _EXP_TEN.sub(r"\1TEN", c)
+    return _cites_row(c, r, r["value"], trend=True)
+
+
+def _abnormal_for_row(c: str, r: dict):
+    """Session 51 (cont. 19): like _abnormal_claim, but for a range with only an upper
+    limit ('<5.0') 'low' words, and with only a lower limit ('>1.03') 'high' words,
+    are not an abnormal claim."""
+    t = (c or "").replace("*", "")
+    ref = (r.get("ref") or "").strip()
+    for m in _ABNORMAL.finditer(t):
+        before = re.split(r"[,;:()]", t[:m.start()])[-1]
+        if _NEG_BEFORE.search(before):
+            continue
+        w = m.group(0).lower()
+        if (ref.startswith("<") and w in _LOW_WORDS) or (ref.startswith(">") and w in _HIGH_WORDS):
+            continue
+        return m
+    return None
