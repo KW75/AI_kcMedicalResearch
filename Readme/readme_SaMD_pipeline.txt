@@ -381,3 +381,11 @@ eGFR value-only row (Session 51 cont. 14)
   line only when no other reader finds a row, and only for eGFR. The value
   is kept as printed; unit and reference stay empty, so the status is
   'no range'. The CKD stage check (cont. 13) uses this row.
+
+Answer checks: urine value and 'elevation' (Session 51 cont. 15)
+  A urine result counts as named in the answer only when its value is in
+  the same sentence as 'urine'/'urinary' and the test word ("urine protein
+  1+", "trace blood in the urine", "RBC 10-17"). "Urine protein
+  quantification" alone does not count. Blood rows are unchanged. The words
+  that call a result abnormal now include 'elevation'. A sentence without a
+  number ("elevated urea and creatinine") still gives no in-range warning.
