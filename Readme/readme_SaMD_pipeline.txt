@@ -426,3 +426,12 @@ deficient/deficiency, insufficient/insufficiency, sufficient/adequate/enough,
 toxic/toxicity/toxicosis/excess. A word right after a range and 'as' ('10-30 as
 insufficient') is a definition, and a negated word does not count. Bands for sex or
 smoking (CPK, CEA) are not checked.
+
+Units, denials and urine rows (Session 52)
+Power-of-ten units are compared in one form, so 'x 10^12/L', 'x10e12/L' and
+'x10(sup)12/L' are the same unit, and the 10 in them is never read as a result.
+'Proteinuria is absent' or 'was not seen' counts as denying a positive urine result;
+'no data on proteinuria' and 'does not exclude proteinuria' do not. 'C-reactive
+protein' does not count as naming total protein. Urine Colour/Appearance rows with a
+reference word ('Yellow Yellow': normal when they match) and Crystals rows are read,
+and 'Ep. Cell' is named '- Urine'.

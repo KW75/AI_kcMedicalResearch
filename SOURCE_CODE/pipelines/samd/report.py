@@ -520,7 +520,7 @@ _PAGE_BREAK = re.compile(r"^--- page \d+ \(")  # cli.py joins pages with this li
 # (Glucose, Protein, Blood, Bilirubin) cannot be told apart by name.
 _URINE_NAME = re.compile(
     r"(?i)(?:ph\b|sp\b|specific\s+gravity|protein|glucose|ketone|bilirubin|urobil|"
-    r"blood|nitrit|leuc|leuk|rbc|wbc|epith|cast|granular|hyaline|crystal|bacteria|"
+    r"blood|nitrit|leuc|leuk|rbc|wbc|epith|ep\.?\s*cells?\b|cast|granular|hyaline|crystal|bacteria|"
     r"yeast|mucu|muco|colou?r|clarity|appearance|others?\b)")
 
 
@@ -748,9 +748,9 @@ def _cites_row(s: str, r: dict, num: str, trend: bool = False) -> bool:
     not glued to letters ("CA19-9"), not the start of a range ("19-9"), not
     followed by a different unit ("69 mm/hr" is not 69 g/L), and - when trend
     is set - not inside "from X to Y" / "X -> Y" (a change over time)."""
-    text = s.replace("*", "")
+    text = _pow10(s.replace("*", ""))  # Session 52
     spans = [m.span() for m in _TREND.finditer(text)] if trend else []
-    row_unit = _unit_key(r.get("unit") or "")
+    row_unit = _unit_key(_pow10(r.get("unit") or ""))  # Session 52
     for m in re.finditer(r"(?<![\dA-Za-z.])" + re.escape(num) + r"(?!\.?\d)", text):
         before, after = text[:m.start()], text[m.end():]
         if re.search(r"\d\s*[-\u2013\u2014]\s*$", before):
@@ -1043,7 +1043,7 @@ def unmentioned_abnormal(rows, answer) -> list:
     """Session 51 (cont. 12): one warning listing abnormal results the answer
     never names (urine results grouped, repeated names once), or []. Known
     limit: a word used in another sense ('C-reactive protein') counts as named."""
-    sentences = [_RATIO_PHRASE.sub(" ratio ", s)  # Session 51 (cont. 18)
+    sentences = [_named_protein(_RATIO_PHRASE.sub(" ratio ", s))  # Session 51 (cont. 18)
                  for s in _sentences(answer or "")]
     urine_sentences = [_PLURAL_ABBR.sub(r"\1", s) for s in sentences]
     found = {False: [], True: []}
@@ -1190,7 +1190,7 @@ _DENIED_TERMS = (
     (r"ketonuria", ("ketone",)),
 )
 _DENY_RE = [(re.compile(r"(?i)\b(?:no|not|without|absence\s+of|negative\s+for|nil)\b"
-                        r"(?:,?\s+(?!(?:but|however|although|though|yet|whereas|except)\b)[\w-]+){0,3}?,?\s+(?:" + t + r")\b"), keys)
+                        r"(?:,?\s+(?!(?:but|however|although|though|yet|whereas|except|data|information|results?|records?|mention|tests?|tested|testing|measured|assessed|checked|exclude[sd]?|rule[sd]?)\b)[\w-]+){0,3}?,?\s+(?:" + t + r")\b"), keys)
             for t, keys in _DENIED_TERMS]
 
 
@@ -1369,3 +1369,79 @@ def band_name_mismatch(rows, answer) -> list:
             out.append(f'The answer may name the wrong band: {what} is in "{label}"; '
                        f'the answer says "{word}": "{q}"')
     return out
+
+# Session 52: power-of-ten units are written one way before a row is matched
+# ('x 10^12', 'x10e12', 'x 10(sup)12' -> 'x10^12'), in the answer and in the row unit.
+# After this the 'x' is not read as 'times', and the '10' is not read as a value.
+_POW10 = re.compile(r"(?<![A-Za-z])[\u00d7xX]\s?10\s?(?:\^\s?|[eE])([-\u2212]?\d+)"
+                    r"|(?<![A-Za-z])[\u00d7xX]\s?10\s?(\u207b?[\u2070\u00b9\u00b2\u00b3"
+                    r"\u2074-\u2079]+)")
+_SUP_DIGITS = str.maketrans("\u2070\u00b9\u00b2\u00b3\u2074\u2075\u2076\u2077\u2078\u2079"
+                            "\u207b", "0123456789-")
+
+
+def _pow10(s: str) -> str:
+    """Session 52: one written form for power-of-ten units ('x10^12/L')."""
+    def rep(m):
+        e = m.group(1) if m.group(1) is not None else m.group(2).translate(_SUP_DIGITS)
+        return "x10^" + e.replace("\u2212", "-")
+    return re.sub(r"(x10\^-?\d+)\s+/", r"\1/", _POW10.sub(rep, s or ""))
+
+
+# Session 52: 'C-reactive protein' / 'Bence Jones protein' do not name Protein(Total)
+# in the not-mentioned check.
+_NAMED_PROTEIN = re.compile(r"(?i)\b(c[-\s]?reactive|bence[-\s]+jones)\s+proteins?\b")
+
+
+def _named_protein(s: str) -> str:
+    return _NAMED_PROTEIN.sub(
+        lambda m: m.group(1) + (" CRP" if "reactive" in m.group(1).lower() else " BJP"), s)
+
+
+# Session 52: a denial after the term ('Proteinuria is absent', 'was not seen');
+# the words between stop at contrast words.
+_DENY_RE = _DENY_RE + [
+    (re.compile(r"(?i)\b(?:" + t + r")\b(?:\s+(?!(?:but|however|although|though|yet|"
+                r"whereas|except)\b)[\w-]+){0,2}?\s+(?:absent|not\s+(?:seen|detected|"
+                r"present|found)|negative|nil)\b"), keys)
+    for t, keys in _DENIED_TERMS]
+
+# Session 52: Colour / Appearance with a reference word ('Colour 顏色 Yellow Yellow',
+# any case) and Crystals rows ('Crystals (1) 結晶 Nil'). A colour equal to its
+# reference is normal; RED, BROWN, TURBID stay ABNORMAL; any other differing word is
+# unclear. Crystals without a reference are 'no range'.
+_DESC_PAIR = re.compile(r"(?i)^(?P<name>" + _DESC_NAME + r"(?:\s+[^\x00-\x7f]+)?)\s+"
+                        r"(?P<value>" + _DESC_WORDS + r")(?:\s+(?P<ref>" + _DESC_WORDS
+                        + r"))?(?:\s+-)?\s*$")
+_CRYSTALS = re.compile(r"(?i)^(?P<name>Crystals?(?:\s*\(\d+\))?(?:\s+[^\x00-\x7f]+)?)\s+"
+                       r"(?P<value>NIL|NEGATIVE|NOT\s+SEEN|PRESENT|FEW|[1-4]?\+)"
+                       r"(?:\s+(?P<ref>NIL|NEGATIVE|NOT\s+SEEN))?\s*$")
+
+
+def _parse_s52_extra(line: str):
+    text = line.strip().translate(_SYMBOLS)
+    m = _DESC_PAIR.match(text)
+    if m:
+        value = re.sub(r"\s+", " ", m.group("value")).upper()
+        ref = re.sub(r"\s+", " ", m.group("ref") or "").upper()
+        st = ("ABNORMAL" if value in _DESC_ABNORMAL else "normal" if ref and ref == value
+              else "unclear" if ref else "no range")
+        return {"test": re.sub(r"\s+", " ", m.group("name")).strip(), "value": value,
+                "unit": "", "ref": ref.title(), "flag": "", "status": st}
+    m = _CRYSTALS.match(text)
+    if m:
+        value = re.sub(r"\s+", " ", m.group("value")).upper()
+        ref = re.sub(r"\s+", " ", m.group("ref") or "").capitalize()
+        return {"test": re.sub(r"\s+", " ", m.group("name")).strip(), "value": value,
+                "unit": "", "ref": ref, "flag": "",
+                "status": _text_status(value, ref) if ref else "no range"}
+    return None
+
+
+_parse_line_before_s52 = parse_line
+
+
+def parse_line(line: str):
+    """Session 52: parse_line as before, then Colour-with-reference and Crystals rows."""
+    row = _parse_line_before_s52(line)
+    return row if row is not None else _parse_s52_extra(line)

@@ -48,8 +48,8 @@ so those catches happen at session open, not mid-work.
 
 | Component      | Status |
 |----------------|--------|
-| Tests | 2275 passed, 10 deselected (Session 51 (cont. 20), +10 tests/test_s51_samd_band_name.py) |
-| Branch | main = 105d89d (PR #117 merged 2026-11-28 06:07 local, Session 51 (cont. 19), SaMD in-range result called abnormal, per clause). Before it: PR #116 7fb88c0, PR #115 afc58c0, PR #114 b032581 |
+| Tests | 2292 passed, 10 deselected (Session 52, +17 tests/test_s52_samd_checks_parser.py) |
+| Branch | main = dbd6ccd (PR #118 merged 2026-11-28 06:21 local, Session 51 (cont. 20), SaMD band name in the answer). Before it: PR #117 105d89d, PR #116 7fb88c0, PR #115 afc58c0 |
 | CI | PR #9: green (2 of 2) at every Session 41 commit checked and at 545af00, 678fadc, 265fe63 and fc3e79e and b56845d and 569fbb8 and b0cd52a, 86d9a9c, 38ea78a (Session 42), 9b5bc25, e6eb7f6, 359d307, 111178c, cc09801, 1f871ab, d318293, 48a306d, 77c0a4f, 62f3fc5, 6f10383, f38c39b, a573c99, 3055352, 6a84f95, 84e8a6b, 431b9cc, d60aa4a, f7fb082, 6d8fd1b, 4e6ec48, c76dc0e, b9b7204, 87f753e, da71fd5, 932b2f1, 8ed5b11, 40e0fce, 769c51b, 2868e90, 8dc7213, fdc59f7, 3c8c4fb, ad97ab8 (Sessions 43-46; 4487f13 failed CI and was reverted by 3055352). Earlier red at 6d61ed2 (CI .env default reached the SR provider check; fixed via ns.provider_explicit). main: green at d5cdb05 (PR #9, 44147187803), 109d971 (44147671111), 34f710f (PR #10, 44200691154), 8ecbdda (PR #11, 44207187118), b0061b8 (PR #12, 44217821419); earlier aa929ec (PR #8, 1282 passed, 10 deselected, both jobs). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
 | Version | 3.0.0 (bumped Session 50 from 2.8.1 at the user's request: OCR -> Finance PR #94-#95, the OCR menu tweaks, and the author's signature 'Dr. Keith KW CHAN' + https://kw75.github.io/Credential/ (link in magenta) in the banners. Tag v3.0.0 on 3e32b98 (PR #96 merge); GitHub release 'v3.0.0 (Session 50)', Latest, published 2026-11-27 by D:\publish_v300.py after main showed VERSION 3.0.0. The user wrote '3.0'; 3.0.0 is the three-part form every version place uses. 2.8.1: tag v2.8.1 on 859834a, release 'v2.8.1 (Session 50)'.) |
 | SR docs | Readme/readme_sr_pipeline.txt = how the SR pipeline works and why (Appendix A worked example); no how-to. How-to = Readme/flashcard-help.html. study_overrides.yaml format = REVIEWER_GUIDE section 5; control-type subgroups = 5.2. docs/sr/REVIEWER_GUIDE.md = what reviewers check by hand (sections 2.2, 3.1, 3.5, 5, 6 are cited by code/tests/README, keep them; 2.2 item 5 covers the quote gate). Readme/RESOLVED_ISSUES.md and HANDOFF_archive_pre_S19.md removed in Session 41 (739b2ce): read with `git show 2923cc3:Readme/<name>`; local copy D:\AI_kcMedicalResearch_backups\2026-11-14\Readme\ |
@@ -3915,3 +3915,35 @@ Tests: tests/test_s51_samd_band_name.py (10; all fail first - new
 function and cli line). Old vs new compared on the saved results.json of the runs.
 Known limits: definitions not in 'range as word' form ('30-100 = sufficient') count
 as claims; 'enough' is a common word (only read in a clause with the value).
+
+## Session 52 - 2026-11-28
+
+Previous PR: PR #118 (c60194f, merge dbd6ccd, merged 2026-11-28 06:21 local; CI run 46075898449 green) - SaMD: band name in the answer.
+
+Opening check (D:\s52_look.py): VERSION 3.0.0, tag v3.0.0; README Tests 2275 =
+collected 2275 (10 deselected); Open Issues = Known Issues = [2, 3]; main = dbd6ccd
+clean, local branches: main. The closed-issue citation grep was not run (no issue
+citations touched). User: finish the remaining tests before one full SaMD run.
+Probes on short sentences confirmed and fixed (report.py):
+- 'RBC 4.45 x 10^12/L is within normal range' gave no warning: 'x' is in _TIME_WORDS,
+  so the value was skipped; 'x10e12/L' did not match unit 'x 10^12/L'. _pow10 writes
+  power-of-ten units one way ('x10^12') in _cites_row for the text and the row unit;
+  the '10' of 'x 10(sup)12' is then no value in any check (open item from cont. 19).
+- 'Proteinuria is absent' / 'was not seen' were not denials: _DENY_RE gets patterns
+  for a negation after the term (absent, not seen/detected/present/found, negative,
+  nil), stopping at contrast words.
+- 'No data on proteinuria' warned, 'does not exclude proteinuria' was a denial: the
+  words before the term stop at data/information/results/records/mention/tests/
+  tested/testing/measured/assessed/checked/exclude/rule.
+- 'C-reactive protein' named Protein(Total): _named_protein (not-mentioned check).
+- Parser: 'Colour 中 Yellow Yellow' / 'Appearance 中 Clear Clear' (any case, reference
+  word) and 'Crystals (n) 中 Nil' rows (_parse_s52_extra after parse_line); 'Ep. Cell'
+  added to _URINE_NAME. Assistant defaults: colour equal to its reference = normal,
+  RED/BROWN/TURBID = ABNORMAL, other differing word = unclear; Crystals without a
+  reference = no range.
+Tests: tests/test_s52_samd_checks_parser.py (17; 13 fail first, 4 guards).
+Warnings compared on saved results.json; parser compared on rows rebuilt from case.md.
+Known limit kept: claims with no number ('if PSA remains elevated', 'due to elevated
+urea and creatinine'). Still the user's choice: eGFR note '>90' as reference (default
+no). A unit with a different exponent ('4.45 x10(sup)9/L' for RBC) no longer names the
+row. Next: one full SaMD run on the three files.
