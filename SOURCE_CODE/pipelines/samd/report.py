@@ -484,7 +484,7 @@ def _row_named(s: str, r: dict) -> bool:
     next to 'urine'/'urinary' ("urine protein", "protein in the urine")."""
     value = r["value"]
     if re.fullmatch(r"(?:[<>]=?)?" + _NUM, value):
-        return _value_cited(s, value.lstrip("<>="))
+        return _cites_row(s, r, value.lstrip("<>="))
     words = r["test"].split()
     key = re.sub(r"[^a-z]", "", words[0].lower()) if words else ""
     if len(key) < 3:
@@ -501,6 +501,54 @@ def _row_named(s: str, r: dict) -> bool:
                      s, re.I) is not None
 
 
+# --- Session 51: fewer false warnings in check_answer ------------------------
+_TREND = re.compile(
+    r"\bfrom\s+(?:[<>]=?\s?)?" + _NUM + r"(?:\s?[^\s\d,;()]+)?"
+    r"(?:\s+to\s+|\s*(?:\u2192|->)\s*)(?:[<>]=?\s?)?" + _NUM, re.I)
+_OUTSIDE_NORMAL = re.compile(
+    r"\b(?:above|below|outside|beyond|exceed(?:s|ed|ing)?|higher\s+than|lower\s+than)"
+    r"\s+(?:the\s+)?(?:upper\s+|lower\s+)?(?:limits?\s+of\s+)?(?:the\s+)?normal\b", re.I)
+_UNIT_WORDS = {"g", "mg", "ug", "ng", "pg", "mmol", "umol", "nmol", "pmol", "u",
+               "iu", "mu", "miu", "ku", "fl", "mmhg", "meq", "sec", "cells", "cell"}
+
+
+def _unit_key(unit: str) -> str:
+    """Session 51: unit for comparison - case, spaces, micro sign; IU = U."""
+    k = re.sub(r"\s+", "", unit).lower().replace("\u00b5", "u").replace("\u03bc", "u")
+    return re.sub(r"^iu(?=/|$)", "u", k.rstrip("."))
+
+
+def _cites_row(s: str, r: dict, num: str, trend: bool = False) -> bool:
+    """Session 51: sentence s cites num as the value of row r. As _value_cited
+    (not a range end, not a time span, not part of a longer number), and also
+    not glued to letters ("CA19-9"), not the start of a range ("19-9"), not
+    followed by a different unit ("69 mm/hr" is not 69 g/L), and - when trend
+    is set - not inside "from X to Y" / "X -> Y" (a change over time)."""
+    text = s.replace("*", "")
+    spans = [m.span() for m in _TREND.finditer(text)] if trend else []
+    row_unit = _unit_key(r.get("unit") or "")
+    for m in re.finditer(r"(?<![\dA-Za-z.])" + re.escape(num) + r"(?!\.?\d)", text):
+        before, after = text[:m.start()], text[m.end():]
+        if re.search(r"\d\s*[-\u2013\u2014]\s*$", before):
+            continue
+        if re.match(r"\s*[-\u2013\u2014]\s*\d", after):
+            continue
+        w = re.match(r"\s*([A-Za-z]+)\b", after)
+        if w and w.group(1).lower() in _TIME_WORDS:
+            continue
+        if any(a <= m.start() < b for a, b in spans):
+            continue
+        u = re.match(r"\s?(%|[A-Za-z\u00b5\u03bc][A-Za-z0-9\u00b5\u03bc/^.]*)", after)
+        if u and row_unit:
+            tok = u.group(1)
+            key = _unit_key(tok)
+            unit_like = "/" in tok or "%" in tok or "^" in tok or key in _UNIT_WORDS
+            if unit_like and key != row_unit:
+                continue
+        return True
+    return False
+
+
 def check_answer(rows, answer: str, case: str) -> list[str]:
     """Warnings: an in-range result called abnormal; an out-of-range result
     (HIGH, LOW, ABNORMAL) called normal; numbers with a unit in
@@ -512,7 +560,7 @@ def check_answer(rows, answer: str, case: str) -> list[str]:
                 or not re.fullmatch(r"(?:[<>]=?)?" + _NUM, r["value"])):
             continue
         for s in sentences:
-            if (_value_cited(s, r["value"]) and _ABNORMAL.search(s)
+            if (_cites_row(s, r, r["value"], trend=True) and _ABNORMAL.search(s)
                     and not _NORMAL.search(s)):
                 short = s if len(s) <= 200 else s[:197] + "..."
                 warnings.append(
@@ -525,7 +573,7 @@ def check_answer(rows, answer: str, case: str) -> list[str]:
             continue
         for s in sentences:
             c = _claim_part(s)
-            if (_row_named(c, r) and _NORMAL.search(c)
+            if (_row_named(c, r) and _NORMAL.search(_OUTSIDE_NORMAL.sub(" ", c))
                     and not _ABNORMAL.search(c) and not _NOT_NORMAL.search(c)):
                 short = s if len(s) <= 200 else s[:197] + "..."
                 what = " ".join(x for x in (r["test"], r["value"], r["unit"]) if x)
