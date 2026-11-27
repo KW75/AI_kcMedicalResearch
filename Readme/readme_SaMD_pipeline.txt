@@ -154,7 +154,7 @@ Three extra rules fix rows a line-by-line reader would get wrong:
   - Urine rows: _mark_urine() adds " - Urine" after the English name of a row
     whose unit is per field (/HPF, /LPF), or of any row inside the
     URINALYSIS section. The section starts at an upper-case "URINALYSIS" line
-    and ends at "Released By", or after 60 lines. The Chinese part of the
+    and ends at "Released By", a page break or after 60 lines. The Chinese part of the
     name is kept; names that already say Urine are left alone.
     Why: one lab file can print "WBC" for blood (4.9 x10e9/L) and for urine
     (NIL cell/HPF). Without the mark, the table and the answer check could
@@ -309,3 +309,34 @@ Three answer sentences and what check_answer() does:
     "Apart from protein 1+, urine blood is normal."
         warned: the clause ends at the comma; "urine blood is normal" calls
         Blood - Urine 2+ (HIGH) normal.
+Session 51 changes (2026-11-27)
+-------------------------------------------------------------
+Urinalysis section (PR #101): rows after URINALYSIS are named "- Urine" until
+"Released By", a page-break line ("--- page N (") or 60 lines, whichever comes
+first. Known limit: a report that ends with another phrase (for example
+"Signed") can still name other rows on the same page "- Urine".
+
+Other labs' layouts (PR #102): a leading row number is dropped; one up/down
+arrow on a line is the report's H/L flag; the order name - value - range - unit
+is read ("Total Cholesterol 4.12 < 5.20 mmol/L"); a reading that took the
+reference limit as the value is refused.
+
+Answer check (PR #103): a number counts as cited only as a value with the
+row's own unit (not inside a test name such as CA19-9, not the start of a
+range); "from X to Y" trend values are not judged as in-range results;
+"above/below/outside normal" is not counted as calling a result normal.
+
+Labelled ranges (PR #104): bands printed with labels (Female / Male,
+Non-smoker / Smoker, a "Recommended Range" with band lines below) are all
+shown in the Reference range column, the value is marked "(value in band)",
+and the status is "see bands". The program does not choose a band (the
+patient's sex or smoking status is not known to it); the clinician does.
+"Upto 2.5" and "under 4 ng/ml" are read as upper limits (<=2.5, <4).
+
+Reference-note lines (PR #105): a line with no printed range (or a range as
+its value), no H/L flag and a note word in its name (normal, optimal,
+desirable, borderline, high, low, risk, factor, target, patient, adult, ref,
+recommended, ideal, goal) is a reference note, not a result ("Normal : < 1.7
+mmol/L", "Target in patients 0-1 risk factors : < 3.4 mmol/L"). "High/low
+density" and "high/low sensitivity" do not count. Known limit: a real result
+with a note word in its name, no printed range and no flag is left out.
