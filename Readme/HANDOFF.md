@@ -48,8 +48,8 @@ so those catches happen at session open, not mid-work.
 
 | Component      | Status |
 |----------------|--------|
-| Tests | 2180 passed, 10 deselected (Session 51, +8 tests/test_s51_samd_answer_check.py) |
-| Branch | main = fd3761c (PR #102 merged 2026-11-27 10:17 local, Session 51, SaMD reads other labs' layouts). Before it: PR #101 564013c, PR #100 7c4bcc3, PR #99 442a6ff |
+| Tests | 2187 passed, 10 deselected (Session 51, +7 tests/test_s51_samd_labelled_ranges.py) |
+| Branch | main = 30e26f3 (PR #103 merged 2026-11-27 16:14 local, Session 51, SaMD fewer false warnings). Before it: PR #102 fd3761c, PR #101 564013c, PR #100 7c4bcc3 |
 | CI | PR #9: green (2 of 2) at every Session 41 commit checked and at 545af00, 678fadc, 265fe63 and fc3e79e and b56845d and 569fbb8 and b0cd52a, 86d9a9c, 38ea78a (Session 42), 9b5bc25, e6eb7f6, 359d307, 111178c, cc09801, 1f871ab, d318293, 48a306d, 77c0a4f, 62f3fc5, 6f10383, f38c39b, a573c99, 3055352, 6a84f95, 84e8a6b, 431b9cc, d60aa4a, f7fb082, 6d8fd1b, 4e6ec48, c76dc0e, b9b7204, 87f753e, da71fd5, 932b2f1, 8ed5b11, 40e0fce, 769c51b, 2868e90, 8dc7213, fdc59f7, 3c8c4fb, ad97ab8 (Sessions 43-46; 4487f13 failed CI and was reverted by 3055352). Earlier red at 6d61ed2 (CI .env default reached the SR provider check; fixed via ns.provider_explicit). main: green at d5cdb05 (PR #9, 44147187803), 109d971 (44147671111), 34f710f (PR #10, 44200691154), 8ecbdda (PR #11, 44207187118), b0061b8 (PR #12, 44217821419); earlier aa929ec (PR #8, 1282 passed, 10 deselected, both jobs). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
 | Version | 3.0.0 (bumped Session 50 from 2.8.1 at the user's request: OCR -> Finance PR #94-#95, the OCR menu tweaks, and the author's signature 'Dr. Keith KW CHAN' + https://kw75.github.io/Credential/ (link in magenta) in the banners. Tag v3.0.0 on 3e32b98 (PR #96 merge); GitHub release 'v3.0.0 (Session 50)', Latest, published 2026-11-27 by D:\publish_v300.py after main showed VERSION 3.0.0. The user wrote '3.0'; 3.0.0 is the three-part form every version place uses. 2.8.1: tag v2.8.1 on 859834a, release 'v2.8.1 (Session 50)'.) |
 | SR docs | Readme/readme_sr_pipeline.txt = how the SR pipeline works and why (Appendix A worked example); no how-to. How-to = Readme/flashcard-help.html. study_overrides.yaml format = REVIEWER_GUIDE section 5; control-type subgroups = 5.2. docs/sr/REVIEWER_GUIDE.md = what reviewers check by hand (sections 2.2, 3.1, 3.5, 5, 6 are cited by code/tests/README, keep them; 2.2 item 5 covers the quote gate). Readme/RESOLVED_ISSUES.md and HANDOFF_archive_pre_S19.md removed in Session 41 (739b2ce): read with `git show 2923cc3:Readme/<name>`; local copy D:\AI_kcMedicalResearch_backups\2026-11-14\Readme\ |
@@ -3681,4 +3681,47 @@ pooled rows, forest plot and report; D4 'reviewer to confirm' in the RoB table;
   no urine section; SaMD readme end-rule lines 156-157, 249.
 - Tests failed first (4 of 8); +8 tests/test_s51_samd_answer_check.py;
   2180 passed, 10 deselected.
+- Open: record this PR in HANDOFF in the next PR script.
+
+## Session 51 (cont. 6) - 2026-11-27 - branch s51-samd-labelled-ranges
+
+- Recorded: PR #103 (2b666fd, merge 30e26f3, merged 2026-11-27 16:14
+  local; CI run 45963902791 green) - SaMD: fewer false warnings in the
+  answer check. Failing-first 4 of 8; 2180 passed. Run 102001 warnings
+  4/1/1 -> 0/0/1 (left: 7.0 mmol/L threshold not in the sources); run
+  083749 Globulin warning gone. Earlier run 20261120_182309 accepted
+  (--accept-old): its row-4 warning first quoted sentence 4, where the
+  value was only the start of a range ('9.9-9.9%' band, row unit mmol/L);
+  it now quotes sentence 22 for the same row (D:\s51_old_run_look.py).
+- Labelled ranges, measured with D:\s51_bands_look.py (masked shapes):
+  photo (run 102001 step2_01) AFP and CA19.9 read; SCC 'Upto 2.5' read
+  since PR #102 (HIGH, <=2.5, flag H); CPK (Female / Male lines), CEA
+  (Non-smoker / Smoker lines) and Vitamin D (Recommended Range + 4 band
+  lines) missing; PSA 'x ng/ml under 4 ng/ml' read, per the code, with
+  the limit 4 as the value and the result inside the test name.
+- Fix (this PR, report.py): a labelled band at the end of a result line
+  and same-form band lines below it; '... Recommended / Reference Range'
+  and the 'label range' lines below (max 6); 'under / below / less than
+  N' -> '<N', 'over / above / more / greater than N' -> '>N', a repeated
+  unit after the limit dropped (only when the line did not parse); a
+  reading whose test name holds '<number> <row unit>' is refused. Band
+  rows: ref = every band, '(value in band)' marks, status 'see bands'
+  (no band picked: sex / smoking unknown), report flag kept. Band lines
+  used are not read again (parse_results 'used').
+- Real-run re-check, rows old->new: 102001 01 rows 8->11, see bands 0->3, no range 1->0, with flag 1->2;
+  02 rows 50->51, see bands 0->1, no range 10->10, with flag 0->0; 03 rows 54->54, see bands 0->0, no range 7->7, with flag 2->2.
+  083749 01 rows 8->11, see bands 0->3, no range 1->0, with flag 1->2.
+- Earlier runs (first lab): unchanged.
+- Assistant defaults (not confirmed): 'see bands' for sex / smoker /
+  category bands (CPK with a value above both bands is not marked HIGH
+  by the program; the lab's arrow shows); limit words and band-marker
+  words as listed; up to 6 band lines; up to 4 label words.
+- Still open: 2024 PDF lipid section - all 10 rangeless rows are
+  reference-note lines read as results ('Normal : < 1.7 mmol/L' shape,
+  limit as value); lipid results themselves not yet checked by the user;
+  urine names by known tests; 'Signed' / 'Medical Technologist' end no
+  urine section; SaMD readme end-rule lines 156-157, 249; user's by-eye
+  check of report.html (run 102001 made before PR #103 and this PR).
+- Tests failed first (5 of 7); +7 tests/test_s51_samd_labelled_ranges.py;
+  2187 passed, 10 deselected.
 - Open: record this PR in HANDOFF in the next PR script.
