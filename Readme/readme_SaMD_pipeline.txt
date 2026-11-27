@@ -389,3 +389,8 @@ Answer checks: urine value and 'elevation' (Session 51 cont. 15)
   quantification" alone does not count. Blood rows are unchanged. The words
   that call a result abnormal now include 'elevation'. A sentence without a
   number ("elevated urea and creatinine") still gives no in-range warning.
+
+'Urinalysis' as a urine word (Session 51 cont. 16)
+  For the not-mentioned check, a sentence is about urine when it has
+  'urine', 'urinary' or 'urinalysis'. The result value must still be in the
+  sentence ("Urinalysis shows protein 1+"); "urinalysis" alone does not count.
