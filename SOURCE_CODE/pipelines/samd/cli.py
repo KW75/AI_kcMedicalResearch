@@ -349,6 +349,7 @@ def write_report_step(base_dir, run_id, run_dir, text, described, case,
     from . import report
     rows = report.parse_results(described)
     warnings = report.check_answer(rows, answer, case)
+    warnings = list(warnings) + report.unmentioned_abnormal(rows, answer)  # Session 51 (cont. 12)
     for w in warnings:
         say("WARNING: " + w)
     if miss:

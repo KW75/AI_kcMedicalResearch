@@ -991,3 +991,58 @@ def write_report(out_dir, md: str, *, title: str, log=print) -> dict:
         log(f"Could not write report.docx ({e}); report.md and report.html written.")
         paths["docx"] = None
     return paths
+
+
+# Session 51 (cont. 12): abnormal results the answer never names. check_answer
+# warns when a result is called the wrong thing; this warns when an abnormal
+# result (HIGH, LOW, ABNORMAL, or 'see bands' with the lab's own flag) is left
+# out. 'Named' = a distinctive English word of the test name in the answer; for
+# a urine row the word must be in a sentence that says urine / urinary.
+_MENTION_COMMON = {"total", "free", "serum", "count", "cell", "cells", "ratio", "test",
+                   "level", "urine", "blood", "fasting", "random", "direct", "indirect",
+                   "and", "the", "with"}
+_URINE_SENTENCE = re.compile(r"(?i)\burin(?:e|ary)\b")
+
+
+def _english_test_name(test: str) -> str:
+    s = test.replace(" - Urine", " ")
+    s = re.sub(r"[^\x20-\x7e]+", " ", s)
+    return re.sub(r"\s+", " ", s).strip(" ,;:*#")
+
+
+def _is_mentioned(name: str, urine: bool, sentences) -> bool:
+    words = [w for w in re.findall(r"[A-Za-z][A-Za-z0-9]+", name)
+             if len(w) >= 3 and w.lower() not in _MENTION_COMMON]
+    if not words:
+        words = [w for w in re.findall(r"[A-Za-z]+", name) if len(w) >= 3] or [name]
+    pats = [re.compile(r"(?i)(?<![A-Za-z])" + re.escape(w) + r"(?![A-Za-z])") for w in words]
+    for s in sentences:
+        if urine and not _URINE_SENTENCE.search(s):
+            continue
+        if any(p.search(s) for p in pats):
+            return True
+    return False
+
+
+def unmentioned_abnormal(rows, answer) -> list:
+    """Session 51 (cont. 12): one warning listing abnormal results the answer
+    never names (urine results grouped, repeated names once), or []. Known
+    limit: a word used in another sense ('C-reactive protein') counts as named."""
+    sentences = _sentences(answer or "")
+    found = {False: [], True: []}
+    for r in rows:
+        st = r.get("status")
+        if not (st in ("HIGH", "LOW", "ABNORMAL") or (st == "see bands" and r.get("flag"))):
+            continue
+        urine = " - Urine" in r.get("test", "") or bool(_PER_FIELD.search(r.get("unit") or ""))
+        name = _english_test_name(r.get("test", ""))
+        if not name or _is_mentioned(name, urine, sentences):
+            continue
+        if name.lower() not in [n.lower() for n in found[urine]]:
+            found[urine].append(name)
+    parts = []
+    if found[False]:
+        parts.append(", ".join(found[False]))
+    if found[True]:
+        parts.append("urine: " + ", ".join(found[True]))
+    return ["Abnormal results not mentioned in the answer: " + "; ".join(parts)] if parts else []

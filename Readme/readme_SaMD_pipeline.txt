@@ -357,3 +357,11 @@ main parser cannot read, or reads without a reference, is read in this order.
 A "*" after the result is the report's flag. TRACE, +, 1+ to 4+ and POSITIVE
 against Negative or Nil are HIGH. Colour / Appearance pairs such as "Yellow
 Yellow" are not read yet.
+Abnormal results not mentioned (Session 51 cont. 12): after the answer, the program
+lists abnormal results (HIGH, LOW, ABNORMAL, or "see bands" with the lab's own
+flag) that the answer never names: "Abnormal results not mentioned in the
+answer: Globulin, Platelet Count; urine: Blood, Protein". A result counts as
+named when a distinctive English word of its test name appears in the answer;
+for a urine result the word must be in a sentence that says urine or urinary.
+Known limit: a word used in another sense ("C-reactive protein") counts as
+named, so the warning reduces silent omissions but cannot rule them out.
