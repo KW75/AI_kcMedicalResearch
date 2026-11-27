@@ -263,13 +263,124 @@ def _parse_vru(text: str):
             "flag": "", "status": status(value, ref)}
 
 
+# --- Session 51 (cont. 6): labelled ranges ------------------------------------
+_LIMIT_WORDS = (
+    (re.compile(r"\b(?:under|below|less\s+than)\s+(?=\d)", re.I), "<"),
+    (re.compile(r"\b(?:over|above|more\s+than|greater\s+than)\s+(?=\d)", re.I), ">"),
+)
+_BAND_CRIT = r"(?:[<>]=?\s?" + _NUM + r"|" + _NUM + r"\s*-\s*" + _NUM + r")"
+_BAND_UNIT = r"(?:\s+(?=\S*[A-Za-z%])[^\s\d]\S*)?"
+_BAND_LABEL = r"[A-Za-z][A-Za-z\-/]*(?:\s+[A-Za-z][A-Za-z\-/]*){0,4}"
+_COLON_TAIL = re.compile(r"\s*:\s*(?P<crit>" + _BAND_CRIT + r")" + _BAND_UNIT + r"\s*$")
+_BAND_LINE = re.compile(r"^(?P<label>" + _BAND_LABEL + r")\s*:?\s*(?P<crit>"
+                        + _BAND_CRIT + r")" + _BAND_UNIT + r"\s*$")
+_BAND_LINE_COLON = re.compile(r"^(?P<label>" + _BAND_LABEL + r")\s*:\s*(?P<crit>"
+                              + _BAND_CRIT + r")" + _BAND_UNIT + r"\s*$")
+_BAND_MARKER = re.compile(r"\s+(?:recommended|reference|ref\.?)\s+(?:ranges?|values?)"
+                          r"\s*:?\s*$", re.I)
+_LABEL_WORD = re.compile(r"[A-Za-z][A-Za-z\-/]*$")
+
+
+def _band_ref(value: str, bands) -> str:
+    """Session 51: printed bands as the reference; the value is marked in
+    every band it falls in (the _add_bands form)."""
+    out = []
+    for label, crit in bands:
+        label = re.sub(r"\s+", " ", label).strip()
+        crit = re.sub(r"\s+", " ", crit).strip()
+        mark = " (value in band)" if status(value, crit) == "normal" else ""
+        out.append(f"{label} {crit}{mark}")
+    return "; ".join(out)
+
+
+def _value_in_name(row: dict) -> bool:
+    """Session 51: the test name holds '<number> <unit>' with the row's own
+    unit - the value was taken from later in the line ("PSA 1.13 ng/ml
+    under 4 ng/ml" read as 4)."""
+    unit = row.get("unit") or ""
+    return bool(unit) and re.search(r"(?<![\d.])" + _NUM + r"\s+" + re.escape(unit)
+                                    + r"(?!\S)", row["test"]) is not None
+
+
+def _read(t: str):
+    """Session 51: the Session 49 parser, then value - range - unit order;
+    readings that took the limit or a later number as the value are refused."""
+    row = _parse_line_v1(t)
+    if row and ((row["value"].startswith(("<", ">")) and _TRAILING_NUM.search(row["test"]))
+                or _value_in_name(row)):
+        row = None
+    return row or _parse_vru(t)
+
+
+def _normalize_limits(t: str) -> str:
+    """Session 51: 'under 4 ng/ml' -> '<4', 'over 10' -> '>10'; a unit
+    repeated after the limit is dropped."""
+    for pat, sym in _LIMIT_WORDS:
+        t = pat.sub(sym, t)
+    return re.sub(r"^(.*\s(\S+)\s+[<>]=?\s?" + _NUM + r")\s+\2\s*$", r"\1", t)
+
+
+def _read_with_bands(t: str):
+    """Session 51: a result with one labelled band at the end of its line
+    ("CPK 248 IU/l Female : 29-168"), or ending in 'Recommended Range'
+    (the bands follow on the next lines; see _labelled_bands)."""
+    m = _COLON_TAIL.search(t)
+    if m:
+        words = t[:m.start()].split()
+        for k in range(1, min(5, len(words))):
+            label = words[-k:]
+            if not all(_LABEL_WORD.match(w) for w in label):
+                break
+            head = " ".join(words[:-k])
+            row = _read(head) or _read(_normalize_limits(head))
+            if row and not row["ref"]:
+                row["ref"] = _band_ref(row["value"], [(" ".join(label), m.group("crit"))])
+                row["status"] = "see bands"
+                return row
+        return None
+    m = _BAND_MARKER.search(t)
+    if m:
+        row = _read(t[:m.start()])
+        if row and not row["ref"]:
+            return row
+    return None
+
+
+def _labelled_bands(row: dict, lines: list, i: int) -> set:
+    """Session 51: more bands on the lines below a result: 'Male : 30-200'
+    under 'CPK ... Female : 29-168', or the 'label range' lines under a
+    '... Recommended Range' result (Vitamin D). A line that is itself a
+    result ends the block. Bands are alternatives (sex, smoking) or
+    categories, so the program does not pick one: 'see bands'. Returns the
+    band lines used, so they are not read again."""
+    text = lines[i].strip().translate(_SYMBOLS)
+    if row["status"] == "see bands" and ";" not in row["ref"] and _COLON_TAIL.search(text):
+        pat = _BAND_LINE_COLON
+    elif not row["ref"] and _BAND_MARKER.search(text):
+        pat = _BAND_LINE
+    else:
+        return set()
+    bands, used = [], set()
+    for j in range(i + 1, min(len(lines), i + 7)):
+        m = pat.match(lines[j].strip().translate(_SYMBOLS))
+        if not m or parse_line(lines[j]):
+            break
+        bands.append((m.group("label"), m.group("crit")))
+        used.add(j)
+    if bands:
+        more = _band_ref(row["value"], bands)
+        row["ref"] = row["ref"] + "; " + more if row["ref"] else more
+        row["status"] = "see bands"
+    return used
+
+
 def parse_line(line: str):
     """One result row (dict) or None if the line is not a lab result.
     Session 51: the Session 49 rules run first (_parse_line_v1); then other
     labs' layouts: one up/down arrow anywhere is the H/L flag, a leading row
-    number is dropped, value - range - unit order is read, and a reading
-    that took the reference limit as the value (name ending in a number,
-    value '<x' or '>x') is rejected."""
+    number is dropped, value - range - unit order is read, and readings that
+    took the reference limit or a later number as the value are refused.
+    Session 51 (cont. 6): 'under/over N' limits and labelled bands."""
     text = line.strip().translate(_SYMBOLS)
     arrow = ""
     if len(_ARROW.findall(text)) == 1:
@@ -280,11 +391,11 @@ def parse_line(line: str):
     if _ROW_NO.match(text):
         tries.append(_ROW_NO.sub("", text, count=1))
     for t in tries:
-        row = _parse_line_v1(t)
-        if (row and row["value"].startswith(("<", ">"))
-                and _TRAILING_NUM.search(row["test"])):
-            row = None
-        row = row or _parse_vru(t)
+        row = _read(t)
+        if not row:
+            n = _normalize_limits(t)
+            row = _read(n) if n != t else None
+        row = row or _read_with_bands(t)
         if row:
             if arrow and not row["flag"]:
                 row["flag"] = arrow
@@ -406,6 +517,7 @@ def parse_results(described) -> list[dict]:
             continue
         lines = (body or "").splitlines()
         urine_from = None
+        used = set()
         for i, line in enumerate(lines):
             if _URINE_START.match(line):
                 urine_from = i
@@ -413,11 +525,14 @@ def parse_results(described) -> list[dict]:
                                              or _PAGE_BREAK.match(line)
                                              or i - urine_from > _URINE_MAX):
                 urine_from = None
+            if i in used:
+                continue
             row = parse_line(line) or _parse_nameless(lines, i)
             if row:
                 _mark_urine(row, urine_from is not None)
                 if not row["ref"] and re.fullmatch(r"(?:[<>]=?)?" + _NUM, row["value"]):
                     _add_bands(row, lines[i + 1:])
+                used.update(_labelled_bands(row, lines, i))
                 row["source"] = name
                 rows.append(row)
     return rows
