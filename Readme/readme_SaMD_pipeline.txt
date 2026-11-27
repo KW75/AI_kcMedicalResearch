@@ -340,3 +340,12 @@ recommended, ideal, goal) is a reference note, not a result ("Normal : < 1.7
 mmol/L", "Target in patients 0-1 risk factors : < 3.4 mmol/L"). "High/low
 density" and "high/low sensitivity" do not count. Known limit: a real result
 with a note word in its name, no printed range and no flag is left out.
+Urine names (Session 51 cont. 9): inside a URINALYSIS section only rows whose
+English name starts like a urine test (pH, Sp./Specific Gravity, Protein,
+Glucose, Ketone, Bilirubin, Urobil..., Blood, Nitrit..., Leuc/Leuk..., RBC, WBC,
+Epith..., Cast, Granular, Hyaline, Crystal, Bacteria, Yeast, Mucus/Mucous,
+Colour/Color, Clarity, Appearance, Others) are named "- Urine"; a /HPF or /LPF
+unit is named "- Urine" anywhere. A blood-only test (Sodium, Potassium) below a
+urinalysis section with no "Released By" keeps its name. Known limit: names
+shared with blood tests (Glucose, Protein, Blood, Bilirubin) cannot be told
+apart by name.

@@ -514,17 +514,31 @@ _URINE_MAX = 60  # lines; guard when no "Released By" follows
 _PAGE_BREAK = re.compile(r"^--- page \d+ \(")  # cli.py joins pages with this line
 
 
+
+# Session 51 (cont. 9): start of the English name of a urine test. Prefixes, so
+# AI misspellings ('Urobiligen') still match. Names shared with blood tests
+# (Glucose, Protein, Blood, Bilirubin) cannot be told apart by name.
+_URINE_NAME = re.compile(
+    r"(?i)(?:ph\b|sp\b|specific\s+gravity|protein|glucose|ketone|bilirubin|urobil|"
+    r"blood|nitrit|leuc|leuk|rbc|wbc|epith|cast|granular|hyaline|crystal|bacteria|"
+    r"yeast|mucu|muco|colou?r|clarity|appearance|others?\b)")
+
+
 def _mark_urine(row: dict, in_urine: bool = False) -> None:
     """Session 49: a urine row - unit per field (/HPF, /LPF), or any row inside
     the URINALYSIS ... Released By section (Casts, Colour, Specific Gravity) - gets
     ' - Urine' after its English name, so 'WBC 白血球' NIL cell/HPF differs from
     the blood 'WBC 白血球' 4.9 x10e9/L in the same file. The Chinese part is kept
     (lab style 'pH - Urine 酸鹼度'); names already saying Urine are left alone."""
-    if ((not in_urine and not _PER_FIELD.search(row["unit"]))
-            or re.search(r"\burine\b", row["test"], re.I)):
+    if re.search(r"\burine\b", row["test"], re.I):
         return
     m = re.match(r"([\x00-\x7f]+?)\s*([^\x00-\x7f].*)?$", row["test"])
     if not m or not m.group(1).strip():
+        return
+    # Session 51 (cont. 9): inside a URINALYSIS section only known urine test
+    # names are marked; a /HPF or /LPF unit is marked anywhere.
+    if not _PER_FIELD.search(row["unit"]) and not (
+            in_urine and _URINE_NAME.match(m.group(1).strip())):
         return
     rest = (m.group(2) or "").strip()
     row["test"] = f"{m.group(1).strip()} - Urine" + (f" {rest}" if rest else "")
