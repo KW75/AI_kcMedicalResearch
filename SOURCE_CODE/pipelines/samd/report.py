@@ -182,7 +182,7 @@ def _parse_descriptive(line: str):
             "status": "ABNORMAL" if value in _DESC_ABNORMAL else "no range"}
 
 
-def parse_line(line: str):
+def _parse_line_v1(line: str):
     """One result row (dict) or None if the line is not a lab result."""
     m = _LINE.match(line.strip().translate(_SYMBOLS))
     if not m:
@@ -206,6 +206,90 @@ def parse_line(line: str):
     return {"test": re.sub(r"\s+", " ", g["name"]).strip(), "value": value,
             "unit": g["unit"], "ref": ref, "flag": g["flag"] or "",
             "status": status(value, ref)}
+
+
+
+# --- Session 51: other labs' layouts -----------------------------------------
+_ROW_NO = re.compile(r"^\d{1,3}\s+(?=[A-Za-z])")  # "22 SGOT/AST ..."
+_ARROW = re.compile(r"\s*([\u2191\u2193])\s*")
+_CJK = re.compile(r"[\u3400-\u9fff\uf900-\ufaff]")
+_TRAILING_NUM = re.compile(r"(?:^|\s)" + _NUM + r"$")
+_LINE_VRU = re.compile(
+    r"^(?P<name>[A-Za-z][^<>]*?)\s+(?P<value>" + _NUM + r")\s+"
+    r"(?P<ref>" + _NUM + r"\s*-\s*" + _NUM + r"|[<>]=?\s?" + _NUM + r")"
+    r"(?:\s+\([A-Z]\))?\s+(?P<unit>(?=[^\d\s(])(?=.*[A-Za-z%]).+?)\s*$")
+
+
+def _numbered_row(text: str) -> bool:
+    """Session 51: "24 CPK 肌酸磷酸酶 248 IU/l ..." is a numbered result row,
+    not a value printed without a name: a leading row number followed by
+    Chinese text or by two or more words before the first number."""
+    if not _ROW_NO.match(text):
+        return False
+    rest = _ROW_NO.sub("", text, count=1)
+    if _CJK.search(rest):
+        return True
+    before = 0
+    for tok in rest.split():
+        if re.search(r"\d", tok):
+            break
+        before += 1
+    return before >= 2
+
+
+def _parse_vru(text: str):
+    """Session 51: value - range - unit order ("Hb 13.2 13.0-17.0 (M) g/dL",
+    "Total Cholesterol 4.12 < 5.20 mmol/L"). A one-letter marker such as
+    (M) after the range is dropped; the unit may contain spaces."""
+    m = _LINE_VRU.match(text)
+    if not m:
+        return None
+    g = m.groupdict()
+    name = re.sub(r"\s+", " ", g["name"]).strip()
+    unit = re.sub(r"\s+", " ", g["unit"]).strip()
+    if (name.endswith("-") or name.endswith(":")
+            or re.search(_NUM + r"\s*-\s*" + _NUM, name)
+            or _NOT_RESULT.search(name)
+            or unit.lower().rstrip(".") in _TIME_WORDS):
+        return None
+    value = g["value"]
+    ref = g["ref"].strip()
+    if ref[0].isdigit():
+        lo, hi = [p.strip() for p in ref.split("-", 1)]
+        ref = f"{lo} - {hi}"
+    else:
+        ref = ref.replace(" ", "")
+    return {"test": name, "value": value, "unit": unit, "ref": ref,
+            "flag": "", "status": status(value, ref)}
+
+
+def parse_line(line: str):
+    """One result row (dict) or None if the line is not a lab result.
+    Session 51: the Session 49 rules run first (_parse_line_v1); then other
+    labs' layouts: one up/down arrow anywhere is the H/L flag, a leading row
+    number is dropped, value - range - unit order is read, and a reading
+    that took the reference limit as the value (name ending in a number,
+    value '<x' or '>x') is rejected."""
+    text = line.strip().translate(_SYMBOLS)
+    arrow = ""
+    if len(_ARROW.findall(text)) == 1:
+        m = _ARROW.search(text)
+        arrow = "H" if m.group(1) == "\u2191" else "L"
+        text = (text[:m.start()] + " " + text[m.end():]).strip()
+    tries = [text]
+    if _ROW_NO.match(text):
+        tries.append(_ROW_NO.sub("", text, count=1))
+    for t in tries:
+        row = _parse_line_v1(t)
+        if (row and row["value"].startswith(("<", ">"))
+                and _TRAILING_NUM.search(row["test"])):
+            row = None
+        row = row or _parse_vru(t)
+        if row:
+            if arrow and not row["flag"]:
+                row["flag"] = arrow
+            return row
+    return None
 
 
 _CRIT = re.compile(r"[<>]=?\s?" + _NUM + r"|" + _NUM + r"\s*-\s*" + _NUM)
@@ -278,6 +362,8 @@ def _parse_nameless(lines: list[str], i: int):
     """Session 49: parse a value-first line under a placeholder name, so the
     value, unit, ref and status rules stay those of parse_line."""
     text = lines[i].strip().translate(_SYMBOLS)
+    if _numbered_row(text):
+        return None  # Session 51: a numbered row, not a nameless value
     if not _VALUE_FIRST.match(text + " "):
         return None
     name = _name_above(lines, i)
