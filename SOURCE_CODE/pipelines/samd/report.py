@@ -784,7 +784,7 @@ def check_answer(rows, answer: str, case: str) -> list[str]:
                 or not re.fullmatch(r"(?:[<>]=?)?" + _NUM, r["value"])):
             continue
         for s in sentences:
-            if (_cites_row(s, r, r["value"], trend=True) and _ABNORMAL.search(s)
+            if (_cites_row(s, r, r["value"], trend=True) and _abnormal_claim(s)
                     and not _NORMAL.search(s)):
                 short = s if len(s) <= 200 else s[:197] + "..."
                 warnings.append(
@@ -798,7 +798,7 @@ def check_answer(rows, answer: str, case: str) -> list[str]:
         for s in sentences:
             c = _claim_part(s)
             if (_row_named(c, r) and _NORMAL.search(_OUTSIDE_NORMAL.sub(" ", c))
-                    and not _ABNORMAL.search(c) and not _NOT_NORMAL.search(c)):
+                    and not _abnormal_claim(c) and not _NOT_NORMAL.search(c)):
                 short = s if len(s) <= 200 else s[:197] + "..."
                 what = " ".join(x for x in (r["test"], r["value"], r["unit"]) if x)
                 ref = f", range {r['ref']}" if r["ref"] else ""
@@ -1159,3 +1159,64 @@ def parse_line(line: str):
     """Session 51 (cont. 14): parse_line as before, then the eGFR value-only row."""
     row = _parse_line_before_egfr(line)
     return row if row is not None else _parse_egfr_only(line)
+
+
+# Session 51 (cont. 17): a negated abnormal word ("no evidence of anaemia",
+# "not elevated") is not an abnormal claim. Used where _ABNORMAL.search was used.
+_NEG_BEFORE = re.compile(
+    r"(?i)\b(?:no|not|without|absence\s+of|negative\s+for)\b(?:\s+[\w-]+){0,3}\s*$")
+
+
+def _abnormal_claim(s: str):
+    t = (s or "").replace("*", "")
+    for m in _ABNORMAL.finditer(t):
+        before = re.split(r"[,;:()]", t[:m.start()])[-1]
+        if not _NEG_BEFORE.search(before):
+            return m
+    return None
+
+
+# Session 51 (cont. 17): "no proteinuria", "no haematuria confirmed" against an
+# abnormal urine result. Known limits: "proteinuria is absent" (negation after
+# the term) is not read; "no data on proteinuria" may warn.
+_DENIED_TERMS = (
+    (r"proteinuria|albuminuria", ("protein", "albumin")),
+    (r"ha?ematuria", ("blood", "rbc")),
+    (r"pyuria|leu[ck]ocyturia", ("wbc", "leuk", "leucocyte", "leukocyte")),
+    (r"glu[ck]osuria|glycosuria", ("glucose",)),
+    (r"ketonuria", ("ketone",)),
+)
+_DENY_RE = [(re.compile(r"(?i)\b(?:no|not|without|absence\s+of|negative\s+for|nil)\b"
+                        r"(?:\s+[\w-]+){0,3}?\s+(?:" + t + r")\b"), keys)
+            for t, keys in _DENIED_TERMS]
+
+
+def denied_urine_findings(rows, answer) -> list:
+    """Session 51 (cont. 17): warnings for sentences that deny an abnormal urine
+    result by its medical term ("No proteinuria" with urine Protein 1+)."""
+    urine = []
+    for r in rows:
+        if r.get("status") not in ("HIGH", "ABNORMAL"):
+            continue
+        if " - Urine" not in r.get("test", "") and not _PER_FIELD.search(r.get("unit") or ""):
+            continue
+        words = r.get("test", "").split()
+        key = re.sub(r"[^a-z]", "", words[0].lower()) if words else ""
+        if key:
+            urine.append((key, r))
+    out = []
+    for s in _sentences(answer or ""):
+        t = s.replace("*", "")
+        hit = []
+        for pat, keys in _DENY_RE:
+            if pat.search(t):
+                for key, r in urine:
+                    if key.startswith(keys) and r not in hit:
+                        hit.append(r)
+        if hit:
+            q = s.strip()
+            q = q if len(q) <= 200 else q[:197] + "..."
+            names = "; ".join(f"{r['test']} {r['value']} (range {r.get('ref') or '-'})"
+                              for r in hit)
+            out.append(f'The answer may deny an abnormal urine result: {names}: "{q}"')
+    return out

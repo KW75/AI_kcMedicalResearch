@@ -394,3 +394,10 @@ Answer checks: urine value and 'elevation' (Session 51 cont. 15)
   For the not-mentioned check, a sentence is about urine when it has
   'urine', 'urinary' or 'urinalysis'. The result value must still be in the
   sentence ("Urinalysis shows protein 1+"); "urinalysis" alone does not count.
+
+Denied urine findings and negated words (Session 51 cont. 17)
+  A sentence such as "No proteinuria" or "no haematuria confirmed" gives a
+  warning when the matching urine result (Protein; Blood and RBC; WBC and
+  Leuk. esterase; Glucose; Ketone) is HIGH. An abnormal word with "no",
+  "not", "without", "absence of" or "negative for" up to 3 words before it
+  ("no evidence of anaemia") no longer counts as calling a result abnormal.
