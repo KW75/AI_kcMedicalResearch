@@ -649,7 +649,7 @@ def parse_results(described) -> list[dict]:
 
 # --- checks on the AI answer -------------------------------------------------
 
-_ABNORMAL = re.compile(r"\b(elevated|raised|high|increased|low|decreased|"
+_ABNORMAL = re.compile(r"\b(elevated|elevations?|raised|high|increased|low|decreased|"
                        r"reduced|abnormal|borderline)\b|ana?emi", re.I)
 _NORMAL = re.compile(r"\b(normal|within)\b", re.I)
 _CITED = re.compile(r"(?<![\w.])(" + _NUM + r")\s?(%|[A-Za-z][A-Za-z/^0-9.]*)")
@@ -1010,7 +1010,21 @@ def _english_test_name(test: str) -> str:
     return re.sub(r"\s+", " ", s).strip(" ,;:*#")
 
 
-def _is_mentioned(name: str, urine: bool, sentences) -> bool:
+def _value_in_sentence(value: str, s: str) -> bool:
+    """Session 51 (cont. 15): a urine result counts as named only when its value
+    is in the same sentence ("urine protein 1+", "trace blood in the urine",
+    "RBC 10-17"); "urine protein quantification" alone is not enough."""
+    v = (value or "").strip().replace("\u2013", "-").replace("\u2014", "-")
+    if not v:
+        return True
+    t = s.replace("\u2013", "-").replace("\u2014", "-")
+    if v == "+":
+        return re.search(r"(?<![\w+])\+(?![\w+])", t) is not None
+    pat = re.escape(v).replace(r"\-", r"\s*-\s*")
+    return re.search(r"(?<![\w.])" + pat + r"(?!\w)", t, re.I) is not None
+
+
+def _is_mentioned(name: str, urine: bool, sentences, value: str = "") -> bool:
     words = [w for w in re.findall(r"[A-Za-z][A-Za-z0-9]+", name)
              if len(w) >= 3 and w.lower() not in _MENTION_COMMON]
     if not words:
@@ -1019,7 +1033,7 @@ def _is_mentioned(name: str, urine: bool, sentences) -> bool:
     for s in sentences:
         if urine and not _URINE_SENTENCE.search(s):
             continue
-        if any(p.search(s) for p in pats):
+        if any(p.search(s) for p in pats) and (not urine or _value_in_sentence(value, s)):
             return True
     return False
 
@@ -1036,7 +1050,7 @@ def unmentioned_abnormal(rows, answer) -> list:
             continue
         urine = " - Urine" in r.get("test", "") or bool(_PER_FIELD.search(r.get("unit") or ""))
         name = _english_test_name(r.get("test", ""))
-        if not name or _is_mentioned(name, urine, sentences):
+        if not name or _is_mentioned(name, urine, sentences, r.get("value") or ""):
             continue
         if name.lower() not in [n.lower() for n in found[urine]]:
             found[urine].append(name)
