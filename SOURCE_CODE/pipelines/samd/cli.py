@@ -350,6 +350,7 @@ def write_report_step(base_dir, run_id, run_dir, text, described, case,
     rows = report.parse_results(described)
     warnings = report.check_answer(rows, answer, case)
     warnings = list(warnings) + report.unmentioned_abnormal(rows, answer)  # Session 51 (cont. 12)
+    warnings = list(warnings) + report.ckd_stage_mismatch(rows, answer)  # Session 51 (cont. 13)
     for w in warnings:
         say("WARNING: " + w)
     if miss:
