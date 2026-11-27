@@ -374,3 +374,10 @@ out", "unlikely", "risk of" or "progress to" in the same sentence is skipped.
 Known limit: only the stage is checked against the eGFR; whether CKD is the
 right diagnosis (more than 3 months, markers such as proteinuria) is for the
 clinician.
+
+eGFR value-only row (Session 51 cont. 14)
+  Some labs print eGFR as name and value only ("e-GFR ... 68"), with the
+  unit and the reference in notes below the table. parse_line reads such a
+  line only when no other reader finds a row, and only for eGFR. The value
+  is kept as printed; unit and reference stay empty, so the status is
+  'no range'. The CKD stage check (cont. 13) uses this row.

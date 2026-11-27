@@ -1117,3 +1117,31 @@ def ckd_stage_mismatch(rows, answer) -> list:
             vals.append(item)
     return ["CKD stage in the answer does not match the eGFR (KDIGO): stage "
             + ", ".join(bad) + " named; " + "; ".join(vals)]
+
+
+# Session 51 (cont. 14): an eGFR row printed as name + value only
+# ("e-GFR <Chinese>, <Chinese> 68"); the unit and the reference are in notes
+# below the table ("eGFR unit: ml/min/1.73m2", "eGFR >90 is normal unless ...").
+# Read only when the other readers find no row, and only for eGFR. The value is
+# kept as printed; no unit or reference is taken from the notes, so the status
+# is 'no range'. Note lines that start with a number ("2. eGFR >90 ...") are not read.
+_EGFR_ONLY = re.compile(
+    r"^\s*(e-?GFR\b[^\d<>=\u2264\u2265]*?)\s*([<>]=?|\u2264|\u2265)?\s*(\d+(?:\.\d+)?)\s*$",
+    re.I)
+_parse_line_before_egfr = parse_line
+
+
+def _parse_egfr_only(line: str):
+    m = _EGFR_ONLY.match(line)
+    if not m:
+        return None
+    sign = m.group(2) or ""
+    sign = {"\u2264": "<=", "\u2265": ">="}.get(sign, sign)
+    return {"test": m.group(1).strip(" ,:"), "value": sign + m.group(3),
+            "unit": "", "ref": "", "flag": "", "status": "no range"}
+
+
+def parse_line(line: str):
+    """Session 51 (cont. 14): parse_line as before, then the eGFR value-only row."""
+    row = _parse_line_before_egfr(line)
+    return row if row is not None else _parse_egfr_only(line)
