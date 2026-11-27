@@ -408,3 +408,12 @@ not name the blood RBC row). A urine albumin- or protein-to-creatinine ratio doe
 count as naming serum Albumin, Protein or Creatinine. The denied-urine check reads a
 comma list after 'No' ('No proteinuria, haematuria, or ...'); the list stops at but,
 however, although, though, yet, whereas or except.
+
+In-range result called abnormal: judged per clause (Session 51 cont. 19)
+A sentence is split at semicolons and at but, however, although, though and whereas.
+A clause warns when it gives the in-range value, calls it abnormal and has no
+'normal'/'within' word, so '... mild elevation in AFP (2.24 ng/ml), but all tumour
+markers remain within ...' warns. The warning quotes the whole sentence. For a range
+with only an upper limit ('<5.0') 'low' is not abnormal ('CRP is low at 0.8'); for
+only a lower limit, 'high' is not. For a result of 10, the '10' in 'x 10^12/L' is
+not read as that result.
