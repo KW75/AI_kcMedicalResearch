@@ -544,6 +544,77 @@ def _mark_urine(row: dict, in_urine: bool = False) -> None:
     row["test"] = f"{m.group(1).strip()} - Urine" + (f" {rest}" if rest else "")
 
 
+
+# Session 51 (cont. 10): urine rows printed as name - result [*] - reference
+# [- unit] ("Blood 尿血 Trace * Negative", "Hyaline Cast 透明柱體 Nil Nil /HPF",
+# "RBC 紅血球 1 - 2 < 5 cells/ul"). Used only inside a URINALYSIS section and
+# only when parse_line found no row or a row with no reference.
+_PAIR_TEXT = r"NEGATIVE|POSITIVE|TRACE|NIL|NOT\s+SEEN|[1-4]?\+"
+_PAIR_NUM = r"[<>]=?\s?" + _NUM + "|" + _NUM + r"\s*-\s*" + _NUM + "|" + _NUM
+_URINE_PAIR = re.compile(
+    r"^(?P<name>[A-Za-z][^<>*]*?)\s+(?P<value>" + _PAIR_TEXT + "|" + _PAIR_NUM + r")"
+    r"(?P<star>\s*\*)?\s+(?P<ref>" + _PAIR_TEXT + "|" + _PAIR_NUM + r")"
+    r"(?:\s+(?P<unit>(?=\S*[A-Za-z%])[^\s\d]\S*))?\s*$", re.I)
+_NEG_REF = ("negative", "nil", "not seen")
+
+
+def _pair_text_status(value: str, ref: str) -> str:
+    """Text result against a text reference: NEGATIVE/NIL/NOT SEEN normal;
+    TRACE HIGH against negative/nil, normal against trace; +, 1+ to 4+ and
+    POSITIVE HIGH against negative/nil/trace. Anything else: unclear."""
+    r = ref.lower()
+    neg = r in _NEG_REF
+    if value in ("NEGATIVE", "NIL", "NOT SEEN"):
+        return "normal" if neg or "trace" in r else "unclear"
+    if value == "TRACE":
+        return "HIGH" if neg else "normal" if "trace" in r else "unclear"
+    if value == "POSITIVE" or value.endswith("+"):
+        return "HIGH" if neg or "trace" in r else "unclear"
+    return "unclear"
+
+
+def _parse_urine_pair(line: str):
+    """Session 51 (cont. 10): see _URINE_PAIR. '*' is the report's flag."""
+    text = line.strip().translate(_SYMBOLS)
+    m = _URINE_PAIR.match(text)
+    if not m:
+        return None
+    name = re.sub(r"\s+", " ", m.group("name")).strip()
+    if (name.endswith(("-", ":")) or _NOT_RESULT.search(name)
+            or re.search(r"(?<![\w.])\d", name)):
+        return None
+    value = re.sub(r"\s+", " ", m.group("value")).strip()
+    ref = re.sub(r"\s+", " ", m.group("ref")).strip()
+    unit = m.group("unit") or ""
+    v_text = re.fullmatch(_PAIR_TEXT, value, re.I) is not None
+    r_text = re.fullmatch(_PAIR_TEXT, ref, re.I) is not None
+    rng = None if v_text else re.fullmatch("(" + _NUM + r")\s*-\s*(" + _NUM + ")", value)
+    if v_text:
+        value = value.upper()
+    elif rng:
+        value = f"{rng.group(1)}-{rng.group(2)}"
+    else:
+        value = value.replace(" ", "")
+    rr = None if r_text else re.fullmatch("(" + _NUM + r")\s*-\s*(" + _NUM + ")", ref)
+    if r_text:
+        ref = ref[0].upper() + ref[1:].lower()
+    elif rr:
+        ref = f"{rr.group(1)} - {rr.group(2)}"
+    else:
+        ref = ref.replace(" ", "")
+    if v_text and r_text:
+        st = _pair_text_status(value, ref)
+    elif v_text or r_text:
+        st = "unclear"
+    elif rng:
+        a, b = status(rng.group(1), ref), status(rng.group(2), ref)
+        st = a if a == b else "no range" if "no range" in (a, b) else "unclear"
+    else:
+        st = status(value, ref)
+    return {"test": name, "value": value, "unit": unit, "ref": ref,
+            "flag": "*" if m.group("star") else "", "status": st}
+
+
 def parse_results(described) -> list[dict]:
     """Rows from every transcription / text layer (photos are skipped)."""
     rows = []
@@ -562,7 +633,10 @@ def parse_results(described) -> list[dict]:
                 urine_from = None
             if i in used:
                 continue
-            row = parse_line(line) or _parse_nameless(lines, i)
+            row = parse_line(line)
+            if urine_from is not None and (row is None or not row["ref"]):
+                row = _parse_urine_pair(line) or row
+            row = row or _parse_nameless(lines, i)
             if row:
                 _mark_urine(row, urine_from is not None)
                 if not row["ref"] and re.fullmatch(r"(?:[<>]=?)?" + _NUM, row["value"]):
