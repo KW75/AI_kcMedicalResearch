@@ -365,3 +365,12 @@ named when a distinctive English word of its test name appears in the answer;
 for a urine result the word must be in a sentence that says urine or urinary.
 Known limit: a word used in another sense ("C-reactive protein") counts as
 named, so the warning reduces silent omissions but cannot rule them out.
+CKD stage check (Session 51 cont. 13): when the answer names a CKD stage
+("CKD stage 3", "stage 3 CKD", "CKD G3a"), the program compares it with the
+eGFR (the table row; if there is none, an eGFR written in the answer) using the
+KDIGO categories G1 >=90, G2 60-89, G3a 45-59, G3b 30-44, G4 15-29, G5 <15, and
+warns when the stage fits none of the eGFR values. A stage after "not", "rule
+out", "unlikely", "risk of" or "progress to" in the same sentence is skipped.
+Known limit: only the stage is checked against the eGFR; whether CKD is the
+right diagnosis (more than 3 months, markers such as proteinuria) is for the
+clinician.

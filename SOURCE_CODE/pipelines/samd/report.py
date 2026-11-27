@@ -1046,3 +1046,74 @@ def unmentioned_abnormal(rows, answer) -> list:
     if found[True]:
         parts.append("urine: " + ", ".join(found[True]))
     return ["Abnormal results not mentioned in the answer: " + "; ".join(parts)] if parts else []
+
+
+# Session 51 (cont. 13): the CKD stage named in the answer against the eGFR
+# (KDIGO G categories). eGFR from the table; if the table has none, from the
+# answer. Only stage vs eGFR is checked, not whether CKD is the right diagnosis.
+_KDIGO_G = (("G1", 90.0, float("inf")), ("G2", 60.0, 90.0), ("G3a", 45.0, 60.0),
+            ("G3b", 30.0, 45.0), ("G4", 15.0, 30.0), ("G5", 0.0, 15.0))
+_KDIGO_TEXT = {"G1": ">=90", "G2": "60-89", "G3a": "45-59", "G3b": "30-44",
+               "G4": "15-29", "G5": "<15"}
+_STAGE_SETS = {"1": {"G1"}, "2": {"G2"}, "3": {"G3a", "G3b"}, "3a": {"G3a"},
+               "3b": {"G3b"}, "4": {"G4"}, "5": {"G5"}}
+_EGFR_NAME = re.compile(r"(?i)\be?GFR\b|estimated\s+glomerular")
+_EGFR_IN_TEXT = re.compile(r"(?i)\beGFR\b[^.\d<>]{0,40}?(?P<v>(?:[<>]=?\s?)?\d+(?:\.\d+)?)")
+_CKD_STAGE = re.compile(
+    r"(?i)\b(?:CKD|chronic\s+kidney\s+disease)(?:\s*\(CKD\))?[\s,:*-]*(?:stage\s*|G)"
+    r"(?P<a>[1-5])(?P<x>[ab])?(?!\d|\.\d)"
+    r"|\bstage\s*(?P<b>[1-5])(?P<y>[ab])?\s+(?:CKD|chronic\s+kidney\s+disease)")
+_STAGE_SKIP = re.compile(r"(?i)\b(?:not|no|without|rule[sd]?\s+out|exclude[sd]?|unlikely|"
+                         r"risk|progress\w*|prevent\w*|avoid\w*)\b")
+
+
+def _egfr_groups(value: str) -> set:
+    m = re.fullmatch(r"([<>]=?)?(\d+(?:\.\d+)?)", (value or "").replace(" ", ""))
+    if not m:
+        return set()
+    op, n = m.group(1) or "", float(m.group(2))
+    if op.startswith(">"):
+        return {g for g, lo, hi in _KDIGO_G if hi > n}
+    if op.startswith("<"):
+        return {g for g, lo, hi in _KDIGO_G if lo < n}
+    return {g for g, lo, hi in _KDIGO_G if lo <= n < hi}
+
+
+def ckd_stage_mismatch(rows, answer) -> list:
+    """Session 51 (cont. 13): one warning when a CKD stage named in the answer
+    fits none of the eGFR values (KDIGO), or []. A stage after 'not', 'rule
+    out', 'unlikely', 'risk', 'progress' ... in the same sentence is skipped."""
+    text = answer or ""
+    egfr = []
+    for r in rows:
+        if _EGFR_NAME.search(_english_test_name(r.get("test", ""))):
+            g = _egfr_groups(r.get("value", ""))
+            if g:
+                egfr.append((r["value"].replace(" ", ""), "table", g))
+    if not egfr:
+        for m in _EGFR_IN_TEXT.finditer(text):
+            g = _egfr_groups(m.group("v"))
+            if g:
+                egfr.append((m.group("v").replace(" ", ""), "answer", g))
+    if not egfr:
+        return []
+    named = []
+    for s in _sentences(text):
+        for m in _CKD_STAGE.finditer(s):
+            if _STAGE_SKIP.search(s[:m.start()]):
+                continue
+            st = (m.group("a") or m.group("b")) + (m.group("x") or m.group("y") or "").lower()
+            if st not in named:
+                named.append(st)
+    bad = [st for st in named if all(not (_STAGE_SETS[st] & g) for _, _, g in egfr)]
+    if not bad:
+        return []
+    vals = []
+    for v, src, g in egfr:
+        gs = sorted(g)
+        item = (f"eGFR {v} ({src}) = {', '.join(gs)} "
+                f"({', '.join(_KDIGO_TEXT[x] for x in gs)})")
+        if item not in vals:
+            vals.append(item)
+    return ["CKD stage in the answer does not match the eGFR (KDIGO): stage "
+            + ", ".join(bad) + " named; " + "; ".join(vals)]
