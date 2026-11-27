@@ -48,8 +48,8 @@ so those catches happen at session open, not mid-work.
 
 | Component      | Status |
 |----------------|--------|
-| Tests | 2265 passed, 10 deselected (Session 51 (cont. 19), +10 tests/test_s51_samd_clause_split.py) |
-| Branch | main = 7fb88c0 (PR #116 merged 2026-11-28 05:44 local, Session 51 (cont. 18), SaMD plural abbreviations (urine), urine ratios, comma lists). Before it: PR #115 afc58c0, PR #114 b032581, PR #113 4db6405 |
+| Tests | 2275 passed, 10 deselected (Session 51 (cont. 20), +10 tests/test_s51_samd_band_name.py) |
+| Branch | main = 105d89d (PR #117 merged 2026-11-28 06:07 local, Session 51 (cont. 19), SaMD in-range result called abnormal, per clause). Before it: PR #116 7fb88c0, PR #115 afc58c0, PR #114 b032581 |
 | CI | PR #9: green (2 of 2) at every Session 41 commit checked and at 545af00, 678fadc, 265fe63 and fc3e79e and b56845d and 569fbb8 and b0cd52a, 86d9a9c, 38ea78a (Session 42), 9b5bc25, e6eb7f6, 359d307, 111178c, cc09801, 1f871ab, d318293, 48a306d, 77c0a4f, 62f3fc5, 6f10383, f38c39b, a573c99, 3055352, 6a84f95, 84e8a6b, 431b9cc, d60aa4a, f7fb082, 6d8fd1b, 4e6ec48, c76dc0e, b9b7204, 87f753e, da71fd5, 932b2f1, 8ed5b11, 40e0fce, 769c51b, 2868e90, 8dc7213, fdc59f7, 3c8c4fb, ad97ab8 (Sessions 43-46; 4487f13 failed CI and was reverted by 3055352). Earlier red at 6d61ed2 (CI .env default reached the SR provider check; fixed via ns.provider_explicit). main: green at d5cdb05 (PR #9, 44147187803), 109d971 (44147671111), 34f710f (PR #10, 44200691154), 8ecbdda (PR #11, 44207187118), b0061b8 (PR #12, 44217821419); earlier aa929ec (PR #8, 1282 passed, 10 deselected, both jobs). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
 | Version | 3.0.0 (bumped Session 50 from 2.8.1 at the user's request: OCR -> Finance PR #94-#95, the OCR menu tweaks, and the author's signature 'Dr. Keith KW CHAN' + https://kw75.github.io/Credential/ (link in magenta) in the banners. Tag v3.0.0 on 3e32b98 (PR #96 merge); GitHub release 'v3.0.0 (Session 50)', Latest, published 2026-11-27 by D:\publish_v300.py after main showed VERSION 3.0.0. The user wrote '3.0'; 3.0.0 is the three-part form every version place uses. 2.8.1: tag v2.8.1 on 859834a, release 'v2.8.1 (Session 50)'.) |
 | SR docs | Readme/readme_sr_pipeline.txt = how the SR pipeline works and why (Appendix A worked example); no how-to. How-to = Readme/flashcard-help.html. study_overrides.yaml format = REVIEWER_GUIDE section 5; control-type subgroups = 5.2. docs/sr/REVIEWER_GUIDE.md = what reviewers check by hand (sections 2.2, 3.1, 3.5, 5, 6 are cited by code/tests/README, keep them; 2.2 item 5 covers the quote gate). Readme/RESOLVED_ISSUES.md and HANDOFF_archive_pre_S19.md removed in Session 41 (739b2ce): read with `git show 2923cc3:Readme/<name>`; local copy D:\AI_kcMedicalResearch_backups\2026-11-14\Readme\ |
@@ -3895,3 +3895,23 @@ Still open: Vitamin D 35.9 called 'insufficient' while in the 'Enough 30-100' ba
 (band-name check; word list needs the user's approval); 'if PSA remains elevated'
 (no number, known limit); the 'x 10^12' exponent may also be read as a value of a
 row valued 10 by _cites_row in other checks (only the in-range clause check is guarded).
+
+## Session 51 (cont. 20) - 2026-11-28
+
+Previous PR: PR #117 (2526e90, merge 105d89d, merged 2026-11-28 06:07 local; CI run 46074448696 green) - SaMD: in-range result called abnormal, per clause.
+
+Run 20261127_234356: Vitamin D 35.9 ng/ml (band 'Enough 30-100') was called
+'insufficient' ("in the 'insufficient' range per source, which defines <10 as
+deficiency, 10-30 as insufficient, and >30 as sufficient"); no check compared band
+names. New report.band_name_mismatch(rows, answer); cli.py calls it after
+denied_urine_findings. Rules approved by the user (Session 51 cont. 19 close):
+1) word list: deficient/deficiency -> Lack/Deficiency band; insufficient/
+insufficiency -> Insufficiency; sufficient/adequate/enough -> Enough/Sufficiency;
+toxic/toxicity/toxicosis/excess -> Toxicosis/Toxicity. 2) A band word right after a
+range and 'as' is a definition (_DEF_BEFORE). 3) Only rows whose band labels are all
+in the list (CPK Female/Male, CEA Non-smoker/Smoker skipped). 4) Per clause
+(_clauses, _clause_cites); negated words skipped (_NEG_BEFORE).
+Tests: tests/test_s51_samd_band_name.py (10; all fail first - new
+function and cli line). Old vs new compared on the saved results.json of the runs.
+Known limits: definitions not in 'range as word' form ('30-100 = sufficient') count
+as claims; 'enough' is a common word (only read in a clause with the value).
