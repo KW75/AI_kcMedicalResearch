@@ -349,3 +349,10 @@ unit is named "- Urine" anywhere. A blood-only test (Sodium, Potassium) below a
 urinalysis section with no "Released By" keeps its name. Known limit: names
 shared with blood tests (Glucose, Protein, Blood, Bilirubin) cannot be told
 apart by name.
+Urine result - reference order (Session 51 cont. 10): some labs print a urine row as
+name, result, reference, unit ("Blood 尿血 Trace * Negative", "Hyaline Cast Nil
+Nil /HPF", "RBC 1 - 2 < 5 cells/ul"). Inside a URINALYSIS section, a line the
+main parser cannot read, or reads without a reference, is read in this order.
+A "*" after the result is the report's flag. TRACE, +, 1+ to 4+ and POSITIVE
+against Negative or Nil are HIGH. Colour / Appearance pairs such as "Yellow
+Yellow" are not read yet.
