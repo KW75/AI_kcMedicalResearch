@@ -417,3 +417,12 @@ markers remain within ...' warns. The warning quotes the whole sentence. For a r
 with only an upper limit ('<5.0') 'low' is not abnormal ('CRP is low at 0.8'); for
 only a lower limit, 'high' is not. For a result of 10, the '10' in 'x 10^12/L' is
 not read as that result.
+
+Band names in the answer (Session 51 cont. 20)
+For a result with labelled bands (Vitamin D: Lack of Vit-D, Insufficiency, Enough,
+Toxicosis), the program warns when a sentence gives the value and calls it by a band
+it is not in ('35.9 ng/ml ... insufficient' with 35.9 in Enough 30-100). Words:
+deficient/deficiency, insufficient/insufficiency, sufficient/adequate/enough,
+toxic/toxicity/toxicosis/excess. A word right after a range and 'as' ('10-30 as
+insufficient') is a definition, and a negated word does not count. Bands for sex or
+smoking (CPK, CEA) are not checked.

@@ -1276,3 +1276,96 @@ def _abnormal_for_row(c: str, r: dict):
             continue
         return m
     return None
+
+# Session 51 (cont. 20): band-name check (word list approved by the user). A 'see
+# bands' row whose band labels are all in the list warns when a clause gives the
+# row's value and names a band the value is not in. A band word right after a range
+# and 'as' ('10-30 as insufficient') is a definition; negated words do not count.
+_BAND_WORDS = (
+    ("insufficient", re.compile(r"(?i)\binsufficien(?:t|cy)\b")),
+    ("deficient", re.compile(r"(?i)\bdeficien(?:t|cy)\b")),
+    ("sufficient", re.compile(r"(?i)\b(?:sufficien(?:t|cy)|adequate|enough)\b")),
+    ("toxic", re.compile(r"(?i)\b(?:toxic(?:ity|osis)?|excess(?:ive)?)\b")),
+)
+_DEF_BEFORE = re.compile(r"(?:[<>]=?\s?|\d\s*[-\u2013\u2014]\s*)" + _NUM
+                         + r"(?:\s*[A-Za-z/]+)?\s+as\s+$", re.I)
+
+
+def _band_kind(label: str):
+    t = label.lower()
+    if "insufficien" in t:
+        return "insufficient"
+    if "deficien" in t or "lack" in t:
+        return "deficient"
+    if "sufficien" in t or "enough" in t or "adequate" in t:
+        return "sufficient"
+    if "toxic" in t:
+        return "toxic"
+    return None
+
+
+def _bands_of(r: dict):
+    """Session 51 (cont. 20): [(label, kind, value_in_band)] for a 'see bands' row,
+    or None when a band label is not in the word list (sex / smoker bands)."""
+    out = []
+    for part in (r.get("ref") or "").split(";"):
+        part = part.strip()
+        if not part:
+            continue
+        m = _CRIT.search(part)
+        label = (part[:m.start()] if m else part).strip()
+        kind = _band_kind(label)
+        if kind is None:
+            return None
+        out.append((label, kind, "(value in band)" in part))
+    return out or None
+
+
+def band_name_mismatch(rows, answer) -> list:
+    """Session 51 (cont. 20): warnings for a band name in the answer that does not
+    match the band the value is in ('35.9 ng/ml ... insufficient' with 35.9 in
+    'Enough 30-100')."""
+    out = []
+    sentences = _sentences(answer or "")
+    for r in rows:
+        if r.get("status") != "see bands":
+            continue
+        bands = _bands_of(r)
+        if not bands:
+            continue
+        inside = {k for _, k, hit in bands if hit}
+        kinds = {k for _, k, _ in bands}
+        if not inside:
+            continue
+        found = None
+        for s in sentences:
+            for c in _clauses(s):
+                if not _clause_cites(c, r):
+                    continue
+                t = c.replace("*", "")
+                for kind, pat in _BAND_WORDS:
+                    if kind in inside or kind not in kinds:
+                        continue
+                    for m in pat.finditer(t):
+                        before = t[:m.start()]
+                        if _DEF_BEFORE.search(before):
+                            continue
+                        if _NEG_BEFORE.search(re.split(r"[,;:()]", before)[-1]):
+                            continue
+                        found = (m.group(0), s)
+                        break
+                    if found:
+                        break
+                if found:
+                    break
+            if found:
+                break
+        if found:
+            word, s = found
+            q = s.strip()
+            q = q if len(q) <= 200 else q[:197] + "..."
+            label = "; ".join(lb for lb, _, hit in bands if hit)
+            what = " ".join(x for x in (r.get("test"), r.get("value"), r.get("unit")) if x)
+            out.append(f'The answer may name the wrong band: {what} is in "{label}"; '
+                       f'the answer says "{word}": "{q}"')
+    return out
