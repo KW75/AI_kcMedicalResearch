@@ -1042,7 +1042,9 @@ def unmentioned_abnormal(rows, answer) -> list:
     """Session 51 (cont. 12): one warning listing abnormal results the answer
     never names (urine results grouped, repeated names once), or []. Known
     limit: a word used in another sense ('C-reactive protein') counts as named."""
-    sentences = _sentences(answer or "")
+    sentences = [_RATIO_PHRASE.sub(" ratio ", s)  # Session 51 (cont. 18)
+                 for s in _sentences(answer or "")]
+    urine_sentences = [_PLURAL_ABBR.sub(r"\1", s) for s in sentences]
     found = {False: [], True: []}
     for r in rows:
         st = r.get("status")
@@ -1050,7 +1052,7 @@ def unmentioned_abnormal(rows, answer) -> list:
             continue
         urine = " - Urine" in r.get("test", "") or bool(_PER_FIELD.search(r.get("unit") or ""))
         name = _english_test_name(r.get("test", ""))
-        if not name or _is_mentioned(name, urine, sentences, r.get("value") or ""):
+        if not name or _is_mentioned(name, urine, urine_sentences if urine else sentences, r.get("value") or ""):
             continue
         if name.lower() not in [n.lower() for n in found[urine]]:
             found[urine].append(name)
@@ -1187,7 +1189,7 @@ _DENIED_TERMS = (
     (r"ketonuria", ("ketone",)),
 )
 _DENY_RE = [(re.compile(r"(?i)\b(?:no|not|without|absence\s+of|negative\s+for|nil)\b"
-                        r"(?:\s+[\w-]+){0,3}?\s+(?:" + t + r")\b"), keys)
+                        r"(?:,?\s+(?!(?:but|however|although|though|yet|whereas|except)\b)[\w-]+){0,3}?,?\s+(?:" + t + r")\b"), keys)
             for t, keys in _DENIED_TERMS]
 
 
@@ -1220,3 +1222,10 @@ def denied_urine_findings(rows, answer) -> list:
                               for r in hit)
             out.append(f'The answer may deny an abnormal urine result: {names}: "{q}"')
     return out
+
+# Session 51 (cont. 18): text read by the not-mentioned check (unmentioned_abnormal).
+# A urine albumin/protein-to-creatinine ratio does not name serum Albumin, Protein or
+# Creatinine. 'RBCs' -> 'RBC' only for urine rows: urine 'RBCs/ul' is not blood RBC.
+_RATIO_PHRASE = re.compile(
+    r"(?i)\b(?:albumin|protein)(?:\s*[-:/]\s*|\s+)(?:to(?:\s*-\s*|\s+))?creatinine\s+ratio\b")
+_PLURAL_ABBR = re.compile(r"\b([A-Z]{2,6})s\b")

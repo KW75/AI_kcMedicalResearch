@@ -401,3 +401,10 @@ Denied urine findings and negated words (Session 51 cont. 17)
   Leuk. esterase; Glucose; Ketone) is HIGH. An abnormal word with "no",
   "not", "without", "absence of" or "negative for" up to 3 words before it
   ("no evidence of anaemia") no longer counts as calling a result abnormal.
+
+Plural abbreviations, urine ratios and comma lists (Session 51 cont. 18)
+The not-mentioned check reads 'RBCs' as RBC for urine rows only (urine 'RBCs/ul' does
+not name the blood RBC row). A urine albumin- or protein-to-creatinine ratio does not
+count as naming serum Albumin, Protein or Creatinine. The denied-urine check reads a
+comma list after 'No' ('No proteinuria, haematuria, or ...'); the list stops at but,
+however, although, though, yet, whereas or except.
