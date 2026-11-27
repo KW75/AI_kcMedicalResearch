@@ -1001,7 +1001,7 @@ def write_report(out_dir, md: str, *, title: str, log=print) -> dict:
 _MENTION_COMMON = {"total", "free", "serum", "count", "cell", "cells", "ratio", "test",
                    "level", "urine", "blood", "fasting", "random", "direct", "indirect",
                    "and", "the", "with"}
-_URINE_SENTENCE = re.compile(r"(?i)\burin(?:e|ary)\b")
+_URINE_SENTENCE = re.compile(r"(?i)\burin(?:e|ary|alysis)\b")
 
 
 def _english_test_name(test: str) -> str:
