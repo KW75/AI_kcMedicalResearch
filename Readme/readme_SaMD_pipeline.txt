@@ -314,7 +314,8 @@ Session 51 changes (2026-11-27)
 Urinalysis section (PR #101): rows after URINALYSIS are named "- Urine" until
 "Released By", a page-break line ("--- page N (") or 60 lines, whichever comes
 first. Known limit: a report that ends with another phrase (for example
-"Signed") can still name other rows on the same page "- Urine".
+"Signed") can still name a blood row "- Urine" if its name is also a urine test
+(Glucose, Protein, Blood, Bilirubin); see "Urine names" below.
 
 Other labs' layouts (PR #102): a leading row number is dropped; one up/down
 arrow on a line is the report's H/L flag; the order name - value - range - unit
