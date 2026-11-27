@@ -48,8 +48,8 @@ so those catches happen at session open, not mid-work.
 
 | Component      | Status |
 |----------------|--------|
-| Tests | 2172 passed, 10 deselected (Session 51, +8 tests/test_s51_samd_layouts.py) |
-| Branch | main = 564013c (PR #101 merged 2026-11-27 08:20 local, Session 51, SaMD urine section ends at a page break). Before it: PR #100 7c4bcc3, PR #99 442a6ff, PR #98 7798d16 |
+| Tests | 2180 passed, 10 deselected (Session 51, +8 tests/test_s51_samd_answer_check.py) |
+| Branch | main = fd3761c (PR #102 merged 2026-11-27 10:17 local, Session 51, SaMD reads other labs' layouts). Before it: PR #101 564013c, PR #100 7c4bcc3, PR #99 442a6ff |
 | CI | PR #9: green (2 of 2) at every Session 41 commit checked and at 545af00, 678fadc, 265fe63 and fc3e79e and b56845d and 569fbb8 and b0cd52a, 86d9a9c, 38ea78a (Session 42), 9b5bc25, e6eb7f6, 359d307, 111178c, cc09801, 1f871ab, d318293, 48a306d, 77c0a4f, 62f3fc5, 6f10383, f38c39b, a573c99, 3055352, 6a84f95, 84e8a6b, 431b9cc, d60aa4a, f7fb082, 6d8fd1b, 4e6ec48, c76dc0e, b9b7204, 87f753e, da71fd5, 932b2f1, 8ed5b11, 40e0fce, 769c51b, 2868e90, 8dc7213, fdc59f7, 3c8c4fb, ad97ab8 (Sessions 43-46; 4487f13 failed CI and was reverted by 3055352). Earlier red at 6d61ed2 (CI .env default reached the SR provider check; fixed via ns.provider_explicit). main: green at d5cdb05 (PR #9, 44147187803), 109d971 (44147671111), 34f710f (PR #10, 44200691154), 8ecbdda (PR #11, 44207187118), b0061b8 (PR #12, 44217821419); earlier aa929ec (PR #8, 1282 passed, 10 deselected, both jobs). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
 | Version | 3.0.0 (bumped Session 50 from 2.8.1 at the user's request: OCR -> Finance PR #94-#95, the OCR menu tweaks, and the author's signature 'Dr. Keith KW CHAN' + https://kw75.github.io/Credential/ (link in magenta) in the banners. Tag v3.0.0 on 3e32b98 (PR #96 merge); GitHub release 'v3.0.0 (Session 50)', Latest, published 2026-11-27 by D:\publish_v300.py after main showed VERSION 3.0.0. The user wrote '3.0'; 3.0.0 is the three-part form every version place uses. 2.8.1: tag v2.8.1 on 859834a, release 'v2.8.1 (Session 50)'.) |
 | SR docs | Readme/readme_sr_pipeline.txt = how the SR pipeline works and why (Appendix A worked example); no how-to. How-to = Readme/flashcard-help.html. study_overrides.yaml format = REVIEWER_GUIDE section 5; control-type subgroups = 5.2. docs/sr/REVIEWER_GUIDE.md = what reviewers check by hand (sections 2.2, 3.1, 3.5, 5, 6 are cited by code/tests/README, keep them; 2.2 item 5 covers the quote gate). Readme/RESOLVED_ISSUES.md and HANDOFF_archive_pre_S19.md removed in Session 41 (739b2ce): read with `git show 2923cc3:Readme/<name>`; local copy D:\AI_kcMedicalResearch_backups\2026-11-14\Readme\ |
@@ -3644,4 +3644,41 @@ pooled rows, forest plot and report; D4 'reviewer to confirm' in the RoB table;
 - report.html of run 20261127_083749 was made by the old parser: re-run SaMD.
 - Tests failed first (5 of 8); +8 tests/test_s51_samd_layouts.py;
   2172 passed, 10 deselected.
+- Open: record this PR in HANDOFF in the next PR script.
+
+## Session 51 (cont. 5) - 2026-11-27 - branch s51-samd-answer-check
+
+- Recorded: PR #102 (fd4e3c6, merge fd3761c, merged 2026-11-27 10:17
+  local; CI run 45927223681 green) - SaMD: read other labs' layouts.
+  Failing-first 5 of 8; 2172 passed. Earlier runs parsed the same. Run
+  20261127_083749 old->new: 01 rows 2->8, with range 2->7, flag 0->1,
+  range-line names 2->0; 03 rows 24->54, with range 10->47, flag 0->5,
+  limit-as-value 7->0; 02 unchanged (53 rows, 5 range-note rows remain).
+- User re-ran SaMD (run 20261127_102001, new parser): 6 warnings. Assistant's
+  reading: 5 false - Urea 5.4, Creatinine 88 and 100 in a 'from X to Y'
+  trend sentence ('increased', 'rose'); Protein Total 69 g/L matched
+  'ESR 69 mm/hr'; Glucose 6.4 HIGH 'called normal' in 'above the normal
+  range'. 1 true - 7.0 mmol/L (a diagnostic threshold) not in the sources.
+  Run 083749 earlier: Globulin 19 matched 'CA19-9'.
+- Fix (this PR, check_answer only; table and status unchanged): new
+  _cites_row replaces _value_cited for row matching (in-range check and
+  _row_named): a number glued to letters (CA19-9) or starting a range is
+  not a value; a number followed by a different unit is not that row
+  (IU = U, micro sign = u); in the in-range check, numbers inside 'from X
+  to Y' / 'X -> Y' are skipped. The called-normal check ignores 'above /
+  below / outside / beyond / exceeds / higher than / lower than (the)
+  normal'. _value_cited itself unchanged.
+- Real-run re-check (warning counts only): 20261127_102001 in-range called abnormal 4->0, out-of-range called normal 1->0, numbers not in sources 1->1;
+  20261127_083749 in-range called abnormal 0->0, out-of-range called normal 1->0, numbers not in sources 1->1. Earlier runs: changed in 1 run(s), accepted by the user (--accept-old).
+- Assistant defaults (not confirmed): the unit word list for the unit
+  check; trend skip only in the in-range check (a called-normal sentence
+  with a trend still warns); a number with no unit after it still matches.
+- Not yet checked by the user: report.html of 20261127_102001 (photo T4 /
+  CA19.9 names and ranges, 2025 lipid values).
+- Still open: labelled / sex bands (CPK Female/Male, CEA smoker bands, SCC
+  'Upto', PSA 'under 4 ng/ml', Vit D bands); range-note rows in the 2024
+  PDF; urine names by known tests; 'Signed' / 'Medical Technologist' end
+  no urine section; SaMD readme end-rule lines 156-157, 249.
+- Tests failed first (4 of 8); +8 tests/test_s51_samd_answer_check.py;
+  2180 passed, 10 deselected.
 - Open: record this PR in HANDOFF in the next PR script.
