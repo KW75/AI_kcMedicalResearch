@@ -48,8 +48,8 @@ so those catches happen at session open, not mid-work.
 
 | Component      | Status |
 |----------------|--------|
-| Tests | 2159 passed, 10 deselected (Session 51, +5 tests/test_s51_finance_categories.py) |
-| Branch | main = 442a6ff (PR #99 merged 2026-11-27 07:37 local, Session 51, OCR Finance 19 categories). Before it: PR #98 7798d16, PR #97 74acaff, PR #96 3e32b98 (tag v3.0.0) |
+| Tests | 2164 passed, 10 deselected (Session 51, +5 tests/test_s51_samd_urine_page_end.py) |
+| Branch | main = 7c4bcc3 (PR #100 merged 2026-11-27 07:53 local, Session 51, docs only). Before it: PR #99 442a6ff, PR #98 7798d16, PR #97 74acaff, PR #96 3e32b98 (tag v3.0.0) |
 | CI | PR #9: green (2 of 2) at every Session 41 commit checked and at 545af00, 678fadc, 265fe63 and fc3e79e and b56845d and 569fbb8 and b0cd52a, 86d9a9c, 38ea78a (Session 42), 9b5bc25, e6eb7f6, 359d307, 111178c, cc09801, 1f871ab, d318293, 48a306d, 77c0a4f, 62f3fc5, 6f10383, f38c39b, a573c99, 3055352, 6a84f95, 84e8a6b, 431b9cc, d60aa4a, f7fb082, 6d8fd1b, 4e6ec48, c76dc0e, b9b7204, 87f753e, da71fd5, 932b2f1, 8ed5b11, 40e0fce, 769c51b, 2868e90, 8dc7213, fdc59f7, 3c8c4fb, ad97ab8 (Sessions 43-46; 4487f13 failed CI and was reverted by 3055352). Earlier red at 6d61ed2 (CI .env default reached the SR provider check; fixed via ns.provider_explicit). main: green at d5cdb05 (PR #9, 44147187803), 109d971 (44147671111), 34f710f (PR #10, 44200691154), 8ecbdda (PR #11, 44207187118), b0061b8 (PR #12, 44217821419); earlier aa929ec (PR #8, 1282 passed, 10 deselected, both jobs). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
 | Version | 3.0.0 (bumped Session 50 from 2.8.1 at the user's request: OCR -> Finance PR #94-#95, the OCR menu tweaks, and the author's signature 'Dr. Keith KW CHAN' + https://kw75.github.io/Credential/ (link in magenta) in the banners. Tag v3.0.0 on 3e32b98 (PR #96 merge); GitHub release 'v3.0.0 (Session 50)', Latest, published 2026-11-27 by D:\publish_v300.py after main showed VERSION 3.0.0. The user wrote '3.0'; 3.0.0 is the three-part form every version place uses. 2.8.1: tag v2.8.1 on 859834a, release 'v2.8.1 (Session 50)'.) |
 | SR docs | Readme/readme_sr_pipeline.txt = how the SR pipeline works and why (Appendix A worked example); no how-to. How-to = Readme/flashcard-help.html. study_overrides.yaml format = REVIEWER_GUIDE section 5; control-type subgroups = 5.2. docs/sr/REVIEWER_GUIDE.md = what reviewers check by hand (sections 2.2, 3.1, 3.5, 5, 6 are cited by code/tests/README, keep them; 2.2 item 5 covers the quote gate). Readme/RESOLVED_ISSUES.md and HANDOFF_archive_pre_S19.md removed in Session 41 (739b2ce): read with `git show 2923cc3:Readme/<name>`; local copy D:\AI_kcMedicalResearch_backups\2026-11-14\Readme\ |
@@ -3573,4 +3573,33 @@ pooled rows, forest plot and report; D4 'reviewer to confirm' in the RoB table;
   values) to check whether 60 can be tighter.
 - No code change; tests unchanged: 2159 passed, 10 deselected.
 - README Known Issues #2 and #3 and the older Next work unchanged.
+- Open: record this PR in HANDOFF in the next PR script.
+
+## Session 51 (cont. 3) - 2026-11-27 - branch s51-samd-page-end
+
+- Recorded: PR #100 (fd9aa03, merge 7c4bcc3, merged 2026-11-27 07:53
+  local; CI run 45913379880 green) - docs: Session 51, HANDOFF records
+  PR #99 and the user's decisions.
+- SaMD urine section, measured on the user's runs (counts only):
+  D:\s51_urine_count.py first reported 'no Released By' and 31-38 lines
+  - wrong: it matched 'Released By' at the line start, the code searches
+  anywhere in the line. D:\s51_urine_pages.py follows parse_results
+  exactly: 3 sections (runs 20261120_142307, _152500, _170939), all on
+  page 7 of 7, each ending at 'Released By' after 23-26 lines, 18 rows,
+  no page break inside. The 60-line guard never acted; no past report
+  named another page's rows '- Urine'.
+- Latent gap found: cli.py joins a file's pages ('--- page N (kind) ---')
+  and parse_results reads the joined text, so a section without
+  'Released By' ran into the next page for up to 60 lines.
+- User decision (Session 51, option B over docs-only A): the urine
+  section also ends at a page-break line (report._PAGE_BREAK). 'Released
+  By' and the 60-line guard unchanged (rule 3 otherwise as confirmed).
+- Real-run re-check: rows and rows named Urine per step-2 file the same
+  before and after the change (10 files).
+- SaMD readme lines mentioning the urine section: 6 (not edited
+  here; update in the next docs PR if they describe the end rule).
+- Assistant defaults (not confirmed): page-break pattern '^--- page \d+ \('
+  (the exact cli.py marker); made-up test lines Glucose/Sodium/Potassium.
+- Tests failed first (1 of 5); +5 tests/test_s51_samd_urine_page_end.py;
+  2164 passed, 10 deselected.
 - Open: record this PR in HANDOFF in the next PR script.

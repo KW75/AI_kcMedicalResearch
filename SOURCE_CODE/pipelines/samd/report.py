@@ -293,6 +293,7 @@ _PER_FIELD = re.compile(r"/\s*[HL]PF\b", re.I)
 _URINE_START = re.compile(r"^\s*URINALYSIS\b")  # upper case: not "Urinalysis CLAB-..."
 _URINE_END = re.compile(r"Released By", re.I)
 _URINE_MAX = 60  # lines; guard when no "Released By" follows
+_PAGE_BREAK = re.compile(r"^--- page \d+ \(")  # cli.py joins pages with this line
 
 
 def _mark_urine(row: dict, in_urine: bool = False) -> None:
@@ -323,6 +324,7 @@ def parse_results(described) -> list[dict]:
             if _URINE_START.match(line):
                 urine_from = i
             elif urine_from is not None and (_URINE_END.search(line)
+                                             or _PAGE_BREAK.match(line)
                                              or i - urine_from > _URINE_MAX):
                 urine_from = None
             row = parse_line(line) or _parse_nameless(lines, i)
