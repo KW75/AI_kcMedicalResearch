@@ -48,8 +48,8 @@ so those catches happen at session open, not mid-work.
 
 | Component      | Status |
 |----------------|--------|
-| Tests | 2187 passed, 10 deselected (Session 51, +7 tests/test_s51_samd_labelled_ranges.py) |
-| Branch | main = 30e26f3 (PR #103 merged 2026-11-27 16:14 local, Session 51, SaMD fewer false warnings). Before it: PR #102 fd3761c, PR #101 564013c, PR #100 7c4bcc3 |
+| Tests | 2193 passed, 10 deselected (Session 51, +6 tests/test_s51_samd_note_lines.py) |
+| Branch | main = aec1cd3 (PR #104 merged 2026-11-27 16:42 local, Session 51, SaMD labelled ranges). Before it: PR #103 30e26f3, PR #102 fd3761c, PR #101 564013c |
 | CI | PR #9: green (2 of 2) at every Session 41 commit checked and at 545af00, 678fadc, 265fe63 and fc3e79e and b56845d and 569fbb8 and b0cd52a, 86d9a9c, 38ea78a (Session 42), 9b5bc25, e6eb7f6, 359d307, 111178c, cc09801, 1f871ab, d318293, 48a306d, 77c0a4f, 62f3fc5, 6f10383, f38c39b, a573c99, 3055352, 6a84f95, 84e8a6b, 431b9cc, d60aa4a, f7fb082, 6d8fd1b, 4e6ec48, c76dc0e, b9b7204, 87f753e, da71fd5, 932b2f1, 8ed5b11, 40e0fce, 769c51b, 2868e90, 8dc7213, fdc59f7, 3c8c4fb, ad97ab8 (Sessions 43-46; 4487f13 failed CI and was reverted by 3055352). Earlier red at 6d61ed2 (CI .env default reached the SR provider check; fixed via ns.provider_explicit). main: green at d5cdb05 (PR #9, 44147187803), 109d971 (44147671111), 34f710f (PR #10, 44200691154), 8ecbdda (PR #11, 44207187118), b0061b8 (PR #12, 44217821419); earlier aa929ec (PR #8, 1282 passed, 10 deselected, both jobs). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
 | Version | 3.0.0 (bumped Session 50 from 2.8.1 at the user's request: OCR -> Finance PR #94-#95, the OCR menu tweaks, and the author's signature 'Dr. Keith KW CHAN' + https://kw75.github.io/Credential/ (link in magenta) in the banners. Tag v3.0.0 on 3e32b98 (PR #96 merge); GitHub release 'v3.0.0 (Session 50)', Latest, published 2026-11-27 by D:\publish_v300.py after main showed VERSION 3.0.0. The user wrote '3.0'; 3.0.0 is the three-part form every version place uses. 2.8.1: tag v2.8.1 on 859834a, release 'v2.8.1 (Session 50)'.) |
 | SR docs | Readme/readme_sr_pipeline.txt = how the SR pipeline works and why (Appendix A worked example); no how-to. How-to = Readme/flashcard-help.html. study_overrides.yaml format = REVIEWER_GUIDE section 5; control-type subgroups = 5.2. docs/sr/REVIEWER_GUIDE.md = what reviewers check by hand (sections 2.2, 3.1, 3.5, 5, 6 are cited by code/tests/README, keep them; 2.2 item 5 covers the quote gate). Readme/RESOLVED_ISSUES.md and HANDOFF_archive_pre_S19.md removed in Session 41 (739b2ce): read with `git show 2923cc3:Readme/<name>`; local copy D:\AI_kcMedicalResearch_backups\2026-11-14\Readme\ |
@@ -3725,3 +3725,16 @@ pooled rows, forest plot and report; D4 'reviewer to confirm' in the RoB table;
 - Tests failed first (5 of 7); +7 tests/test_s51_samd_labelled_ranges.py;
   2187 passed, 10 deselected.
 - Open: record this PR in HANDOFF in the next PR script.
+## Session 51 (cont. 7) - 2026-11-27 - SaMD: reference-note lines are not results
+
+- Recorded: PR #104 (cfb89ab, merge aec1cd3, merged 2026-11-27 16:42 local; CI run 45967530896 green) - SaMD: read labelled ranges. 5 of 7 new tests failed first; 2187 passed, 10 deselected.
+- User checked against the PDFs after PR #104 ('all confirmed with pdf'): CPK, CEA, Vitamin D, PSA and SCC rows, and step2_02 line 271 (a lipid risk-factor note, not a result).
+- PR #104 check run showed one new row in the 2024.08 PDF (run 20261127_102001 step2_02 line 271, value 'x-y', status 'see bands'); user chose option A: merge PR #104, remove the row here with the other note rows.
+- Assistant correction: line 274 (name, value, unit, limit) was thought to be a real result left without a range; D:\s51_lipid_look.py showed it already has its range. All 11 rows without a range (or with a range as value) in that file are reference notes.
+- Fix (pipelines/samd/report.py): new _is_note_row; parse_line returns None for a row with no printed range (or a range as the value), no H/L flag, and a note word in the test name (normal, optimal, desirable, borderline, high, low, risk, factor(s), target, patient(s), adult(s), ref, recommended, ideal, goal). 'high/low density' and 'high/low sensitivity' do not count.
+- Rule chosen with D:\s51_note_rule_look.py (read-only): R1 (note word) removes 24 rows: 11 in 20261127_102001 step2_02 and 13 in 20261127_083749 step2_02 (two more there, lines 228 and 230: the same PDF transcribed differently); 0 in every other file. R2 (note word plus colon, '<'/'>' or range value) rejected: it misses the '... - Low risk 9.9' note lines (219, 220).
+- Known limit: a real result with a note word in its name, no printed range and no flag would be dropped.
+- Not changed: 42 rows without a range and without a note word (text results, HbA1c without bands etc.).
+- Tests: +6 (tests/test_s51_samd_note_lines.py), 4 failed first; 2193 passed, 10 deselected.
+- Reports made before this PR (runs 20261127_083749, 20261127_102001) are out of date; re-run SaMD.
+- Open: Readme/readme_SaMD_pipeline.txt not yet updated for PR #101, PR #104 and this PR; '- Urine' naming for known urine tests only; record this PR in HANDOFF in the next PR script.

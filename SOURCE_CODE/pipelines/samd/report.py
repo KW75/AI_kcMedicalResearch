@@ -374,6 +374,25 @@ def _labelled_bands(row: dict, lines: list, i: int) -> set:
     return used
 
 
+
+_NOTE_WORDS = re.compile(r"(?i)\b(?:normal|optimal|desirable|borderline|high|low|risk|"
+                         r"factors?|target|patients?|adults?|ref|recommended|ideal|goal)\b")
+_NOTE_KEEP = re.compile(r"(?i)\b(?:high|low)[\s-]+(?:density|sensitivity)\b")
+
+
+def _is_note_row(row: dict) -> bool:
+    """Session 51 (cont. 7): a reference-note line read as a row ("Normal :
+    < 1.7 mmol/L", "Target in patients 0-1 risk factors : < 3.4 mmol/L").
+    No printed range (or a range as the value), no H/L flag, and a note word
+    in the test name. 'high/low density' and 'high/low sensitivity' do not
+    count, so 'High Sensitivity CRP 0.8 mg/L' stays a result."""
+    if row.get("flag"):
+        return False
+    if row.get("ref") and not re.search(r"\d\s*-\s*\d", str(row.get("value", ""))):
+        return False
+    return bool(_NOTE_WORDS.search(_NOTE_KEEP.sub(" ", row.get("test", ""))))
+
+
 def parse_line(line: str):
     """One result row (dict) or None if the line is not a lab result.
     Session 51: the Session 49 rules run first (_parse_line_v1); then other
@@ -399,6 +418,8 @@ def parse_line(line: str):
         if row:
             if arrow and not row["flag"]:
                 row["flag"] = arrow
+            if _is_note_row(row):
+                return None
             return row
     return None
 
