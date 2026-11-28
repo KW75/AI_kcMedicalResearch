@@ -10,8 +10,9 @@ Clinical Decision Support
 ## Goal
 A local-first Python application that helps medical students, researchers
 and doctors with structured research and clinical workflows. It provides
-eight modes, each built on an AI pipeline, with a ninth (Data Analysis)
-planned.
+eight modes, each built on an AI pipeline, and a ninth, Data Analysis
+(Session 53, being built), which computes every number in Python and calls
+no AI model.
 
 The application runs locally with Ollama by default, so confidential
 documents and patient data stay on the machine. Cloud providers are

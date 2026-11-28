@@ -175,11 +175,15 @@ MODES = [
     ('4',  'Search',        '--mode search'),
     ('5',  'RCT Search',    '--mode rct_search'),
     ('6',  'SR Pipeline',   '--mode sr'),
-    ('7',  'Data Analysis', None),        # coming soon
+    ('7',  'Data Analysis', '--mode data_analysis'),  # Session 53: no AI questions
     ('8',  'OCR',           '--mode ocr'),
     ('9',  'SaMD',          '--mode samd'),
     ('10', 'Setup',         'setup'),     # launcher sub-menu, not a main.py flag
 ]
+
+# Session 53: modes that call no AI model. The launcher runs them straight
+# away: no provider, model or time-limit question.
+NO_AI_MODES = {'--mode data_analysis'}
 
 HELP_FILE = BASE / "Readme" / "flashcard-help.html"
 ENV_FILE     = BASE / ".env"
@@ -1095,8 +1099,15 @@ def main() -> None:
                 safe_input(f'  {INFO}Press Enter to return to menu...{RESET}')
                 continue
 
-            if mode_flag is None:          # 7 Data Analysis
+            if mode_flag is None:          # placeholder entry (none at present)
                 coming_soon(label)
+                continue
+
+            if mode_flag in NO_AI_MODES:   # 7 Data Analysis
+                # Session 53: no AI model, so no provider, model or time limit.
+                cmd = [PYTHON, str(BASE / "SOURCE_CODE" / 'main.py')] + mode_flag.split()
+                _run_cmd(cmd, label=label or '')
+                safe_input(f'  {INFO}Press Enter to return to menu...{RESET}')
                 continue
 
             if mode_flag == 'setup':       # 10 Setup

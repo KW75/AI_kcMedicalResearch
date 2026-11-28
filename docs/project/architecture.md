@@ -27,7 +27,8 @@ only after the cloud gate: the job lists every destination and needs a typed
     |   |   +-- rct_search/    <- Formulator -> Searcher -> Validator
     |   |   +-- sr/            <- systematic review (self-contained)
     |   |   +-- ocr/           <- reader.py, engine.py, cli.py
-    |   |   +-- samd/          <- SaMD clinical decision support (planned, Session 49)
+    |   |   +-- samd/          <- SaMD clinical decision support (built Sessions 49-52; frozen)
+    |   |   +-- data_analysis/ <- statistics computed in Python, no AI (Session 53)
     |   |   +-- shared/        <- cross-pipeline helpers (document reader)
     |   +-- utils/
     +-- scripts/
@@ -59,10 +60,10 @@ only after the cloud gate: the job lists every destination and needs a typed
 ### SOURCE_CODE/main.py
 - CLI argument parsing (parse_args) and run_cli
 - Mode dispatch on --mode: coding, writing, appraisal, search, rct_search,
-  sr, ocr (samd planned)
+  sr, ocr, samd, data_analysis
 - Cloud gate: data_destinations() and confirm_data_destinations(). SR, OCR
   and SaMD call one provider directly (no fallback chain), so they list only
-  the chosen provider
+  the chosen provider. data_analysis calls no AI model, so it lists none
 - Environment loading (.env via python-dotenv)
 
 ### Provider System (SOURCE_CODE/providers.py)
@@ -97,16 +98,20 @@ file in docs/ changes the AI's behaviour without a code change.
 
 ### scripts/launcher.py
 Interactive menu: 1 Coding, 2 Writing, 3 Appraisal, 4 Search, 5 RCT Search,
-6 SR Pipeline, 7 Data Analysis (coming soon), 8 OCR, 9 SaMD (Session 49;
+6 SR Pipeline, 7 Data Analysis (Session 53), 8 OCR, 9 SaMD (Session 49;
 was Dry Run - --dry-run stays a main.py flag, reachable through C Custom
 flags), 10 Setup; C Custom flags, H Help, X Exit. It asks for the provider,
-model and time limit, then runs main.py as a subprocess with stdin, stdout
-and stderr inherited. Modules the launcher imports are stdlib only.
+model and time limit (7 Data Analysis asks none: it uses no AI), then runs
+main.py as a subprocess with stdin, stdout and stderr inherited. Modules the
+launcher imports are stdlib only.
 
-## SaMD Mode (planned, Session 49)
+## SaMD Mode (built Sessions 49-52, frozen)
 Clinical decision support for doctors. Intended use: decision support for a
 clinician, for research and evaluation; not a cleared or certified medical
 device. The clinician makes every decision.
+
+Status: frozen from PR #126 (Session 52): bug fixes only. Known limits:
+Readme/readme_SaMD_pipeline.txt (last section).
 
 | Folder | Content |
 |--------|---------|
@@ -131,6 +136,30 @@ Flow:
 Provider: Ollama by default (vision model from the shared picker); Qwen or
 OpenAI only after the cloud gate. The cloud banner says clinical images and
 case text leave the machine and asks the user to de-identify them.
+
+## Data Analysis Mode (Session 53, being built)
+Statistics on a table of data. Every number is computed by Python (pandas,
+scipy; scikit-learn for the random forest). No AI model is called, so the data
+never leaves the machine and the launcher asks no provider, model or time
+limit.
+
+| Folder | Content |
+|--------|---------|
+| input/data_analysis/ | data tables: .csv and Excel .xlsx |
+| reports/data_analysis/<run_id>/ | run.log and intermediate steps (planned) |
+| output/data_analysis/<run_id>/ | report as .html, .md, .docx (planned, B7) |
+
+Flow:
+
+    launcher 7 -> main.py --mode data_analysis   (no --provider, no --model)
+      -> list .csv / .xlsx files in input/data_analysis/          (B1, built)
+      -> load the table; each column categorical or continuous;
+         missing values reported                                  (B2)
+      -> submenus: Comparison (B3), Effect size (B4),
+         Correlation (B5), Random forest (B6)
+      -> report .html / .md / .docx                               (B7)
+
+Not in the first version: paired tests; models other than random forest.
 
 ## Data Flow
 

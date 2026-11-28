@@ -27,6 +27,10 @@ def _ignored(rel_path: str) -> bool:
     "input/sr/new_overrides.yaml",
     "input/sr/pico_sample.json",
     "input/writing/draft.docx",
+    "input/data_analysis/trial.csv",
+    "input/data_analysis/trial.xlsx",
+    "output/data_analysis/run1/report.html",
+    "reports/data_analysis/run1/run.log",
     "reference/sr_cbt_fibromyalgia/trial1.pdf",
     "reference/sr_cbt_fibromyalgia/paper_text/trial1.txt",
 ])
