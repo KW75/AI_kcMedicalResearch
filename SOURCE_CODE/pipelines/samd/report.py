@@ -1674,3 +1674,132 @@ def _cites_row(s: str, r: dict, num: str, trend: bool = False) -> bool:
     """Session 52 (cont. 2): as before, but a dipstick grade ('1+ protein') is not read
     as the value 1 (false in-range warning for a Basophils 1 % row, run 20261127_173019)."""
     return _cites_row_before_s52c2(_DIPSTICK.sub(" ", s), r, num, trend)
+
+
+# Session 52 (cont. 3): finding words (lymphopenia, anaemia, hypercalcaemia ...) checked
+# against the table: denied while the table shows them, or claimed while it does not.
+_FINDINGS = [
+    ("anaemia", r"an(?:a)?emi(?:a|c)", r"^(?:ha?emoglobin|hb)\b", "LOW"),
+    ("thrombocytopenia", r"thrombocytopeni(?:a|c)", r"^platelets?\b", "LOW"),
+    ("thrombocytosis", r"thrombocytosis", r"^platelets?\b", "HIGH"),
+    ("leukopenia", r"leu[ck]openi(?:a|c)", r"^wbc\b", "LOW"),
+    ("leukocytosis", r"leu[ck]ocytosis", r"^wbc\b", "HIGH"),
+    ("neutropenia", r"neutropeni(?:a|c)", r"^neutrophils?\s+\(absolute\)", "LOW"),
+    ("neutrophilia", r"neutrophilia", r"^neutrophils?\s+\(absolute\)", "HIGH"),
+    ("lymphopenia", r"lympho(?:cyto)?peni(?:a|c)", r"^lymphocytes?\s+\(absolute\)", "LOW"),
+    ("lymphocytosis", r"lymphocytosis", r"^lymphocytes?\s+\(absolute\)", "HIGH"),
+    ("hypoalbuminaemia", r"hypoalbumin(?:a)?emi(?:a|c)", r"^albumin\b", "LOW"),
+    ("hyperglycaemia", r"hyperglyc(?:a)?emi(?:a|c)", r"^glucose\b", "HIGH"),
+    ("hypoglycaemia", r"hypoglyc(?:a)?emi(?:a|c)", r"^glucose\b", "LOW"),
+    ("hypercalcaemia", r"hypercalc(?:a)?emi(?:a|c)", r"^calcium\b", "HIGH"),
+    ("hypocalcaemia", r"hypocalc(?:a)?emi(?:a|c)", r"^calcium\b", "LOW"),
+    ("hyperkalaemia", r"hyperkal(?:a)?emi(?:a|c)", r"^(?:k\s+)?potassium\b", "HIGH"),
+    ("hypokalaemia", r"hypokal(?:a)?emi(?:a|c)", r"^(?:k\s+)?potassium\b", "LOW"),
+    ("hypernatraemia", r"hypernatr(?:a)?emi(?:a|c)", r"^(?:na\s+)?sodium\b", "HIGH"),
+    ("hyponatraemia", r"hyponatr(?:a)?emi(?:a|c)", r"^(?:na\s+)?sodium\b", "LOW"),
+    ("hyperuricaemia", r"hyperuric(?:a)?emi(?:a|c)", r"^uric\s+acid\b", "HIGH"),
+    ("hypercholesterolaemia", r"hypercholesterol(?:a)?emi(?:a|c)",
+     r"^(?:cholesterol,?\s*total|ldl\s+cholesterol)\b", "HIGH"),
+    ("hypertriglyceridaemia", r"hypertriglycerid(?:a)?emi(?:a|c)", r"^triglycerides?\b", "HIGH"),
+    ("hyperbilirubinaemia", r"hyperbilirubin(?:a)?emi(?:a|c)", r"^bili(?:rubin)?\.?\s*total\b", "HIGH"),
+    ("azotaemia", r"azot(?:a)?emi(?:a|c)", r"^urea\b", "HIGH"),
+]
+_FINDINGS = [(lab, re.compile(r"(?i)\b" + w + r"\b"), re.compile(n), st) for lab, w, n, st in _FINDINGS]
+_FIND_CUT = re.compile(r"(?i)(?<!\d)[.;:](?!\d)|\b(?:but|however|although|though|whereas|yet|except|while)\b")
+_FIND_NEG = re.compile(r"(?i)\b(?:no|not|without|absence\s+of|neither|nor|free\s+of)\b")
+_FIND_NEG_BLOCK = re.compile(
+    r"(?i)^(?:no|not|without)\s+(?:\w+\s+){0,2}?(?:mention|data|information|history|records?|details"
+    r"|documentation|symptoms?|signs?|features?|complaints?)\b|^not\s+(?:exclud\w*|rul\w*|only|just)\b")
+_FIND_AFTER_NEG = re.compile(
+    r"(?i)^\s*(?:is|are|was|were|has\s+been|have\s+been)?\s*(?:absent|excluded|ruled\s+out"
+    r"|not\s+(?:present|seen|detected|found|evident|noted|shown|indicated|suggested|supported))\b")
+_FIND_HEDGE = re.compile(
+    r"(?i)\b(?:rul(?:e|es|ed|ing)\s+out|exclud\w*|screen\w*\s+for|assess\w*\s+for|evaluat\w*\s+for"
+    r"|check\w*\s+for|test\w*\s+for|monitor\w*\s+for|look\w*\s+for|risk\s+of|prevent\w*"
+    r"|progress\w*\s+to|lead\w*\s+to|caus\w*|differentiat\w*|distinguish\w*|whether)\b")
+_FIND_SOFT = re.compile(r"(?i)\b(?:unlikely|less\s+likely|not\s+supported|ruled\s+out"
+                        r"|typically|usually|classically|characteri[sz]ed\s+by"
+                        r"|would\s+(?:be\s+)?(?:considered|suspected|expected)"
+                        r"|if\s+(?:\w+\s+){0,3}(?:were|was)\s+(?:low|high|abnormal|present|reduced|raised))\b")
+_FIND_AFTER_HEDGE = re.compile(r"(?i)^\s*(?:develops?|occurs?|arises?|is\s+suspected)\b")
+
+
+def _finding_mode(s: str, m) -> str:
+    """Session 52 (cont. 3): 'denied', 'claim' or 'other' (hedged, 'no symptoms of', ...)."""
+    head = re.sub(r"^\s*(?:[-*\u2022]|\d+[.)])\s*", "", s)
+    off = len(s) - len(head)
+    d = re.search(r"\s[\u2013\u2014-]\s", head)
+    if d and m.end() <= off + d.start() and len(re.findall(r"[A-Za-z]+", head[:d.start()])) <= 8:
+        return "other"   
+    before = _FIND_CUT.split(s[:m.start()])[-1]
+    after = _FIND_CUT.split(s[m.end():])[0]
+    negs = list(_FIND_NEG.finditer(before))
+    if negs:
+        n = negs[-1]
+        if _FIND_NEG_BLOCK.match(before[n.start():]):
+            return "other"
+        if len(re.findall(r"[A-Za-z]+", before[n.end():])) <= 8:
+            return "denied"
+    if _FIND_AFTER_NEG.match(after):
+        return "denied"
+    if _FIND_HEDGE.search(before) or _FIND_SOFT.search(before + " " + after) or _FIND_AFTER_HEDGE.match(after):
+        return "other"
+    return "claim"
+
+
+def _finding_rows(rows, name_re):
+    return [r for r in rows if " - Urine" not in r.get("test", "")
+            and name_re.search(_english_test_name(r.get("test", "")).lower())]
+
+
+def _finding_row_text(r) -> str:
+    head = " ".join(x for x in (r.get("test", ""), r.get("value", ""), r.get("unit") or "") if x)
+    return f"{head} (range {r.get('ref') or '-'})"
+
+
+def _finding_quote(s: str) -> str:
+    s = s.strip()
+    return s if len(s) <= 200 else s[:200] + "..."
+
+
+def _finding_scan(answer, mode):
+    for s in _sentences(answer or ""):
+        t = s.replace("*", "")
+        for lab, word, name_re, want in _FINDINGS:
+            for m in word.finditer(t):
+                if _finding_mode(t, m) == mode:
+                    yield lab, name_re, want, t
+                    break
+
+
+def denied_blood_findings(rows, answer) -> list:
+    """Session 52 (cont. 3): the answer denies a finding ('no significant lymphopenia') that
+    the table shows (Lymphocytes (absolute) LOW). One warning per finding word."""
+    out, seen = [], set()
+    for lab, name_re, want, t in _finding_scan(answer, "denied"):
+        if lab in seen:
+            continue
+        bad = [r for r in _finding_rows(rows, name_re) if r.get("status") == want]
+        if bad:
+            seen.add(lab)
+            out.append("The answer may deny an abnormal blood result: "
+                       + "; ".join(_finding_row_text(r) for r in bad) + f': "{_finding_quote(t)}"')
+    return out
+
+
+def unsupported_findings(rows, answer) -> list:
+    """Session 52 (cont. 3): the answer claims a finding ('if hypercalcemia persists', 'mild
+    anaemia') while every matching row in the table is read and none is in that direction."""
+    out, seen = [], set()
+    for lab, name_re, want, t in _finding_scan(answer, "claim"):
+        if lab in seen:
+            continue
+        found = [r for r in _finding_rows(rows, name_re) if r.get("status") in ("HIGH", "LOW", "normal")]
+        if found and not any(r.get("status") == want for r in found):
+            seen.add(lab)
+            table = "; ".join(" ".join(x for x in (r.get("test", ""), r.get("value", ""),
+                                                   r.get("unit") or "", r.get("status", "")) if x)
+                              for r in found)
+            out.append(f"The answer names a finding the lab table does not show: {lab} "
+                       f"(table: {table}): \"{_finding_quote(t)}\"")
+    return out
