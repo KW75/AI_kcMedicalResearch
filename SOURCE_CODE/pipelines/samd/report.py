@@ -1030,7 +1030,7 @@ def _is_mentioned(name: str, urine: bool, sentences, value: str = "") -> bool:
              if len(w) >= 3 and w.lower() not in _MENTION_COMMON]
     if not words:
         words = [w for w in re.findall(r"[A-Za-z]+", name) if len(w) >= 3] or [name]
-    pats = [re.compile(r"(?i)(?<![A-Za-z])" + re.escape(w) + r"(?![A-Za-z])") for w in words]
+    pats = _mention_pats(name, words)  # Session 52 (cont. 1): plurals; A/G
     for s in sentences:
         if urine and not _URINE_SENTENCE.search(s):
             continue
@@ -1445,3 +1445,56 @@ def parse_line(line: str):
     """Session 52: parse_line as before, then Colour-with-reference and Crystals rows."""
     row = _parse_line_before_s52(line)
     return row if row is not None else _parse_s52_extra(line)
+
+
+# Session 52 (cont. 1): plural test names; A/G Ratio named only as A/G; lone '-' unit column.
+_AG_NAME = re.compile(r"(?i)^\s*A\s*/\s*G\b")
+_AG_WORDS = re.compile(r"(?i)(?<![A-Za-z])A\s*/\s*G(?![A-Za-z])"
+                       r"|\balbumin\s*(?:/|:|-?\s*to\s*-?)\s*globulin\b")
+
+
+def _plural_pat(w: str) -> str:
+    """Session 52 (cont. 1): an ordinary test word also matches with a plural 's'
+    ('Platelet' names 'platelets'); short capital forms (RBC, WBC, ESR) stay exact,
+    so urine 'RBCs' never names a blood RBC row."""
+    if w.isupper() or len(w) < 4:
+        return re.escape(w)
+    lw = w.lower()
+    stem = w[:-1] if lw.endswith("s") and not lw.endswith(("ss", "us")) else w
+    return re.escape(stem) + "s?"
+
+
+def _mention_pats(name: str, words) -> list:
+    """Session 52 (cont. 1): patterns that name a row. A/G Ratio is named only by
+    'A/G' or 'albumin/globulin', not by any word 'ratio'."""
+    if _AG_NAME.match(name):
+        return [_AG_WORDS]
+    return [re.compile(r"(?i)(?<![A-Za-z])" + _plural_pat(w) + r"(?![A-Za-z])") for w in words]
+
+
+_DASH_UNIT = re.compile(
+    r"^(?P<name>[A-Za-z][A-Za-z0-9 /().,#%+'-]*?)\s+(?P<value>\d+(?:\.\d+)?)\s*"
+    r"(?P<arrow>[\u2191\u2193])?\s+-\s+(?P<low>\d+(?:\.\d+)?)\s*-\s*(?P<high>\d+(?:\.\d+)?)\s*$")
+
+_parse_line_before_s52c1 = parse_line
+
+
+def _parse_dash_unit(line: str):
+    """Session 52 (cont. 1): a row whose unit column is a lone '-'
+    ('A/G Ratio 2.2 (up arrow) - 0.8 - 2.0'): the dash is dropped and the line is
+    read again by the usual rules; refused unless low <= high and the value is kept."""
+    m = _DASH_UNIT.match(line.strip().translate(_SYMBOLS))
+    if not m or float(m.group("low")) > float(m.group("high")):
+        return None
+    text = " ".join(x for x in (m.group("name").strip(), m.group("value"), m.group("arrow"),
+                                m.group("low") + " - " + m.group("high")) if x)
+    row = _parse_line_before_s52c1(text)
+    if not row or row.get("value") != m.group("value"):
+        return None
+    return row
+
+
+def parse_line(line: str):
+    """Session 52 (cont. 1): parse_line as before, then rows with a lone '-' unit."""
+    row = _parse_line_before_s52c1(line)
+    return row if row is not None else _parse_dash_unit(line)

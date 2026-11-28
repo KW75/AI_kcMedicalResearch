@@ -48,8 +48,8 @@ so those catches happen at session open, not mid-work.
 
 | Component      | Status |
 |----------------|--------|
-| Tests | 2292 passed, 10 deselected (Session 52, +17 tests/test_s52_samd_checks_parser.py) |
-| Branch | main = dbd6ccd (PR #118 merged 2026-11-28 06:21 local, Session 51 (cont. 20), SaMD band name in the answer). Before it: PR #117 105d89d, PR #116 7fb88c0, PR #115 afc58c0 |
+| Tests | 2304 passed, 10 deselected (Session 52, +17 tests/test_s52_samd_checks_parser.py) |
+| Branch | main = 474b299 (PR #119 merged 2026-11-28 06:53 local, Session 52, SaMD units, denials, urine parser leftovers). Before it: PR #118 dbd6ccd, PR #117 105d89d, PR #116 7fb88c0 |
 | CI | PR #9: green (2 of 2) at every Session 41 commit checked and at 545af00, 678fadc, 265fe63 and fc3e79e and b56845d and 569fbb8 and b0cd52a, 86d9a9c, 38ea78a (Session 42), 9b5bc25, e6eb7f6, 359d307, 111178c, cc09801, 1f871ab, d318293, 48a306d, 77c0a4f, 62f3fc5, 6f10383, f38c39b, a573c99, 3055352, 6a84f95, 84e8a6b, 431b9cc, d60aa4a, f7fb082, 6d8fd1b, 4e6ec48, c76dc0e, b9b7204, 87f753e, da71fd5, 932b2f1, 8ed5b11, 40e0fce, 769c51b, 2868e90, 8dc7213, fdc59f7, 3c8c4fb, ad97ab8 (Sessions 43-46; 4487f13 failed CI and was reverted by 3055352). Earlier red at 6d61ed2 (CI .env default reached the SR provider check; fixed via ns.provider_explicit). main: green at d5cdb05 (PR #9, 44147187803), 109d971 (44147671111), 34f710f (PR #10, 44200691154), 8ecbdda (PR #11, 44207187118), b0061b8 (PR #12, 44217821419); earlier aa929ec (PR #8, 1282 passed, 10 deselected, both jobs). Runs only on push to main and PRs to main (ci.yml lines 4-7) |
 | Version | 3.0.0 (bumped Session 50 from 2.8.1 at the user's request: OCR -> Finance PR #94-#95, the OCR menu tweaks, and the author's signature 'Dr. Keith KW CHAN' + https://kw75.github.io/Credential/ (link in magenta) in the banners. Tag v3.0.0 on 3e32b98 (PR #96 merge); GitHub release 'v3.0.0 (Session 50)', Latest, published 2026-11-27 by D:\publish_v300.py after main showed VERSION 3.0.0. The user wrote '3.0'; 3.0.0 is the three-part form every version place uses. 2.8.1: tag v2.8.1 on 859834a, release 'v2.8.1 (Session 50)'.) |
 | SR docs | Readme/readme_sr_pipeline.txt = how the SR pipeline works and why (Appendix A worked example); no how-to. How-to = Readme/flashcard-help.html. study_overrides.yaml format = REVIEWER_GUIDE section 5; control-type subgroups = 5.2. docs/sr/REVIEWER_GUIDE.md = what reviewers check by hand (sections 2.2, 3.1, 3.5, 5, 6 are cited by code/tests/README, keep them; 2.2 item 5 covers the quote gate). Readme/RESOLVED_ISSUES.md and HANDOFF_archive_pre_S19.md removed in Session 41 (739b2ce): read with `git show 2923cc3:Readme/<name>`; local copy D:\AI_kcMedicalResearch_backups\2026-11-14\Readme\ |
@@ -3947,3 +3947,13 @@ Known limit kept: claims with no number ('if PSA remains elevated', 'due to elev
 urea and creatinine'). Still the user's choice: eGFR note '>90' as reference (default
 no). A unit with a different exponent ('4.45 x10(sup)9/L' for RBC) no longer names the
 row. Next: one full SaMD run on the three files.
+
+## Session 52 (cont. 1) - 2026-11-28
+
+- Recorded: PR #119 (27fe6d4, merge 474b299, merged 2026-11-28 06:53 local; CI run 46079183075 green) - SaMD: units, denials, urine parser leftovers.
+- This PR: SaMD 'not mentioned' check accepts plural test words ("platelets" names Platelet Count); short capital forms (RBC, WBC, ESR) stay exact, so urine "RBCs" still never names blood RBC rows.
+- Parser: a result line with a lone '-' in the unit column is read (dash dropped, line read again; refused if low > high or the value changes). Found in run 20261128_065727: the 2024 A/G Ratio row (up arrow, above range) was missing from the table; the AI had read it correctly. The user confirmed the row against the PDF.
+- A/G Ratio counts as named only by "A/G" or "albumin/globulin" (before, any word "ratio", including "albumin-to-creatinine ratio", named it).
+- Tests: 12 new (6 fail first, 6 guards); suite 2304 passed, 10 deselected.
+- Comparisons now rebuild each run's table from case.md with old and new parser; the old rebuild of the newest run equals its results.json.
+- Open: claims without numbers (e.g. "normal albumin levels" when the 2024 albumin is LOW; "remains elevated"); answers suggesting tests already done (serum albumin, total protein); eGFR ">90" note (default no).
