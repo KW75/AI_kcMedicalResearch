@@ -435,3 +435,6 @@ Power-of-ten units are compared in one form, so 'x 10^12/L', 'x10e12/L' and
 protein' does not count as naming total protein. Urine Colour/Appearance rows with a
 reference word ('Yellow Yellow': normal when they match) and Crystals rows are read,
 and 'Ep. Cell' is named '- Urine'.
+
+Plural names, lone '-' unit and A/G (Session 52 (cont. 1))
+The 'not mentioned' check accepts a plural 's' on ordinary test words ("platelets" names Platelet Count); short capital forms such as RBC, WBC and ESR stay exact, so urine "RBCs" never names a blood RBC row. A result line whose unit column is a lone '-' ("A/G Ratio 2.2 (up arrow) - 0.8 - 2.0") is now read: the dash is dropped and the line is read again by the usual rules (refused if low > high or the value changes). A/G Ratio counts as named only by "A/G" or "albumin/globulin", not by any word "ratio".
