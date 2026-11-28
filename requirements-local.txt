@@ -30,6 +30,9 @@ docx2txt==0.8
 pandas==2.2.2
 numpy==1.26.4
 scipy==1.13.1
+# openpyxl reads .xlsx for data_analysis (Session 53); pandas 3 needs >= 3.1.5
+openpyxl==3.1.5
+et-xmlfile==2.0.0
 matplotlib==3.9.2
 pillow==10.4.0
 
