@@ -2,14 +2,17 @@
 
 Statistics on a table of data. Every number is computed by Python on this
 machine; no AI model is called, so the launcher asks for no provider, model
-or time limit and main.py runs no cloud gate.
+or time limit and main.py runs no cloud gate and checks no API key.
 
 B1: list the .csv and .xlsx files in input/data_analysis/.
-B2 (this step): pick one file (and sheet), read it, show each column's type
-with the reason and its missing values (table.py); save run.log in
-reports/data_analysis/<run_id>/. No cell value is printed or logged.
-Next: B3-B6 add the Comparison, Effect size, Correlation and Random forest
-submenus; B7 writes the report.
+B2: pick one file (and sheet), read it, show each column's type with the
+reason and its missing values (table.py); save run.log in
+reports/data_analysis/<run_id>/.
+B3 (this step): analysis menu, 1 = Comparison (compare.py): an outcome column
+across the groups of a categorical column. Group labels and summaries per
+group are printed; a single cell value never is.
+Next: B4-B6 add Effect size, Correlation and Random forest; B7 writes the
+report.
 """
 from __future__ import annotations
 
@@ -20,6 +23,7 @@ INPUT_EXT = {".csv", ".xlsx"}
 LOCAL_LINE = ("[LOCAL] No AI model is used: every number is computed by "
               "Python on this machine. Your data does not leave it.")
 XLS_HINT = " - old Excel format: open it in Excel and save it as .xlsx"
+MENU_PROMPT = "Analysis (1 = Comparison, Enter or 0 = stop): "
 
 
 def input_dir(base_dir) -> Path:
@@ -86,6 +90,47 @@ def choose_sheet(sheets, input_fn=input, say=print):
     return None
 
 
+def pick_column(df, prompt, input_fn=input, say=print):
+    """A column by its # in the column table; None if the answer is not valid."""
+    answer = input_fn(prompt).strip()
+    if answer.isdigit() and 1 <= int(answer) <= df.shape[1]:
+        return int(answer) - 1
+    say(f"Not a valid column number: {answer or '(empty)'}.")
+    return None
+
+
+def analysis_menu(df, input_fn=input, say=print) -> None:
+    """1 = Comparison (repeatable); Enter or 0 = stop."""
+    from . import compare
+
+    while True:
+        say("")
+        answer = input_fn(MENU_PROMPT).strip()
+        if answer in ("", "0"):
+            return
+        if answer != "1":
+            say(f"Not a valid choice: {answer}.")
+            continue
+        say("Comparison: choose the columns by their # in the table above.")
+        oi = pick_column(df, "Outcome column number: ", input_fn, say)
+        if oi is None:
+            continue
+        gi = pick_column(df, "Group column number (categorical): ", input_fn, say)
+        if gi is None:
+            continue
+        if oi == gi:
+            say("Outcome and group must be different columns.")
+            continue
+        try:
+            res = compare.compare(df.iloc[:, oi], df.iloc[:, gi])
+        except compare.CompareError as e:
+            say(f"Comparison not run: {e}")
+            continue
+        say("")
+        for line in res["lines"]:
+            say(line)
+
+
 def _write_log(run_dir: Path, lines) -> Path:
     run_dir.mkdir(parents=True, exist_ok=True)
     p = run_dir / "run.log"
@@ -95,7 +140,7 @@ def _write_log(run_dir: Path, lines) -> Path:
 
 
 def run(base_dir, *, say=print, input_fn=input, now=None) -> list[str]:
-    """List the data files, read the chosen one, describe its columns.
+    """List the data files, read the chosen one, describe it, run the menu.
 
     Returns the usable file names in input/data_analysis/.
     """
@@ -149,9 +194,9 @@ def run(base_dir, *, say=print, input_fn=input, now=None) -> list[str]:
     show("")
     for line in table.report_lines(name, df, sheet):
         show(line)
+    analysis_menu(df, input_fn, show)
     show("")
-    show("The analysis menus (Comparison, Effect size, Correlation, Random forest) "
-         "come in the next updates.")
+    show("Effect size, Correlation and Random forest come in the next updates.")
     p = _write_log(run_dir, log)
     say(f"Run log: {p}")
     return usable

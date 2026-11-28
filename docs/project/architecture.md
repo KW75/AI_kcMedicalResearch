@@ -147,7 +147,7 @@ limit.
 | Folder | Content |
 |--------|---------|
 | input/data_analysis/ | data tables: .csv and Excel .xlsx |
-| reports/data_analysis/<run_id>/ | run.log (B2; names and counts only, no cell values) |
+| reports/data_analysis/<run_id>/ | run.log (names, counts, group labels and per-group summaries; no single cell value) |
 | output/data_analysis/<run_id>/ | report as .html, .md, .docx (planned, B7) |
 
 Flow:
@@ -156,7 +156,7 @@ Flow:
       -> list .csv / .xlsx files in input/data_analysis/          (B1, built)
       -> load the table; each column categorical or continuous;
          missing values reported                                  (B2, built)
-      -> submenus: Comparison (B3), Effect size (B4),
+      -> submenus: Comparison (B3, built), Effect size (B4),
          Correlation (B5), Random forest (B6)
       -> report .html / .md / .docx                               (B7)
 

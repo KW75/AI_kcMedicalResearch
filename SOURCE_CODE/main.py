@@ -2302,7 +2302,9 @@ def run_cli(args: argparse.Namespace) -> None:
         or args.help_guide
         or args.dry_run
     )
-    if not non_ai_flags:
+    # Session 53: data_analysis calls no AI model, so it needs no API key and
+    # no cloud consent, whatever provider .env or --provider names.
+    if not non_ai_flags and args.mode != "data_analysis":
         try:
             validate_api_keys(args.provider)
         except (EnvironmentError, ValueError) as e:
