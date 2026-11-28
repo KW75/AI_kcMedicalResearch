@@ -52,6 +52,8 @@ def _run(tmp_path, answers=()):
     asked = []
 
     def fake_input(prompt):
+        if prompt.startswith("Analysis"):   # B3 analysis menu: 0 = stop
+            return "0"
         asked.append(prompt)
         if not answers:
             raise AssertionError(f"unexpected question: {prompt}")

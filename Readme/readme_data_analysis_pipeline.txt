@@ -8,11 +8,11 @@ table from the moment it is chosen, which method is used at each step, and
 why. It is not a user guide. To start a run: launcher menu 7, or main.py
 --mode data_analysis. The code is in SOURCE_CODE/pipelines/data_analysis/
 (cli.py = the steps and questions; table.py = reading the table, column
-types, missing values).
+types, missing values; compare.py = the Comparison tests).
 
-Status: being built (Session 53). Built so far: B1 (file list) and B2 (read
-one table, column types, missing values). Planned: B3 Comparison, B4 Effect
-size, B5 Correlation, B6 Random forest, B7 report files.
+Status: being built (Session 53). Built so far: B1 (file list), B2 (read
+one table, column types, missing values) and B3 (Comparison). Planned: B4
+Effect size, B5 Correlation, B6 Random forest, B7 report files.
 
 Contents
   1. What this mode is, and what it is not
@@ -24,6 +24,7 @@ Contents
        3.4 Column types
        3.5 Notes on a column
        3.6 Run log
+       3.7 Comparison
   4. Honest limitations
 
 
@@ -49,8 +50,11 @@ design.
 
 - No AI, local only. The data never leaves the machine.
 - Every number from Python, never from a language model.
-- The screen and run.log show column names and counts only, never a cell
-  value, so the output can be shared without exposing patient data.
+- The screen and run.log never show a single cell value. They show column
+  names and counts; a comparison (B3) also shows group labels (only from
+  columns with at most 10 groups) and summaries per group (n, mean, SD,
+  median, IQR, counts and percentages). Check that labels and small groups
+  do not identify anyone before sharing the output.
 - Pinned versions: requirements-local.txt pins pandas, numpy, scipy and
   openpyxl. The code is tested on those pins (CI job test-local-pins) and on
   newer versions (the development venv).
@@ -118,7 +122,42 @@ Two notes point at likely data-entry problems, with counts only:
 
 After a file is chosen, everything printed is also saved in
 reports/data_analysis/<run_id>/run.log (run_id = YYYYMMDD_HHMMSS). Like the
-screen, it holds no cell values.
+screen, it holds no single cell value.
+
+3.7 Comparison
+
+After the column table, the analysis menu asks: 1 = Comparison, Enter or
+0 = stop. A comparison takes an outcome column and a group column, chosen
+by their # in the column table; several comparisons can be run one after
+another. The group column must be categorical with 2 to 10 groups, so an
+ID or name column cannot be used as groups. Rows with the outcome or the
+group missing are left out of that comparison, and the number left out is
+printed. compare() picks the test by fixed rules.
+
+Continuous outcome. check_normal() judges each group with the Shapiro-Wilk
+test: p below 0.05 = does not look normal. A group with fewer than 3 values,
+or with all values equal, counts as not normal (Shapiro-Wilk cannot judge
+it). Every group needs at least 2 values.
+- 2 groups, every group normal: Welch t test (no equal-variance
+  assumption).
+- 2 groups, any group not normal: Mann-Whitney U (two-sided).
+- 3 or more groups, every group normal: one-way ANOVA.
+- 3 or more groups, any group not normal: Kruskal-Wallis.
+Each group's n, mean, SD, median and IQR (Q1 - Q3) are printed with its
+Shapiro-Wilk result.
+
+Categorical outcome (at most 10 values). The counts form a table of outcome
+values by groups; each cell is printed as n (% of the group).
+- 2 x 2 table with any expected count below 5: Fisher's exact test.
+- otherwise: chi-square test; a 2 x 2 table uses the Yates continuity
+  correction. If a larger table has expected counts below 5, the result
+  carries a warning that the p value may not be reliable: Fisher's exact
+  test for tables larger than 2 x 2 is not available in the pinned scipy
+  (1.13.1).
+
+The result gives the test, the reason it was chosen, the statistic, the
+degrees of freedom where the test has them, and the p value; format_p()
+prints p below 0.001 as "< 0.001". Effect sizes come in B4.
 
 
 ------------------------------------------------------------------------------
@@ -132,3 +171,10 @@ screen, it holds no cell values.
   the header in Excel confuse the reading.
 - One table per run. Paired tests are not in the first version.
 - .xls (old Excel) and other formats are not read.
+- A comparison follows the rules above, not the study design: it does not
+  know about paired or repeated measurements, and it does not adjust p
+  values for several comparisons.
+- One-way ANOVA assumes equal variances in the groups; Welch's ANOVA is not
+  offered.
+- Shapiro-Wilk rarely flags small groups and flags small departures in
+  large groups; the normality decision is a rule, not a judgement.
