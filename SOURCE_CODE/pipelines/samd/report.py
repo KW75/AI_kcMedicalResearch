@@ -1498,3 +1498,179 @@ def parse_line(line: str):
     """Session 52 (cont. 1): parse_line as before, then rows with a lone '-' unit."""
     row = _parse_line_before_s52c1(line)
     return row if row is not None else _parse_dash_unit(line)
+
+
+# Session 52 (cont. 2): white-cell differential re-paired by position (WBC x % check).
+_MENTION_COMMON = set(_MENTION_COMMON) | {"absolute"}
+_DIFF_CELLS = ("Neutrophils", "Lymphocytes", "Monocytes", "Eosinophils", "Basophils")
+_DIFF_NAME = re.compile(r"(?i)^(neutrophils?|lymphocytes?|monocytes?|eosinophils?|basophils?)\b")
+_DIFF_ABS_UNIT = r"x\s*10\s*(?:\^|e)?\s*9\s*/\s*L"
+_DIFF_ITEM = re.compile(r"(?i)^(?P<value>\d+(?:\.\d+)?)\s*(?P<unit>%|" + _DIFF_ABS_UNIT + r")?\s*(?P<ref>.*)$")
+_DIFF_NOVALUE = re.compile(r"(?i)^" + _DIFF_ABS_UNIT + r"(?![A-Za-z])")
+_DIFF_CJK = re.compile(r"^[\s\u3400-\u9fff\uf900-\ufaff()\uff08\uff09,]*")
+
+
+def _diff_stem(s: str) -> str:
+    return s.lower().rstrip("s")
+
+
+def _diff_items(lines):
+    """Session 52 (cont. 2): value lines of the differential block in order, named or not."""
+    start = next((i for i, s in enumerate(lines) if s.strip().lower() == "differential"), None)
+    if start is None:
+        start = next((i for i, s in enumerate(lines) if _DIFF_NAME.match(s.strip())), None)
+    if start is None:
+        return []
+    items, began = [], False
+    for s in lines[start:]:
+        t = s.strip()
+        if t.lower() == "differential":
+            continue
+        if not t:
+            if began:
+                break
+            continue
+        name, cn = "", ""
+        m = _DIFF_NAME.match(t)
+        if m:
+            name = m.group(1)
+            rest = t[m.end():]
+            c = _DIFF_CJK.match(rest)
+            cn = re.sub(r"[^\u3400-\u9fff\uf900-\ufaff]", "", c.group(0))
+            t = rest[c.end():]
+        if _DIFF_NOVALUE.match(t):
+            items.append({"name": name, "cn": cn, "value": None, "kind": "none", "unit": "", "ref": ""})
+            began = True
+            continue
+        m = _DIFF_ITEM.match(t)
+        if not m:
+            break
+        unit = m.group("unit") or ""
+        items.append({"name": name, "cn": cn, "value": m.group("value"),
+                      "kind": "abs" if unit and unit != "%" else "pct",
+                      "unit": unit, "ref": m.group("ref").strip()})
+        began = True
+    return items
+
+
+def _diff_wbc(lines):
+    for s in lines:
+        if re.match(r"(?i)^\s*WBC\b", s) and not re.search(r"(?i)urine|cells?\s*/\s*ul", s):
+            r = parse_line(s)
+            if r and re.search(r"(?i)10\s*(?:\^|e)?\s*9", r.get("unit") or ""):
+                try:
+                    return float(r["value"])
+                except (TypeError, ValueError):
+                    pass
+    return None
+
+
+def _diff_plan(lines) -> dict:
+    """Session 52 (cont. 2): 'ok' (10 values, % / absolute alternating), 'partial'
+    (leading full pairs only), 'missing' (absolute lines without a number), 'fail'
+    (names out of order, odd layout or WBC x % check failed) or 'none'."""
+    items = _diff_items(lines)
+    if not items:
+        return {"status": "none"}
+    if any(it["kind"] == "none" for it in items):
+        return {"status": "missing"}
+    has_abs = any(it["kind"] == "abs" for it in items)
+    stems = [_diff_stem(c) for c in _DIFF_CELLS]
+    named = [_diff_stem(it["name"]) for it in items if it["name"]]
+    if named != stems[:len(named)]:
+        return {"status": "fail" if has_abs else "none"}
+    n, pairs = len(items), 0
+    while (pairs < 5 and 2 * pairs + 1 < n and items[2 * pairs]["kind"] == "pct"
+           and items[2 * pairs + 1]["kind"] == "abs"):
+        pairs += 1
+    full = n == 10 and pairs == 5
+    partial = (1 <= pairs < 5 and n in (2 * pairs, 2 * pairs + 1)
+               and items[-1]["kind"] == ("abs" if n == 2 * pairs else "pct"))
+    if not (full or partial):
+        return {"status": "fail" if has_abs else "none"}
+    wbc = _diff_wbc(lines)
+    if wbc is None:
+        return {"status": "none"}
+    for k in range(pairs):
+        exp = wbc * float(items[2 * k]["value"]) / 100
+        if abs(float(items[2 * k + 1]["value"]) - exp) > max(0.15, 0.15 * exp):
+            return {"status": "fail"}
+    cn = {_diff_stem(it["name"]): it["cn"] for it in items if it["name"] and it["cn"]}
+    specs = [(_DIFF_CELLS[j // 2], it, j % 2 == 1, cn.get(_diff_stem(_DIFF_CELLS[j // 2]), ""))
+             for j, it in enumerate(items)]
+    return {"status": "ok" if full else "partial", "specs": specs, "n": n}
+
+
+def _diff_rows(plan, name):
+    out = []
+    for cell, it, is_abs, cn in plan["specs"]:
+        if is_abs:
+            text = f"{cell} (absolute) {it['value']} {it['unit']} {it['ref']}"
+        else:
+            text = f"{cell} {it['value']} % {it['ref']}"
+        row = parse_line(text.strip())
+        if not row or row.get("value") != it["value"]:
+            return None
+        row["test"] = cell + (" (absolute)" if is_abs else "") + (" " + cn if cn else "")
+        _mark_urine(row, False)
+        row["source"] = name
+        out.append(row)
+    return out
+
+
+_parse_results_before_s52c2 = parse_results
+
+
+def parse_results(described) -> list:
+    """Session 52 (cont. 2): parse_results as before; then a white-cell differential whose
+    names the AI placed on the wrong lines is re-paired by position (report order, % then
+    absolute), only when every pair passes WBC x % = absolute (15%, at least 0.15)."""
+    rows = _parse_results_before_s52c2(described)
+    for name, kind, body in described:
+        if kind == "photo description":
+            continue
+        plan = _diff_plan((body or "").splitlines())
+        if plan["status"] not in ("ok", "partial"):
+            continue
+        new = _diff_rows(plan, name)
+        if not new:
+            continue
+        src_idx = [i for i, r in enumerate(rows) if r.get("source") == name]
+        idx = [i for i in src_idx if " - Urine" not in rows[i].get("test", "")
+               and _DIFF_NAME.match(rows[i].get("test", ""))]
+        at = idx[0] if idx else (src_idx[-1] + 1 if src_idx else len(rows))
+        for i in reversed(idx):
+            del rows[i]
+        rows[at:at] = new
+    return rows
+
+
+def differential_problems(described) -> list:
+    """Session 52 (cont. 2): warnings about the white-cell differential transcription."""
+    out = []
+    for name, kind, body in described:
+        if kind == "photo description":
+            continue
+        plan = _diff_plan((body or "").splitlines())
+        st = plan["status"]
+        if st == "missing":
+            out.append(f"White-cell differential: absolute counts are missing from the "
+                       f"transcription of {name} (unit and range only); only percentages are in the table.")
+        elif st == "partial":
+            out.append(f"White-cell differential: only {plan['n']} of 10 values were read from "
+                       f"{name}; the rest are missing from the transcription.")
+        elif st == "fail":
+            out.append(f"White-cell differential rows of {name} may be mislabelled (WBC x % does "
+                       f"not match the absolute count, or names out of order); check them against the report.")
+    return out
+
+
+# Session 52 (cont. 2): a dipstick grade ('1+', '2+') is not a value.
+_DIPSTICK = re.compile(r"(?<![\dA-Za-z.])\d+\+(?!\d)")
+_cites_row_before_s52c2 = _cites_row
+
+
+def _cites_row(s: str, r: dict, num: str, trend: bool = False) -> bool:
+    """Session 52 (cont. 2): as before, but a dipstick grade ('1+ protein') is not read
+    as the value 1 (false in-range warning for a Basophils 1 % row, run 20261127_173019)."""
+    return _cites_row_before_s52c2(_DIPSTICK.sub(" ", s), r, num, trend)
