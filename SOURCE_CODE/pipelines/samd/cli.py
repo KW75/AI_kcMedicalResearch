@@ -353,6 +353,7 @@ def write_report_step(base_dir, run_id, run_dir, text, described, case,
     warnings = list(warnings) + report.ckd_stage_mismatch(rows, answer)  # Session 51 (cont. 13)
     warnings = list(warnings) + report.denied_urine_findings(rows, answer)  # Session 51 (cont. 17)
     warnings = list(warnings) + report.band_name_mismatch(rows, answer)  # Session 51 (cont. 20)
+    warnings = list(warnings) + report.differential_problems(described)  # Session 52 (cont. 2)
     for w in warnings:
         say("WARNING: " + w)
     if miss:

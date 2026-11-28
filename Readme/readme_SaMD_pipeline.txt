@@ -438,3 +438,6 @@ and 'Ep. Cell' is named '- Urine'.
 
 Plural names, lone '-' unit and A/G (Session 52 (cont. 1))
 The 'not mentioned' check accepts a plural 's' on ordinary test words ("platelets" names Platelet Count); short capital forms such as RBC, WBC and ESR stay exact, so urine "RBCs" never names a blood RBC row. A result line whose unit column is a lone '-' ("A/G Ratio 2.2 (up arrow) - 0.8 - 2.0") is now read: the dash is dropped and the line is read again by the usual rules (refused if low > high or the value changes). A/G Ratio counts as named only by "A/G" or "albumin/globulin", not by any word "ratio".
+
+White-cell differential re-paired by position (Session 52 (cont. 2))
+The AI sometimes writes the differential numbers in the right order (% then absolute for Neutrophils, Lymphocytes, Monocytes, Eosinophils, Basophils) but puts the names on the wrong lines. The block is now re-paired by position, only if the names present are in report order and every pair passes WBC x % = absolute (within 15%, at least 0.15). Absolute rows are named '<cell> (absolute)'. A new warning reports absolute counts missing from the transcription, a partly read block, or a failed check (rows kept as read). The word 'absolute' alone does not name a row.
