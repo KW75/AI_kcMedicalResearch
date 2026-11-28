@@ -1237,7 +1237,7 @@ _PLURAL_ABBR = re.compile(r"\b([A-Z]{2,6})s\b")
 # value ('GGT 10' vs '4.45 x 10(sup)12/L'); other rows read the clause unchanged so
 # 'WBC 4.9 x10e9/L' still matches its unit. For a one-sided range 'low' (range '<X')
 # or 'high' (range '>X') is not an abnormal claim ('CRP is low at 0.8 mg/L (<5.0)').
-_CONTRAST = re.compile(r"\s*;\s*|,?\s*\b(?:but|however|although|though|whereas)\b", re.I)
+_CONTRAST = re.compile(r"\s*;\s*|,?\s*\b(?:but|however|although|though|whereas|[Ww]hile)\b", re.I)
 _EXP_TEN = re.compile(r"([\u00d7xX]\s?)10(?=\s?\^\s?[-\u2212]?\d"
                       r"|\s?[\u207b\u2070\u00b9\u00b2\u00b3\u2074-\u2079]|[eE]\d)")
 _LOW_WORDS = {"low", "decreased", "reduced"}
@@ -1802,4 +1802,93 @@ def unsupported_findings(rows, answer) -> list:
                               for r in found)
             out.append(f"The answer names a finding the lab table does not show: {lab} "
                        f"(table: {table}): \"{_finding_quote(t)}\"")
+    return out
+
+# Session 52 (cont. 5): a white-cell differential whose reference ranges slipped down one
+# line in the transcription (a % line without its range, a lone range line at the end).
+_DIFF_LONE_RANGE = re.compile(r"^[-\u2013]\s*\d")
+_diff_plan_before_s52c5 = _diff_plan
+_diff_rows_before_s52c5 = _diff_rows
+_differential_problems_before_s52c5 = differential_problems
+
+
+def _diff_plan(lines) -> dict:
+    """Session 52 (cont. 5): as before; a block that failed only because its ranges slipped
+    (lone range line(s) at the end, a % line without a range) is re-paired by position when
+    10 values alternate % / absolute, names are in report order and every pair passes
+    WBC x % = absolute. Rows from the first % line without a range on get no range."""
+    plan = _diff_plan_before_s52c5(lines)
+    if plan.get("status") != "fail":
+        return plan
+    items = list(_diff_items(lines))
+    lone = 0
+    while items and not items[-1]["unit"] and _DIFF_LONE_RANGE.match(items[-1]["ref"] or ""):
+        items.pop()
+        lone += 1
+    if not lone or len(items) != 10:
+        return plan
+    if any(it["kind"] != ("pct" if j % 2 == 0 else "abs") for j, it in enumerate(items)):
+        return plan
+    stems = [_diff_stem(c) for c in _DIFF_CELLS]
+    named = [_diff_stem(it["name"]) for it in items if it["name"]]
+    if named != stems[:len(named)]:
+        return plan
+    cut = next((j for j in range(0, 10, 2) if not items[j]["ref"]), None)
+    if cut is None:
+        return plan
+    wbc = _diff_wbc(lines)
+    if wbc is None:
+        return plan
+    for k in range(5):
+        exp = wbc * float(items[2 * k]["value"]) / 100
+        if abs(float(items[2 * k + 1]["value"]) - exp) > max(0.15, 0.15 * exp):
+            return plan
+    cn = {_diff_stem(it["name"]): it["cn"] for it in items if it["name"] and it["cn"]}
+    specs = []
+    for j, it in enumerate(items):
+        cell = _DIFF_CELLS[j // 2]
+        if j >= cut:
+            it = dict(it, ref="")
+        specs.append((cell, it, j % 2 == 1, cn.get(_diff_stem(cell), "")))
+    return {"status": "ok", "specs": specs, "n": 10, "slipped": 10 - cut}
+
+
+def _diff_rows(plan, name):
+    """Session 52 (cont. 5): rows whose range could not be matched get status 'no range'."""
+    if not plan.get("slipped"):
+        return _diff_rows_before_s52c5(plan, name)
+    out = []
+    for cell, it, is_abs, cn in plan["specs"]:
+        if it["ref"]:
+            one = _diff_rows_before_s52c5({"specs": [(cell, it, is_abs, cn)]}, name)
+            if not one:
+                return None
+            out.extend(one)
+            continue
+        unit = it["unit"] if is_abs else "%"
+        test = cell + (" (absolute)" if is_abs else "")
+        row = parse_line(f"{test} {it['value']} {unit}")
+        if (not row or row.get("value") != it["value"] or row.get("ref")
+                or row.get("status") != "no range"):
+            row = {"test": test, "value": it["value"], "unit": unit, "ref": "",
+                   "flag": "", "status": "no range"}
+        row["unit"] = unit
+        row["test"] = test + (" " + cn if cn else "")
+        _mark_urine(row, False)
+        row["source"] = name
+        out.append(row)
+    return out
+
+
+def differential_problems(described) -> list:
+    """Session 52 (cont. 5): as before, plus a warning when slipped ranges were dropped."""
+    out = list(_differential_problems_before_s52c5(described))
+    for name, kind, body in described:
+        if kind == "photo description":
+            continue
+        plan = _diff_plan((body or "").splitlines())
+        if plan.get("slipped"):
+            out.append(f"White-cell differential of {name}: the reference ranges of the last "
+                       f"{plan['slipped']} rows did not line up with their values in the "
+                       f"transcription, so those rows show no range; check them against the report.")
     return out

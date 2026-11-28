@@ -64,16 +64,17 @@ def _check_layout(text):
     assert [g[0] for g in got if g[2]] == ["Lymphocytes (absolute)"]
 
 
-def test_prompt_asks_one_line_per_result():
-    assert "write each result on its own line beginning with the test name" in cli.IMAGE_PROMPT
+def test_prompt_one_line_rule_reverted():
+    """Session 52 (cont. 5): the PR #123 sentence was reverted (the model ignored it)."""
+    assert "its own line beginning with the test name" not in cli.IMAGE_PROMPT
 
 
-def test_prompt_asks_absolute_label():
-    assert "add (absolute) after the name on the absolute-count line" in cli.IMAGE_PROMPT
+def test_prompt_absolute_label_reverted():
+    assert "(absolute) after the name" not in cli.IMAGE_PROMPT
 
 
-def test_prompt_names_the_one_exception():
-    assert "add anything, with one exception" in cli.IMAGE_PROMPT
+def test_prompt_old_copy_sentence_back():
+    assert "add anything; write [illegible] for a word you cannot read" in cli.IMAGE_PROMPT
 
 
 def test_prompt_keeps_exact_copy_rules():
