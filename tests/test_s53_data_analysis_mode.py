@@ -36,7 +36,8 @@ def _run(tmp_path, names=()):
     for n in names:
         (d / n).write_text("x", encoding="utf-8")
     lines = []
-    found = _cli().run(tmp_path, say=lines.append)
+    # B2: run() asks when there are several files; 0 = stop.
+    found = _cli().run(tmp_path, say=lines.append, input_fn=lambda prompt: "0")
     return found, "\n".join(lines)
 
 

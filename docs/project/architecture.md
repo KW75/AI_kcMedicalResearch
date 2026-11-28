@@ -44,7 +44,8 @@ only after the cloud gate: the job lists every destination and needs a typed
     +-- assets/                <- icon files (.ico, .png) for desktop shortcuts:
     |                             app, input, output, reports
     +-- Readme/                <- HANDOFF.md, flashcard-help.html (launcher H),
-    |                             readme_sr_pipeline.txt
+    |                             readme_sr_pipeline.txt, readme_SaMD_pipeline.txt,
+    |                             readme_data_analysis_pipeline.txt
     +-- input/<mode>/          <- user files (gitignored, except
     |                             input/sr/study_overrides.yaml)
     +-- output/<mode>/         <- final results (gitignored)
@@ -146,7 +147,7 @@ limit.
 | Folder | Content |
 |--------|---------|
 | input/data_analysis/ | data tables: .csv and Excel .xlsx |
-| reports/data_analysis/<run_id>/ | run.log and intermediate steps (planned) |
+| reports/data_analysis/<run_id>/ | run.log (B2; names and counts only, no cell values) |
 | output/data_analysis/<run_id>/ | report as .html, .md, .docx (planned, B7) |
 
 Flow:
@@ -154,7 +155,7 @@ Flow:
     launcher 7 -> main.py --mode data_analysis   (no --provider, no --model)
       -> list .csv / .xlsx files in input/data_analysis/          (B1, built)
       -> load the table; each column categorical or continuous;
-         missing values reported                                  (B2)
+         missing values reported                                  (B2, built)
       -> submenus: Comparison (B3), Effect size (B4),
          Correlation (B5), Random forest (B6)
       -> report .html / .md / .docx                               (B7)
