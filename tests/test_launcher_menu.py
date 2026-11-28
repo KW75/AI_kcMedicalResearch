@@ -1,6 +1,7 @@
 """Launcher main menu (Session 33).
 
-7 Data Analysis is a placeholder, 8 OCR, 9 SaMD (was Dry Run), 10 Setup.
+7 Data Analysis runs --mode data_analysis with no AI questions (Session 53),
+8 OCR, 9 SaMD (was Dry Run), 10 Setup.
 Custom flags moved from 9 to C; H still opens Help. Setup -> Open Help
 opens Readme/flashcard-help.html, found relative to the launcher.
 The Streamlit UI (--ui) is no longer offered.
@@ -52,7 +53,7 @@ def _run_main(launcher, inputs):
 def test_menu_numbers_labels_and_flags(launcher):
     table = {k: (label, flag) for k, label, flag in launcher.MODES}
     assert [k for k, _, _ in launcher.MODES] == [str(n) for n in range(1, 11)]
-    assert table["7"] == ("Data Analysis", None)
+    assert table["7"] == ("Data Analysis", "--mode data_analysis")
     assert table["8"] == ("OCR", "--mode ocr")
     assert table["9"] == ("SaMD", "--mode samd")
     assert table["10"] == ("Setup", "setup")
@@ -92,14 +93,17 @@ def test_prompt_lists_the_new_keys(launcher):
 
 # --- main loop --------------------------------------------------------------
 
-@pytest.mark.parametrize("key, label", [("7", "Data Analysis")])
-def test_placeholders_say_coming_soon_and_run_nothing(launcher, capsys, key, label):
-    run_cmd, pick_provider, _ = _run_main(launcher, [key, "", "X"])
-    out = capsys.readouterr().out
-    assert label in out
-    assert "coming soon" in out.lower()
-    run_cmd.assert_not_called()
+def test_data_analysis_runs_main_without_ai_questions(launcher):
+    # Session 53: menu 7 runs main.py --mode data_analysis. No AI model is
+    # used, so no provider, model or time-limit question is asked.
+    with patch.object(launcher, "time_limit_flag") as tlf:
+        run_cmd, pick_provider, _ = _run_main(launcher, ["7", "", "X"])
+    run_cmd.assert_called_once()
+    cmd = run_cmd.call_args.args[0]
+    assert cmd[-2:] == ["--mode", "data_analysis"]
+    assert str(cmd[1]).endswith("main.py")
     pick_provider.assert_not_called()
+    tlf.assert_not_called()
 
 
 def test_setup_open_help_opens_the_help_page(launcher):

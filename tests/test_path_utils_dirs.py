@@ -33,9 +33,9 @@ def test_data_and_docker_attributes_and_helpers_are_gone(tmp_path):
     assert not hasattr(path_utils, "get_docker_file")
 
 
-# OCR and data_analysis are planned but not runnable modes yet. Git ignores
-# input/*, output/ and reports/, so the app itself must create these folders
-# for colleagues. They get no docs/ folder until the mode code exists.
+# OCR and data_analysis have no docs/ guidelines folder (data_analysis calls
+# no AI model). Git ignores input/*, output/ and reports/, so the app itself
+# must create these folders for colleagues.
 FUTURE_MODES = ("ocr", "data_analysis")
 
 

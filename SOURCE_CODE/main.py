@@ -1,6 +1,6 @@
 """
 main.py  - AI Automation Tool (version: see VERSION below)
-Workflow modes (--mode): coding, writing, rct_search, appraisal, search, sr, ocr, samd.
+Workflow modes (--mode): coding, writing, rct_search, appraisal, search, sr, ocr, samd, data_analysis.
 AI providers: ollama (default when .env sets none; local only), openai, anthropic, deepseek, groq, qwen.
 Each --mode is sent by run_cli() to its own handler or pipeline.
 Coding mode: Builder (pipeline), Reviewer (standalone), Tester (standalone).
@@ -436,6 +436,8 @@ def data_destinations(mode: str, provider: str) -> list[str]:
     SR calls its provider directly (no fallback chain), so it lists only the
     chosen provider. Other modes go through call_ai -> call_ai_with_fallback.
     """
+    if mode == "data_analysis":
+        return []  # Session 53: no AI call; every number is computed by Python
     if mode in ("sr", "ocr", "samd"):
         return [provider]
     return provider_attempt_order(provider, _fallback_chain_from_env())
@@ -462,6 +464,11 @@ def confirm_data_destinations(
             stdin_is_tty = sys.stdin.isatty()
         except Exception:
             stdin_is_tty = False
+
+    if mode == "data_analysis":
+        # Session 53: no AI call, so nothing to confirm; the pipeline prints
+        # its own [LOCAL] line.
+        return True
 
     services = SEARCH_SERVICES.get(mode, [])
     cloud = [p for p in data_destinations(mode, provider)
@@ -2087,6 +2094,7 @@ def parse_args(args: list[str] | None = None) -> argparse.Namespace:
             "  python SOURCE_CODE/main.py --mode appraisal          # appraisal mode\n"
             "  python SOURCE_CODE/main.py --mode search             # medical search\n"
             "  python SOURCE_CODE/main.py --mode sr                 # SR pipeline\n"
+            "  python SOURCE_CODE/main.py --mode data_analysis      # statistics, no AI\n"
             "  python SOURCE_CODE/main.py --model llama3.2:3b       # different model\n"
             "  python SOURCE_CODE/main.py --provider qwen           # use Qwen\n"
             "  python SOURCE_CODE/main.py --list-sessions           # list transcripts\n"
@@ -2099,7 +2107,8 @@ def parse_args(args: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--model",          type=str, default=None)
     parser.add_argument("--mode",           type=str, default="coding",
                         choices=["coding", "writing", "rct_search",
-                                 "appraisal", "search", "sr", "ocr", "samd"])
+                                 "appraisal", "search", "sr", "ocr", "samd",
+                                 "data_analysis"])
     parser.add_argument("--report",         action="store_true", default=False,
                         help="Generate a writing report from input/writing/ files")
     parser.add_argument("--revise",         action="store_true", default=False,
@@ -2388,6 +2397,10 @@ def run_cli(args: argparse.Namespace) -> None:
             confirm=lambda p: confirm_data_destinations(
                 "samd", p, confirm_cloud=args.confirm_cloud),
         )
+    elif args.mode == "data_analysis":
+        # Session 53: no AI model, so no provider, model or cloud gate.
+        from pipelines.data_analysis import cli as data_analysis_cli
+        data_analysis_cli.run(BASE_DIR)
     elif args.mode == "appraisal":
         handle_appraisal_mode(
             provider=args.provider,
