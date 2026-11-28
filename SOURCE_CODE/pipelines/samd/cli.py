@@ -44,11 +44,7 @@ IMAGE_PROMPT = (
     "report, results table, letter, prescription), otherwise TYPE: PHOTO. "
     "Then, for TEXT: transcribe all text exactly as written, keeping line "
     "breaks, numbers, units, reference ranges and flags (H, L, *); do not "
-    "summarise, correct or add anything, with one exception: if a test has "
-    "more than one result (for example a percentage and an absolute count), "
-    "write each result on its own line beginning with the test name, and add "
-    "(absolute) after the name on the absolute-count line. Write [illegible] "
-    "for a word you "
+    "summarise, correct or add anything; write [illegible] for a word you "
     "cannot read. For PHOTO: describe only what is visible (body site, "
     "size, colour, shape, border, surface, distribution, any scale or "
     "ruler) in plain words; do not name a diagnosis. Write symbols as "
@@ -206,6 +202,7 @@ def choose_call(provider, model, *, confirm=None, input_fn=input, log=print,
         log(f"SaMD: {provider} cannot read clinical photos and lab images. "
             f"Use ollama (local), qwen or openai.")
         return None
+    log(_WAIT_CHECKING)  # Session 52 (cont. 5)
     if model:
         caps_fn = caps_fn or _ollama().model_capabilities
         try:
@@ -218,6 +215,7 @@ def choose_call(provider, model, *, confirm=None, input_fn=input, log=print,
                 f"{ocr_cli.DEFAULT_VISION_MODEL}.")
             return None
         log(f"AI: Ollama {model} (local).")
+        log(_WAIT_LOADING)  # Session 52 (cont. 5)
         return engine.ollama_call(model)
     models = (models_fn or _local_vision_models)()
     if models:
@@ -228,6 +226,7 @@ def choose_call(provider, model, *, confirm=None, input_fn=input, log=print,
             log("No model chosen.")
             return None
         log(f"AI: Ollama {name} (local).")
+        log(_WAIT_LOADING)  # Session 52 (cont. 5)
         return engine.ollama_call(name)
     log(f"No pulled Ollama model can read images. Run: ollama pull "
         f"{ocr_cli.DEFAULT_VISION_MODEL}, or pull one in launcher "
@@ -422,6 +421,7 @@ def run(base_dir, model=None, *, provider="ollama", confirm=None,
               "ai_called": False, "answer": None, "report": None,
               "warnings": []}
     try:
+        say(_WAIT_READING)  # Session 52 (cont. 5)
         sources = read_sources(folder, files, say)
         if sources is None:
             return result
@@ -469,3 +469,9 @@ def run(base_dir, model=None, *, provider="ollama", confirm=None,
         return result
     finally:
         _write_log(run_dir, lines)
+
+# Session 52 (cont. 5): wait messages (a long silent pause looked like a hang).
+_WAIT_READING = "Reading the chosen files (PDF pages are turned into images); please wait..."
+_WAIT_CHECKING = "Checking the local AI models (Ollama); please wait..."
+_WAIT_LOADING = ("Loading the local AI model. The first reply can take a few minutes; "
+                 "please wait...")
