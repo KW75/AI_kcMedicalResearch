@@ -450,3 +450,6 @@ The image prompt (IMAGE_PROMPT in cli.py) keeps its rule to copy text exactly an
 
 Wait messages, slipped differential ranges and 'while' (Session 52 (cont. 5))
 While files are read and PDF pages turned into images, the program says so; with Ollama it also says when it checks the local models and when the model loads (the first reply can take minutes). When a white-cell differential was copied with its reference ranges slipped down one line (a % line without its range, a lone range line at the end), the values are still re-paired by position if the WBC x % check passes, but rows from the first missing range on show no range and a warning asks you to check them against the report. 'While' now splits a sentence into clauses, so 'Elevated PSA (...): While within normal limits ...' is caught as an in-range result called abnormal. The Session 52 (cont. 4) prompt sentence was removed: the model did not follow it.
+
+Urine protein wording and blood group rows (Session 52 (cont. 6))
+'Urine protein', 'urinary protein' and 'protein in the urine' name the urine Protein row only; they no longer count as mentioning serum Protein(Total) in 'Abnormal results not mentioned'. A blood group line such as 'Blood group  O Positive' gives the test 'Blood group' with the value 'O POSITIVE' (no range).
