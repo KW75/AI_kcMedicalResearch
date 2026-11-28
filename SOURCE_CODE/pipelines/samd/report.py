@@ -1046,6 +1046,7 @@ def unmentioned_abnormal(rows, answer) -> list:
     sentences = [_named_protein(_RATIO_PHRASE.sub(" ratio ", s))  # Session 51 (cont. 18)
                  for s in _sentences(answer or "")]
     urine_sentences = [_PLURAL_ABBR.sub(r"\1", s) for s in sentences]
+    sentences = [_URINE_PROTEIN.sub("urine-prot", s) for s in sentences]  # Session 52 (cont. 6): blood rows only
     found = {False: [], True: []}
     for r in rows:
         st = r.get("status")
@@ -1892,3 +1893,22 @@ def differential_problems(described) -> list:
                        f"{plan['slipped']} rows did not line up with their values in the "
                        f"transcription, so those rows show no range; check them against the report.")
     return out
+
+# Session 52 (cont. 6): 'urine protein', 'urinary protein' and 'protein in the urine' do not
+# name serum Protein(Total) (urine rows still read the sentence as written).
+_URINE_PROTEIN = re.compile(r"(?i)\burin(?:e|ary)\s+proteins?\b|\bproteins?\s+(?:in|on)\s+(?:the\s+)?urine\b")
+
+# Session 52 (cont. 6): 'Blood group  O Positive' - the group letter belongs to the value.
+_BLOOD_GROUP = re.compile(r"(?i)^(blood\s+group)\b(.*?)\s+(AB|A|B|O)$")
+_parse_line_before_s52c6 = parse_line
+
+
+def parse_line(line):
+    """Session 52 (cont. 6): as before; a blood group row keeps its letter in the value."""
+    row = _parse_line_before_s52c6(line)
+    if row:
+        m = _BLOOD_GROUP.match(str(row.get("test", "")).strip())
+        if m and re.fullmatch(r"(?i)positive|negative", str(row.get("value", ""))):
+            row["test"] = (m.group(1) + m.group(2)).strip()
+            row["value"] = f"{m.group(3).upper()} {row['value']}"
+    return row
