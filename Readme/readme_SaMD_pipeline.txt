@@ -453,3 +453,20 @@ While files are read and PDF pages turned into images, the program says so; with
 
 Urine protein wording and blood group rows (Session 52 (cont. 6))
 'Urine protein', 'urinary protein' and 'protein in the urine' name the urine Protein row only; they no longer count as mentioning serum Protein(Total) in 'Abnormal results not mentioned'. A blood group line such as 'Blood group  O Positive' gives the test 'Blood group' with the value 'O POSITIVE' (no range).
+
+Known limits and freeze (Session 52 (cont. 7))
+
+Status: the SaMD pipeline is frozen from this PR. Only bug fixes go in; new work goes to the data_analysis pipeline.
+
+It is decision support for a clinician, for research and evaluation. It is not a cleared or certified medical device, and the clinician makes every decision.
+
+Tested on three sample lab reports (bilingual English/Chinese layouts; one scan, two PDFs) with one local model (Ollama qwen3-vl:30b-a3b-instruct). Other labs, layouts and models are untested.
+
+Known limits:
+- Step 2 (the model reading a scan) can shift test names or ranges by one line, mostly in the white-cell differential. The pipeline re-pairs by position only when every WBC x % check passes; otherwise the rows are kept and a warning says they may be mislabelled or have no range.
+- The model does not reliably follow layout instructions in the step-2 prompt (PR #123 asked for one line per result; it was reverted in PR #124).
+- The same model on the same files gives a different answer, and different warnings, on each run.
+- The answer checks are English text patterns. They can miss a paraphrase and can still give a false warning on unusual wording; each warning says 'may'.
+- When the same test name appears on two report dates, one mention can count for both, so a missed abnormal result on the other date is not always listed.
+- Not checked: trend claims across dates (for example 'persistent elevation'), reference ranges quoted from the wrong date, total vs free hormone names, and a urine row such as 'Mucus + +' when the model drops part of the range (status 'unclear').
+- The default time limit is 15 minutes per AI call; a slow machine may need 30.
